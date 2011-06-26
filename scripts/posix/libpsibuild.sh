@@ -512,7 +512,7 @@ prepare_sources() {
     src/plugins/psiplugin.pri
 
   # prepare icons
-  cp -a git-plus/iconsets "${PSI_DIR}/build"
+  cp -a "${PSI_DIR}"/git-plus/iconsets "${PSI_DIR}/build"
 }
 
 prepare_plugins_sources() {
