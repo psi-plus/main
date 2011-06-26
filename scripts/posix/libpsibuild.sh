@@ -30,6 +30,7 @@ TRANSLATIONS="${TRANSLATIONS}"
 GIT_REPO_PSI=git://git.psi-im.org/psi.git
 
 GIT_REPO_PLUS=git://github.com/psi-plus/main.git
+GIT_REPO_PLUGINS=git://github.com/psi-plus/plugins.git
 
 LANGS_REPO_URI="git://pv.et-inf.fho-emden.de/git/psi-l10n"
 RU_LANG_REPO_URI="http://psi-ru.googlecode.com/svn/branches/psi-plus"
@@ -322,24 +323,6 @@ validate_plugins_list() {
     echo "WARNING: there are selected plugins but plugins are disabled in"
     echo "configuration options. no one will be built"
     PLUGINS=""
-  } || {
-    [ -z "${PLUGINS}" ] && return 0
-    echo "Detecting available plugins.."
-    local plugins_tmp=""
-    local require_all_plugins="$([ "$PLUGINS" = "*" ] && echo 1 || echo 0)"
-    local actual_plugins=""
-    for plugins_prefix in $PLUGINS_PREFIXES; do
-      PLUGINS_SVN=`echo $(svn ls ${SVN_BASE_REPO}/plugins/$plugins_prefix | grep 'plugin/')`
-      [ $require_all_plugins = 1 ] && {
-        for p in $PLUGINS_SVN; do actual_plugins="$actual_plugins $plugins_prefix/${p%/}"; done
-      } || {
-        for pn in $PLUGINS; do
-          for p in $PLUGINS_SVN; do [ "${p}" = "${pn}plugin/" ] && actual_plugins="$actual_plugins $plugins_prefix/${p%/}"; done
-        done
-      }
-    done
-    PLUGINS="${actual_plugins}"
-    echo "Enabled plugins:" $(echo $PLUGINS | sed 's:generic/::g')
   }
 }
 
@@ -453,7 +436,24 @@ fetch_sources() {
 }
 
 fetch_plugins_sources() {
-  svn_fetch_set "plugin" "plugins" "${PLUGINS}"
+  git_fetch "${GIT_REPO_PLUGINS}" plugins "Psi+ plugins"
+  [ -z "${PLUGINS}" ] && return 0
+  echo "Validate plugins list.."
+  local plugins_tmp=""
+  local require_all_plugins="$([ "$PLUGINS" = "*" ] && echo 1 || echo 0)"
+  local actual_plugins=""
+  for plugins_prefix in $PLUGINS_PREFIXES; do
+    PLUGINS_ALL=`echo $(ls -F "${PSI_DIR}/plugins/$plugins_prefix" | grep 'plugin/')`
+    [ $require_all_plugins = 1 ] && {
+      for p in $PLUGINS_ALL; do actual_plugins="$actual_plugins $plugins_prefix/${p%/}"; done
+    } || {
+      for pn in $PLUGINS; do
+        for p in $PLUGINS_ALL; do [ "${p}" = "${pn}plugin/" ] && actual_plugins="$actual_plugins $plugins_prefix/${p%/}"; done
+      done
+    }
+  done
+  PLUGINS="${actual_plugins}"
+  echo "Enabled plugins:" $(echo $PLUGINS | sed 's:generic/::g')
 }
 
 fetch_all() {
@@ -520,8 +520,8 @@ prepare_plugins_sources() {
     die "preparing plugins requires prepared psi+ sources"
   for name in ${PLUGINS}; do
     mkdir -p `dirname "${PSI_DIR}/build/src/plugins/$name"`
-    svn export "${PSI_DIR}/plugins/$name" \
-      "${PSI_DIR}/build/src/plugins/$name" --force
+    cp -a "${PSI_DIR}/plugins/$name" \
+      "${PSI_DIR}/build/src/plugins/$name"
   done
 }
 
