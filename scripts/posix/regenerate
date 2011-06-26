@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# Settings
+PATCHES_DIR=patches
+GIT_DIR=git
+DEST_DIR=sources
+WORK_DIR=work
+PATCH_LOG=/dev/null
+
+
+# Init
+term_width=`tput cols`
+
+die() { echo " !!!ERROR: ${1}"; exit 1; }
+_epatch_assert() { local _pipestatus=${PIPESTATUS[*]}; [[ ${_pipestatus// /} -eq 0 ]] ; }
+
+prepare_dir() {
+  [ -z "${1}" ] && die "dir must not be empty";
+  [ ! -e "${1}" ] && mkdir "${1}"
+  [ ! -d "${1}" ] && die "can't prepare dir ${1}"
+}
+
+unpack_git() {
+  ( cd "${GIT_DIR}"; git archive --format=tar master ) \
+  	| ( cd "${1}" ; tar xf - )
+  ( cd "${GIT_DIR}/iris"; git archive --format=tar master ) \
+  	| ( cd "${1}/iris" ; tar xf - )
+}
+
+spatch() {
+  popts=""
+  PATCH_TARGET="${1}"
+
+  if [ ! -f $PATCH_TARGET ]
+  then
+    echo "patch '${PATCH_TARGET}' doesn't exist"
+    exit 1
+  fi
+
+  echo -n " * applying ${PATCH_TARGET}..."
+
+  count=0
+  while [ "${count}" -lt 5 ]; do
+    echo " * trying patch -p${count} ${popts} --dry-run -f" >> $PATCH_LOG
+    if (cat ${PATCH_TARGET} | patch -p${count} ${popts} --dry-run -f ; _epatch_assert) >> $PATCH_LOG 2>&1
+    then
+      cat ${PATCH_TARGET} | patch -p${count} ${popts} >> $PATCH_LOG 2>&1
+      _epatch_assert
+      if [ "$?" -ne 0 ]
+      then
+        echo "A dry-run of patch command succeeded, but actually"
+        echo "applying the patch failed!"
+        count=5
+      fi
+      break;
+    fi
+    count=$((count + 1))
+  done
+
+  if [ $count -ne 5 ]
+  then
+     echo "done"
+     return 0
+  else
+     echo -e "fail\nsee log here ${PATCH_LOG}"
+     return 1
+  fi
+}
+
+
+PATCHES=`ls -1 "${PATCHES_DIR}" 2>/dev/null | grep .diff`
+[ -z "${PATCHES}" ] && die "patches not found in ${PATCHES_DIR}"
+[ -d "${GIT_DIR}/.git" ] || die "${GIT_DIR} is not git repo"
+
+
+prepare_dir "${DEST_DIR}"
+prepare_dir "${WORK_DIR}"
+
+
+ZENITY_LIST=`echo "${PATCHES}" | sed 's/.*/FALSE \0/'`
+UP_TO=`zenity --title 'Patch selector' --text 'Apply patches up to?' \
+	--list --radiolist --column '' --column Patch --height 440 \
+	--width 600 ${ZENITY_LIST}`
+[ "$?" != 0 ] && die "aborted"
+
+echo "patches will be applied up to ${UP_TO}"
+
+unpack_git "${DEST_DIR}"
+unpack_git "${WORK_DIR}"
+
+if [ ! -z "${UP_TO}" ]
+then
+  for p in $PATCHES; do
+     fp=$(readlink -f "${PATCHES_DIR}/${p}")
+     ( cd "${WORK_DIR}"; spatch "${fp}" )
+     [ "$?" != 0 ] && die "can't continue"
+     
+     diff -urN -X psidiff.ignore "${DEST_DIR}" "${WORK_DIR}" > "${fp}"
+
+     ( cd "${DEST_DIR}"; spatch "${fp}" )
+     [ "$?" != 0 ] && die "can't continue"
+     [ "${p}" == "${UP_TO}" ] && break;
+  done
+fi

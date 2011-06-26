@@ -1,0 +1,133 @@
+diff -urN src/mac/Info.plist work/mac/Info.plist
+--- src/mac/Info.plist	2010-04-28 18:01:10.000000000 +0400
++++ work/mac/Info.plist	2010-05-03 01:43:37.000000000 +0400
+@@ -7,23 +7,25 @@
+ 	<key>CFBundleExecutable</key>
+ 	<string>psi</string>
+ 	<key>CFBundleGetInfoString</key>
+-	<string>Psi 0.15-devel by the Psi team. This program is licensed under the GNU GPL.</string>
++	<string>Psi+ 0.15-devel by the Psi+ team. This program is licensed under the GNU GPL.</string>
+ 	<key>CFBundleIconFile</key>
+ 	<string>application.icns</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.psi-im</string>
++	<string>com.googlecode.psi-dev</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+-	<string>Psi</string>
++	<string>Psi+</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>APPL</string>
+ 	<key>CFBundleShortVersionString</key>
+-	<string>Psi 0.15-devel</string>
++	<string>Psi+ 0.15-devel</string>
+ 	<key>CFBundleSignature</key>
+ 	<string>psi</string>
+ 	<key>CFBundleVersion</key>
+ 	<string>0.15-devel</string>
++	<key>SUPublicDSAKeyFile</key>
++	<string>dsa_pub.pem</string>
+ 	<key>CSResourcesFileMapped</key>
+ 	<true/>
+ </dict>
+diff -urN src/src/applicationinfo.cpp work/src/applicationinfo.cpp
+--- src/src/applicationinfo.cpp	2010-05-03 01:46:30.000000000 +0400
++++ work/src/applicationinfo.cpp	2010-05-02 22:33:40.000000000 +0400
+@@ -34,7 +34,7 @@
+ #define PROG_OPTIONS_NS "http://psi-im.org/options"
+ #define PROG_STORAGE_NS "http://psi-im.org/storage"
+ #ifdef Q_WS_MAC
+-#define PROG_APPCAST_URL "http://psi-im.org/appcast/psi-mac.xml"
++#define PROG_APPCAST_URL "http://psih.ath.cx/~bvp/files/psi-plus-mac.xml"
+ #else
+ #define PROG_APPCAST_URL ""
+ #endif
+diff -urN src/src/mainwin.cpp work/src/mainwin.cpp
+--- src/src/mainwin.cpp	2010-05-03 16:05:24.000000000 +0400
++++ work/src/mainwin.cpp	2010-05-03 16:03:30.000000000 +0400
+@@ -79,6 +79,11 @@
+ #include "rosteravatarframe.h"
+ #include "avatars.h"
+ 
++#include "AutoUpdater/AutoUpdater.h"
++#ifdef HAVE_SPARKLE
++#include "AutoUpdater/SparkleAutoUpdater.h"
++#endif
++
+ using namespace XMPP;
+ 
+ static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
+@@ -496,6 +501,7 @@
+ 	d->getAction("help_online_home")->addTo (helpMenu);
+ 	d->getAction("help_online_forum")->addTo (helpMenu);
+ 	d->getAction("help_psi_muc")->addTo (helpMenu);
++	d->getAction("help_update")->addTo (helpMenu);
+ 	d->getAction("help_report_bug")->addTo (helpMenu);
+ 	QMenu* diagMenu = new QMenu(tr("Diagnostics"), this);
+ 	helpMenu->addMenu(diagMenu);
+@@ -641,6 +647,7 @@
+ 		{ "help_online_home", activated, this, SLOT( actOnlineHomeActivated() ) },
+ 		{ "help_online_forum", activated, this, SLOT( actOnlineForumActivated() ) },
+ 		{ "help_psi_muc",     activated, this, SLOT( actJoinPsiMUCActivated() ) },
++		{ "help_update",     activated, this, SLOT( actCheckUpdateActivated() ) },
+ 		{ "help_report_bug",  activated, this, SLOT( actBugReportActivated() ) },
+ 		{ "help_about",       activated, this, SLOT( actAboutActivated() ) },
+ 		{ "help_about_qt",    activated, this, SLOT( actAboutQtActivated() ) },
+@@ -901,6 +908,7 @@
+ 	        << "help_report_bug"
+ 	        << "diagnostics"
+ 	        << "separator"
++	        << "help_update"
+ 	        << "help_about"
+ 	        << "help_about_qt";
+ 
+@@ -1010,6 +1018,16 @@
+ 	account->actionJoin("psi-dev@conference.jabber.ru");
+ }
+ 
++void MainWin::actCheckUpdateActivated()
++{
++	AutoUpdater* autoUpdater;
++#ifdef HAVE_SPARKLE
++	autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
++#endif
++	autoUpdater->checkForUpdates();
++	delete autoUpdater;
++}
++
+ void MainWin::actBugReportActivated ()
+ {
+ 	DesktopUtil::openUrl("http://forum.psi-im.org/forum/2");
+diff -urN src/src/mainwin.h work/src/mainwin.h
+--- src/src/mainwin.h	2010-05-03 16:00:37.000000000 +0400
++++ work/src/mainwin.h	2010-05-03 15:57:49.000000000 +0400
+@@ -123,6 +123,7 @@
+ 	void actOnlineHomeActivated ();
+ 	void actOnlineForumActivated ();
+ 	void actJoinPsiMUCActivated();
++	void actCheckUpdateActivated();
+ 	void actBugReportActivated ();
+ 	void actAboutActivated ();
+ 	void actAboutQtActivated ();
+diff -urN src/src/psiactionlist.cpp work/src/psiactionlist.cpp
+--- src/src/psiactionlist.cpp	2010-05-03 16:00:22.000000000 +0400
++++ work/src/psiactionlist.cpp	2010-05-03 16:07:33.000000000 +0400
+@@ -355,6 +355,9 @@
+ 		IconAction *actPsiMUC = new IconAction (tr("Join Psi+ Discussion Room (Online)"), tr("&Join Psi+ Discussion Room (Online)"), 0, this);
+ 		actOnlineHome->setWhatsThis (tr("Join Psi+ Discussion Room (Online)"));
+ 
++		IconAction *actCheckUpdate = new IconAction (tr("Check for Updates..."), tr("&Check for Updates..."), 0, this);
++		actCheckUpdate->setWhatsThis (tr("Check for Updates..."));
++
+ 		IconAction *actBugReport = new IconAction (tr("Report a Bug (Online)"), tr("Report a &Bug (Online)"), 0, this);
+ 		actBugReport->setWhatsThis (tr("Report a Bug (Online)"));
+ 
+@@ -383,6 +386,7 @@
+ 			{ "help_report_bug",       actBugReport       },
+ 			{ "help_about",            actAbout           },
+ 			{ "help_about_qt",         actAboutQt         },
++			{ "help_update",           actCheckUpdate     },
+ 			{ "help_about_psimedia",   actAboutPsiMedia   },
+ 			{ "help_diag_qcaplugin",   actDiagQCAPlugin   },
+ 			{ "help_diag_qcakeystore", actDiagQCAKeyStore },

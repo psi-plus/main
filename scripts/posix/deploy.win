@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Settings
+PROJECT_DIR="/c/projects/psi"
+SYSTEM_ICONSET_DIR=$PROJECT_DIR/trunk/iconsets/system/default
+export QTDIR="${QTDIR:-/c/Qt/2010.02.1/qt}"
+PATCHES_DIR=$PROJECT_DIR/trunk/patches
+GIT_DIR=$PROJECT_DIR/git
+DEST_DIR=$PROJECT_DIR/sources
+WORK_DIR=$PROJECT_DIR/work
+PATCH_LOG=$PROJECT_DIR/long.log
+SHORT_LOG=$PROJECT_DIR/short.log
+SKIP_BAD_PATCHES="${SKIP_BAD_PATCHES:-0}"
+
+#Utils
+QCONF="qconf"
+
+die() { echo " !!!ERROR: ${1}"; exit 1; }
+_epatch_assert() { local _pipestatus=${PIPESTATUS[*]}; [[ ${_pipestatus// /} -eq 0 ]] ; }
+
+prepare_dir() {
+  [ -z "${1}" ] && die "dir must not be empty";
+  [ ! -e "${1}" ] && mkdir "${1}"
+  [ ! -d "${1}" ] && die "can't prepare dir ${1}"
+}
+
+unpack_git() {
+  ( cd "${GIT_DIR}"; git archive --format=tar master ) \
+  	| ( cd "${1}" ; tar xf - )
+  ( cd "${GIT_DIR}/iris"; git archive --format=tar master ) \
+  	| ( cd "${1}/iris" ; tar xf - )
+  ( cd "${GIT_DIR}/src/libpsi"; git archive --format=tar master ) \
+  	| ( cd "${1}/src/libpsi" ; tar xf - )
+}
+
+spatch() {
+  popts=""
+  PATCH_TARGET="${1}"
+
+  echo -n " * applying ${PATCH_TARGET}..." | tee -a $SHORT_LOG
+
+  if (patch -p1 ${popts} --dry-run -i ${PATCH_TARGET}) >> $PATCH_LOG 2>&1
+  then
+    if (patch -p1 ${popts} -i ${PATCH_TARGET} >> $PATCH_LOG 2>&1)
+    then
+    	echo "done" | tee -a $SHORT_LOG
+	return 0
+    else
+    	echo "dry-run ok, but actual failed" | tee -a $SHORT_LOG
+    fi
+  else
+    echo "failed" | tee -a $SHORT_LOG
+  fi
+
+  [ "${SKIP_BAD_PATCHES}" = "1" ] && { echo "skip buggy patch"  | tee -a $SHORT_LOG; return 0; }
+  return 1
+}
+
+
+cd $PROJECT_DIR
+PATCHES=`(cd "${PATCHES_DIR}"; ls -1 *.diff 2>/dev/null)`
+[ -z "${PATCHES}" ] && die "patches not found in ${PATCHES_DIR}"
+[ -d "${GIT_DIR}/.git" ] || die "${GIT_DIR} is not git repo"
+
+
+prepare_dir "${DEST_DIR}"
+prepare_dir "${WORK_DIR}"
+
+
+ZENITY_LIST=`echo "${PATCHES}" | sed 's/.*/FALSE \0/'`
+UP_TO=`zenity --title 'Patch selector' --text 'Apply patches up to?' \
+	--list --radiolist --column '' --column Patch --height 440 \
+	--width 600 ${ZENITY_LIST}`
+[ "$?" != 0 ] && die "aborted"
+
+echo "patches will be applied up to ${UP_TO}"
+
+unpack_git "${DEST_DIR}"
+unpack_git "${WORK_DIR}"
+svn export "${SYSTEM_ICONSET_DIR}" "${WORK_DIR}/iconsets/system/default" --force
+touch "${SHORT_LOG}"
+
+if [ ! -z "${UP_TO}" ]
+then
+  for p in $PATCHES; do
+     fp="${PATCHES_DIR}/${p}"
+     ( cd "${WORK_DIR}"; spatch "${fp}" )
+     [ "$?" = 0 ] || die "can't continue"
+     [ "${p}" = "${UP_TO}" ] && [ "$1" = "-e" ] && break
+     ( cd "${DEST_DIR}"; spatch "${fp}" )
+     [ "$?" = 0 ] || die "can't continue"
+    [ "${p}" = "${UP_TO}" ] && break;
+  done
+fi
+
+( cd "${DEST_DIR}"; $QCONF; )
+( cd "${WORK_DIR}"; $QCONF; ./configure.exe --disable-growl \
+  --debug --enable-plugins --qtdir=${QTDIR} --enable-webkit --disable-qdbus --disable-xss )
+
+[ -f psi.pro.user ] && cp psi.pro.user "${WORK_DIR}"
