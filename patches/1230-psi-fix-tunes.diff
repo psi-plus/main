@@ -1,0 +1,309 @@
+--- psi.orig/src/options/options.pri
++++ psi/src/options/options.pri
+@@ -26,7 +26,8 @@ HEADERS += \
+ 	$$PWD/opt_avcall.h \
+ 	$$PWD/opt_toolbars.h \
+ 	$$PWD/opt_advanced.h \
+-	$$PWD/opt_shortcuts.h
++	$$PWD/opt_shortcuts.h \
++	$$PWD/opt_statuspep.h
+ 
+ HEADERS += $$PWD/opt_tree.h
+ 
+@@ -46,7 +47,8 @@ SOURCES += \
+ 	$$PWD/opt_avcall.cpp \
+ 	$$PWD/opt_toolbars.cpp \
+ 	$$PWD/opt_advanced.cpp \
+-	$$PWD/opt_shortcuts.cpp
++	$$PWD/opt_shortcuts.cpp \
++	$$PWD/opt_statuspep.cpp
+ 
+ SOURCES += $$PWD/opt_tree.cpp
+ 
+@@ -72,7 +74,8 @@ FORMS += \
+ 	$$PWD/opt_iconset_system.ui \
+ 	$$PWD/opt_iconset_roster.ui \
+ 	$$PWD/opt_general_groupchat.ui \
+-	$$PWD/opt_shortcuts.ui
++	$$PWD/opt_shortcuts.ui \
++	$$PWD/opt_statuspep.ui
+ 
+ psi_plugins {
+ 	FORMS += $$PWD/opt_plugins.ui
+--- psi.orig/src/options/opt_status.cpp
++++ psi/src/options/opt_status.cpp
+@@ -1,6 +1,7 @@
+ #include "opt_status.h"
+ #include "opt_statusgeneral.h"
+ #include "opt_statusauto.h"
++#include "opt_statuspep.h"
+ 
+ OptionsTabStatus::OptionsTabStatus(QObject *parent)
+ : MetaOptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
+@@ -10,4 +11,5 @@ OptionsTabStatus::OptionsTabStatus(QObje
+ 	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), parent, SLOT(enableCommonWidgets(bool)));
+ 	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), SLOT(enableOtherTabs(bool)));
+ 	addTab(new OptionsTabStatusAuto(this));
++	addTab(new OptionsTabStatusPep(this));
+ }
+--- psi.orig/src/options/opt_statuspep.cpp
++++ psi/src/options/opt_statuspep.cpp
+@@ -0,0 +1,108 @@
++#include "opt_statuspep.h"
++#include "psioptions.h"
++
++#include <QListWidget>
++#include <QCheckBox>
++
++#include "ui_opt_statuspep.h"
++
++static const char *tuneUrlFilterOptionPath = "options.extended-presence.tune.url-filter";
++static const char *tuneControllerFilterOptionPath = "options.extended-presence.tune.controller-filter";
++
++class OptStatusPepUI : public QWidget, public Ui::OptStatusPep
++{
++public:
++	OptStatusPepUI() : QWidget() { setupUi(this); }
++};
++
++OptionsTabStatusPep::OptionsTabStatusPep(QObject *parent)
++: OptionsTab(parent, "status_tunes", "", tr("PEP"), tr("Tunes no-video filter and controllers switcher"))
++, w(0)
++, psi_(0)
++, controllersChanged(false)
++{
++}
++
++OptionsTabStatusPep::~OptionsTabStatusPep()
++{
++}
++
++QWidget *OptionsTabStatusPep::widget()
++{
++	if (w) {
++		return 0;
++	}
++
++	w = new OptStatusPepUI();
++	return w;
++}
++
++void OptionsTabStatusPep::applyOptions()
++{
++	if (!w) {
++		return;
++	}
++
++	OptStatusPepUI *d = (OptStatusPepUI *)w;
++	PsiOptions* o = PsiOptions::instance();
++	QStringList newTuneFilters = d->tuneExtensions->text().split(QRegExp("\\W+"));
++	QString tuneExstensionsFilter;
++	if (!newTuneFilters.isEmpty()) {
++		newTuneFilters.removeDuplicates();
++		qSort(newTuneFilters);
++		tuneExstensionsFilter = newTuneFilters.join(" ").toLower();
++		d->tuneExtensions->setText(tuneExstensionsFilter);
++	}
++	QString controllerFilter = blackList.join(",");
++	if (tuneExstensionsFilter != tuneFilters) {
++		o->setOption(tuneUrlFilterOptionPath, tuneExstensionsFilter);
++	}
++	if (controllersChanged) {
++		o->setOption(tuneControllerFilterOptionPath, controllerFilter);
++	}
++}
++
++void OptionsTabStatusPep::restoreOptions()
++{
++	if (!w) {
++		return;
++	}
++
++	OptStatusPepUI *d = (OptStatusPepUI *)w;
++	PsiOptions* o = PsiOptions::instance();
++	tuneFilters = o->getOption(tuneUrlFilterOptionPath).toString();
++	d->tuneExtensions->setText(tuneFilters);
++	QStringList controllers = psi_->tuneManager()->controllerNames();
++	blackList = o->getOption(tuneControllerFilterOptionPath).toString().split(QRegExp("[,]\\s*"), QString::SkipEmptyParts);
++	foreach(const QString &name, controllers) {
++		QCheckBox* cb = new QCheckBox(name);
++		QString caption = name + " controller";
++		cb->setText(caption);
++		cb->setObjectName(name);
++		int i = controllers.indexOf(name);
++		d->gridLayout->addWidget(cb,i/3,i%3);
++		cb->setChecked(!blackList.contains(name));
++		connect(cb, SIGNAL(toggled(bool)), SLOT(controllerSelected(bool)));
++	}
++}
++
++void OptionsTabStatusPep::controllerSelected(bool checked)
++{
++	QCheckBox *box = qobject_cast<QCheckBox*>(sender());
++	QString name_ = box->objectName();
++	if (!name_.isEmpty()) {
++		if (!checked && !blackList.contains(name_, Qt::CaseInsensitive)) {
++			blackList << name_;
++			controllersChanged = true;
++		}
++		else if (checked) {
++			blackList.removeAll(name_);
++			controllersChanged = true;
++		}
++	}
++}
++
++void OptionsTabStatusPep::setData(PsiCon *psi, QWidget *)
++{
++	psi_ = psi;
++}
+--- psi.orig/src/options/opt_statuspep.h
++++ psi/src/options/opt_statuspep.h
+@@ -0,0 +1,36 @@
++#ifndef OPT_STAUSPEP_H
++#define OPT_STAUSPEP_H
++
++#include "optionstab.h"
++#include "common.h"
++#include "psicon.h"
++
++class QWidget;
++
++class OptionsTabStatusPep : public OptionsTab
++{
++	Q_OBJECT
++
++public:
++
++	OptionsTabStatusPep(QObject *parent);
++	~OptionsTabStatusPep();
++
++	QWidget *widget();
++	void applyOptions();
++	void restoreOptions();
++	void setData(PsiCon *psi, QWidget *);
++
++protected slots:
++	void controllerSelected(bool);
++
++private:
++	QWidget *w;
++	PsiCon *psi_;
++	QStringList blackList;
++	QString tuneFilters;
++	bool controllersChanged;
++};
++
++
++#endif // OPT_STAUSPEP_H
+--- psi.orig/src/options/opt_statuspep.ui
++++ psi/src/options/opt_statuspep.ui
+@@ -0,0 +1,108 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>OptStatusPep</class>
++ <widget class="QWidget" name="OptStatusPep">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>588</width>
++    <height>350</height>
++   </rect>
++  </property>
++  <property name="sizePolicy">
++   <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
++    <horstretch>0</horstretch>
++    <verstretch>0</verstretch>
++   </sizepolicy>
++  </property>
++  <property name="windowTitle">
++   <string>Form</string>
++  </property>
++  <property name="autoFillBackground">
++   <bool>false</bool>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <widget class="QGroupBox" name="groupBox">
++     <property name="title">
++      <string>Tunes</string>
++     </property>
++     <property name="alignment">
++      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
++     </property>
++     <property name="flat">
++      <bool>false</bool>
++     </property>
++     <layout class="QVBoxLayout" name="verticalLayout_4">
++      <property name="spacing">
++       <number>6</number>
++      </property>
++      <item>
++       <widget class="QLabel" name="label">
++        <property name="text">
++         <string>Enter media file extensions to ignore them on tune sending</string>
++        </property>
++       </widget>
++      </item>
++      <item>
++       <widget class="QLineEdit" name="tuneExtensions">
++        <property name="toolTip">
++         <string>Add extensions</string>
++        </property>
++        <property name="whatsThis">
++         <string>Ignored media file extensions on psi tunes sending</string>
++        </property>
++       </widget>
++      </item>
++      <item>
++       <widget class="QGroupBox" name="rightGroupBox">
++        <property name="sizePolicy">
++         <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
++          <horstretch>0</horstretch>
++          <verstretch>0</verstretch>
++         </sizepolicy>
++        </property>
++        <property name="title">
++         <string>Tune Controllers</string>
++        </property>
++        <property name="flat">
++         <bool>false</bool>
++        </property>
++        <layout class="QVBoxLayout" name="verticalLayout_2">
++         <property name="spacing">
++          <number>0</number>
++         </property>
++         <property name="sizeConstraint">
++          <enum>QLayout::SetDefaultConstraint</enum>
++         </property>
++         <property name="margin">
++          <number>6</number>
++         </property>
++         <item>
++          <layout class="QGridLayout" name="gridLayout"/>
++         </item>
++        </layout>
++       </widget>
++      </item>
++     </layout>
++    </widget>
++   </item>
++   <item>
++    <spacer name="verticalSpacer">
++     <property name="orientation">
++      <enum>Qt::Vertical</enum>
++     </property>
++     <property name="sizeHint" stdset="0">
++      <size>
++       <width>20</width>
++       <height>40</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>

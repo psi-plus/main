@@ -1,0 +1,1077 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -113,6 +113,7 @@
+ 				<css type="QString" />
+ 				<only-paste-template type="bool">false</only-paste-template>
+ 				<disable-paste-send type="bool">false</disable-paste-send>
++				<hide-when-closing type="bool">false</hide-when-closing>
+ 			</chat>
+ 			<save>
+ 				<toolbars-state type="QByteArray"/>
+@@ -439,6 +440,7 @@ QLineEdit#le_status_text {
+ 				<show-tab-close-buttons type="bool">true</show-tab-close-buttons>
+ 				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
+ 				<use-tabs type="bool">true</use-tabs>
++				<mouse-middle-button type="QString">close</mouse-middle-button>
+ 				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
+ 				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
+ 				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
+@@ -533,9 +535,13 @@ QLineEdit#le_status_text {
+ 				<scroll-up type="QKeySequence" comment="Scroll up">Shift+PgUp</scroll-up>
+ 				<scroll-down type="QKeySequence" comment="Scroll down">Shift+PgDown</scroll-down>
+ 				<close type="QVariantList" comment="Close the current window/tab">
+-					<item type="QKeySequence">Esc</item>
++					<item type="QKeySequence">Ctrl+Q</item>
+ 					<item type="QKeySequence">Ctrl+W</item>
+ 				</close>
++				<hide type="QVariantList" comment="Hide the current window/tab">
++					<item type="QKeySequence">ESC</item>
++					<item type="QKeySequence">Alt+H</item>
++				</hide>
+ 				<history type="QKeySequence" comment="Open the message history">Ctrl+H</history>
+ 				<user-info type="QKeySequence" comment="Show the user info of the contact">Ctrl+I</user-info>
+ 			</common>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -186,6 +186,10 @@ void ChatDlg::initActions()
+ 	addAction(act_close_);
+ 	connect(act_close_, SIGNAL(triggered()), SLOT(close()));
+ 
++	act_hide_ = new QAction(this);
++	addAction(act_hide_);
++	connect(act_hide_, SIGNAL(triggered()), SLOT(hideTab()));
++
+ 	act_scrollup_ = new QAction(this);
+ 	addAction(act_scrollup_);
+ 	connect(act_scrollup_, SIGNAL(triggered()), SLOT(scrollUp()));
+@@ -200,6 +204,7 @@ void ChatDlg::setShortcuts()
+ 	act_send_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.send"));
+ 	act_scrollup_->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-up"));
+ 	act_scrolldown_->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-down"));
++	act_hide_->setShortcuts(ShortcutManager::instance()->shortcuts("common.hide"));
+ 
+ 	if(!isTabbed()) {
+ 		act_close_->setShortcuts(ShortcutManager::instance()->shortcuts("common.close"));
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
+@@ -176,6 +176,7 @@ private:
+ 	QAction* act_scrollup_;
+ 	QAction* act_scrolldown_;
+ 	QAction* act_close_;
++	QAction* act_hide_;
+ 
+ 	int pending_;
+ 	bool keepOpen_;
+--- psi.orig/src/contactlistgroup.h
++++ psi/src/contactlistgroup.h
+@@ -92,7 +92,8 @@ public:
+ 		SpecialType_General,
+ 		SpecialType_NotInList,
+ 		SpecialType_Transports,
+-		SpecialType_MUCPrivateChats
++		SpecialType_MUCPrivateChats,
++		SpecialType_Conference
+ 	};
+ 
+ 	virtual bool isSpecial() const;
+--- psi.orig/src/contactlistgroupmenu.cpp
++++ psi/src/contactlistgroupmenu.cpp
+@@ -35,6 +35,8 @@
+ #include "statusdlg.h"
+ #include "xmpp_tasks.h"
+ 
++#include "groupchatdlg.h"
++
+ class ContactListGroupMenu::Private : public QObject
+ {
+ 	Q_OBJECT
+@@ -52,6 +54,9 @@ class ContactListGroupMenu::Private : pu
+ 	QAction* actionAuthRequest_;
+ 	QAction* actionAuthRemove_;
+ 	QAction* actionCustomStatus_;
++	QAction* actionMucHide_;
++	QAction* actionMucShow_;
++	QAction* actionMucLeave_;
+ 
+ public:
+ 	Private(ContactListGroupMenu* menu, ContactListGroup* _group)
+@@ -94,23 +99,41 @@ public:
+ 		connect(addGroupAction_, SIGNAL(triggered()), SLOT(addGroup()));
+ #endif
+ 
++		actionMucHide_ = new IconAction(tr("Hide All"), this, "psi/action_muc_hide");
++		connect(actionMucHide_, SIGNAL(triggered()), SLOT(mucHide()));
++
++		actionMucShow_ = new IconAction(tr("Show All"), this, "psi/action_muc_show");
++		connect(actionMucShow_, SIGNAL(triggered()), SLOT(mucShow()));
++		
++		actionMucLeave_ = new IconAction(tr("Leave All"), this, "psi/action_muc_leave");
++		connect(actionMucLeave_, SIGNAL(triggered()), SLOT(mucLeave()));
++
+ 		updateActions();
+ 
++		if (ContactListGroup::SpecialType_Conference != group->specialGroupType()) {
+ #ifdef YAPSI
+-		menu->addAction(renameAction_);
+-		menu->addAction(removeGroupAndContactsAction_);
+-		menu->addAction(addGroupAction_);
++			menu->addAction(renameAction_);
++			menu->addAction(removeGroupAndContactsAction_);
++			menu->addAction(addGroupAction_);
+ #else
+-		menu->addAction(renameAction_);
+-		menu->addAction(sendMessageAction_);
+-		menu->addAction(actionCustomStatus_);
+-		menu->addSeparator();
+-		authMenu_ = menu->addMenu(tr("Authorization"));
+-		authMenu_->addAction(actionAuth_);
+-		authMenu_->addAction(actionAuthRequest_);
+-		authMenu_->addAction(actionAuthRemove_);
+-		menu->addAction(removeGroupWithoutContactsAction_);
+-		menu->addAction(removeGroupAndContactsAction_);
++			menu->addAction(renameAction_);
++			menu->addAction(sendMessageAction_);
++			menu->addAction(actionCustomStatus_);
++			menu->addSeparator();
++			authMenu_ = menu->addMenu(tr("Authorization"));
++			authMenu_->addAction(actionAuth_);
++			authMenu_->addAction(actionAuthRequest_);
++			authMenu_->addAction(actionAuthRemove_);
++			menu->addAction(removeGroupWithoutContactsAction_);
++			menu->addAction(removeGroupAndContactsAction_);
++		}
++		else {
++			menu->addAction(actionMucHide_);
++			menu->addAction(actionMucShow_);
++			menu->addAction(actionMucLeave_);
++			menu->addSeparator();
++			menu->addAction(actionCustomStatus_);
++		}
+ #endif
+ 	}
+ 
+@@ -129,6 +152,41 @@ private slots:
+ #endif
+ 	}
+ 
++	void mucHide()
++	{
++		PsiAccount *pa = group->contacts().first()->account();
++		foreach (QString gc, pa->groupchats()) {
++			Jid j(gc);
++			GCMainDlg *gcDlg = pa->findDialog<GCMainDlg*>(j.bare());
++			if (gcDlg && (gcDlg->isTabbed() || !gcDlg->isHidden()))
++				gcDlg->hideTab();
++		}
++	}
++
++	void mucShow()
++	{
++		PsiAccount *pa = group->contacts().first()->account();
++		foreach (QString gc, pa->groupchats()) {
++			Jid j(gc);
++			GCMainDlg *gcDlg = pa->findDialog<GCMainDlg*>(j.bare());
++			if (gcDlg) {
++				gcDlg->ensureTabbedCorrectly();
++				gcDlg->bringToFront();
++			}
++		}
++	}
++
++	void mucLeave()
++	{
++		PsiAccount *pa = group->contacts().first()->account();
++		foreach (QString gc, pa->groupchats()) {
++			Jid j(gc);
++			GCMainDlg *gcDlg = pa->findDialog<GCMainDlg*>(j.bare());
++			if (gcDlg)
++				gcDlg->close();
++		}
++	}
++
+ 	void rename()
+ 	{
+ 		if (!group)
+--- psi.orig/src/contactlistmodel.cpp
++++ psi/src/contactlistmodel.cpp
+@@ -533,6 +533,12 @@ QVariant ContactListModel::contactData(c
+ 		QPixmap pix = contact->account()->avatarFactory()->getAvatar(contact->jid());
+ 		return QVariant(pix);
+ 	}
++	else if (role == IsMucRole) {
++		return QVariant(contact->userListItem().isConference());
++	}
++	else if (role == MucMessagesRole) {
++		return QVariant(contact->userListItem().pending());
++	}
+ #ifdef YAPSI
+ 	else if (role == Qt::ForegroundRole) {
+ 		return QVariant(Ya::statusColor(contact->status().type()));
+--- psi.orig/src/contactlistmodel.h
++++ psi/src/contactlistmodel.h
+@@ -82,6 +82,8 @@ public:
+ 		ClientRole = Qt::UserRole + 24,
+ 		TuneRole = Qt::UserRole + 25,
+ 		AvatarRole = Qt::UserRole + 26,
++		IsMucRole = Qt::UserRole + 27,
++		MucMessagesRole = Qt::UserRole + 28,
+ 
+ 		// groups
+ 		ExpandedRole = Qt::UserRole + 12,
+--- psi.orig/src/contactlistnestedgroup.cpp
++++ psi/src/contactlistnestedgroup.cpp
+@@ -298,6 +298,9 @@ ContactListGroup* ContactListNestedGroup
+ 	else if (contact->isAgent()) {
+ 		type = ContactListGroup::SpecialType_Transports;
+ 	}
++	else if (contact->isConference()) {
++		type = ContactListGroup::SpecialType_Conference;
++	}
+ 	else if (contact->noGroups()) {
+ 		type = ContactListGroup::SpecialType_General;
+ 	}
+--- psi.orig/src/contactlistspecialgroup.cpp
++++ psi/src/contactlistspecialgroup.cpp
+@@ -44,6 +44,11 @@ ContactListSpecialGroup::ContactListSpec
+ 	case SpecialType_MUCPrivateChats:
+ 		name_ += "mucprivatechats";
+ 		displayName_ = tr("Private messages");
++		break;
++	case SpecialType_Conference:
++		name_ += "conferences";
++		displayName_ = tr("Conferences");
++		break;
+ 	default:
+ 		Q_ASSERT(false);
+ 	}
+@@ -101,8 +106,9 @@ bool ContactListSpecialGroup::compare(co
+ 		rank[SpecialType_General]         = 0;
+ 		rank[SpecialType_None]            = 1;
+ 		rank[SpecialType_MUCPrivateChats] = 2;
+-		rank[SpecialType_Transports]      = 3;
++		rank[SpecialType_Conference]      = 3;
+ 		rank[SpecialType_NotInList]       = 4;
++		rank[SpecialType_Transports]      = 5;
+ 		Q_ASSERT(rank.contains(specialGroupType()));
+ 		Q_ASSERT(rank.contains(group->specialGroupType()));
+ 		return rank[specialGroupType()] < rank[group->specialGroupType()];
+--- psi.orig/src/eventdlg.cpp
++++ psi/src/eventdlg.cpp
+@@ -1426,6 +1426,8 @@ void EventDlg::keyPressEvent(QKeyEvent *
+ 		close();
+ 	else if(ShortcutManager::instance()->shortcuts("message.send").contains(key))
+ 		doSend();
++	else if(ShortcutManager::instance()->shortcuts("common.hide").contains(key))
++		hide();
+ 	else
+ 		e->ignore();
+ }
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -216,7 +216,7 @@ public:
+ #endif
+ 	QAction *act_send, *act_scrollup, *act_scrolldown, *act_close;
+ 
+-	QAction *act_mini_cmd, *act_nick;
++	QAction *act_mini_cmd, *act_nick, *act_hide;
+ 
+ 	MCmdSimpleSite mCmdSite;
+ 	MCmdManager mCmdManager;
+@@ -225,6 +225,7 @@ public:
+ 
+ 	QMenu *pm_settings;
+ 	int pending;
++	int hPending; // highlight pending
+ 	bool connecting;
+ 
+ 	QStringList hist;
+@@ -606,6 +607,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	options_ = PsiOptions::instance();
+ 
+ 	d->pending = 0;
++	d->hPending = 0;
+ 	d->connecting = false;
+ 
+ 	d->histAt = 0;
+@@ -740,6 +742,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	d->act_close = new QAction(this);
+ 	addAction(d->act_close);
+ 	connect(d->act_close,SIGNAL(triggered()), SLOT(close()));
++	d->act_hide = new QAction(this);
++	addAction(d->act_hide);
++	connect(d->act_hide,SIGNAL(triggered()), SLOT(hideTab()));
+ 	d->act_scrollup = new QAction(this);
+ 	addAction(d->act_scrollup);
+ 	connect(d->act_scrollup,SIGNAL(triggered()), SLOT(scrollUp()));
+@@ -869,6 +874,7 @@ void GCMainDlg::setShortcuts()
+ 	} else {
+ 		d->act_close->QAction::setShortcuts (QList<QKeySequence>());
+ 	}
++	d->act_hide->setShortcuts(ShortcutManager::instance()->shortcuts("common.hide"));
+ 	d->act_scrollup->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-up"));
+ 	d->act_scrolldown->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-down"));
+ 	d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
+@@ -885,6 +891,8 @@ void GCMainDlg::scrollDown() {
+ void GCMainDlg::closeEvent(QCloseEvent *e)
+ {
+ 	e->accept();
++	if (d->state != Private::Connected)
++		account()->groupChatLeave(d->dlg->jid().domain(),d->dlg->jid().node());
+ }
+ 
+ void GCMainDlg::resizeEvent(QResizeEvent* e)
+@@ -906,6 +914,12 @@ void GCMainDlg::activated()
+ 
+ 	if(d->pending > 0) {
+ 		d->pending = 0;
++		d->hPending = 0;
++		UserListItem* u = account()->find(d->dlg->jid().bare());
++		if (u) {
++			u->setPending(d->pending, d->hPending);
++			account()->updateEntry(*u);
++		}
+ 		invalidateTab();
+ 	}
+ 	doFlash(false);
+@@ -1316,6 +1330,14 @@ void GCMainDlg::presence(const QString &
+ 	if (nick == d->self) {
+ 		if(s.isAvailable())
+ 			setStatusTabIcon(s.type());
++		UserListItem* u = account()->find(d->dlg->jid().bare());
++		if(u) {
++			Resource r;
++			r.setName("Muc");
++			r.setStatus(s);
++			u->userResourceList().replace(0, r);
++			account()->updateEntry(*u);
++		}
+ 		// Update configuration dialog
+ 		if (d->configDlg) {
+ 			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
+@@ -1598,6 +1620,7 @@ void GCMainDlg::joined()
+ 		setConnecting();
+ 		appendSysMsg(tr("Connected."), true);
+ 	}
++	account()->addMucItem(d->dlg->jid().bare());
+ }
+ 
+ void GCMainDlg::setPassword(const QString& p)
+@@ -1667,6 +1690,13 @@ void GCMainDlg::appendMessage(const Mess
+ 	// if we're not active, notify the user by changing the title
+ 	if(!isActiveTab() && !mv.isLocal()) {
+ 		++d->pending;
++		if(alert)
++			++d->hPending;
++		UserListItem* u = account()->find(d->dlg->jid().bare());
++		if (u) {
++			u->setPending(d->pending, d->hPending);
++			account()->updateEntry(*u);
++		}
+ 		invalidateTab();
+ 	}
+ 
+--- psi.orig/src/historydlg.cpp
++++ psi/src/historydlg.cpp
+@@ -214,7 +214,8 @@ void HistoryDlg::loadContacts()
+ 	ui_.msgLog->clear();
+ 	foreach (PsiContact* contact, d->pa->contactList())
+ 	{
+-		if(contact->isPrivate()
++		if(contact->isConference()
++		|| contact->isPrivate()
+ 		|| jids_.contains(contact->jid().bare()))
+ 			continue;
+ 
+--- psi.orig/src/mucjoindlg.cpp
++++ psi/src/mucjoindlg.cpp
+@@ -161,6 +161,8 @@ void MUCJoinDlg::doJoin()
+ 
+ 	GCMainDlg *gc = account_->findDialog<GCMainDlg*>(j.bare());
+ 	if (gc) {
++		if(gc->isHidden() && !gc->isTabbed())
++			gc->ensureTabbedCorrectly();
+ 		gc->bringToFront();
+ 		if (gc->isInactive()) {
+ 			gc->reactivate();
+@@ -198,6 +200,7 @@ void MUCJoinDlg::joined()
+ 
+ 	closeDialogs(this);
+ 	deleteLater();
++	account_->addMucItem(jid_.bare());
+ }
+ 
+ void MUCJoinDlg::error(int, const QString &str)
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -613,10 +613,11 @@ public:
+ 	void removeEntry(const Jid& jid)
+ 	{
+ 		PsiContact* contact = findContact(jid);
+-		Q_ASSERT(contact);
+-		delete contact;
+-		emit account->removeContact(jid);
+-
++		if (contact) {
++			Q_ASSERT(contact);
++			delete contact;
++			emit account->removeContact(jid);
++		}
+ 		updateOnlineContactsCount();
+ 	}
+ 
+@@ -3805,6 +3806,14 @@ void PsiAccount::actionDefault(const Jid
+ 
+ 	if(d->eventQueue->count(u->jid()) > 0)
+ 		openNextEvent(*u, UserAction);
++	else if (groupchats().contains(j.full()))
++	{
++		TabbableWidget *tab = findDialog<TabbableWidget*>(Jid(j.full()));
++		if(tab) {
++			tab->ensureTabbedCorrectly();
++			tab->bringToFront();
++		}
++	}
+ 	else {
+ 		if(PsiOptions::instance()->getOption("options.messages.default-outgoing-message-type").toString() == "message")
+ 			actionSendMessage(u->jid());
+@@ -4946,6 +4955,7 @@ UserListItem* PsiAccount::addUserListIte
+ 	u->setInList(false);
+ 	u->setAvatarFactory(avatarFactory());
+ 	u->setName(nick);
++	u->setConference(groupchats().contains(jid.full()));
+ 
+ 	// is it a private groupchat?
+ 	Jid j = u->jid();
+@@ -4961,6 +4971,21 @@ UserListItem* PsiAccount::addUserListIte
+ 		u->userResourceList().append(ur);
+ 	}
+ 
++	if(u->isConference()) {
++		// make a resource so the contact appears online
++		QString name = j.node();
++		UserResource ur;
++		foreach(ConferenceBookmark c, d->bookmarkManager->conferences())
++		{
++			if(c.jid().full() == j.bare()) name = c.name();
++		}
++		u->setInList(true);
++		u->setName(name);
++		ur.setName("Muc");
++		ur.setStatus(status());
++		u->userResourceList().append(ur);
++	}
++
+ 	// treat it like a push  [pushinfo]
+ 	//VCard info;
+ 	//if(readUserInfo(item->jid, &info) && !info.field[vNickname].isEmpty())
+@@ -4975,6 +5000,20 @@ UserListItem* PsiAccount::addUserListIte
+ 	return u;
+ }
+ 
++void PsiAccount::addMucItem(const Jid& jid)
++{
++	if (jid.isEmpty())
++		return;
++	UserListItem *u = find(jid);
++	if (u) {
++		d->removeEntry(jid);
++		d->userList.removeAll(u);
++	}
++	if (!d->groupchats.contains(jid.bare()))
++		d->groupchats += jid.bare();
++	addUserListItem(jid.bare(), "");
++}
++
+ // put an event into the event queue, and update the related alerts
+ void PsiAccount::queueEvent(PsiEvent* e, ActivationType activationType)
+ {
+@@ -5069,8 +5108,12 @@ void PsiAccount::openNextEvent(Activatio
+ 	}
+ 
+ 	UserListItem *u = find(e->jid());
+-	if(!u)
+-		return;
++	if(!u) {
++		u = new UserListItem();
++		u->setJid(e->jid());
++		u->setInList(false);
++		d->userList.append(u);
++	}
+ 	openNextEvent(*u, activationType);
+ }
+ 
+@@ -5283,17 +5326,6 @@ void PsiAccount::edb_finished()
+ void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType)
+ {
+ #ifdef GROUPCHAT
+-	QString str = j.bare();
+-	bool found = false;
+-	for(QStringList::ConstIterator it = d->groupchats.begin(); it != d->groupchats.end(); ++it) {
+-		if((*it) == str) {
+-			found = true;
+-			break;
+-		}
+-	}
+-	if(!found)
+-		d->groupchats += str;
+-
+ 	GCMainDlg *w = new GCMainDlg(this, j, d->tabManager);
+ 	w->setPassword(d->client->groupChatPassword(j.node(),j.domain()));
+ 	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
+@@ -5327,8 +5359,14 @@ void PsiAccount::groupChatSetStatus(cons
+ 
+ void PsiAccount::groupChatLeave(const QString &host, const QString &room)
+ {
+-	d->groupchats.removeAll(room + '@' + host);
++	Jid j(room + '@' + host);
++	d->groupchats.removeAll(j.bare());
+ 	d->client->groupChatLeave(host, room);
++	UserListItem *u = find(j);
++	if (u) {
++		d->removeEntry(j);
++		d->userList.removeAll(u);
++	}
+ }
+ 
+ GCContact *PsiAccount::findGCContact(const Jid &j) const
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -256,6 +256,7 @@ public:
+ 	class xmlRingElem { public: int type; QDateTime time; QString xml; };
+ 	QList< xmlRingElem > dumpRingbuf();
+ 	void clearRingbuf();
++	void addMucItem(const Jid&);
+ 
+ signals:
+ 	void accountDestroyed();
+--- psi.orig/src/psicontact.cpp
++++ psi/src/psicontact.cpp
+@@ -361,7 +361,8 @@ bool PsiContact::isDragEnabled() const
+ {
+ 	return isEditable()
+ 	       && !isPrivate()
+-	       && !isAgent();
++	       && !isAgent()
++	       && !isConference();
+ }
+ 
+ /**
+@@ -947,6 +948,11 @@ bool PsiContact::isAgent() const
+ 	return userListItem().isTransport();
+ }
+ 
++bool PsiContact::isConference() const
++{
++	return userListItem().isConference();
++}
++
+ bool PsiContact::inList() const
+ {
+ 	return userListItem().inList();
+--- psi.orig/src/psicontact.h
++++ psi/src/psicontact.h
+@@ -55,6 +55,7 @@ public:
+ 	virtual bool isAgent() const;
+ 	virtual bool inList() const;
+ 	virtual bool isPrivate() const;
++	virtual bool isConference() const;
+ 	virtual bool noGroups() const;
+ 	virtual bool authorized() const;
+ 	virtual bool authorizesToSeeStatus() const;
+--- psi.orig/src/psicontactlistviewdelegate.cpp
++++ psi/src/psicontactlistviewdelegate.cpp
+@@ -288,7 +288,9 @@ void PsiContactListViewDelegate::drawCon
+ 			txtRect.setHeight(r.height() - txtRect.height());
+ 			o.font.setPointSize(qMax(o.font.pointSize()-2, 7));
+ 			o.fontMetrics = QFontMetrics(o.font);
++			painter->save();
+ 			drawText(painter, o, txtRect, statusMsg, index);
++			painter->restore();
+ 		}
+ 	}
+ 	else {
+@@ -297,9 +299,15 @@ void PsiContactListViewDelegate::drawCon
+ 		drawText(painter, o, r, text, index);
+ 	}
+ 
++	bool isMuc = index.data(ContactListModel::IsMucRole).toBool();
++	QString mucMessages;
++	if(isMuc)
++		mucMessages = index.data(ContactListModel::MucMessagesRole).toString();
++
+ 	QRect iconRect(r);
+ 	QList<QPixmap> rightPixs;
+ 	QList<int> rightWidths;
++	if(!isMuc) {
+ 	if (showClientIcons_) {
+ 		bool showAllClients = PsiOptions::instance()->getOption("options.ui.contactlist.show-all-client-icons").toBool();
+ 		const QList<QPixmap> pixList = this->clientPixmap(index);
+@@ -339,18 +347,23 @@ void PsiContactListViewDelegate::drawCon
+ 		rightPixs.push_back(pix);
+ 		rightWidths.push_back(pix.width());
+ 	}
++	}
+ 
+-	if(rightPixs.isEmpty())
++	if(rightPixs.isEmpty() && mucMessages.isEmpty())
+ 		return;
+ 
+ 	int sumWidth = 0;
+-	foreach (int w, rightWidths) {
+-		sumWidth += w;
++	if(isMuc)
++		sumWidth = fontMetrics_->width(mucMessages);
++	else {
++		foreach (int w, rightWidths) {
++			sumWidth += w;
++		}
++		sumWidth+=rightPixs.count();
+ 	}
+ 	QColor bgc = (option.state & QStyle::State_Selected) ? palette.color(QPalette::Highlight) : palette.color(QPalette::Base);
+ 	QColor tbgc = bgc;
+ 	tbgc.setAlpha(0);
+-	sumWidth+=rightPixs.count();
+ 	QLinearGradient grad(r.right() - sumWidth - 20, 0, r.right() - sumWidth, 0);
+ 	grad.setColorAt(0, tbgc);
+ 	grad.setColorAt(1, bgc);
+@@ -359,10 +372,16 @@ void PsiContactListViewDelegate::drawCon
+ 	gradRect.setLeft(gradRect.right() - sumWidth - 20);
+ 	painter->fillRect(gradRect, tbakBr);
+ 
+-	for (int i=0; i<rightPixs.size(); i++) {
+-		const QPixmap pix = rightPixs[i];
+-		iconRect.setRight(iconRect.right() - pix.width() -1);
+-		painter->drawPixmap(iconRect.topRight(), pix);
++	if(isMuc) {
++		iconRect.setLeft(iconRect.right() - sumWidth - 1);
++		painter->drawText(iconRect, mucMessages);
++	}
++	else {
++		for (int i=0; i<rightPixs.size(); i++) {
++			const QPixmap pix = rightPixs[i];
++			iconRect.setRight(iconRect.right() - pix.width() -1);
++			painter->drawPixmap(iconRect.topRight(), pix);
++		}
+ 	}
+ 
+ #if 0
+--- psi.orig/src/psicontactmenu.cpp
++++ psi/src/psicontactmenu.cpp
+@@ -47,6 +47,8 @@
+ #include "yaprofile.h"
+ #endif
+ 
++#include "groupchatdlg.h"
++
+ //----------------------------------------------------------------------------
+ // GroupMenu
+ //----------------------------------------------------------------------------
+@@ -249,6 +251,10 @@ public:
+ 	QAction* gpgUnassignKeyAction_;
+ 	QAction* vcardAction_;
+ 	QAction* historyAction_;
++	QAction* mucHideAction_;
++	QAction* mucShowAction_;
++	QAction* mucLeaveAction_;
++
+ #endif
+ 
+ public:
+@@ -312,6 +318,7 @@ public:
+ 		menu->addAction(blockAction_);
+ 		menu_->addSeparator();
+ 		menu_->addAction(disableMoodNotificationsAction_);
++		updateActions();
+ #else
+ 		addAuthAction_ = new IconAction(tr("Add/Authorize to Contact List"), this, "psi/addContact");
+ 		connect(addAuthAction_, SIGNAL(triggered()), SLOT(addAuth()));
+@@ -402,46 +409,66 @@ public:
+ 		activeChatsMenu_->setActiveChatsMode(true);
+ 		connect(activeChatsMenu_, SIGNAL(resourceActivated(PsiContact*, const XMPP::Jid&)), SLOT(openActiveChat(PsiContact*, const XMPP::Jid&)));
+ 
+-		menu_->addAction(addAuthAction_);
+-		menu_->addSeparator();
+-		menu_->addAction(receiveIncomingEventAction_);
+-		menu_->addSeparator();
+-		menu_->addAction(sendMessageAction_);
+-		menu_->addMenu(sendMessageToMenu_);
+-		menu_->addAction(openChatAction_);
+-		menu_->addMenu(openChatToMenu_);
+-		menu_->addAction(openWhiteboardAction_);
+-		menu_->addMenu(openWhiteboardToMenu_);
+-		menu_->addMenu(executeCommandMenu_);
+-		menu_->addMenu(activeChatsMenu_);
+-		if(AvCallManager::isSupported()) {
+-			menu_->addAction(voiceCallAction_);
++		mucHideAction_ = new IconAction(tr("Hide"), this, "psi/action_muc_hide");
++		connect(mucHideAction_, SIGNAL(triggered()), SLOT(mucHide()));
++		mucHideAction_->setShortcuts(ShortcutManager::instance()->shortcuts("common.hide"));
++
++		mucShowAction_ = new IconAction(tr("Show"), this, "psi/action_muc_show");
++		connect(mucShowAction_, SIGNAL(triggered()), SLOT(mucShow()));
++		mucShowAction_->setShortcuts(ShortcutManager::instance()->shortcuts("contactlist.chat"));
++
++		mucLeaveAction_ = new IconAction(tr("Leave"), this, "psi/action_muc_leave");
++		connect(mucLeaveAction_, SIGNAL(triggered()), SLOT(mucLeave()));
++		mucLeaveAction_->setShortcuts(ShortcutManager::instance()->shortcuts("common.close"));
++
++		if (!contact_->isConference()) {
++			menu_->addAction(addAuthAction_);
++			menu_->addSeparator();
++			menu_->addAction(receiveIncomingEventAction_);
++			menu_->addSeparator();
++			menu_->addAction(sendMessageAction_);
++			menu_->addMenu(sendMessageToMenu_);
++			menu_->addAction(openChatAction_);
++			menu_->addMenu(openChatToMenu_);
++			menu_->addAction(openWhiteboardAction_);
++			menu_->addMenu(openWhiteboardToMenu_);
++			menu_->addMenu(executeCommandMenu_);
++			menu_->addMenu(activeChatsMenu_);
++			if(AvCallManager::isSupported()) {
++				menu_->addAction(voiceCallAction_);
++			}
++			menu_->addSeparator();
++			menu_->addAction(sendFileAction_);
++			menu_->addMenu(inviteToGroupchatMenu_);
++			menu_->addSeparator();
++			menu_->addAction(renameAction_);
++			menu_->addMenu(groupMenu_);
++			menu_->addAction(transportLogonAction_);
++			menu_->addAction(transportLogoffAction_);
++			authMenu_ = menu_->addMenu(tr("Authorization"));
++			authMenu_->addAction(authResendAction_);
++			authMenu_->addAction(authRerequestAction_);
++			authMenu_->addAction(authRemoveAction_);
++			menu_->addAction(removeAction_);
++			menu_->addAction(customStatusAction_);
++			menu_->addSeparator();
++			pictureMenu_ = menu_->addMenu(tr("&Picture"));
++			pictureMenu_->addAction(pictureAssignAction_);
++			pictureMenu_->addAction(pictureClearAction_);
++			menu_->addAction(gpgAssignKeyAction_);
++			menu_->addAction(gpgUnassignKeyAction_);
++			menu_->addAction(vcardAction_);
++			menu_->addAction(historyAction_);
++			updateActions();
++		}
++		else {
++			menu_->addAction(mucHideAction_);
++			menu_->addAction(mucShowAction_);
++			menu_->addAction(mucLeaveAction_);
++			menu_->addSeparator();
++			menu_->addAction(customStatusAction_);
+ 		}
+-		menu_->addSeparator();
+-		menu_->addAction(sendFileAction_);
+-		menu_->addMenu(inviteToGroupchatMenu_);
+-		menu_->addSeparator();
+-		menu_->addAction(renameAction_);
+-		menu_->addMenu(groupMenu_);
+-		menu_->addAction(transportLogonAction_);
+-		menu_->addAction(transportLogoffAction_);
+-		authMenu_ = menu_->addMenu(tr("Authorization"));
+-		authMenu_->addAction(authResendAction_);
+-		authMenu_->addAction(authRerequestAction_);
+-		authMenu_->addAction(authRemoveAction_);
+-		menu_->addAction(removeAction_);
+-		menu_->addAction(customStatusAction_);
+-		menu_->addSeparator();
+-		pictureMenu_ = menu_->addMenu(tr("&Picture"));
+-		pictureMenu_->addAction(pictureAssignAction_);
+-		pictureMenu_->addAction(pictureClearAction_);
+-		menu_->addAction(gpgAssignKeyAction_);
+-		menu_->addAction(gpgUnassignKeyAction_);
+-		menu_->addAction(vcardAction_);
+-		menu_->addAction(historyAction_);
+ #endif
+-
+-		updateActions();
+ 	}
+ 
+ private slots:
+@@ -458,7 +485,7 @@ private slots:
+ 
+ 	void updateActions()
+ 	{
+-		if (!contact_)
++		if (!contact_ or contact_->isConference())
+ 			return;
+ 
+ 		renameAction_->setEnabled(contact_->isEditable());
+@@ -543,6 +570,30 @@ private slots:
+ 	}
+ #endif
+ 
++
++	void mucHide()
++	{
++		GCMainDlg *gc = contact_->account()->findDialog<GCMainDlg*>(contact_->jid());
++		if (gc && (gc->isTabbed() || !gc->isHidden()))
++			gc->hideTab();
++	}
++
++	void mucShow()
++	{
++		GCMainDlg *gc = contact_->account()->findDialog<GCMainDlg*>(contact_->jid());
++		if (gc) {
++			gc->ensureTabbedCorrectly();
++			gc->bringToFront();
++		}
++	}
++
++	void mucLeave()
++	{
++		GCMainDlg *gc = contact_->account()->findDialog<GCMainDlg*>(contact_->jid());
++		if (gc)
++			gc->close();
++	}
++
+ 	void rename()
+ 	{
+ 		if (!contact_)
+--- psi.orig/src/tabs/tabbablewidget.cpp
++++ psi/src/tabs/tabbablewidget.cpp
+@@ -56,6 +56,9 @@ void TabbableWidget::ensureTabbedCorrect
+ 		if (!isTabbed()) {
+ 			tabManager_->getTabs(this)->addTab(this);
+ 		}
++		else {
++			tabManager_->getTabs(this)->showWithoutActivation();
++		}
+ 	}
+ 	else {
+ 		if (PsiOptions::instance()->getOption("options.ui.tabs.tab-singles").toString().contains(tabManager_->tabKind(this))) {
+@@ -268,3 +271,10 @@ const QIcon &TabbableWidget::icon() cons
+ {
+ 	return icon_;
+ }
++
++void TabbableWidget::hideTab() {
++	if(isTabbed())
++		getManagingTabDlg()->hideTab(this);
++	else
++		hide();
++}
+--- psi.orig/src/tabs/tabbablewidget.h
++++ psi/src/tabs/tabbablewidget.h
+@@ -84,6 +84,7 @@ public slots:
+ 	virtual void activated();
+ 	void bringToFront(bool raiseWindow = true);
+ 	virtual void ensureTabbedCorrectly();
++	void hideTab();
+ 
+ protected:
+ 	virtual void setJid(const Jid&);
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -233,6 +233,7 @@ void TabDlg::showTabMenu(int tab, QPoint
+ 
+ 	if (tab != -1) {
+ 		QAction *d = 0;
++		QAction *h = tabMenu_->addAction(tr("Hide Tab"));
+ 		if(userManagement_) {
+ 			d = tabMenu_->addAction(tr("Detach Tab"));
+ 		}
+@@ -261,6 +262,9 @@ void TabDlg::showTabMenu(int tab, QPoint
+ 		else if (act == d) {
+ 			detachTab(getTab(tab));
+ 		}
++		else if(act == h) {
++			hideTab(getTab(tab));
++		}
+ 		else {
+ 			TabDlg* target = sentTos[act];
+ 			if (target)
+@@ -272,6 +276,8 @@ void TabDlg::showTabMenu(int tab, QPoint
+ void TabDlg::tab_aboutToShowMenu(QMenu *menu)
+ {
+ 	menu->addSeparator();
++	menu->addAction(tr("Hide Current Tab"), this, SLOT(hideCurrentTab()));
++	menu->addAction(tr("Hide All Tabs"), this, SLOT(hideAllTab()));
+ 	menu->addAction(tr("Detach Current Tab"), this, SLOT(detachCurrentTab()));
+ 	menu->addAction(tr("Close Current Tab"), this, SLOT(closeCurrentTab()));
+ 
+@@ -389,6 +395,22 @@ void TabDlg::addTab(TabbableWidget* tab)
+ 	setUpdatesEnabled(true);
+ }
+ 
++void TabDlg::hideCurrentTab()
++{
++	hideTab(static_cast<TabbableWidget*>(tabWidget_->currentPage()));
++}
++
++void TabDlg::hideTab(TabbableWidget* tab)
++{
++	closeTab(tab, false);
++}
++
++void TabDlg::hideAllTab()
++{
++	foreach(TabbableWidget* tab, tabs_)
++		hideTab(tab);
++}
++
+ void TabDlg::detachCurrentTab()
+ {
+ 	detachTab(static_cast<TabbableWidget*>(tabWidget_->currentPage()));
+@@ -401,7 +423,10 @@ void TabDlg::mouseDoubleClickTab(QWidget
+ }
+ 
+ void TabDlg::mouseMiddleClickTab(QWidget* widget) {
+-	closeTab(static_cast<TabbableWidget*>(widget));
++	if(PsiOptions::instance()->getOption("options.ui.tabs.mouse-middle-button").toString() == "close")
++		closeTab(static_cast<TabbableWidget*>(widget));
++	else
++		hideTab(static_cast<TabbableWidget*>(widget));
+ }
+ 
+ void TabDlg::detachTab(TabbableWidget* tab)
+@@ -469,6 +494,10 @@ void TabDlg::checkHasChats()
+ 	}
+ 	else if (tabWidget_->count() > 0)
+ 		return;
++	if (tabs_.count() > 0) {
++		hide();
++		return;
++	}
+ 	deleteLater();
+ }
+ 
+@@ -521,8 +550,13 @@ void TabDlg::closeEvent(QCloseEvent* clo
+ 			return;
+ 		}
+ 	}
+-	foreach(TabbableWidget* tab, tabs_) {
+-		closeTab(tab);
++	if(PsiOptions::instance()->getOption("options.ui.chat.hide-when-closing").toBool()) {
++		hide();
++	}
++	else {
++		foreach(TabbableWidget* tab, tabs_) {
++			closeTab(tab);
++		}
+ 	}
+ }
+ 
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
+@@ -121,6 +121,9 @@ public slots:
+ 	void detachTab(TabbableWidget*);
+ 	void sendTabTo(TabbableWidget*, TabDlg *);
+ 	void tabCloseRequested(int i);
++	void hideTab(TabbableWidget*);
++	void hideCurrentTab();
++	void hideAllTab();
+ 
+ signals:
+ 	void resized(QSize size);
+--- psi.orig/src/userlist.cpp
++++ psi/src/userlist.cpp
+@@ -296,8 +296,11 @@ UserListItem::UserListItem(bool self)
+ 	v_inList = false;
+ 	v_self = self;
+ 	v_private = false;
++	v_isConference = false;
+ 	v_avatarFactory = NULL;
+ 	lastmsgtype = -1;
++	v_pending = 0;
++	v_hPending = 0;
+ }
+ 
+ UserListItem::~UserListItem()
+@@ -625,6 +628,32 @@ bool UserListItem::isTransport() const
+ 	return v_isTransport;
+ }
+ 
++bool UserListItem::isConference() const
++{
++	return v_isConference;
++}
++
++void UserListItem::setConference(bool b)
++{
++	v_isConference = b;
++}
++
++void UserListItem::setPending(int p, int h)
++{
++	v_pending = p;
++	v_hPending = h;
++}
++
++QString UserListItem::pending() const
++{
++	QString str;
++	if (v_hPending)
++		str = QString("[%1/%2]").arg(v_pending).arg(v_hPending);
++	else if (v_pending)
++		str = QString("[%1]").arg(v_pending);
++	return str;
++}
++
+ bool UserListItem::isAvailable() const
+ {
+ 	return !v_url.isEmpty();
+@@ -741,7 +770,7 @@ QString UserListItem::makeBareTip(bool t
+ 		str += QString("<div style='white-space:pre'>%1</div>").arg(Qt::escape(nick));
+ 
+ 	// subscription
+-	if(!v_self && subscription().type() != Subscription::Both)
++	if(!v_self && !v_isConference && subscription().type() != Subscription::Both)
+ 		str += QString("<div style='white-space:pre'>") + QObject::tr("Subscription") + ": " + subscription().toString() + "</div>";
+ 
+ 	if(!v_keyID.isEmpty())
+@@ -845,7 +874,7 @@ QString UserListItem::makeBareTip(bool t
+ 			}
+ 
+ 			// MUC
+-			if(r.status().hasMUCItem()) {
++			if(!v_isConference && r.status().hasMUCItem()) {
+ 				if(!r.status().mucItem().jid().isEmpty())
+ 					str += QString("<div style='white-space:pre'>") + QObject::tr("JID: %1").arg(JIDUtil::toString(r.status().mucItem().jid(),true)) + QString("</div>");
+ 				if(r.status().mucItem().role() != MUCItem::NoRole)
+--- psi.orig/src/userlist.h
++++ psi/src/userlist.h
+@@ -111,6 +111,7 @@ public:
+ 
+ 	bool inList() const;
+ 	bool isTransport() const;
++	bool isConference() const;
+ 	bool isAvailable() const;
+ 	bool isHidden() const;
+ 	bool isAway() const;
+@@ -127,7 +128,8 @@ public:
+ 	QStringList clients() const;
+ 	QString findClient(QString name) const;
+ 	const Activity& activity() const;
+-
++	QString pending() const;
++	
+ 	void setJid(const XMPP::Jid &);
+ 	void setInList(bool);
+ 	void setLastAvailable(const QDateTime &);
+@@ -136,6 +138,8 @@ public:
+ 	void setMood(const Mood&);
+ 	void setActivity(const Activity&);
+ 	void setTune(const QString&);
++	void setConference(bool);
++	void setPending(int p, int h);
+ 	const QString& tune() const;
+ 	void setGeoLocation(const GeoLocation&);
+ 	const GeoLocation& geoLocation() const;
+@@ -155,12 +159,12 @@ public:
+ 	void setPublicKeyID(const QString &);
+ 	
+ private:
+-	int lastmsgtype;
++	int lastmsgtype, v_pending, v_hPending;
+ 	bool v_inList;
+ 	QDateTime v_t;
+ 	UserResourceList v_url;
+ 	QString v_perr;
+-	bool v_self, v_isTransport;
++	bool v_self, v_isTransport, v_isConference;
+ 	bool v_private;
+ 	QStringList secList;
+ 	QString v_keyID;

@@ -1,0 +1,196 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -294,6 +294,7 @@ QLineEdit#le_status_text {
+ 				<maximized type="bool">false</maximized>
+ 				<x type="int">10</x>
+ 				<y type="int">10</y>
++				<hide-on-autojoin type="bool">false</hide-on-autojoin>
+ 				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
+ 				<show-initial-joins comment="Show joins on your MUC join (with status and priority, depends on options)" type="bool">false</show-initial-joins>
+ 				<log-width type="int">500</log-width>
+--- psi.orig/src/mucjoindlg.cpp
++++ psi/src/mucjoindlg.cpp
+@@ -48,6 +48,8 @@ MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiA
+ 	joinButton_ = ui_.buttonBox->addButton(tr("&Join"), QDialogButtonBox::AcceptRole);
+ 	joinButton_->setDefault(true);
+ 
++	reason_ = MucCustomJoin;
++
+ 	updateIdentity(pa);
+ 
+ 	ui_.cb_ident->setController(controller_);
+@@ -176,11 +178,13 @@ void MUCJoinDlg::updateBookmarks(PsiAcco
+ 	}
+ }
+ 
+-void MUCJoinDlg::doJoin()
++void MUCJoinDlg::doJoin(MucJoinReason r)
+ {
+ 	if (!account_ || !account_->checkConnected(this))
+ 		return;
+ 
++	reason_ = r;
++
+ 	QString host = ui_.le_host->text();
+ 	QString room = ui_.le_room->text();
+ 	QString nick = ui_.le_nick->text();
+@@ -244,6 +248,9 @@ void MUCJoinDlg::joined()
+ 
+ void MUCJoinDlg::error(int, const QString &str)
+ {
++	if(!isVisible())
++		show();
++
+ 	ui_.busy->stop();
+ 	setWidgetsEnabled(true);
+ 
+--- psi.orig/src/mucjoindlg.h
++++ psi/src/mucjoindlg.h
+@@ -36,6 +36,12 @@ class MUCJoinDlg : public QDialog
+ 	Q_OBJECT
+ 
+ public:
++
++	enum MucJoinReason {
++		MucAutoJoin,
++		MucCustomJoin
++	};
++
+ 	MUCJoinDlg(PsiCon *, PsiAccount *);
+ 	~MUCJoinDlg();
+ 
+@@ -48,10 +54,12 @@ public:
+ 
+ public slots:
+ 	void done(int);
+-	void doJoin();
++	void doJoin(MucJoinReason reason = MucCustomJoin);
+ 
+ 	// reimplemented
+ 	void accept();
++	MucJoinReason getReason() { return reason_; };
++
+ 
+ private slots:
+ 	void updateIdentity(PsiAccount *);
+@@ -67,6 +75,7 @@ private:
+ 	PsiAccount* account_;
+ 	QPushButton* joinButton_;
+ 	XMPP::Jid jid_;
++	MucJoinReason reason_;
+ 
+ 	void disableWidgets();
+ 	void enableWidgets();
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -134,7 +134,6 @@
+ #include "systeminfo.h"
+ #include "avatars.h"
+ #include "ahcommanddlg.h"
+-#include "mucjoindlg.h"
+ #include "ahcservermanager.h"
+ #include "rc.h"
+ #include "tabdlg.h"
+@@ -2279,7 +2278,7 @@ void PsiAccount::bookmarksAvailabilityCh
+ 	foreach(ConferenceBookmark c, d->bookmarkManager->conferences()) {
+ 		if (!findDialog<GCMainDlg*>(Jid(c.jid().bare())) && c.autoJoin()) {
+ 			if  (!joinSkip.contains(c.jid().full().toUpper()))
+-				actionJoin(c, true);
++				actionJoin(c, true, MUCJoinDlg::MucAutoJoin);
+ 		}
+ 	}
+ #endif
+@@ -3323,7 +3322,7 @@ void PsiAccount::actionJoin(const Jid& m
+ 	           false);
+ }
+ 
+-void PsiAccount::actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately)
++void PsiAccount::actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately, MUCJoinDlg::MucJoinReason reason)
+ {
+ #ifdef GROUPCHAT
+ 	MUCJoinDlg* w = new MUCJoinDlg(psi(), this);
+@@ -3332,9 +3331,11 @@ void PsiAccount::actionJoin(const Confer
+ 	w->setNick(bookmark.nick().isEmpty() ? d->jid.node() : bookmark.nick());
+ 	w->setPassword(bookmark.password());
+ 
+-	w->show();
++	if(reason != MUCJoinDlg::MucAutoJoin
++	   || !PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool())
++		w->show();
+ 	if (connectImmediately) {
+-		w->doJoin();
++		w->doJoin(reason);
+ 	}
+ #else
+ 	Q_UNUSED(bookmark);
+@@ -5465,16 +5466,18 @@ void PsiAccount::edb_finished()
+ 	delete h;
+ }
+ 
+-void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType)
++void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType, MUCJoinDlg::MucJoinReason reason)
+ {
+ #ifdef GROUPCHAT
+ 	GCMainDlg *w = new GCMainDlg(this, j, d->tabManager);
+ 	w->setPassword(d->client->groupChatPassword(j.node(),j.domain()));
+ 	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
+ 	connect(d->psi, SIGNAL(emitOptionsUpdate()), w, SLOT(optionsUpdate()));
+-	w->ensureTabbedCorrectly();
+-	if (activationType == UserAction)
+-		w->bringToFront();
++	if(reason != MUCJoinDlg::MucAutoJoin) {
++		w->ensureTabbedCorrectly();
++		if (activationType == UserAction)
++			w->bringToFront();
++	}
+ #endif
+ }
+ 
+@@ -5549,10 +5552,17 @@ void PsiAccount::client_groupChatJoined(
+ 	MUCJoinDlg *w = findDialog<MUCJoinDlg*>(j);
+ 	if(!w)
+ 		return;
++	MUCJoinDlg::MucJoinReason r = w->getReason();
+ 	w->joined();
+ 
+-	// TODO: Correctly handle auto-join groupchats
+-	openGroupChat(j, UserAction);
++	openGroupChat(j, UserAction, r);
++	if(r == MUCJoinDlg::MucAutoJoin && PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
++		m = findDialog<GCMainDlg*>(Jid(j.bare()));
++		if(m) {
++			QTimer::singleShot(0, m, SLOT(hideTab()));
++		}
++	}
++
+ #endif
+ }
+ 
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -35,6 +35,7 @@
+ #include "mood.h"
+ #include "activity.h"
+ #include "geolocation.h"
++#include "mucjoindlg.h"
+ 
+ namespace XMPP
+ {
+@@ -187,7 +188,7 @@ public:
+ 	void showXmlConsole();
+ 	void openAddUserDlg();
+ 	void openAddUserDlg(const XMPP::Jid &jid, const QString &nick, const QString &group);
+-	void openGroupChat(const Jid &, ActivationType activationType);
++	void openGroupChat(const Jid &, ActivationType activationType, MUCJoinDlg::MucJoinReason reason = MUCJoinDlg::MucCustomJoin);
+ 	bool groupChatJoin(const QString &host, const QString &room, const QString &nick, const QString& pass, bool nohistory = false);
+ 	void groupChatSetStatus(const QString &host, const QString &room, const Status &);
+ 	void groupChatChangeNick(const QString &host, const QString &room, const QString& nick, const Status &);
+@@ -350,7 +351,7 @@ public slots:
+ 	void actionSearch(const Jid &);
+ 	void actionManageBookmarks();
+ 	void actionJoin(const Jid& mucJid, const QString& password = QString());
+-	void actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately);
++	void actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately, MUCJoinDlg::MucJoinReason reason = MUCJoinDlg::MucCustomJoin);
+ 	void actionDisco(const Jid &, const QString &);
+ 	void actionInvite(const Jid &, const QString &);
+ 	void actionVoice(const Jid&);

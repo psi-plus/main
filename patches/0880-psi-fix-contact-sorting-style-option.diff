@@ -1,0 +1,181 @@
+--- psi.orig/src/contactlistmodel.cpp
++++ psi/src/contactlistmodel.cpp
+@@ -73,6 +73,7 @@ ContactListModel::ContactListModel(PsiCo
+ 	connect(contactList_, SIGNAL(showSelfChanged(bool)), SIGNAL(showSelfChanged()));
+ 	connect(contactList_, SIGNAL(showAgentsChanged(bool)), SIGNAL(showTransportsChanged()));
+ 	connect(contactList_, SIGNAL(rosterRequestFinished()), SLOT(rosterRequestFinished()));
++	connect(contactList_, SIGNAL(contactSortStyleChanged(QString)), SIGNAL(contactSortStyleChanged()));
+ }
+ 
+ ContactListModel::~ContactListModel()
+@@ -900,6 +901,13 @@ bool ContactListModel::showHidden() cons
+ 	return contactList_->showHidden();
+ }
+ 
++QString ContactListModel::contactSortStyle() const
++{
++	if (!contactList_)
++		return QString("alpha");
++	return contactList_->contactSortStyle();
++}
++
+ bool ContactListModel::updatesEnabled() const
+ {
+ 	return updater()->updatesEnabled();
+--- psi.orig/src/contactlistmodel.h
++++ psi/src/contactlistmodel.h
+@@ -132,6 +132,7 @@ public:
+ 	bool showTransports() const;
+ 	bool showHidden() const;
+ 	bool hasContacts(bool onlineOnly) const;
++	QString contactSortStyle() const;
+ 
+ 	int groupOrder(const QString& groupFullName) const;
+ 	void setGroupOrder(const QString& groupFullName, int order);
+@@ -182,6 +183,7 @@ signals:
+ 	void showTransportsChanged();
+ 	void showHiddenChanged();
+ 	void inPlaceRename();
++	void contactSortStyleChanged();
+ 
+ 	void contactAlert(const QModelIndex&);
+ 
+--- psi.orig/src/contactlistproxymodel.cpp
++++ psi/src/contactlistproxymodel.cpp
+@@ -42,6 +42,7 @@ void ContactListProxyModel::setSourceMod
+ 	connect(model, SIGNAL(showSelfChanged()), SLOT(filterParametersChanged()));
+ 	connect(model, SIGNAL(showTransportsChanged()), SLOT(filterParametersChanged()));
+ 	connect(model, SIGNAL(showHiddenChanged()), SLOT(filterParametersChanged()));
++	connect(model, SIGNAL(contactSortStyleChanged()), SLOT(updateSorting()));
+ }
+ 
+ bool ContactListProxyModel::showOffline() const
+@@ -142,7 +143,16 @@ bool ContactListProxyModel::lessThan(con
+ 	ContactListItemProxy* item2 = static_cast<ContactListItemProxy*>(right.internalPointer());
+ 	if (!item1 || !item2)
+ 		return false;
+-	return item1->item()->compare(item2->item());
++
++	ContactListModel *model = static_cast<ContactListModel*>(sourceModel());
++	if((model->contactSortStyle() == "status") ||
++	   !dynamic_cast<const PsiContact*>(item1->item()) ||
++	   !dynamic_cast<const PsiContact*>(item2->item()) ) {
++		return item1->item()->compare(item2->item());
++	}
++	else {
++		return item1->item()->name().toLower() < item2->item()->name().toLower();
++	}
+ }
+ 
+ void ContactListProxyModel::filterParametersChanged()
+--- psi.orig/src/contactlistproxymodel.h
++++ psi/src/contactlistproxymodel.h
+@@ -33,6 +33,7 @@ public:
+ 
+ 	void setSourceModel(QAbstractItemModel* model);
+ 
++public slots:
+ 	void updateSorting();
+ 
+ protected:
+--- psi.orig/src/psicontactlist.cpp
++++ psi/src/psicontactlist.cpp
+@@ -39,6 +39,7 @@ PsiContactList::PsiContactList(PsiCon* p
+ 	, showSelf_(false)
+ 	, showOffline_(false)
+ 	, accountsLoaded_(false)
++	, contactSortStyle_("")
+ {
+ }
+ 
+@@ -342,6 +343,11 @@ bool PsiContactList::showOffline() const
+ 	return showOffline_;
+ }
+ 
++QString PsiContactList::contactSortStyle() const
++{
++	return contactSortStyle_;
++}
++
+ /**
+  * TODO
+  */
+@@ -383,6 +389,14 @@ void PsiContactList::setShowOffline(bool
+ 	}
+ }
+ 
++void PsiContactList::setContactSortStyle(QString style)
++{
++	if (contactSortStyle_ != style) {
++		contactSortStyle_ = style;
++		emit contactSortStyleChanged(contactSortStyle_);
++	}
++}
++
+ PsiAccount *PsiContactList::tryQueueLowestEventId(bool includeDND)
+ {
+ 	PsiAccount *low = 0;
+--- psi.orig/src/psicontactlist.h
++++ psi/src/psicontactlist.h
+@@ -45,6 +45,7 @@ public:
+ 	bool showHidden() const;
+ 	bool showSelf() const;
+ 	bool showOffline() const;
++	QString contactSortStyle() const;
+ 
+ 	bool accountsLoaded() const;
+ 
+@@ -81,12 +82,14 @@ public slots:
+ 	void setShowHidden(bool);
+ 	void setShowSelf(bool);
+ 	void setShowOffline(bool);
++	void setContactSortStyle(QString);
+ 
+ signals:
+ 	void showAgentsChanged(bool);
+ 	void showHiddenChanged(bool);
+ 	void showSelfChanged(bool);
+ 	void showOfflineChanged(bool);
++	void contactSortStyleChanged(QString);
+ 
+ signals:
+ 	void addedContact(PsiContact*);
+@@ -160,6 +163,7 @@ private:
+ 	bool showSelf_;
+ 	bool showOffline_;
+ 	bool accountsLoaded_;
++	QString contactSortStyle_;
+ 
+ 	void addEnabledAccount(PsiAccount* account);
+ 	void removeEnabledAccount(PsiAccount* account);
+--- psi.orig/src/psirosterwidget.cpp
++++ psi/src/psirosterwidget.cpp
+@@ -41,6 +41,7 @@
+ #include "contactlistutil.h"
+ #include "psiaccount.h"
+ 
++static const QString contactSortStyleOptionPath = "options.ui.contactlist.contact-sort-style";
+ static const QString showOfflineOptionPath = "options.ui.contactlist.show.offline-contacts";
+ static const QString showHiddenOptionPath = "options.ui.contactlist.show.hidden-contacts-group";
+ static const QString showAgentsOptionPath = "options.ui.contactlist.show.agent-contacts";
+@@ -175,6 +176,7 @@ void PsiRosterWidget::setContactList(Psi
+ 	optionChanged(showHiddenOptionPath);
+ 	optionChanged(showSelfOptionPath);
+ 	optionChanged(showOfflineOptionPath);
++	optionChanged(contactSortStyleOptionPath);
+ 
+ 	contactListModel_ = new PsiContactListModel(contactList_);
+ 	contactListModel_->invalidateLayout();
+@@ -218,8 +220,10 @@ void PsiRosterWidget::optionChanged(cons
+ {
+ 	if (!contactList_)
+ 		return;
+-
+-	if (option == showAgentsOptionPath) {
++	if (option == contactSortStyleOptionPath) {
++		contactList_->setContactSortStyle(PsiOptions::instance()->getOption(contactSortStyleOptionPath).toString());
++	}
++	else if (option == showAgentsOptionPath) {
+ 		contactList_->setShowAgents(PsiOptions::instance()->getOption(showAgentsOptionPath).toBool());
+ 	}
+ 	else if (option == showHiddenOptionPath) {

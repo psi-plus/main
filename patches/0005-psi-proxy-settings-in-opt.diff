@@ -1,0 +1,298 @@
+--- psi.orig/src/options/opt_application.cpp
++++ psi/src/options/opt_application.cpp
+@@ -2,6 +2,7 @@
+ #include "common.h"
+ #include "iconwidget.h"
+ #include "psioptions.h"
++#include "proxy.h"
+ 
+ #include <QCheckBox>
+ #include <QComboBox>
+@@ -73,6 +74,13 @@ QWidget *OptionsTabApplication::widget()
+ 		d->ck_autoUpdate->hide();
+ 	}
+ 
++	//Proxy
++
++	ProxyChooser *pc = ProxyManager::instance()->createProxyChooser(w);
++	d->gb_proxy->layout()->addWidget(ProxyManager::instance()->proxyForObject()->getComboBox(pc, w));
++	d->gb_proxy->layout()->addWidget(pc);
++
++
+ 	connect(d->le_dtPort, SIGNAL(textChanged(QString)), this, SLOT(updatePortLabel()));
+ 
+ 	return w;
+@@ -108,6 +116,9 @@ void OptionsTabApplication::applyOptions
+ 	// data transfer
+ 	PsiOptions::instance()->setOption("options.p2p.bytestreams.listen-port", d->le_dtPort->text().toInt());
+ 	PsiOptions::instance()->setOption("options.p2p.bytestreams.external-address", d->le_dtExternal->text().trimmed());
++
++	//Proxy
++	ProxyManager::instance()->proxyForObject()->save();
+ }
+ 
+ void OptionsTabApplication::restoreOptions()
+--- psi.orig/src/options/opt_application.ui
++++ psi/src/options/opt_application.ui
+@@ -202,6 +202,14 @@
+     </layout>
+    </item>
+    <item>
++    <widget class="QGroupBox" name="gb_proxy">
++     <property name="title">
++      <string>Proxy Settings</string>
++     </property>
++     <layout class="QHBoxLayout" name="horizontalLayout_2"/>
++    </widget>
++   </item>
++   <item>
+     <spacer>
+      <property name="orientation" >
+       <enum>Qt::Vertical</enum>
+--- psi.orig/src/proxy.cpp
++++ psi/src/proxy.cpp
+@@ -363,6 +363,7 @@ ProxyChooser::ProxyChooser(ProxyManager*
+ 	hb->addWidget(d->cb_proxy);
+ 	d->pb_edit = new QPushButton(tr("Edit..."), this);
+ 	connect(d->pb_edit, SIGNAL(clicked()), SLOT(doOpen()));
++	connect(d->cb_proxy, SIGNAL(activated(int)), SIGNAL(itemChanged()));
+ 	hb->addWidget(d->pb_edit);
+ 
+ 	buildComboBox();
+@@ -423,18 +424,88 @@ void ProxyChooser::doOpen()
+ 	d->m->openDialog(x);
+ }
+ 
++
++//----------------------------------------------------------------------------
++// ProxyForObject
++//----------------------------------------------------------------------------
++const QString defaultItemName = "Default";
++
++ProxyForObject::ProxyForObject(OptionsTree *o, QObject *parent)
++	: QObject(parent)
++	, ot_(o)
++{
++	loadItem(defaultItemName);
++}
++
++ProxyForObject::~ProxyForObject()
++{
++}
++
++QString ProxyForObject::itemForObject(const QString& obj)
++{
++	if(!items_.contains(obj))
++		loadItem(obj);
++
++	return items_.value(obj);
++}
++
++void ProxyForObject::save()
++{
++	items_ = tmp_;
++	QString base = "proxy.";
++	foreach(QString obj, items_.keys()) {
++		QString val = items_.value(obj);
++		ot_->setOption(base+obj, QVariant(val));
++	}
++}
++
++QComboBox* ProxyForObject::getComboBox(ProxyChooser* pc, QWidget* p)
++{
++	tmp_ = items_;
++	pc_ = pc;
++	cb_ = new QComboBox(p);
++	cb_->addItems(items_.keys());
++	cb_->setCurrentIndex(0);
++	currentItemChanged(0);
++
++	connect(cb_, SIGNAL(currentIndexChanged(int)), SLOT(currentItemChanged(int)));
++	connect(pc_, SIGNAL(itemChanged()), SLOT(updateCurrentItem()));
++
++	return cb_;
++}
++
++void ProxyForObject::currentItemChanged(int index)
++{
++	const QString data = cb_->itemText(index);
++	pc_->setCurrentItem(tmp_.value(data));
++}
++
++void ProxyForObject::loadItem(const QString& obj)
++{
++	QVariant v = ot_->getOption(("proxy." + obj));
++	if(!v.isValid())
++		v = ot_->getOption(("proxy." + defaultItemName));
++	items_[obj] = v.toString();
++}
++
++void ProxyForObject::updateCurrentItem()
++{
++	tmp_[cb_->currentText()] = pc_->currentItem();
++}
++
+ //----------------------------------------------------------------------------
+ // ProxyManager
+ //----------------------------------------------------------------------------
+ class ProxyManager::Private
+ {
+ public:
+-	Private() {}
++	Private() : po(0) {}
+ 
+ 	QPointer<ProxyDlg> pd;
+ 	QList<int> prevMap;
+ 	QString lastEdited;
+ 	OptionsTree *o;
++	ProxyForObject* po;
+ 	
+ 	void itemToOptions(ProxyItem pi) {
+ 		QString base = "proxies." + pi.id;
+@@ -444,11 +515,17 @@ public:
+ 	}
+ };
+ 
+-ProxyManager::ProxyManager(OptionsTree *opt, QObject *parent)
+-		: QObject(parent)
++ProxyManager::ProxyManager()
++		: QObject(0)
+ {
+ 	d = new Private;
+-	d->o = opt;
++}
++
++void ProxyManager::init(OptionsTree *o)
++{
++	d->o = o;
++	delete d->po;
++	d->po = new ProxyForObject(o, this);
+ }
+ 
+ ProxyManager::~ProxyManager()
+@@ -456,6 +533,13 @@ ProxyManager::~ProxyManager()
+ 	delete d;
+ }
+ 
++ProxyManager* ProxyManager::instance()
++{
++	if(!instance_)
++		instance_ = new ProxyManager();
++	return instance_;
++}
++
+ ProxyChooser *ProxyManager::createProxyChooser(QWidget *parent)
+ {
+ 	return new ProxyChooser(this, parent);
+@@ -540,4 +624,17 @@ void ProxyManager::pd_applyList(const Pr
+ 	settingsChanged();
+ }
+ 
++ProxyItem ProxyManager::getItemForObject(const QString& obj)
++{
++	QString str = obj;
++	return getItem(d->po->itemForObject(str.replace(QRegExp("\\s+"), "_")));
++}
++
++ProxyForObject* ProxyManager::proxyForObject()
++{
++	return d->po;
++}
++
++ProxyManager* ProxyManager::instance_ = NULL;
++
+ #include "proxy.moc"
+--- psi.orig/src/proxy.h
++++ psi/src/proxy.h
+@@ -23,6 +23,7 @@
+ 
+ #include <QList>
+ #include <QGroupBox>
++#include <QPointer>
+ 
+ #include "ui_proxy.h"
+ //#include "ui_proxyedit.h"
+@@ -85,6 +86,9 @@ private slots:
+ 	void pm_settingsChangedApply();
+ 	void doOpen();
+ 
++signals:
++	void itemChanged();
++
+ private:
+ 	class Private;
+ 	Private *d;
+@@ -103,11 +107,39 @@ public:
+ 	ProxySettings settings;
+ };
+ 
++class ProxyForObject : public QObject
++{
++	Q_OBJECT
++
++public:
++	ProxyForObject(OptionsTree *o, QObject *parent = 0);
++	~ProxyForObject();
++
++	QString itemForObject(const QString& obj);
++	void save();
++	QComboBox* getComboBox(ProxyChooser* pc, QWidget* p = 0);
++
++private slots:
++	void currentItemChanged(int);
++	void updateCurrentItem();
++
++private:
++	void loadItem(const QString& obj);
++
++	OptionsTree* ot_;
++	ProxyChooser* pc_;
++	QPointer<QComboBox> cb_;
++	QMap<QString, QString> items_;
++	QMap<QString, QString> tmp_;
++};
++
+ class ProxyManager : public QObject
+ {
+ 	Q_OBJECT
+ public:
+-	ProxyManager(OptionsTree *o, QObject *parent=0);
++	static ProxyManager* instance();
++
++	void init(OptionsTree *o);
+ 	~ProxyManager();
+ 
+ 	ProxyChooser *createProxyChooser(QWidget *parent=0);
+@@ -116,6 +148,8 @@ public:
+ 	QString lastEdited() const;
+ 	void migrateItemList(const ProxyItemList &);
+ //	int findOldIndex(int) const;
++	ProxyForObject* proxyForObject();
++	ProxyItem getItemForObject(const QString& obj);
+ 
+ signals:
+ 	void settingsChanged();
+@@ -128,8 +162,11 @@ private slots:
+ 	void pd_applyList(const ProxyItemList &, int cur);
+ 
+ private:
++	ProxyManager();
+ 	class Private;
+ 	Private *d;
++
++	static ProxyManager* instance_;
+ };
+ 
+ #endif
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -444,7 +444,8 @@ bool PsiCon::init()
+ 	}
+ 
+ 	// proxy
+-	d->proxy = new ProxyManager(&d->accountTree, this);
++	d->proxy = ProxyManager::instance();
++	d->proxy->init(&d->accountTree);
+ 	if (accountMigration) d->proxy->migrateItemList(d->optionsMigration.proxyMigration);
+ 	connect(d->proxy, SIGNAL(settingsChanged()), SLOT(proxy_settingsChanged()));
+ 	

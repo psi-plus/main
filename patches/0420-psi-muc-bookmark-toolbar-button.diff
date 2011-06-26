@@ -1,0 +1,282 @@
+--- psi.orig/src/bookmarkmanager.cpp
++++ psi/src/bookmarkmanager.cpp
+@@ -138,6 +138,24 @@ void BookmarkManager::setIsAvailable(boo
+ 	}
+ }
+ 
++bool BookmarkManager::isBookmarked(const XMPP::Jid &j)
++{
++	return indexOfConference(j) >= 0;
++}
++
++void BookmarkManager::removeConference(const XMPP::Jid &j)
++{
++	if (isAvailable_) {
++		QList<ConferenceBookmark> confs;
++		foreach (ConferenceBookmark c, conferences_) {
++			if (!c.jid().compare(j, false)) {
++				confs.push_back(c);
++			}
++		}
++		setBookmarks(confs);
++	}
++}
++
+ QList<URLBookmark> BookmarkManager::urls() const
+ {
+ 	return urls_;
+@@ -148,6 +166,20 @@ QList<ConferenceBookmark> BookmarkManage
+ 	return conferences_;
+ }
+ 
++int BookmarkManager::indexOfConference(const XMPP::Jid &j) const
++{
++	if (isAvailable_) {
++		int i = 0;
++		foreach(ConferenceBookmark c, conferences_) {
++			if (c.jid().compare(j, false)) {
++				return i;
++			}
++			i++;
++		}
++	}
++	return -1;
++}
++
+ void BookmarkManager::accountStateChanged()
+ {
+ 	if (!account_->isAvailable()) {
+@@ -214,4 +246,5 @@ void BookmarkManager::setBookmarks_finis
+ {
+ 	BookmarkTask* t = static_cast<BookmarkTask*>(sender());
+ 	Q_UNUSED(t);
++	emit bookmarksSaved();
+ }
+--- psi.orig/src/bookmarkmanager.h
++++ psi/src/bookmarkmanager.h
+@@ -37,18 +37,22 @@ public:
+ 	BookmarkManager(PsiAccount* account);
+ 
+ 	bool isAvailable() const;
++	bool isBookmarked(const XMPP::Jid &);
+ 
+ 	QList<URLBookmark> urls() const;
+ 	QList<ConferenceBookmark> conferences() const;
++	int indexOfConference(const XMPP::Jid &) const;
+ 
+ 	void setBookmarks(const QList<URLBookmark>&, const QList<ConferenceBookmark>&);
+ 	void setBookmarks(const QList<URLBookmark>&);
+ 	void setBookmarks(const QList<ConferenceBookmark>&);
++	void removeConference(const XMPP::Jid &);
+ 
+ signals:
+ 	void availabilityChanged();
+ 	void urlsChanged(const QList<URLBookmark>&);
+ 	void conferencesChanged(const QList<ConferenceBookmark>&);
++	void bookmarksSaved();
+ 
+ private slots:
+ 	void getBookmarks_finished();
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -50,6 +50,9 @@
+ #include <QTextDocument> // for Qt::escape()
+ #include <QToolTip>
+ #include <QScrollBar>
++#include <QCheckBox>
++#include <QDialogButtonBox>
++#include <QFormLayout>
+ 
+ #include "psicon.h"
+ #include "psiaccount.h"
+@@ -77,6 +80,7 @@
+ #include "psicontactlist.h"
+ #include "accountlabel.h"
+ #include "gcuserview.h"
++#include "bookmarkmanager.h"
+ #include "mucreasonseditor.h"
+ #include "mcmdmanager.h"
+ #include "lastactivitytask.h"
+@@ -205,7 +209,7 @@ public:
+ 	QString password;
+ 	QString topic;
+ 	bool nonAnonymous;		 // got status code 100 ?
+-	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates;
++	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark;
+ #ifdef WHITEBOARDING
+ 	IconAction *act_whiteboard;
+ #endif
+@@ -684,6 +688,19 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 
+ 	d->act_templates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
+ 	d->act_templates->setMenu(getTemplateMenu());
++
++	d->act_bookmark = new IconAction(this);
++	connect(d->act_bookmark, SIGNAL(triggered()), SLOT(doBookmark()));
++	ui_.le_topic->addAction(d->act_bookmark);
++	BookmarkManager *bm = account()->bookmarkManager();
++	d->act_bookmark->setVisible(bm->isAvailable());
++	if (bm->isAvailable()) {
++		updateBookmarkIcon();
++	}
++	connect(bm, SIGNAL(availabilityChanged()), SLOT(updateBookmarkIcon()));
++	connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateBookmarkIcon()));
++	connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
++
+ 	ui_.toolbar->setIconSize(QSize(16,16));
+ 	ui_.toolbar->addAction(d->act_clear);
+ 	ui_.toolbar->addAction(d->act_configure);
+@@ -888,6 +905,25 @@ void GCMainDlg::updateIdentityVisibility
+ 	ui_.lb_ident->setVisible(account()->psi()->contactList()->enabledAccounts().count() > 1);
+ }
+ 
++void GCMainDlg::updateBookmarkIcon()
++{
++	BookmarkManager *bm = account()->bookmarkManager();
++	d->act_bookmark->setVisible(bm->isAvailable());
++	if (bm->isAvailable()) {
++		QString text;
++		if (bm->isBookmarked(jid())) {
++			text = tr("Edit bookmark");
++			d->act_bookmark->setPsiIcon("psi/bookmark_remove");
++		} else {
++			text = tr("Add to bookmarks");
++			d->act_bookmark->setPsiIcon("psi/bookmark_add");
++		}
++		d->act_bookmark->setToolTip(text);
++		d->act_bookmark->setText(text);
++		d->act_bookmark->setStatusTip(text);
++	}
++}
++
+ #ifdef WHITEBOARDING
+ void GCMainDlg::openWhiteboard()
+ {
+@@ -1794,6 +1830,7 @@ void GCMainDlg::buildMenu()
+ 	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
+ 		d->pm_settings->addAction(d->act_ps);
+ 	d->pm_settings->addAction(d->act_nick);
++	d->pm_settings->addAction(d->act_bookmark);
+ }
+ 
+ void GCMainDlg::chatEditCreated()
+@@ -1852,6 +1889,71 @@ void GCMainDlg::doPasteAndSend()
+ 	}
+ }
+ 
++void GCMainDlg::doBookmark()
++{
++	BookmarkManager *bm = account()->bookmarkManager();
++	if (!bm->isAvailable()) {
++		return;
++	}
++	QList<ConferenceBookmark> confs =  bm->conferences();
++	int confInd = bm->indexOfConference(jid());
++	if (confInd < 0) { // not found
++		ConferenceBookmark conf(jid().bare(), jid(), false, nick(), d->password);
++		confs.push_back(conf);
++		bm->setBookmarks(confs);
++		return;
++	}
++	ConferenceBookmark &b = confs[confInd];
++	QDialog *dlg = new QDialog(this);
++	QVBoxLayout *layout = new QVBoxLayout;
++	QHBoxLayout *blayout = new QHBoxLayout;
++	QFormLayout *formLayout = new QFormLayout;
++	QLineEdit *txtName = new QLineEdit;
++	QLineEdit *txtNick = new QLineEdit;
++	QCheckBox *chkAJoin = new QCheckBox;
++	QPushButton *saveBtn = new QPushButton(dlg->style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save"), dlg);
++	QPushButton *deleteBtn = new QPushButton(dlg->style()->standardIcon(QStyle::SP_DialogDiscardButton), tr("Delete"), dlg);
++	QPushButton *cancelBtn = new QPushButton(dlg->style()->standardIcon(QStyle::SP_DialogCancelButton), tr("Cancel"), dlg);
++
++	blayout->insertStretch(0);
++	blayout->addWidget(saveBtn);
++	blayout->addWidget(deleteBtn);
++	blayout->addWidget(cancelBtn);
++	txtName->setText(b.name());
++	txtNick->setText(b.nick());
++	chkAJoin->setChecked(b.autoJoin());
++	formLayout->addRow(tr("&Name:"), txtName);
++	formLayout->addRow(tr("N&ick:"), txtNick);
++	formLayout->addRow(tr("&Auto join:"), chkAJoin);
++	layout->addLayout(formLayout);
++	layout->addLayout(blayout);
++	dlg->setLayout(layout);
++	dlg->setMinimumWidth(300);
++	dlg->connect(saveBtn, SIGNAL(clicked()), dlg, SLOT(accept()));
++	dlg->connect(deleteBtn, SIGNAL(clicked()), dlg, SLOT(reject()));
++	dlg->connect(cancelBtn, SIGNAL(clicked()), dlg, SLOT(reject()));
++	connect(deleteBtn, SIGNAL(clicked()), this, SLOT(doRemoveBookmark()));
++
++	dlg->setWindowTitle(tr("Bookmark conference"));
++	dlg->adjustSize();
++	dlg->move(ui_.le_topic->mapToGlobal(QPoint(
++			ui_.le_topic->width() - dlg->width(), ui_.le_topic->height())));
++	if (dlg->exec() == QDialog::Accepted) {
++		ConferenceBookmark conf(txtName->text(), jid(), chkAJoin->checkState() == Qt::Checked, txtNick->text(), d->password);
++		confs[confInd] = conf;
++		bm->setBookmarks(confs);
++	}
++	delete dlg;
++}
++
++void GCMainDlg::doRemoveBookmark()
++{
++	BookmarkManager *bm = account()->bookmarkManager();
++	if (bm->isAvailable()) {
++		bm->removeConference(jid());
++	}
++}
++
+ void GCMainDlg::psButtonEnabled()
+ {
+ 	d->act_ps->setEnabled(true);
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -131,6 +131,7 @@ private slots:
+ 	void unsetConnecting();
+ 	void action_error(MUCManager::Action, int, const QString&);
+ 	void updateIdentityVisibility();
++	void updateBookmarkIcon();
+ #ifdef WHITEBOARDING
+ 	void openWhiteboard();
+ #endif
+@@ -138,6 +139,8 @@ private slots:
+ 	void sendButtonMenu();
+ 	void editTemplates();
+ 	void doPasteAndSend();
++	void doBookmark();
++	void doRemoveBookmark();
+ 	void sendTemp(const QString &);
+ 	void psButtonEnabled();
+ 
+--- psi.orig/src/groupchatdlg.ui
++++ psi/src/groupchatdlg.ui
+@@ -71,10 +71,13 @@
+            </widget>
+           </item>
+           <item>
+-           <widget class="QLineEdit" name="le_topic" >
++           <widget class="ActionLineEdit" name="le_topic" >
+             <property name="readOnly" >
+              <bool>true</bool>
+             </property>
++            <property name="toolButtonStyle" >
++             <enum>Qt::ToolButtonIconOnly</enum>
++            </property>
+            </widget>
+           </item>
+           <item>
+@@ -325,6 +328,11 @@
+    <extends>QTextEdit</extends>
+    <header>chateditproxy.h</header>
+   </customwidget>
++  <customwidget>
++   <class>ActionLineEdit</class>
++   <extends>QLineEdit</extends>
++   <header>actionlineedit.h</header>
++  </customwidget>
+  </customwidgets>
+  <resources/>
+  <connections/>

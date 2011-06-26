@@ -1,0 +1,30 @@
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -1185,7 +1185,7 @@ PsiAccount::PsiAccount(const UserAccount
+ 	connect(capsManager(),SIGNAL(capsChanged(const Jid&)),SLOT(capsChanged(const Jid&)));
+ 
+ 	//printf("PsiAccount: [%s] loaded\n", name().latin1());
+-	d->xmlConsole = new XmlConsole(this);
++
+ 	if(PsiOptions::instance()->getOption("options.xml-console.enable-at-login").toBool() && enabled()) {
+ 		this->showXmlConsole();
+ 		d->xmlConsole->enable();
+@@ -1337,6 +1337,8 @@ void PsiAccount::setEnabled(bool e)
+ 				return;
+ 			}
+ 		}
++		delete d->xmlConsole;
++		d->xmlConsole = 0;
+ 	}
+ 
+ 	d->setEnabled( e );
+@@ -3233,6 +3235,9 @@ void PsiAccount::changePW()
+ 
+ void PsiAccount::showXmlConsole()
+ {
++	if(!d->xmlConsole) {
++		d->xmlConsole = new XmlConsole(this);
++	}
+ 	bringToFront(d->xmlConsole);
+ }
+ 

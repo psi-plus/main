@@ -1,0 +1,302 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -333,6 +333,7 @@
+ 				<recent-jids type="QStringList" />
+ 			</service-discovery>
+ 			<tabs>
++				<show-tab-icons type="bool">true</show-tab-icons>
+ 				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
+ 				<use-tabs type="bool">false</use-tabs>
+ 				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -195,12 +195,6 @@ void ChatDlg::initActions()
+ 	connect(act_scrolldown_, SIGNAL(triggered()), SLOT(scrollDown()));
+ }
+ 
+-void ChatDlg::ensureTabbedCorrectly() {
+-	TabbableWidget::ensureTabbedCorrectly();
+-	setShortcuts();
+-}
+-
+-
+ void ChatDlg::setShortcuts()
+ {
+ 	act_send_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.send"));
+@@ -448,6 +442,15 @@ UserStatus userStatusFor(const Jid& jid,
+ 	return u;
+ }
+ 
++void ChatDlg::ensureTabbedCorrectly()
++{
++	TabbableWidget::ensureTabbedCorrectly();
++	setShortcuts();
++	QList<UserListItem*> ul = account()->findRelevant(jid());
++	UserStatus userStatus = userStatusFor(jid(), ul, false);
++	setTabIcon(PsiIconset::instance()->statusPtr(jid(), userStatus.statusType)->icon());
++}
++
+ void ChatDlg::updateContact(const Jid &j, bool fromPresence)
+ {
+ 	// if groupchat, only update if the resource matches
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -763,6 +764,13 @@ void GCMainDlg::ensureTabbedCorrectly() 
+ 	QList<int> tmp = ui_.hsplitter->sizes();
+ 	ui_.hsplitter->setSizes(QList<int>() << 0);
+ 	ui_.hsplitter->setSizes(tmp);
++	UserListItem* u = account()->find(jid().bare());
++	if(u) {
++		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
++	}
++	else {
++		setStatusTabIcon((d->state == Private::Connected ? STATUS_ONLINE : STATUS_OFFLINE));
++	}
+ }
+ 
+ void GCMainDlg::setShortcuts()
+@@ -1058,6 +1066,7 @@ void GCMainDlg::goDisc()
+ 	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
+ 		d->state = Private::Idle;
+ 		ui_.pb_topic->setEnabled(false);
++		setStatusTabIcon(STATUS_OFFLINE);
+ 		appendSysMsg(tr("Disconnected."), true);
+ 		ui_.mle->chatEdit()->setEnabled(false);
+ 	}
+@@ -1145,6 +1154,7 @@ PsiAccount* GCMainDlg::account() const
+ void GCMainDlg::error(int, const QString &str)
+ {
+ 	ui_.pb_topic->setEnabled(false);
++	setStatusTabIcon(STATUS_ERROR);
+ 
+ 	if(d->state == Private::Connecting)
+ 		appendSysMsg(tr("Unable to join groupchat.	Reason: %1").arg(str), true);
+@@ -1198,6 +1208,8 @@ void GCMainDlg::presence(const QString &
+ 	}
+ 
+ 	if (nick == d->self) {
++		if(s.isAvailable())
++			setStatusTabIcon(s.type());
+ 		// Update configuration dialog
+ 		if (d->configDlg) {
+ 			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
+@@ -1475,6 +1487,7 @@ void GCMainDlg::joined()
+ 		ui_.lv_users->clear();
+ 		d->state = Private::Connected;
+ 		ui_.pb_topic->setEnabled(true);
++		setStatusTabIcon(STATUS_ONLINE);
+ 		ui_.mle->chatEdit()->setEnabled(true);
+ 		setConnecting();
+ 		appendSysMsg(tr("Connected."), true);
+@@ -1780,6 +1793,11 @@ int GCMainDlg::unreadMessageCount() cons
+ 	return d->pending;
+ }
+ 
++void GCMainDlg::setStatusTabIcon(int status)
++{
++	setTabIcon(PsiIconset::instance()->statusPtr(jid(), status)->icon());
++}
++
+ //----------------------------------------------------------------------------
+ // GCFindDlg
+ //----------------------------------------------------------------------------
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -93,6 +93,7 @@ protected:
+ 	void closeEvent(QCloseEvent *);
+ 	void resizeEvent(QResizeEvent*);
+ 	void mucInfoDialog(const QString& title, const QString& message, const Jid& actor, const QString& reason);
++	void setStatusTabIcon(int status);
+ 
+ signals:
+ 	void aSend(const Message &);
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -179,6 +179,7 @@ void PsiChatDlg::initUi()
+ 
+ 	PsiToolTip::install(ui_.lb_status);
+ 	ui_.lb_status->setPsiIcon(IconsetFactory::iconPtr("status/noauth"));
++	setTabIcon(IconsetFactory::iconPtr("status/noauth")->icon());
+ 
+ 	ui_.tb_emoticons->setIcon(IconsetFactory::icon("psi/smile").icon());
+ 
+@@ -392,9 +393,11 @@ void PsiChatDlg::contactUpdated(UserList
+ 
+ 	if (status == -1 || !u) {
+ 		ui_.lb_status->setPsiIcon(IconsetFactory::iconPtr("status/noauth"));
++		setTabIcon(IconsetFactory::iconPtr("status/noauth")->icon());
+ 	}
+ 	else {
+ 		ui_.lb_status->setPsiIcon(PsiIconset::instance()->statusPtr(jid(), status));
++		setTabIcon(PsiIconset::instance()->statusPtr(jid(), status)->icon());
+ 	}
+ 
+ 	if (u) {
+--- psi.orig/src/tabs/tabbablewidget.cpp
++++ psi/src/tabs/tabbablewidget.cpp
+@@ -209,3 +209,20 @@ void TabbableWidget::changeEvent(QEvent*
+ 		}
+ 	}
+ }
++
++/**
++ * Set the icon of the tab.
++ */
++void TabbableWidget::setTabIcon(const QIcon &icon)
++{
++	icon_ = icon;
++	TabDlg* tabDlg = tabManager_->getManagingTabs(this);
++	if (tabDlg) {
++		tabDlg->setTabIcon(this, icon);
++	}
++}
++
++const QIcon &TabbableWidget::icon() const
++{
++	return icon_;
++}
+--- psi.orig/src/tabs/tabbablewidget.h
++++ psi/src/tabs/tabbablewidget.h
+@@ -21,6 +21,7 @@
+ #ifndef TABBABLE_H
+ #define TABBABLE_H
+ 
++#include <QIcon>
+ #include "advwidget.h"
+ #include "im.h" // ChatState
+ 
+@@ -42,6 +43,8 @@ public:
+ 	~TabbableWidget();
+ 
+ 	PsiAccount* account() const;
++	void setTabIcon(const QIcon &);
++	const QIcon &icon() const;
+ 
+ 	virtual Jid jid() const; 
+ 	virtual const QString & getDisplayName();
+@@ -86,6 +89,7 @@ private:
+ 	Jid jid_;
+ 	PsiAccount *pa_;
+ 	TabManager *tabManager_;
++	QIcon icon_;
+ };
+ 
+ #endif
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -372,7 +372,7 @@ void TabDlg::addTab(TabbableWidget* tab)
+ {
+ 	setUpdatesEnabled(false);
+ 	tabs_.append(tab);
+-	tabWidget_->addTab(tab, captionForTab(tab));
++	tabWidget_->addTab(tab, captionForTab(tab), tab->icon());
+ 
+ 	connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
+ 	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
+@@ -562,12 +562,15 @@ void TabDlg::updateTab(TabbableWidget* c
+ 
+ 	if (chat->state() == TabbableWidget::StateComposing) {
+ 		tabWidget_->setTabTextColor(chat, Qt::darkGreen);
++		tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/typing")->icon());
+ 	}
+ 	else if (chat->unreadMessageCount()) {
+ 		tabWidget_->setTabTextColor(chat, Qt::red);
++		tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/chat")->icon());
+ 	}
+ 	else {
+ 		tabWidget_->setTabTextColor(chat, palette().windowText().color());
++		tabWidget_->setTabIcon(chat, chat->icon());
+ 	}
+ 	updateCaption();
+ }
+@@ -775,3 +778,11 @@ TabbableWidget* TabDlg::getCurrentTab() 
+ {
+ 	return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
+ }
++
++/**
++ * Set the icon of the tab.
++ */
++void TabDlg::setTabIcon(QWidget *widget,const QIcon &icon)
++{
++	tabWidget_->setTabIcon(widget, icon);
++}
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
+@@ -85,6 +85,7 @@ public:
+ 	void setTabBarShownForSingles(bool enabled); // default enabled
+ 	void setSimplifiedCaptionEnabled(bool enabled); // default disabled
+ 	TabbableWidget* getCurrentTab() const;
++	void setTabIcon(QWidget *,const QIcon &);
+ 
+ protected:
+ 	void setShortcuts();
+--- psi.orig/src/widgets/psitabwidget.cpp
++++ psi/src/widgets/psitabwidget.cpp
+@@ -21,6 +21,7 @@
+ #include "psitabwidget.h"
+ #include "psitabbar.h"
+ #include "common.h"
++#include "psioptions.h"
+ #include <QWidget>
+ #include <QVBoxLayout>
+ #include <QHBoxLayout>
+@@ -155,14 +156,18 @@ int PsiTabWidget::currentPageIndex() {
+ /**
+  * Add the Widget to the tab stack.
+  */
+-void PsiTabWidget::addTab(QWidget *widget, QString name) {
++void PsiTabWidget::addTab(QWidget *widget, QString name, const QIcon &icon)
++{
+ 	Q_ASSERT(widget);
+ 	if (widgets_.contains(widget)) {
+ 		return;
+ 	}
+ 	widgets_.append(widget);
+ 	stacked_->addWidget(widget);
+-	tabBar_->addTab(name);
++	if (PsiOptions::instance()->getOption("options.ui.tabs.show-tab-icons").toBool())
++		tabBar_->addTab(icon, name);
++	else
++		tabBar_->addTab(name);
+ 	showPage(currentPage());
+ } 
+ 
+@@ -230,6 +235,18 @@ void PsiTabWidget::setTabText(QWidget* w
+ 	tabBar_->setTabText(index, label);
+ } 
+ 
++/**
++ * Set the icon of the tab.
++ */
++void PsiTabWidget::setTabIcon(QWidget *widget, const QIcon &icon)
++{
++	int index = getIndex(widget);
++	if (index == -1 || !PsiOptions::instance()->getOption("options.ui.tabs.show-tab-icons").toBool()) {
++		return;
++	}
++	tabBar_->setTabIcon(index, icon);
++}
++
+ void PsiTabWidget::setCurrentPage(int index) {
+ 	if (index >= 0 && index < count()) {
+ 		showPage(widgets_[index]);
+--- psi.orig/src/widgets/psitabwidget.h
++++ psi/src/widgets/psitabwidget.h
+@@ -48,7 +48,7 @@ public:
+ 	QWidget *currentPage();
+ 	int currentPageIndex();
+ 	QWidget *widget(int index);
+-	void addTab(QWidget *, QString);
++	void addTab(QWidget *, QString, const QIcon &icon = QIcon());
+ 	void showPage(QWidget *);
+ 	void showPageDirectly(QWidget *);
+ 
+@@ -56,6 +56,7 @@ public:
+ 	QWidget* page(int index);
+ 	int getIndex(QWidget *);
+ 	void setTabText(QWidget *, const QString &);
++	void setTabIcon(QWidget *, const QIcon &);
+ 	void setTabPosition(QTabWidget::TabPosition pos);
+ 	void setCloseIcon(const QIcon &);
+ 

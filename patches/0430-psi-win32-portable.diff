@@ -1,0 +1,105 @@
+--- psi.orig/src/applicationinfo.cpp
++++ psi/src/applicationinfo.cpp
+@@ -15,6 +15,7 @@
+ #include <CoreServices/CoreServices.h>
+ #endif
+ 
++#include "psiapplication.h"
+ #include "applicationinfo.h"
+ #include "profiles.h"
+ #ifdef HAVE_CONFIG
+@@ -193,15 +194,17 @@ QString ApplicationInfo::homeDir()
+ 	}
+ 	return proghome.path();
+ #elif defined(Q_WS_WIN)
+-	QString base;
++	QString base = ((PsiApplication *)qApp)->portableBase();
+ 
+-	// Windows 9x
+-	if(QDir::homePath() == QDir::rootPath()) {
+-		base = ".";
+-	}
+-	// Windows NT/2K/XP variant
+-	else {
+-		base = QDir::homePath();
++	if (base.isEmpty()) {
++		// Windows 9x
++		if(QDir::homePath() == QDir::rootPath()) {
++			base = ".";
++		}
++		// Windows NT/2K/XP variant
++		else {
++			base = QDir::homePath();
++		}
+ 	}
+ 	// no trailing slash
+ 	if(base.at(base.length()-1) == '/') {
+--- psi.orig/src/main.cpp
++++ psi/src/main.cpp
+@@ -33,6 +33,7 @@
+ #include <QtCrypto>
+ #include <QTranslator>
+ #include <QDir>
++#include <QFileInfo>
+ #include <QProcess>
+ 
+ #include <stdlib.h>
+@@ -466,6 +467,12 @@ int main(int argc, char *argv[])
+ 
+ 	// it must be initialized first in order for ApplicationInfo::resourcesDir() to work
+ 	PsiApplication app(argc, argv);
++#if defined(Q_WS_WIN)
++	QFileInfo fi(argv[0]);
++	if (fi.baseName().toLower().indexOf("portable") != -1) {
++		app.setPortableBase(fi.absolutePath());
++	}
++#endif
+ 	QApplication::addLibraryPath(ApplicationInfo::resourcesDir());
+ 	QApplication::addLibraryPath(ApplicationInfo::homeDir());
+ 	QApplication::setQuitOnLastWindowClosed(false);
+--- psi.orig/src/psiapplication.cpp
++++ psi/src/psiapplication.cpp
+@@ -173,7 +173,8 @@ private:
+ //----------------------------------------------------------------------------
+ 
+ PsiApplication::PsiApplication(int &argc, char **argv, bool GUIenabled)
+-: QApplication(argc, argv, GUIenabled)
++:	QApplication(argc, argv, GUIenabled),
++	portableBase_(0)
+ {
+ 	init(GUIenabled);
+ }
+@@ -327,3 +328,13 @@ void PsiApplication::commitData(QSession
+ 	Q_UNUSED(manager);
+ 	emit forceSavePreferences();
+ }
++
++void PsiApplication::setPortableBase(const QString &base)
++{
++	portableBase_ = new QString(base);
++}
++
++QString PsiApplication::portableBase() const
++{
++	return portableBase_?*portableBase_:QString();
++}
+--- psi.orig/src/psiapplication.h
++++ psi/src/psiapplication.h
+@@ -46,6 +46,9 @@ public:
+ 	// reimplemented
+ 	void commitData(QSessionManager& manager);
+ 
++	void setPortableBase(const QString &base);
++	QString portableBase() const;
++
+ signals:
+ 	void forceSavePreferences();
+ 	void dockActivated();
+@@ -54,6 +57,7 @@ signals:
+ 
+ private:
+ 	void init(bool GUIenabled);
++	QString *portableBase_;
+ };
+ 
+ #endif

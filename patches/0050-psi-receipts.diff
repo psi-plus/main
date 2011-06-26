@@ -1,0 +1,605 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -107,6 +107,8 @@
+ 				<use-chat-says-style type="bool">false</use-chat-says-style>
+ 				<use-expanding-line-edit type="bool">true</use-expanding-line-edit>
+ 				<use-small-chats type="bool">false</use-small-chats>
++				<use-message-icons type="bool">true</use-message-icons>
++				<scaled-message-icons type="bool">false</scaled-message-icons>
+ 				<warn-before-clear type="bool">true</warn-before-clear>
+ 			</chat>
+ 			<history comment="History dialog options">
+@@ -281,6 +283,8 @@
+ 			<notifications>
+ 				<alert-style type="QString">animate</alert-style>
+ 				<bounce-dock type="QString">forever</bounce-dock>
++				<send-receipts type="bool" >true</send-receipts>
++				<request-receipts type="bool" >true</request-receipts>
+ 				<passive-popups>
+ 					<duration type="int">10000</duration>
+ 					<enabled type="bool">false</enabled>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -692,6 +692,20 @@ void ChatDlg::doSend()
+ 	}
+ 	QString id = account()->client()->genUniqueId();
+ 	m.setId(id); // we need id early for message manipulations in chatview
++
++	//xep-0184 Message Receipts
++	if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
++		QStringList sl;
++		sl<<"urn:xmpp:receipts";
++		//FIXME uncomment next lines when all bugs will be fixed
++		//if (!jid().resource().isEmpty() || (account()->capsManager()->isEnabled() &&
++		//    account()->capsManager()->features(jid()).test(sl))) {
++		if (true) {
++			m.setMessageReceipt(ReceiptRequest);
++			//rememberPosition(id);
++		}
++	}
++
+ 	m_ = m;
+ 
+ 	// Request events
+@@ -765,6 +779,9 @@ void ChatDlg::incomingMessage(const Mess
+ 		if (m.chatState() != XMPP::StateNone) {
+ 			setContactChatState(m.chatState());
+ 		}
++		if (m.messageReceipt() == ReceiptReceived) {
++			chatView()->markReceived(m.id());
++		}
+ 	}
+ 	else {
+ 		// Normal message
+@@ -845,6 +862,7 @@ void ChatDlg::appendMessage(const Messag
+ 	mv.setUserId(local?account()->jid().bare():jid().bare());
+ 	mv.setDateTime(m.timeStamp());
+ 	mv.setSpooled(m.spooled());
++	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
+ 	chatView()->dispatchMessage(mv);
+ 
+ 	if (!m.urlList().isEmpty()) {
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -27,12 +27,14 @@
+ #include "textutil.h"
+ #include "psirichtext.h"
+ #include "chatviewshare.h"
++#include "iconset.h"
+ 
+ #include <QWidget>
+ #include <QTextOption>
+ #include <QScrollBar>
+ #include <QTimer>
+ #include <QKeyEvent>
++#include <QUrl>
+ 
+ //----------------------------------------------------------------------------
+ // ChatView
+@@ -54,6 +56,26 @@ ChatView::ChatView(QWidget *parent)
+ 	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
+ 	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
+ #endif
++
++	useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
++	if (useMessageIcons_) {
++		int logIconsSize = fontInfo().pixelSize()*0.93;
++		if (PsiOptions::instance()->getOption("options.ui.chat.scaled-message-icons").toBool()) {
++			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
++			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
++			logIconDelivered = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
++			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
++			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
++		} else {
++			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive");
++			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send");
++			logIconDelivered = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok");
++			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
++			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
++		}
++		addLogIconsResources();
++	}
++
+ }
+ 
+ ChatView::~ChatView()
+@@ -84,6 +106,29 @@ void ChatView::setSessionData(bool isMuc
+ 	name_ = name;
+ }
+ 
++void ChatView::clear()
++{
++	PsiTextView::clear();
++	addLogIconsResources();
++}
++
++void ChatView::addLogIconsResources()
++{
++	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
++	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_send"), logIconSend);
++	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_time"), logIconTime);
++	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_info"), logIconInfo);
++	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
++}
++
++void ChatView::markReceived(QString id)
++{
++	if (useMessageIcons_) {
++		document()->addResource(QTextDocument::ImageResource, QUrl(QString("icon:delivery") + id), logIconDelivered);
++		setLineWrapColumnOrWidth(lineWrapColumnOrWidth());
++	}
++}
++
+ bool ChatView::focusNextPrevChild(bool next)
+ {
+ 	return QWidget::focusNextPrevChild(next);
+@@ -197,7 +242,8 @@ void ChatView::dispatchMessage(const Mes
+ {
+ 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject) && share_.updateLastMsgTime(mv.dateTime())) {
+ 		QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
+-		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
++		appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
++				   QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
+ 	}
+ 	switch (mv.type()) {
+ 		case MessageView::Message:
+@@ -227,6 +273,8 @@ void ChatView::renderMucMessage(const Me
+ 	const QString timestr = formatTimeStamp(mv.dateTime());
+ 	QString alerttagso, alerttagsc, nickcolor;
+ 	QString textcolor = palette().color(QPalette::Active, QPalette::Text).name();
++	QString icon = useMessageIcons_?
++					(QString("<img src=\"%1\" />").arg(mv.isLocal()?"icon:log_icon_delivered":"icon:log_icon_receive")):"";
+ 	if(mv.isAlert()) {
+ 		textcolor = "#FF0000";
+ 		alerttagso = "<b>";
+@@ -240,14 +288,14 @@ void ChatView::renderMucMessage(const Me
+ 	}
+ 
+ 	if(mv.isEmote()) {
+-		appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
++		appendText(icon + QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
+ 	}
+ 	else {
+ 		if(PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
+-			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(Qt::escape(mv.nick())) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
++			appendText(icon + QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(Qt::escape(mv.nick())) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
+ 		}
+ 		else {
+-			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + Qt::escape(mv.nick()) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc +"</font>");
++			appendText(icon + QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + Qt::escape(mv.nick()) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc +"</font>");
+ 		}
+ 	}
+ 
+@@ -260,14 +308,20 @@ void ChatView::renderMessage(const Messa
+ {
+ 	QString timestr = formatTimeStamp(mv.dateTime());
+ 	QString color = colorString(mv.isLocal(), mv.isSpooled());
++	if (useMessageIcons_ && mv.isAwaitingReceipt()) {
++		document()->addResource(QTextDocument::ImageResource, QUrl(QString("icon:delivery") + mv.messageId()), logIconSend);
++	}
++	QString icon = useMessageIcons_?
++		(QString("<img src=\"%1\" />").arg(mv.isLocal()?
++		(mv.isAwaitingReceipt()?QString("icon:delivery") + mv.messageId():"icon:log_icon_send"):"icon:log_icon_receive")):"";
+ 	if (mv.isEmote()) {
+-		appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(mv.nick()) + mv.formattedText() + "</span>");
++		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(mv.nick()) + mv.formattedText() + "</span>");
+ 	} else {
+ 		if (PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
+-			appendText(QString("<p style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(mv.nick()) + "</p>" + mv.formattedText());
++			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(mv.nick()) + "</span><br>" + mv.formattedText());
+ 		}
+ 		else {
+-			appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + mv.nick() + QString("&gt;</span> ") + mv.formattedText());
++			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + mv.nick() + QString("&gt;</span> ") + mv.formattedText());
+ 		}
+ 	}
+ 
+@@ -282,14 +336,15 @@ void ChatView::renderSysMessage(const Me
+ 	QString ut = mv.formattedUserText();
+ 	QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
+ 	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
+-	appendText(QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
++	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") +
++			   QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
+ 						(ut.isEmpty()?"":":") + "</font>" +
+ 						(ut.isEmpty()?"":QString(" <span style=\"color:%1;\">%2</span>").arg(userTextColor, ut)));
+ }
+ 
+ void ChatView::renderSubject(const MessageView &mv)
+ {
+-	appendText(QString("<b>") + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText()));
++	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") + "<b>" + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText()));
+ }
+ 
+ void ChatView::renderMucSubject(const MessageView &mv)
+@@ -298,7 +353,8 @@ void ChatView::renderMucSubject(const Me
+ 	QString ut = mv.formattedUserText();
+ 	QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
+ 	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
+-	appendText(QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
++	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") +
++			   QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
+ 						(ut.isEmpty()?"":":<br>") + "</font>" +
+ 						(ut.isEmpty()?"":QString(" <span style=\"color:%1;font-weight:bold\">%2</span>").arg(userTextColor, ut)));
+ }
+--- psi.orig/src/chatview_te.h
++++ psi/src/chatview_te.h
+@@ -39,8 +39,12 @@ public:
+ 	ChatView(QWidget* parent);
+ 	~ChatView();
+ 
++	void addLogIconsResources();
++	void markReceived(QString id);
++
+ 	// reimplemented
+ 	QSize sizeHint() const;
++	void clear();
+ 
+ 	void init();
+ 	void setDialog(QWidget* dialog);
+@@ -85,6 +89,13 @@ private:
+ 	int  oldTrackBarPosition;
+ 	QPointer<QWidget> dialog_;
+ 	ChatViewShare share_;
++	bool useMessageIcons_;
++
++	QPixmap logIconSend;
++	QPixmap logIconReceive;
++	QPixmap logIconDelivered;
++	QPixmap logIconTime;
++	QPixmap logIconInfo;
+ };
+ 
+ #endif
+--- psi.orig/src/chatview_webkit.cpp
++++ psi/src/chatview_webkit.cpp
+@@ -164,6 +164,14 @@ void ChatView::embedJsObject()
+ 	}
+ }
+ 
++void ChatView::markReceived(QString id)
++{
++	QVariantMap m;
++	m["type"] = "receipt";
++	m["id"] = id;
++	sendJsObject(m);
++}
++
+ QSize ChatView::sizeHint() const
+ {
+ 	return minimumSizeHint();
+--- psi.orig/src/chatview_webkit.h
++++ psi/src/chatview_webkit.h
+@@ -61,6 +61,8 @@ public:
+ 	ChatView(QWidget* parent);
+ 	~ChatView();
+ 
++	void markReceived(QString id);
++
+ 	// reimplemented
+ 	QSize sizeHint() const;
+ 
+--- psi.orig/src/messageview.cpp
++++ psi/src/messageview.cpp
+@@ -32,6 +32,7 @@ MessageView::MessageView(Type t)
+ 	, alert_(false)
+ 	, local_(false)
+ 	, spooled_(false)
++	, awaitingReceipt_(false)
+ 	, dateTime_(QDateTime::currentDateTime())
+ {
+ 
+@@ -165,6 +166,16 @@ bool MessageView::isSpooled() const
+ 	return spooled_;
+ }
+ 
++void MessageView::setAwaitingReceipt(bool b)
++{
++	awaitingReceipt_ = b;
++}
++
++bool MessageView::isAwaitingReceipt() const
++{
++	return awaitingReceipt_;
++}
++
+ void MessageView::setNick(const QString &nick)
+ {
+ 	nick_ = nick;
+@@ -226,6 +237,8 @@ QVariantMap MessageView::toVariantMap(bo
+ 			m["id"] = messageId_;
+ 			if (isMuc) { // maybe w/o conditions ?
+ 				m["alert"] = alert_;
++			} else {
++				m["awaitingReceipt"] = awaitingReceipt_;
+ 			}
+ 			break;
+ 		case System:
+--- psi.orig/src/messageview.h
++++ psi/src/messageview.h
+@@ -56,6 +56,8 @@ public:
+ 	bool isEmote() const;
+ 	void setSpooled(bool);
+ 	bool isSpooled() const;
++	void setAwaitingReceipt(bool);
++	bool isAwaitingReceipt() const;
+ 	void setNick(const QString &);
+ 	QString nick() const;
+ 	void setMessageId(const QString &);
+@@ -74,6 +76,7 @@ private:
+ 	bool alert_;
+ 	bool local_;
+ 	bool spooled_;
++	bool awaitingReceipt_;
+ 	QString messageId_;
+ 	QString userId_;
+ 	QString nick_;
+--- psi.orig/src/options/opt_advanced.cpp
++++ psi/src/options/opt_advanced.cpp
+@@ -52,6 +52,10 @@ QWidget *OptionsTabAdvanced::widget()
+ 	d->ck_inactiveevents->setWhatsThis(
+ 		tr("Enables the sending of events when you end or suspend a "
+ 		"conversation"));
++	d->ck_requestReceipts->setWhatsThis(
++		tr("Request receipts from contacts on each message."));
++	d->ck_sendReceipts->setWhatsThis(
++		tr("Send receipts to contacts by request."));
+ 	d->ck_rc->setWhatsThis(
+ 		tr("Enables remote controlling your client from other locations"));
+ 	d->ck_spell->setWhatsThis(
+@@ -106,6 +110,8 @@ void OptionsTabAdvanced::applyOptions()
+ 
+ 	PsiOptions::instance()->setOption("options.messages.send-composing-events", d->ck_messageevents->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.send-inactivity-events", d->ck_inactiveevents->isChecked());
++	PsiOptions::instance()->setOption("options.ui.notifications.request-receipts", d->ck_requestReceipts->isChecked());
++	PsiOptions::instance()->setOption("options.ui.notifications.send-receipts", d->ck_sendReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
+ 	if ( SpellChecker::instance()->available() )
+ 		PsiOptions::instance()->setOption("options.ui.spell-check.enabled",d->ck_spell->isChecked());
+@@ -132,6 +138,8 @@ void OptionsTabAdvanced::restoreOptions(
+ 
+ 	d->ck_messageevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool() );
+ 	d->ck_inactiveevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-inactivity-events").toBool() );
++	d->ck_requestReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool() );
++	d->ck_sendReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool() );
+ 	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
+ 	if ( !SpellChecker::instance()->available() )
+ 		d->ck_spell->setChecked(false);
+--- psi.orig/src/options/opt_advanced.ui
++++ psi/src/options/opt_advanced.ui
+@@ -34,6 +34,20 @@
+     </widget>
+    </item>
+    <item>
++    <widget class="QCheckBox" name="ck_requestReceipts" >
++     <property name="text" >
++      <string>Request receipts</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_sendReceipts" >
++     <property name="text" >
++      <string>Send receipts</string>
++     </property>
++    </widget>
++   </item>
++   <item>
+     <widget class="QCheckBox" name="ck_rc" >
+      <property name="text" >
+       <string>Enable remote controlling from other locations</string>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -1036,6 +1036,7 @@ PsiAccount::PsiAccount(const UserAccount
+ #endif
+ 
+ 	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
++	setReceipts(PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool());
+ 
+ 	//connect(d->client, SIGNAL(connected()), SLOT(client_connected()));
+ 	//connect(d->client, SIGNAL(handshaken()), SLOT(client_handshaken()));
+@@ -2545,7 +2546,7 @@ void PsiAccount::client_messageReceived(
+ void PsiAccount::processIncomingMessage(const Message &_m)
+ {
+ 	// skip empty messages, but not if the message contains a data form
+-	if(_m.body().isEmpty() && _m.urlList().isEmpty() && _m.invite().isEmpty() && !_m.containsEvents() && _m.chatState() == StateNone && _m.subject().isNull() && _m.rosterExchangeItems().isEmpty() && _m.mucInvites().isEmpty() &&  _m.getForm().fields().empty())
++	if(_m.body().isEmpty() && _m.urlList().isEmpty() && _m.invite().isEmpty() && !_m.containsEvents() && _m.chatState() == StateNone && _m.subject().isNull() && _m.rosterExchangeItems().isEmpty() && _m.mucInvites().isEmpty() &&  _m.getForm().fields().empty() && _m.messageReceipt() == ReceiptNone)
+ 		return;
+ 
+ 	// skip headlines?
+@@ -2645,6 +2646,17 @@ void PsiAccount::processIncomingMessage(
+ 	//if(m.type() == "chat" && (!m.urlList().isEmpty() || !m.subject().isEmpty()))
+ 	//	m.setType("");
+ 
++	if( m.messageReceipt() == ReceiptRequest && !m.id().isEmpty() &&
++		PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()) {
++		UserListItem *u;
++		if(j.compare(d->self.jid(), false) || groupchats().contains(j.bare()) || (!d->loginStatus.isInvisible() && (u = d->userList.find(j)) && (u->subscription().type() == Subscription::To || u->subscription().type() == Subscription::Both))) {
++			Message tm(m.from());
++			tm.setId(m.id());
++			tm.setMessageReceipt(ReceiptReceived);
++			dj_sendMessage(tm, false);
++		}
++	}
++
+ 	MessageEvent *me = new MessageEvent(m, this);
+ 	me->setOriginLocal(false);
+ 	handleEvent(me, IncomingStanza);
+@@ -4633,6 +4645,19 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			delete e;
+ 			return;
+ 		}
++		else if (m.messageReceipt() == ReceiptReceived) {
++			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
++				ChatDlg *c = findChatDialog(e->from());
++				if (!c) {
++					c = findChatDialog(e->jid());
++				}
++				if (c) {
++					c->incomingMessage(m);
++				}
++			}
++			delete e;
++			return;
++		}
+ 
+ 		// pass chat messages directly to a chat window if possible (and deal with sound)
+ 		if(m.type() == "chat") {
+@@ -5712,6 +5737,9 @@ void PsiAccount::optionsUpdate()
+ 	// Chat states
+ 	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
+ 
++	//Receipts
++	setReceipts(PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
++
+ 	// Remote Controlling
+ 	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
+ 
+@@ -5756,6 +5784,19 @@ void PsiAccount::setSendChatState(bool b
+ 	}
+ }
+ 
++void PsiAccount::setReceipts(bool b)
++{
++	if (b && !d->client->extensions().contains("mr")) {
++		d->client->addExtension("mr",Features("urn:xmpp:receipts"));
++		if (isConnected())
++			setStatusActual(d->loginStatus);
++	}
++	else if (!b && d->client->extensions().contains("mr")) {
++		d->client->removeExtension("mr");
++		if (isConnected())
++			setStatusActual(d->loginStatus);
++	}
++}
+ 
+ void PsiAccount::invokeGCMessage(const Jid &j)
+ {
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -429,6 +429,7 @@ protected:
+ 
+ 	void publishTune(const Tune&);
+ 	void setSendChatState(bool);
++	void setReceipts(bool);
+ 	void setRCEnabled(bool);
+ 	void sessionStarted();
+ 
+--- psi.orig/themes/chatview/psi/classic/index.html
++++ psi/themes/chatview/psi/classic/index.html
+@@ -11,6 +11,7 @@ body > div {
+ 	overflow:hidden;
+ }
+ body > div img { vertical-align:bottom; }
++body > div > img:first-child { vertical-align:text-bottom; }
+ .sent {}
+ .received {}
+ .infmsg {}
+@@ -33,6 +34,7 @@ window[chatServer.jsNamespace()].theme =
+ 	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
+ 	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
+ 	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
++	var useMessageIcons, messageIconsSize = 0;
+ 	
+ 	var applyPsiSettings = function() {
+ 		chat.util.updateObject(cssBody, eval("["+shared.session.getFont()+"][0]"));
+@@ -41,6 +43,17 @@ window[chatServer.jsNamespace()].theme =
+ 		cssReceivedMsg.color = shared.colorOption("options.ui.look.colors.messages.received");
+ 		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
+ 		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
++		useMessageIcons = shared.psiOption("options.ui.chat.use-message-icons");
++		if (shared.psiOption("options.ui.chat.scaled-message-icons")) {
++			var d = document.createElement("div");
++			d.style.position = "absolute";
++			d.style.top = "-1000;";
++			d.style.visibility = "hidden";
++			d.style.height = "1em";
++			shared.chatElement.appendChild(d);
++			messageIconsSize = parseInt(document.defaultView.getComputedStyle(d, null).height);
++			shared.chatElement.removeChild(d);
++		}
+ 	}
+ 	
+ 	var shared = chat.adapter.initSession();
+@@ -48,22 +61,22 @@ window[chatServer.jsNamespace()].theme =
+ 		chatElement : document.body,
+ 		templates : {
+ 			message: shared.isMuc?
+-				"<div class='msg'><span style='color:%nickcolor%'>[%time%] %sender%</span> %message%</div>"
+-				: "<div class='msg'><span class='%sentrec%'>[%time%] %sender%</span> %message%</div>",
++				"<div class='msg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %message%</div>"
++				: "<div class='msg'>%icon%<span class='%sentrec%'>[%time%] %sender%</span> %message%</div>",
+ 			messageNC: shared.isMuc?
+-				"<div style='color:%nickcolor%'>[%time%] %sender% %message%</div>"
+-				: "<div class='%sentrec%'>[%time%] %sender% %message%</div>",
++				"<div style='color:%nickcolor%'>%icon%[%time%] %sender% %message%</div>"
++				: "<div class='%sentrec%'>%icon%[%time%] %sender% %message%</div>",
+ 			receivedMessage: shared.isMuc?
+-				"<div class='msg'><span style='color:%nickcolor%'>[%time%] %sender%</span> %alertedmessage%</div>"
++				"<div class='msg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %alertedmessage%</div>"
+ 				: null,
+-			spooledMessage: "<div class='infmsg'>[%time%] %sender% %message%</div>",
+-			sys: "<div class='infmsg'>%message%</div>",
+-			sysMessage: "<div class='infmsg'>[%time%] *** %message%</div>",
+-			sysMessageUT: "<div class='infmsg'>[%time%] *** %message%: <span class='usertext'>%usertext%</span></div>",
+-			lastMsgDate: "<div class='infmsg'>*** %date%</div>",
++			spooledMessage: "<div class='infmsg'>%icon%[%time%] %sender% %message%</div>",
++			sys: "<div class='infmsg'>%icon%%message%</div>",
++			sysMessage: "<div class='infmsg'>%icon%[%time%] *** %message%</div>",
++			sysMessageUT: "<div class='infmsg'>%icon%[%time%] *** %message%: <span class='usertext'>%usertext%</span></div>",
++			lastMsgDate: "<div class='infmsg'>%icon%*** %date%</div>",
+ 			subject: shared.isMuc?
+-				"<div class='infmsg'>[%time%] %message%<div class='usertext'><b>%usertext%</b></div></div>"
+-				: "<div class='infmsg'><b>*** %usertext%</b></div>",
++				"<div class='infmsg'>%icon%[%time%] %message%<div class='usertext'><b>%usertext%</b></div></div>"
++				: "<div class='infmsg'>%icon%<b>*** %usertext%</b></div>",
+ 			trackbar: '<hr style="height:1px; border:1px solid black; border-color:#bbf #66f #66f #bbf" />'
+ 		},
+ 		dateFormat : "hh:mm:ss",
+@@ -71,6 +84,12 @@ window[chatServer.jsNamespace()].theme =
+ 			if (shared.cdata.type == "settings") {
+ 				applyPsiSettings();
+ 				return false;
++			} else if (shared.cdata.type == "receipt") {
++				var img = document.getElementById("receipt"+shared.cdata.id);
++				if (img) {
++					var sizeUri = messageIconsSize?"?w="+messageIconsSize+"&h="+messageIconsSize:"";
++					img.src = "icon:psi/notification_chat_delivery_ok"+sizeUri;
++				}
+ 			}
+ 			if (shared.cdata.mtype == "message") {
+ 				var template = shared.cdata.emote && shared.templates.messageNC ||
+@@ -94,7 +113,32 @@ window[chatServer.jsNamespace()].theme =
+ 				(shared.cdata.local?"sent":"received");},
+ 			nickcolor : function() {
+ 				return shared.session.mucNickColor(shared.cdata.sender, shared.cdata.local);
+-			}
++			},
++			icon : function() {
++				var icon = "";
++				if (useMessageIcons) {
++					switch (shared.cdata.mtype) {
++						case "message":
++							icon = shared.cdata.local?(shared.cdata.awaitingReceipt?
++								"psi/notification_chat_send":"psi/notification_chat_delivery_ok")
++								: "psi/notification_chat_receive";
++							break;
++						case "system":
++						case "subject":
++						case "urls":
++							icon = "psi/notification_chat_info";
++							break;
++						case "lastDate":
++							icon = "psi/notification_chat_time";
++							break;
++					}
++					var sizeStyle = messageIconsSize?" style='width:"+messageIconsSize+"px; height:"+messageIconsSize+"px'":"";
++					var sizeUri = messageIconsSize?"?w="+messageIconsSize+"&h="+messageIconsSize:"";
++					var id = shared.cdata.awaitingReceipt?" id='receipt"+shared.cdata.id+"'":"";
++					icon = icon?"<img src='icon:"+icon+sizeUri+"'"+sizeStyle+id+" />":"";
++				}
++				return icon;
++ 			}
+ 		}
+ 	});
+ 	

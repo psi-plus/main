@@ -1,0 +1,330 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -113,6 +113,7 @@
+ 				<use-message-icons type="bool">true</use-message-icons>
+ 				<scaled-message-icons type="bool">false</scaled-message-icons>
+ 				<warn-before-clear type="bool">true</warn-before-clear>
++				<css type="QString" />
+ 				<only-paste-template type="bool">false</only-paste-template>
+ 				<disable-paste-send type="bool">false</disable-paste-send>
+ 			</chat>
+@@ -134,6 +135,7 @@
+ 					<show comment="Show status messages" type="bool">false</show>
+ 				</status-messages>
+ 				<tooltip comment="Display options for the contact list tooltips">
++					<css type="QString"></css>
+ 					<avatar comment="Display avatar" type="bool">true</avatar>
+ 					<client-version comment="Display client version information" type="bool">true</client-version>
+ 					<geolocation comment="Display geolocation information" type="bool">true</geolocation>
+@@ -142,6 +144,58 @@
+ 				</tooltip>
+ 				<temp-no-roster-animation comment="Disable animated icons. This option will be removed as soon as the contactlist code is optimized enough" type="bool">false</temp-no-roster-animation>
+ 				<account-sort-style type="QString">alpha</account-sort-style>
++				<css type="QString">/* frame of avatar - general settings */
++/* фрейм с аватаром - общие настройки */
++RosterAvatarFrame * {
++	margin: 1px;
++}
++
++/* frame of avatar - avatar */
++/* фрейм с аватаром - аватар */
++QLabel#lb_avatar {
++	margin-left: 0px;
++	margin-top: 2px;
++	margin-bottom: 2px;
++	border: 1px solid #949494;
++	border-radius: 3px;
++}
++
++/* frame of avatar - nick */
++/* фрейм с аватаром - ник */
++QLabel#lb_nick {
++	margin: 2px;
++	margin-right: 1px;
++	margin-bottom: 3px;
++	border: 1px solid #949494;
++	border-radius: 3px;
++}
++
++/* frame of avatar - buttons of PEP and status */
++/* фрейм с аватаром - кнопки PEP и статуса */
++QToolButton#tb_status, #tb_mood, #tb_activity {
++	margin-left: 1px;
++	margin-right: 1px;
++	margin-bottom: 2px;
++	width: 100%;
++}
++
++QToolButton#tb_status {
++	margin-top: 0px;
++	margin-bottom: 1px;
++}
++
++/* frame of avatar - button of status, arrow */
++/* фрейм с аватаром - кнопка статуса, стрелка */
++QToolButton#tb_status::menu-indicator {
++	image: url();
++}
++
++/* frame of avatar - field of status message */
++/* фрейм с аватаром - строка статусного сообщения */
++QLineEdit#le_status_text {
++	margin-right: 0px;
++	margin-bottom: 2px;
++}</css>
+ 				<always-on-top type="bool">false</always-on-top>
+ 				<automatically-resize-roster type="bool">false</automatically-resize-roster>
+ 				<grow-roster-upwards type="bool">true</grow-roster-upwards>
+@@ -321,6 +375,7 @@
+ 					<message type="QString">Sans Serif,9,-1,5,50,0,0,0,0,0</message>
+ 					<passive-popup type="QString">Sans Serif,7,-1,5,50,0,0,0,0,0</passive-popup>
+ 				</font>
++				<css type="QString" />
+ 			</look>
+ 			<notifications>
+ 				<alert-style type="QString">animate</alert-style>
+@@ -335,6 +390,7 @@
+ 						<status type="int">2000</status>
+ 					</delays>
+ 					<enabled type="bool">false</enabled>
++					<css type="QString"></css>
+ 					<incoming-chat type="bool">true</incoming-chat>
+ 					<incoming-file-transfer type="bool">true</incoming-file-transfer>
+ 					<incoming-headline type="bool">true</incoming-headline>
+--- psi.orig/src/contactlistitemmenu.cpp
++++ psi/src/contactlistitemmenu.cpp
+@@ -21,12 +21,17 @@
+ #include "contactlistitemmenu.h"
+ 
+ #include "shortcutmanager.h"
++#include "psioptions.h"
+ 
+ ContactListItemMenu::ContactListItemMenu(ContactListItem* item, ContactListModel* model)
+ 	: QMenu(0)
+ 	, item_(item)
+ 	, model_(model)
+ {
++	const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ }
+ 
+ ContactListItemMenu::~ContactListItemMenu()
+--- psi.orig/src/gcuserview.cpp
++++ psi/src/gcuserview.cpp
+@@ -519,6 +519,10 @@ void GCUserView::doContextMenu(QTreeWidg
+ 	pm->addAction(act);
+ 	act->setData(3);
+ 
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty()) {
++		pm->setStyleSheet(css);
++	}
+ 	int x = -1;
+ 	bool enabled = false;
+ 	act = pm->exec(QCursor::pos());
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -1712,6 +1712,10 @@ QString GCMainDlg::desiredCaption() cons
+ 
+ void GCMainDlg::setLooks()
+ {
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ 	ui_.vsplitter->optionsChanged();
+ 	ui_.mle->optionsChanged();
+ 
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
+@@ -510,6 +510,8 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 
+         /*QShortcut *sp_ss = new QShortcut(QKeySequence(tr("Ctrl+Shift+N")), this);
+         connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
++
++	optionChanged("options.ui.contactlist.css");
+ }
+ 
+ MainWin::~MainWin()
+@@ -550,6 +552,12 @@ void MainWin::optionChanged(const QStrin
+ 		loadToolbarsState();
+ 		//buildToolbars(); //FIXME!!! not a very good solution
+ 	}
++	else if (option == "options.ui.contactlist.css") {
++		const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
++		if (!css.isEmpty()) {
++			setStyleSheet(css);
++		}
++	}
+ }
+ 
+ void MainWin::registerAction( IconAction* action )
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -263,6 +263,10 @@ void PsiChatDlg::setLooks()
+ {
+ 	ChatDlg::setLooks();
+ 
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ 	ui_.splitter->optionsChanged();
+ 	ui_.mle->optionsChanged();
+ 
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -474,6 +474,10 @@ bool PsiCon::init()
+ 	d->iconSelect = new IconSelectPopup(0);
+ 	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
+ 
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty())
++		d->iconSelect->setStyleSheet(css);
++
+ 	// first thing, try to load the iconset
+ 	bool result = true;;
+ 	if( !PsiIconset::instance()->loadAll() ) {
+@@ -1286,6 +1290,13 @@ void PsiCon::optionChanged(const QString
+ 	if (option == "options.p2p.bytestreams.listen-port") {
+ 		s5b_init();
+ 	}
++	if (option == "options.ui.chat.css") {
++		QString css = PsiOptions::instance()->getOption(option).toString();
++		if (!css.isEmpty())
++			d->iconSelect->setStyleSheet(css);
++		return;
++	}
++
+ #ifdef USE_PEP
+ 	if (option == tuneUrlFilterOptionPath || option == tuneTitleFilterOptionPath) {
+ 		d->tuneManager->setTuneFilters(PsiOptions::instance()->getOption(tuneUrlFilterOptionPath).toString().split(QRegExp("\\W+")),
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -341,6 +341,11 @@ void TabDlg::setLooks()
+ 		tabWidget_->setTabPosition(QTabWidget::South);
+ 
+ 	setWindowOpacity(double(qMax(MINIMUM_OPACITY,PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt()))/100);
++
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ }
+ 
+ void TabDlg::tabSelected(QWidget* _selected)
+--- psi.orig/src/widgets/fancypopup.cpp
++++ psi/src/widgets/fancypopup.cpp
+@@ -37,6 +37,7 @@
+ #include "fancylabel.h"
+ #include "iconlabel.h"
+ #include "psitooltip.h"
++#include "psioptions.h"
+ 
+ #define BUTTON_WIDTH	16
+ #define BUTTON_HEIGHT	14
+@@ -317,6 +318,11 @@ void FancyPopup::Private::initContents(Q
+ 	bottom3->setFixedSize( 4, 4 );
+ 	bottom3->setPalette(backgroundPalette);
+ 	bottomhbox->addWidget(bottom3);
++
++	const QString css = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.css").toString();
++	if (!css.isEmpty()) {
++		popup->setStyleSheet(css);
++	}
+ }
+ 
+ bool FancyPopup::Private::eventFilter(QObject *o, QEvent *e)
+--- psi.orig/src/widgets/iconaction.cpp
++++ psi/src/widgets/iconaction.cpp
+@@ -30,6 +30,8 @@ class PsiIcon;
+ class Iconset;
+ #endif
+ 
++#include "psioptions.h"
++
+ #include <QLayout>
+ #include <QMenu>
+ #include <QTimer>
+@@ -427,6 +429,11 @@ IconActionGroup::IconActionGroup(QObject
+ 	d->updatePopup();
+ 
+ 	d->exclusive = exclusive;
++
++	const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
++	if (!css.isEmpty()) {
++		d->popup->setStyleSheet(css);
++	}
+ }
+ 
+ IconActionGroup::~IconActionGroup()
+--- psi.orig/src/widgets/psitabwidget.cpp
++++ psi/src/widgets/psitabwidget.cpp
+@@ -74,6 +74,7 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+ 	stacked_ = new QStackedLayout(layout_);
+ 
+ 	setTabPosition(QTabWidget::North);
++	setLooks();
+ 
+ 	if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool()){
+ 		closeButton_->hide();
+@@ -179,7 +180,16 @@ void PsiTabWidget::addTab(QWidget *widge
+ 		tabBar_->addTab(icon, name);
+ 	else
+ 		tabBar_->addTab(name);
++	setLooks();
+ 	showPage(currentPage());
++}
++
++void PsiTabWidget::setLooks()
++{
++	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ } 
+ 
+ /**
+--- psi.orig/src/widgets/psitabwidget.h
++++ psi/src/widgets/psitabwidget.h
+@@ -67,6 +67,7 @@ public:
+ public slots:
+ 	void setCurrentPage(int);
+ 	void removeCurrentPage();
++	void setLooks();
+ 
+ signals:
+ 	void mouseDoubleClickTab(QWidget *tab);
+--- psi.orig/src/widgets/psitiplabel.cpp
++++ psi/src/widgets/psitiplabel.cpp
+@@ -51,6 +51,10 @@ void PsiTipLabel::init(const QString& te
+ 		}
+ 	}
+ 	setPalette(palette);
++	const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ }
+ 
+ void PsiTipLabel::setText(const QString& text)
+--- psi.orig/src/widgets/urlobject.cpp
++++ psi/src/widgets/urlobject.cpp
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include "urlobject.h"
++#include "psioptions.h"
+ 
+ #include <QApplication>
+ #include <QClipboard>
+@@ -221,6 +222,7 @@ QMenu *URLObject::createPopupMenu(const
+ 	}
+ 
+ 	m->addAction(d->act_copy);
++	m->setStyleSheet(PsiOptions::instance()->getOption("options.ui.look.css").toString());
+ 	return m;
+ }
+ 

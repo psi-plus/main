@@ -1,0 +1,63 @@
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -101,6 +101,7 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
+ 	transid_ = -1;
+ 	key_ = "";
+ 	lastWasEncrypted_ = false;
++	trackBar_ = false;
+ 
+ 	status_ = -1;
+ 
+@@ -175,6 +176,12 @@ void ChatDlg::initComposing()
+ 	chatEditCreated();
+ }
+ 
++void ChatDlg::doTrackBar()
++{
++	trackBar_ = false;
++	chatView()->doTrackBar();
++}
++
+ void ChatDlg::initActions()
+ {
+ 	act_send_ = new QAction(this);
+@@ -352,6 +359,8 @@ void ChatDlg::logSelectionChanged()
+ void ChatDlg::deactivated()
+ {
+ 	TabbableWidget::deactivated();
++
++	trackBar_ = true;
+ }
+ 
+ void ChatDlg::activated()
+@@ -366,6 +375,8 @@ void ChatDlg::activated()
+ 	doFlash(false);
+ 
+ 	chatEdit()->setFocus();
++
++	trackBar_ = false;
+ }
+ 
+ void ChatDlg::dropEvent(QDropEvent* event)
+@@ -879,6 +890,9 @@ QString ChatDlg::whoNick(bool local) con
+ 
+ void ChatDlg::appendMessage(const Message &m, bool local)
+ {
++	if(trackBar_)
++		doTrackBar();
++
+ 	// figure out the encryption state
+ 	bool encChanged = false;
+ 	bool encEnabled = false;
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
+@@ -184,6 +184,9 @@ private:
+ 	bool keepOpen_;
+ 	bool warnSend_;
+ 
++	bool trackBar_;
++	void doTrackBar();
++
+ 	QTimer* selfDestruct_;
+ 
+ 	QString key_;

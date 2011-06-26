@@ -1,0 +1,479 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -111,6 +111,10 @@
+ 				<scaled-message-icons type="bool">false</scaled-message-icons>
+ 				<warn-before-clear type="bool">true</warn-before-clear>
+ 			</chat>
++			<save>
++				<toolbars-state type="QByteArray"/>
++				<splitter-state type="QByteArray"/>
++			</save>
+ 			<history comment="History dialog options">
+ 				<size comment="Remembered window size" type="QSize">
+ 					<width>640</width>
+@@ -162,10 +166,10 @@
+ 				<show-client-icons type="bool">true</show-client-icons>
+ 				<show-all-client-icons type="bool">false</show-all-client-icons>
+ 				<toolbars/>
+-				<toolbars-state type="QByteArray"/>
+ 				<use-left-click type="bool">false</use-left-click>
+ 				<use-single-click type="bool">false</use-single-click>
+ 				<use-status-change-animation type="bool">true</use-status-change-animation>
++				<roster-at-left-when-all-in-one-window type="bool">false</roster-at-left-when-all-in-one-window>
+ 				<use-transport-icons type="bool">true</use-transport-icons>
+ 				<saved-window-geometry type="QRect" >
+ 					<x>64</x>
+@@ -353,7 +357,7 @@
+ 				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
+ 				<use-tabs type="bool">true</use-tabs>
+ 				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
+-				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs">CM</grouping>
++				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
+ 				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
+ 				<tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
+ 			</tabs>
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
+@@ -35,6 +35,7 @@
+ #include <QVBoxLayout>
+ #include <QMenu>
+ #include <QMenuItem>
++#include <QSplitter>
+ #include <QtAlgorithms>
+ #include <QShortcut>
+ 
+@@ -42,6 +43,8 @@
+ #include <windows.h>
+ #endif
+ 
++#include "tabmanager.h"
++#include "tabdlg.h"
+ #include "common.h"
+ #include "showtextdlg.h"
+ #include "psicon.h"
+@@ -98,14 +101,19 @@ public:
+ 	Private(PsiCon *, MainWin *);
+ 	~Private();
+ 
+-	QVBoxLayout* vb_main;
+ 	bool onTop, asTool;
+ 	QMenu* mainMenu, *statusMenu, *optionsMenu, *toolsMenu;
+ 	int sbState;
+ 	QString nickname;
+ 	PsiTrayIcon* tray;
+ 	QMenu* trayMenu;
++	QVBoxLayout *vb_roster;
++	QSplitter *splitter;
++	TabDlg *mainTabs;
+ 	QString statusTip;
++	PsiToolBar *viewToolBar;
++	QSize rosterGeometry;
++	QSize tabsGeometry;
+ 
+ 	PopupAction* optionsButton, *statusButton;
+ 	IconActionGroup* statusGroup;
+@@ -137,7 +145,7 @@ public:
+ 	void updateMenu(QStringList actions, QMenu* menu);
+ };
+ 
+-MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : psi(_psi), mainWin(_mainWin)
++MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), psi(_psi), mainWin(_mainWin)
+ {
+ 
+ 	statusGroup   = (IconActionGroup *)getAction("status_all");
+@@ -258,6 +266,10 @@ void MainWin::Private::updateMenu(QStrin
+ #define TOOLW_FLAGS ((Qt::WFlags) 0)
+ #endif
+ 
++const QString toolbarsStateOptionPath = "options.ui.save.toolbars-state";
++const QString rosterGeometryPath      = "options.ui.save.roster-geometry";
++const QString tabsGeometryPath        = "options.ui.save.tabs-geometry";
++
+ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
+ :AdvancedWidget<QMainWindow>(0, (_onTop ? Qt::WindowStaysOnTopHint : Qt::Widget) | (_asTool ? (Qt::Tool |TOOLW_FLAGS) : Qt::Widget))
+ {
+@@ -283,14 +295,39 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 	d->statusTip = "";
+ 	d->nickname = "";
+ 
+-	QWidget* center = new QWidget (this);
+-	setCentralWidget ( center );
++	QWidget *rosterBar = new QWidget(this);
++	bool allInOne = false;
++
++	if ( PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool() && PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A')) {
++		d->splitter = new QSplitter(this);
++		d->splitter->setObjectName("onewindowsplitter");
++		connect(d->splitter, SIGNAL(splitterMoved(int,int)), this, SLOT(splitterMoved(int,int)));
++		setCentralWidget(d->splitter);
++		allInOne = true;
++
++		d->mainTabs = d->psi->tabManager()->newTabs(0);
++		d->psi->tabManager()->setPreferredTabsForKind('C', d->mainTabs);
++		d->psi->tabManager()->setPreferredTabsForKind('M', d->mainTabs);
++
++		if ( PsiOptions::instance()->getOption("options.ui.contactlist.roster-at-left-when-all-in-one-window").toBool() ) {
++			d->splitter->addWidget(rosterBar);
++			d->splitter->addWidget(d->mainTabs);
++		} else {
++			d->splitter->addWidget(d->mainTabs);
++			d->splitter->addWidget(rosterBar);
++		}
++
++		d->rosterGeometry = PsiOptions::instance()->getOption(rosterGeometryPath).toSize();
++		d->tabsGeometry = PsiOptions::instance()->getOption(tabsGeometryPath).toSize();
++		rosterBar->resize(d->rosterGeometry);
++		d->mainTabs->resize(d->tabsGeometry);
++	} else setCentralWidget(rosterBar);
+ 
+-	d->vb_main = new QVBoxLayout(center);
++	d->vb_roster = new QVBoxLayout(rosterBar);
+ #ifndef NEWCONTACTLIST
+-	cvlist = new ContactView(center);
++	cvlist = new ContactView(rosterBar);
+ #else
+-	d->rosterWidget_ = new PsiRosterWidget(center);
++	d->rosterWidget_ = new PsiRosterWidget(rosterBar);
+ 	d->rosterWidget_->setContactList(psi->contactList());
+ #endif
+ 
+@@ -304,13 +341,31 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 	// d->contactListView_->setFrameShape(QFrame::NoFrame);
+ #endif
+ #endif
+-	d->vb_main->setMargin(layoutMargin);
+-	d->vb_main->setSpacing(layoutMargin);
++	QMenu* viewMenu = new QMenu(tr("View"), this);
++
++
++	d->vb_roster->setMargin(layoutMargin);
++	d->vb_roster->setSpacing(layoutMargin);
++
++	if (allInOne) {
++		QString toolOpt = "options.ui.contactlist.toolbars";
++		foreach(QString base, PsiOptions::instance()->getChildOptionNames(toolOpt, true, true)) {
++			// toolbar "Show contacts" is second, so check m1
++			if (base == toolOpt + ".m1") {
++				d->viewToolBar = new PsiToolBar(base, rosterBar, d->psi->actionList());
++				d->viewToolBar->initialize();
++				connect(d->viewToolBar, SIGNAL(customize()), d->psi, SLOT(doToolbars()));
++				d->vb_roster->addWidget(d->viewToolBar);
++				break;
++			}
++		}
++	}
++
+ 
+ #ifndef NEWCONTACTLIST
+ 	// create search bar
+-	d->searchWidget = new QWidget(centralWidget());
+-	d->vb_main->addWidget(d->searchWidget);
++	d->searchWidget = new QWidget(rosterBar);
++	d->vb_roster->addWidget(d->searchWidget);
+ 	QHBoxLayout* searchLayout = new QHBoxLayout(d->searchWidget);
+ 	searchLayout->setMargin(0);
+ 	searchLayout->setSpacing(0);
+@@ -327,15 +382,15 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 
+ 	//add contact view
+ #ifndef NEWCONTACTLIST
+-	d->vb_main->addWidget(cvlist);
++	d->vb_roster->addWidget(cvlist);
+ # ifdef Q_WS_MAC
+ 	// Disable the empty vertical scrollbar:
+ 	// it's here because of weird code in q3scrollview.cpp
+ 	// Q3ScrollView::updateScrollBars() around line 877
+-	d->vb_main->addSpacing(4);
++	d->vb_roster->addSpacing(4);
+ # endif
+ #else
+-	d->vb_main->addWidget(d->rosterWidget_);
++	d->vb_roster->addWidget(d->rosterWidget_);
+ #endif
+ 
+ 	d->statusMenu = new QMenu(tr("Status"), this);
+@@ -392,12 +447,11 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 
+ 	mainMenuBar()->addMenu(d->statusMenu);
+ 
+-	QMenu* viewMenu = new QMenu(tr("View"), this);
+ 	mainMenuBar()->addMenu(viewMenu);
+ 	d->getAction("show_offline")->addTo(viewMenu);
+-	// if (PsiOptions::instance()->getOption("options.ui.menu.view.show-away").toBool()) {
+-	// 	d->getAction("show_away")->addTo(viewMenu);
+-	// }
++	if (PsiOptions::instance()->getOption("options.ui.menu.view.show-away").toBool()) {
++		d->getAction("show_away")->addTo(viewMenu);
++	}
+ 	d->getAction("show_hidden")->addTo(viewMenu);
+ 	d->getAction("show_agents")->addTo(viewMenu);
+ 	d->getAction("show_self")->addTo(viewMenu);
+@@ -461,9 +515,28 @@ MainWin::~MainWin()
+ 	}
+ 
+ 	saveToolbarsState();
++
++	if(d->splitter != NULL) {
++		PsiOptions::instance()->setOption(rosterGeometryPath, d->rosterGeometry);
++		PsiOptions::instance()->setOption(tabsGeometryPath, d->tabsGeometry);
++	}
++
+ 	delete d;
+ }
+ 
++void MainWin::splitterMoved(int /*pos*/, int /*index*/)
++{
++	int rosterIdx = 1;
++	if (PsiOptions::instance()->getOption("options.ui.contactlist.roster-at-left-when-all-in-one-window").toBool())
++		rosterIdx = 0;
++
++	QWidget * rosterBar = d->splitter->widget(rosterIdx);
++	if (rosterBar && d->mainTabs) {
++		d->rosterGeometry = rosterBar->size();
++		d->tabsGeometry = d->mainTabs->size();
++	}
++}
++
+ void MainWin::registerAction( IconAction* action )
+ {
+ 	const char *activated  = SIGNAL( triggered() );
+@@ -695,8 +768,6 @@ QMenuBar* MainWin::mainMenuBar() const
+ 	return menuBar();
+ }
+ 
+-const QString toolbarsStateOptionPath = "options.ui.contactlist.toolbars-state";
+-
+ void MainWin::saveToolbarsState()
+ {
+ 	PsiOptions::instance()->setOption(toolbarsStateOptionPath, saveState());
+@@ -717,8 +788,21 @@ void MainWin::buildToolbars()
+ 	qDeleteAll(toolbars_);
+ 	toolbars_.clear();
+ 
++	bool allInOne = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A');
+ 	foreach(QString base, PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true)) {
+-		PsiToolBar* tb = new PsiToolBar(base, this, d->psi->actionList());
++		PsiToolBar* tb;
++		if (allInOne) {
++			if (d && d->viewToolBar && (d->viewToolBar->base() == base))
++				continue;
++			tb = new PsiToolBar(base, this, d->psi->actionList());
++			d->vb_roster->addWidget(tb);
++		} else {
++			if (d && d->viewToolBar) {
++				delete d->viewToolBar;
++				d->viewToolBar = 0;
++			}
++			tb = new PsiToolBar(base, this, d->psi->actionList());
++		}
+ 		tb->initialize();
+ 		connect(tb, SIGNAL(customize()), d->psi, SLOT(doToolbars()));
+ 		toolbars_ << tb;
+@@ -740,6 +824,11 @@ void MainWin::buildToolbars()
+ 	foreach(PsiToolBar* tb, toolbars_) {
+ 		tb->setUpdatesEnabled(true);
+ 	}
++
++	if (allInOne && d && d->viewToolBar) {
++		d->viewToolBar->updateVisibility();
++		d->viewToolBar->setUpdatesEnabled(true);
++	}
+ }
+ 
+ bool MainWin::showDockMenu(const QPoint &)
+@@ -1093,6 +1182,17 @@ void MainWin::closeEvent(QCloseEvent* e)
+ #endif
+ }
+ 
++void MainWin::changeEvent(QEvent *event)
++{
++    if (event->type() == QEvent::ActivationChange ||
++	    event->type() == QEvent::WindowStateChange)
++	{
++		if (d->mainTabs) {
++			QCoreApplication::sendEvent(d->mainTabs, event);
++		}
++	}
++}
++
+ void MainWin::keyPressEvent(QKeyEvent* e)
+ {
+ #ifdef Q_WS_MAC
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
+@@ -73,6 +73,7 @@ public:
+ protected:
+ 	// reimplemented
+ 	void closeEvent(QCloseEvent *);
++	void changeEvent(QEvent *event);
+ 	void keyPressEvent(QKeyEvent *);
+ 	QMenuBar* mainMenuBar() const;
+ #ifdef Q_WS_WIN
+@@ -141,6 +142,7 @@ private slots:
+ 	void searchTextStarted(QString const &text);
+ 
+ 	void registerAction( IconAction * );
++	void splitterMoved(int pos, int index);
+ 
+ public slots:
+ 	void setWindowIcon(const QPixmap&);
+--- psi.orig/src/options/opt_chat.cpp
++++ psi/src/options/opt_chat.cpp
+@@ -136,12 +136,15 @@ void OptionsTabChat::applyOptions()
+ 		case 3:
+ 			tabGrouping = "CM";
+ 			break;
++		case 4:
++			tabGrouping = "ACM";
++			break;
+ 	}
+ 	if (!tabGrouping.isEmpty()) {
+ 		PsiOptions::instance()->setOption("options.ui.tabs.grouping", tabGrouping);
+ 	} else {
+-		if (d->cb_tabGrouping->count() == 5) {
+-			d->cb_tabGrouping->removeItem(4);
++		if (d->cb_tabGrouping->count() == 6) {
++			d->cb_tabGrouping->removeItem(5);
+ 		}
+ 	}
+ 	
+@@ -186,16 +189,18 @@ void OptionsTabChat::restoreOptions()
+ 		d->cb_tabGrouping->setCurrentIndex(2);
+ 	} else if (tabGrouping == "CM") {
+ 		d->cb_tabGrouping->setCurrentIndex(3);
++	} else if (tabGrouping == "ACM") {
++		d->cb_tabGrouping->setCurrentIndex(4);
+ 	} else {
+-		if (d->cb_tabGrouping->count() == 5) {
+-			d->cb_tabGrouping->setCurrentIndex(4);
++		if (d->cb_tabGrouping->count() == 6) {
++			d->cb_tabGrouping->setCurrentIndex(5);
+ 		} else {
+ 			d->cb_tabGrouping->setCurrentIndex(-1);
+ 		}
+ 		custom = true;
+ 	}
+-	if (!custom && d->cb_tabGrouping->count() == 5) {
+-		d->cb_tabGrouping->removeItem(4);
++	if (!custom && d->cb_tabGrouping->count() == 6) {
++		d->cb_tabGrouping->removeItem(5);
+ 	}
+ 	d->ck_autoResize->setChecked( PsiOptions::instance()->getOption("options.ui.chat.use-expanding-line-edit").toBool() );
+ 	QString delafter = PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString();
+--- psi.orig/src/options/opt_chat.ui
++++ psi/src/options/opt_chat.ui
+@@ -92,6 +92,11 @@
+          <string>for mucs and chats in one window</string>
+         </property>
+        </item>
++	   <item>
++		<property name="text" >
++		 <string>for mucs, chats and roster in one window</string>
++		</property>
++	   </item>
+        <item>
+         <property name="text" >
+          <string>[customized]</string>
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -1261,7 +1261,8 @@ void PsiCon::optionChanged(const QString
+ 		alertIconUpdateAlertStyle();
+ 	}
+ 
+-	if (option == "options.ui.tabs.use-tabs") {
++	if (option == "options.ui.tabs.use-tabs" || 
++		option == "options.ui.tabs.grouping") {
+ 		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
+ 		notifyRestart = false;
+ 	}
+--- psi.orig/src/psicon.h
++++ psi/src/psicon.h
+@@ -47,6 +47,7 @@ class QThread;
+ class PsiActionList;
+ class PsiToolBar;
+ class TabDlg;
++class TabManager;
+ class AccountsComboBox;
+ class ChatDlg;
+ class AlertManager;
+--- psi.orig/src/psitoolbar.cpp
++++ psi/src/psitoolbar.cpp
+@@ -54,7 +54,7 @@ Qt::ToolBarArea dockPositionToToolBarAre
+ 	return Qt::NoToolBarArea;
+ }
+ 
+-PsiToolBar::PsiToolBar(const QString& base, QMainWindow* mainWindow, MetaActionList* actionList)
++PsiToolBar::PsiToolBar(const QString& base, QWidget* mainWindow, MetaActionList* actionList)
+ 	: QToolBar(mainWindow)
+ 	, actionList_(actionList)
+ 	, base_(base)
+@@ -81,6 +81,11 @@ void PsiToolBar::contextMenuEvent(QConte
+ 	menu.exec(e->globalPos());
+ }
+ 
++QString PsiToolBar::base()
++{
++	return base_;
++}
++
+ void PsiToolBar::initialize()
+ {
+ 	PsiOptions* o = PsiOptions::instance();
+@@ -108,11 +113,13 @@ void PsiToolBar::initialize()
+ 		}
+ 	}
+ 
+-	QMainWindow* mainWindow = dynamic_cast<QMainWindow*>(parentWidget());
+-	mainWindow->addToolBar(dockPositionToToolBarArea((Qt3Dock)o->getOption(base_ + ".dock.position").toInt()),
+-	                       this);
+-	if (mainWindow && o->getOption(base_ + ".dock.nl").toBool()) {
+-		mainWindow->insertToolBarBreak(this);
++	if (!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A')) {
++		QMainWindow* mainWindow = dynamic_cast<QMainWindow*>(parentWidget());
++		if (mainWindow) {
++			mainWindow->addToolBar(dockPositionToToolBarArea((Qt3Dock)o->getOption(base_ + ".dock.position").toInt()), this);
++			if (o->getOption(base_ + ".dock.nl").toBool())
++				mainWindow->insertToolBarBreak(this);
++		}
+ 	}
+ 
+ 	updateVisibility();
+--- psi.orig/src/psitoolbar.h
++++ psi/src/psitoolbar.h
+@@ -35,11 +35,12 @@ class PsiToolBar : public QToolBar
+ 	Q_OBJECT
+ 
+ public:
+-	PsiToolBar(const QString& base, QMainWindow* mainWindow, MetaActionList* actionList);
++	PsiToolBar(const QString& base, QWidget* mainWindow, MetaActionList* actionList);
+ 	~PsiToolBar();
+ 
+ 	void initialize();
+ 	void updateVisibility();
++	QString base();
+ 
+ 	static void structToOptions(PsiOptions* options, const ToolbarPrefs& s);
+ 
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -371,6 +371,7 @@ bool TabDlg::tabOnTop(const TabbableWidg
+ void TabDlg::addTab(TabbableWidget* tab)
+ {
+ 	setUpdatesEnabled(false);
++	act_close_->setEnabled(true);
+ 	tabs_.append(tab);
+ 	tabWidget_->addTab(tab, captionForTab(tab), tab->icon());
+ 
+@@ -456,7 +457,11 @@ void TabDlg::selectTab(TabbableWidget* c
+ 
+ void TabDlg::checkHasChats()
+ {
+-	if (tabWidget_->count() > 0)
++	if (window() != this) {
++		act_close_->setEnabled(false);
++		return;
++	}
++	else if (tabWidget_->count() > 0)
+ 		return;
+ 	deleteLater();
+ }

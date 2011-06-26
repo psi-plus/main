@@ -1,0 +1,128 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -209,6 +209,7 @@
+ 			<spell-check comment="Options related to the spell checker">
+ 				<enabled comment="Whether the spell checker is enabled" type="bool">true</enabled>
+ 			</spell-check>
++			<disable-send-button type="bool">false</disable-send-button>
+ 			<systemtray comment="Options related to the system tray">
+ 				<use-old comment="Use the old system tray code (deprecated)" type="bool">false</use-old>
+ 				<enable type="bool">true</enable>
+--- psi.orig/src/chatdlg.ui
++++ psi/src/chatdlg.ui
+@@ -285,6 +285,31 @@
+           </layout>
+          </item>
+          <item>
++          <widget class="QPushButton" name="pb_send">
++           <property name="sizePolicy">
++            <sizepolicy vsizetype="Expanding" hsizetype="Minimum">
++             <horstretch>0</horstretch>
++             <verstretch>0</verstretch>
++            </sizepolicy>
++           </property>
++           <property name="minimumSize">
++            <size>
++             <width>26</width>
++             <height>0</height>
++            </size>
++           </property>
++           <property name="maximumSize" >
++            <size>
++             <width>26</width>
++             <height>16777215</height>
++            </size>
++           </property>
++           <property name="toolTip">
++            <string>Send</string>
++           </property>
++          </widget>
++         </item>
++         <item>
+           <widget class="QLabel" name="avatar" >
+            <property name="sizePolicy" >
+             <sizepolicy>
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -681,6 +681,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	d->act_send = new QAction(this);
+ 	addAction(d->act_send);
+ 	connect(d->act_send,SIGNAL(triggered()), SLOT(mle_returnPressed()));
++ 	ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
++	connect(ui_.pb_send, SIGNAL(clicked()), SLOT(mle_returnPressed()));
+ 	d->act_close = new QAction(this);
+ 	addAction(d->act_close);
+ 	connect(d->act_close,SIGNAL(triggered()), SLOT(close()));
+@@ -1595,6 +1597,13 @@ void GCMainDlg::setLooks()
+ 		ui_.tb_actions->show();
+ 	}
+ 
++	if (PsiOptions::instance()->getOption("options.ui.disable-send-button").toBool()) {
++		ui_.pb_send->hide();
++	}
++	else {
++		ui_.pb_send->show();
++	}
++
+ 	setWindowOpacity(double(qMax(MINIMUM_OPACITY,PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt()))/100);
+ 
+ 	// update the widget icon
+--- psi.orig/src/groupchatdlg.ui
++++ psi/src/groupchatdlg.ui
+@@ -260,6 +260,31 @@
+            </property>
+           </widget>
+          </item>
++         <item>
++          <widget class="QPushButton" name="pb_send">
++           <property name="sizePolicy">
++            <sizepolicy vsizetype="Expanding" hsizetype="Minimum">
++             <horstretch>0</horstretch>
++             <verstretch>0</verstretch>
++            </sizepolicy>
++           </property>
++           <property name="minimumSize">
++            <size>
++             <width>26</width>
++             <height>0</height>
++            </size>
++           </property>
++           <property name="maximumSize">
++            <size>
++             <width>26</width>
++             <height>16777215</height>
++            </size>
++           </property>
++           <property name="toolTip">
++            <string>Send</string>
++           </property>
++          </widget>
++         </item>
+         </layout>
+        </item>
+       </layout>
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -215,6 +215,8 @@ void PsiChatDlg::initUi()
+ 	ui_.splitter->setSizes(list);
+ 
+ 	smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
++ 	ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
++	connect(ui_.pb_send, SIGNAL(clicked()), this, SLOT(doSend()));
+ 
+ 	act_mini_cmd_ = new QAction(this);
+ 	act_mini_cmd_->setText(tr("Input command..."));
+@@ -297,6 +299,13 @@ void PsiChatDlg::updateIdentityVisibilit
+ 	else {
+ 		ui_.lb_ident->setVisible(false);
+ 	}
++	
++	if (PsiOptions::instance()->getOption("options.ui.disable-send-button").toBool()) {
++		ui_.pb_send->hide();
++	}
++	else {
++		ui_.pb_send->show();
++	}
+ }
+ 
+ void PsiChatDlg::initToolButtons()

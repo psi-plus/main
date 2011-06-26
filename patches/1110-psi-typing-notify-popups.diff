@@ -1,0 +1,267 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -422,6 +422,7 @@ QLineEdit#le_status_text {
+ 					<at-left-corner type="bool">false</at-left-corner>
+ 					<css type="QString"></css>
+ 					<incoming-chat type="bool">true</incoming-chat>
++					<composing type="bool">true</composing>
+ 					<incoming-file-transfer type="bool">true</incoming-file-transfer>
+ 					<incoming-headline type="bool">true</incoming-headline>
+ 					<incoming-message type="bool">true</incoming-message>
+@@ -646,6 +647,7 @@ QLineEdit#le_status_text {
+ 			<ignore-non-roster-contacts type="bool">false</ignore-non-roster-contacts>
+ 			<send-composing-events type="bool">true</send-composing-events>
+ 			<send-inactivity-events type="bool">false</send-inactivity-events>
++			<dont-send-composing-events type="bool">false</dont-send-composing-events>
+ 		</messages>
+ 		<p2p>
+ 			<bytestreams>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -1000,36 +1000,38 @@ void ChatDlg::setChatState(ChatState sta
+ 		}
+ 
+ 		// Build event message
+-		Message m(jid());
+-		if (sendComposingEvents_) {
+-			m.setEventId(eventId_);
+-			if (state == XMPP::StateComposing) {
+-				m.addEvent(ComposingEvent);
+-			}
+-			else if (lastChatState_ == XMPP::StateComposing) {
+-				m.addEvent(CancelEvent);
++		if( !PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() ) {
++			Message m(jid());
++			if (sendComposingEvents_) {
++				m.setEventId(eventId_);
++				if (state == XMPP::StateComposing) {
++					m.addEvent(ComposingEvent);
++				}
++				else if (lastChatState_ == XMPP::StateComposing) {
++					m.addEvent(CancelEvent);
++				}
+ 			}
+-		}
+-		if (contactChatState_ != XMPP::StateNone) {
+-			if (lastChatState_ != XMPP::StateGone) {
+-				if ((state == XMPP::StateInactive && lastChatState_ == XMPP::StateComposing) || (state == XMPP::StateComposing && lastChatState_ == XMPP::StateInactive)) {
+-					// First go to the paused state
+-					Message tm(jid());
+-					m.setType("chat");
+-					m.setChatState(XMPP::StatePaused);
+-					if (account()->isAvailable()) {
+-						account()->dj_sendMessage(m, false);
++			if (contactChatState_ != XMPP::StateNone) {
++				if (lastChatState_ != XMPP::StateGone) {
++					if ((state == XMPP::StateInactive && lastChatState_ == XMPP::StateComposing) || (state == XMPP::StateComposing && lastChatState_ == XMPP::StateInactive)) {
++						// First go to the paused state
++						Message tm(jid());
++						m.setType("chat");
++						m.setChatState(XMPP::StatePaused);
++						if (account()->isAvailable()) {
++							account()->dj_sendMessage(m, false);
++						}
+ 					}
++					m.setChatState(state);
+ 				}
+-				m.setChatState(state);
+ 			}
+-		}
+ 
+-		// Send event message
+-		if (m.containsEvents() || m.chatState() != XMPP::StateNone) {
+-			m.setType("chat");
+-			if (account()->isAvailable()) {
+-				account()->dj_sendMessage(m, false);
++			// Send event message
++			if (m.containsEvents() || m.chatState() != XMPP::StateNone) {
++				m.setType("chat");
++				if (account()->isAvailable()) {
++					account()->dj_sendMessage(m, false);
++				}
+ 			}
+ 		}
+ 
+--- psi.orig/src/options/opt_advanced.cpp
++++ psi/src/options/opt_advanced.cpp
+@@ -96,7 +96,9 @@ QWidget *OptionsTabAdvanced::widget()
+ 		" like system-wide news on MSN, announcements, etc."));
+ 
+ 	connect(d->ck_messageevents,SIGNAL(toggled(bool)),d->ck_inactiveevents,SLOT(setEnabled(bool)));
++	connect(d->ck_messageevents,SIGNAL(toggled(bool)),d->ck_sendComposingEvents,SLOT(setEnabled(bool)));
+ 	d->ck_inactiveevents->setEnabled(d->ck_messageevents->isChecked());
++	d->ck_sendComposingEvents->setEnabled(d->ck_messageevents->isChecked());
+ 
+ 	return w;
+ }
+@@ -110,6 +112,7 @@ void OptionsTabAdvanced::applyOptions()
+ 
+ 	PsiOptions::instance()->setOption("options.messages.send-composing-events", d->ck_messageevents->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.send-inactivity-events", d->ck_inactiveevents->isChecked());
++	PsiOptions::instance()->setOption("options.messages.dont-send-composing-events", d->ck_sendComposingEvents->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.request-receipts", d->ck_requestReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.send-receipts", d->ck_sendReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
+@@ -138,6 +141,7 @@ void OptionsTabAdvanced::restoreOptions(
+ 
+ 	d->ck_messageevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool() );
+ 	d->ck_inactiveevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-inactivity-events").toBool() );
++	d->ck_sendComposingEvents->setChecked( PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() );
+ 	d->ck_requestReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool() );
+ 	d->ck_sendReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool() );
+ 	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
+--- psi.orig/src/options/opt_advanced.ui
++++ psi/src/options/opt_advanced.ui
+@@ -34,6 +34,16 @@
+     </widget>
+    </item>
+    <item>
++    <widget class="QCheckBox" name="ck_sendComposingEvents">
++     <property name="whatsThis">
++      <string>Disables the sending of message events such as &quot;Contact is Typing...&quot;</string>
++     </property>
++     <property name="text">
++      <string>Do not send composing events</string>
++     </property>
++    </widget>
++   </item>
++   <item>
+     <widget class="QCheckBox" name="ck_requestReceipts" >
+      <property name="text" >
+       <string>Request receipts</string>
+--- psi.orig/src/options/opt_events.cpp
++++ psi/src/options/opt_events.cpp
+@@ -115,6 +115,7 @@ void OptionsTabEvents::applyOptions()
+ 	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.online", d->ck_popupOnOnline->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.offline", d->ck_popupOnOffline->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.other-changes", d->ck_popupOnStatus->isChecked());
++	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.composing", d->ck_popupComposing->isChecked());
+ }
+ 
+ void OptionsTabEvents::restoreOptions()
+@@ -142,4 +143,5 @@ void OptionsTabEvents::restoreOptions()
+ 	d->ck_popupOnOnline->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.online").toBool() );
+ 	d->ck_popupOnOffline->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.offline").toBool() );
+ 	d->ck_popupOnStatus->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool() );
++	d->ck_popupComposing->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool() );
+ }
+--- psi.orig/src/options/opt_events.ui
++++ psi/src/options/opt_events.ui
+@@ -243,6 +243,13 @@
+        </widget>
+       </item>
+       <item>
++       <widget class="QCheckBox" name="ck_popupComposing">
++        <property name="text">
++         <string>When a contact begins typing</string>
++        </property>
++       </widget>
++      </item>
++      <item>
+        <widget class="QCheckBox" name="ck_popupOnOnline" >
+         <property name="text" >
+          <string>When a contact becomes available</string>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -4855,8 +4855,15 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 					c->incomingMessage(m);
+ 				}
+ 			}
+-			delete e;
+-			return;
++			if(m.chatState() == StateComposing) {
++				doPopup = true;
++				putToQueue = false;
++				popupType = PsiPopup::AlertComposing;
++			}
++			else {
++				delete e;
++				return;
++			}
+ 		}
+ 		else if (m.messageReceipt() == ReceiptReceived) {
+ 			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
+@@ -4873,7 +4880,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		}
+ 
+ 		// pass chat messages directly to a chat window if possible (and deal with sound)
+-		if(m.type() == "chat") {
++		else if(m.type() == "chat") {
+ 			ChatDlg *c = findChatDialog(e->from());
+ 			if(!c)
+ 				c = findChatDialog(e->jid());
+@@ -5020,11 +5027,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			r = *(u->priority());
+ 		}
+ 
+-		if ((popupType == PsiPopup::AlertChat     && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
+-		    (popupType == PsiPopup::AlertMessage  && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
+-		    (popupType == PsiPopup::AlertHeadline && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
+-		    (popupType == PsiPopup::AlertFile     && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
+-		    (popupType == PsiPopup::AlertAvCall   && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()))
++		if ((popupType == PsiPopup::AlertChat      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
++		    (popupType == PsiPopup::AlertMessage   && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
++		    (popupType == PsiPopup::AlertHeadline  && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
++		    (popupType == PsiPopup::AlertFile      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
++		    (popupType == PsiPopup::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
++		    (popupType == PsiPopup::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
+ 		{
+ 			PsiPopup *popup = new PsiPopup(popupType, this);
+ 			popup->setData(j, r, u, e);
+--- psi.orig/src/psipopup.cpp
++++ psi/src/psipopup.cpp
+@@ -291,6 +291,11 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
+ 		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/message");
+ 		doAlertIcon = true;
+ 		break;
++	case AlertComposing:
++		text += PsiPopup::tr("Typing notify");
++		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
++		doAlertIcon = false;
++		break;
+ 	case AlertChat:
+ 		text += PsiPopup::tr("Incoming chat message");
+ 		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/chat");
+@@ -349,9 +354,10 @@ void PsiPopup::setData(const Jid &j, con
+ 
+ 	d->jid    = j;
+ 	d->status = r.status();
+-	d->event  = (PsiEvent *)event;
++	if(d->popupType != AlertComposing)
++		d->event  = (PsiEvent *)event;
+ 
+-	if ( event )
++	if ( d->event )
+ 		connect(event, SIGNAL(destroyed()), d, SLOT(eventDestroyed()));
+ 
+ 	PsiIcon *icon = PsiIconset::instance()->statusPtr(j, r.status());
+@@ -411,7 +417,7 @@ void PsiPopup::setData(const Jid &j, con
+ 	}
+ 	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
+ 	// show popup
+-	if ( d->popupType != AlertHeadline && (d->popupType != AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) ) {
++	if ( d->popupType != AlertComposing && d->popupType != AlertHeadline && (d->popupType != AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) ) {
+ 
+ 		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
+ 			const Message *jmessage = &((MessageEvent *)event)->message();
+@@ -429,6 +435,10 @@ void PsiPopup::setData(const Jid &j, con
+ 
+                 setData(&avatar, icon, contactText);
+ 	}
++	else if ( d->popupType == AlertComposing ) {
++		QString txt = "<font size=\"+1\">" + name + tr(" is typing...") + "</font>" ;
++		setData(&avatar, icon, txt);
++	}
+ 	else if ( d->popupType == AlertHeadline ) {
+ 		QVBoxLayout *vbox = new QVBoxLayout;
+ 		vbox->addLayout( d->createContactInfo(&avatar, icon, contactText) );
+--- psi.orig/src/psipopup.h
++++ psi/src/psipopup.h
+@@ -52,6 +52,7 @@ public:
+ 		AlertStatusChange,
+ 
+ 		AlertMessage,
++		AlertComposing,
+ 		AlertChat,
+ 		AlertHeadline,
+ 		AlertFile,

@@ -1,0 +1,420 @@
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -35,6 +35,8 @@
+ #include <QTimer>
+ #include <QKeyEvent>
+ #include <QUrl>
++#include <QMenu>
++#include <QTextDocumentFragment>
+ 
+ //----------------------------------------------------------------------------
+ // ChatView
+@@ -56,6 +58,12 @@ ChatView::ChatView(QWidget *parent)
+ 	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
+ 	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
+ #endif
++	actQuote_ = new QAction(tr("Quote"), this);
++	actQuote_->setEnabled(false);
++	actQuote_->setShortcut(QKeySequence(tr("Ctrl+S")));
++	addAction(actQuote_);
++	connect(actQuote_, SIGNAL(triggered()), SLOT(quoteEvent()));
++	connect(this, SIGNAL(selectionChanged()), SLOT(changeActQuoteState()));
+ 
+ 	useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
+ 	if (useMessageIcons_) {
+@@ -121,10 +129,20 @@ void ChatView::contextMenuEvent(QContext
+ 		e->accept();
+ 	}
+ 	else {
+-		PsiTextView::contextMenuEvent(e);
++		QMenu *menu = createStandardContextMenu(e->pos());
++		menu->exec(e->globalPos());
++		delete menu;
++		e->accept();
+ 	}
+ }
+ 
++QMenu* ChatView::createStandardContextMenu(const QPoint &position)
++{
++	QMenu *menu = PsiTextView::createStandardContextMenu(position);
++	menu->addAction(actQuote_);
++	return menu;
++}
++
+ void ChatView::addLogIconsResources()
+ {
+ 	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
+@@ -186,6 +204,24 @@ void ChatView::autoCopy()
+ }
+ 
+ /**
++ * Make quote from any selected text and paste it in chat window
++ */
++
++void ChatView::quoteEvent()
++{
++	emit quote(getPlainText());
++}
++
++/**
++ * Enable or disable actQuote_ in relations from hasSelection()
++ */
++
++void ChatView::changeActQuoteState()
++{
++	actQuote_->setEnabled(textCursor().hasSelection());
++}
++
++/**
+  * Handle KeyPress events that happen in ChatEdit widget. This is used
+  * to 'fix' the copy shortcut.
+  * \param object object that should receive the event
+@@ -460,4 +496,4 @@ bool ChatView::internalFind(QString str,
+ ChatView * ChatView::textWidget()
+ {
+ 	return this;
+-}
+\ В конце файла нет новой строки
++}
+--- psi.orig/src/chatview_te.h
++++ psi/src/chatview_te.h
+@@ -47,6 +47,7 @@ public:
+ 	QSize sizeHint() const;
+ 	void clear();
+ 	void contextMenuEvent(QContextMenuEvent *e);
++	QMenu* createStandardContextMenu(const QPoint &position);
+ 
+ 	void init();
+ 	void setDialog(QWidget* dialog);
+@@ -81,12 +82,15 @@ protected:
+ 
+ protected slots:
+ 	void autoCopy();
++	void quoteEvent();
++	void changeActQuoteState();
+ 
+ private slots:
+ 	void slotScroll();
+ 
+ signals:
+ 	void showNM(const QString&);
++	void quote(const QString &text);
+ 
+ private:
+ 	bool isMuc_;
+@@ -102,6 +106,7 @@ private:
+ 	QPixmap logIconDelivered;
+ 	QPixmap logIconTime;
+ 	QPixmap logIconInfo;
++	QAction *actQuote_;
+ };
+ 
+ #endif
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -826,6 +826,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	invalidateTab();
+ 	setConnecting();
+ 	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
++
++	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
+ }
+ 
+ void GCMainDlg::vcard(const QString& _str)
+--- psi.orig/src/msgmle.cpp
++++ psi/src/msgmle.cpp
+@@ -32,6 +32,7 @@
+ #include <QTextCharFormat>
+ #include <QTextDocument>
+ #include <QTimer>
++#include <QClipboard>
+ 
+ #include "shortcutmanager.h"
+ #include "spellchecker/spellhighlighter.h"
+@@ -92,6 +93,13 @@ void ChatEdit::initActions()
+ 	act_showMessageLast= new QAction(this);
+ 	addAction(act_showMessageLast);
+ 	connect(act_showMessageLast, SIGNAL(triggered()), SLOT(showHistoryMessageLast()));
++
++	QClipboard *clipboard = QApplication::clipboard();
++	actPasteAsQuote_ = new QAction(tr("Paste As Quotation"), this);
++	actPasteAsQuote_->setEnabled(!clipboard->text().isEmpty());
++	addAction(actPasteAsQuote_);
++	connect(actPasteAsQuote_, SIGNAL(triggered()), SLOT(pasteAsQuote()));
++	connect(clipboard, SIGNAL(dataChanged()), SLOT(changeActPasteAsQuoteState()));
+ }
+ 
+ void ChatEdit::setShortcuts()
+@@ -118,6 +126,13 @@ void ChatEdit::setFont(const QFont &f)
+ 	controller_->setFont(f);
+ }
+ 
++QMenu* ChatEdit::createStandardContextMenu(const QPoint &position)
++{
++	QMenu *menu = QTextEdit::createStandardContextMenu(position);
++	menu->addAction(actPasteAsQuote_);
++	return menu;
++}
++
+ bool ChatEdit::checkSpellingGloballyEnabled()
+ {
+ 	return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
+@@ -222,8 +237,10 @@ void ChatEdit::contextMenuEvent(QContext
+ 		}
+ 	}
+ 
+-	// Do normal menu
+-	QTextEdit::contextMenuEvent(e);
++	// Do custom menu
++	QMenu *menu = createStandardContextMenu(e->pos());
++	menu->exec(e->globalPos());
++	delete menu;
+ 	e->accept();
+ }
+ 
+@@ -298,6 +315,18 @@ void ChatEdit::showHistoryMessageNext()
+ 	}
+ }
+ 
++void ChatEdit::changeActPasteAsQuoteState()
++{
++	QClipboard *clipboard = QApplication::clipboard();
++	actPasteAsQuote_->setEnabled(!clipboard->text().isEmpty());
++}
++
++void ChatEdit::pasteAsQuote()
++{
++	QString text = QApplication::clipboard()->text();
++	insertAsQuote(text);
++}
++
+ void ChatEdit::showHistoryMessagePrev()
+ {
+ 	if (!typedMsgsHistory.isEmpty() && typedMsgsIndex > 0) {
+@@ -402,6 +431,24 @@ void ChatEdit::setCssString(const QStrin
+ 	controller_->setCssString(css);
+ }
+ 
++void ChatEdit::insertAsQuote(const QString &text)
++{
++	int pos =  textCursor().position();
++	QString prevLine = toPlainText().left(pos - 1);
++	prevLine = prevLine.mid(prevLine.lastIndexOf("\n") + 1);
++
++	QString quote = QString::fromUtf8("» ") + text;
++	quote.replace("\n", QString::fromUtf8("\n» "));
++
++	// Check for previous quote and merge if true
++	if(!prevLine.startsWith(QString::fromUtf8("»"))) {
++		quote.prepend("\n");
++	}
++	quote.append("\n");
++	insertPlainText(quote);
++}
++
++
+ //----------------------------------------------------------------------------
+ // LineEdit
+ //----------------------------------------------------------------------------
+--- psi.orig/src/msgmle.h
++++ psi/src/msgmle.h
+@@ -49,6 +49,7 @@ public:
+ 	// reimplemented
+ 	QSize sizeHint() const;
+ 	void setFont(const QFont &);
++	QMenu* createStandardContextMenu(const QPoint &position);
+ 
+ 	static bool checkSpellingGloballyEnabled();
+ 	void setCheckSpelling(bool);
+@@ -59,6 +60,7 @@ public slots:
+ 	void clearMessageHistory();
+ 	void doHTMLTextMenu();
+ 	void setCssString(const QString& css);
++	void insertAsQuote(const QString& text);
+ 
+ protected slots:
+  	void applySuggestion();
+@@ -68,6 +70,8 @@ protected slots:
+ 	void showHistoryMessagePrev();
+ 	void showHistoryMessageFirst();
+ 	void showHistoryMessageLast();
++	void changeActPasteAsQuoteState();
++	void pasteAsQuote();
+ 
+ protected:
+ 	// override the tab/esc behavior
+@@ -92,6 +96,8 @@ private:
+ 	QAction* act_showMessageNext;
+ 	QAction* act_showMessageFirst;
+ 	QAction* act_showMessageLast;
++	QAction *actPasteAsQuote_;
++
+ 	QString currentText;
+ 	HTMLTextController *controller_;
+ };
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -263,6 +263,8 @@ void PsiChatDlg::initUi()
+ 		ui_.vboxLayout1->insertWidget(0, winHeader_);
+ 	}
+ 	setMargins();
++
++	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
+ }
+ 
+ void PsiChatDlg::updateCountVisibility()
+--- psi.orig/src/webview.cpp
++++ psi/src/webview.cpp
+@@ -45,6 +45,11 @@ WebView::WebView(QWidget* parent) : QWeb
+ 	connect(page()->action(QWebPage::Cut), SIGNAL(triggered()), SLOT(textCopiedEvent()));
+ 	connect(page(), SIGNAL(loadStarted()), this, SLOT(loadStartedEvent()));
+ 	connect(page(), SIGNAL(loadFinished(bool)), this, SLOT(loadFinishedEvent(bool)));
++
++	actQuote_ = new QAction(tr("Quote"), this);
++	actQuote_->setShortcut(QKeySequence(tr("Ctrl+S")));
++	addAction(actQuote_);
++	connect(actQuote_, SIGNAL(triggered()), SLOT(quoteEvent()));
+ }
+ 
+ void WebView::linkClickedEvent(const QUrl& url)
+@@ -68,6 +73,11 @@ void WebView::loadFinishedEvent(bool suc
+ 	isLoading_ = false;
+ }
+ 
++void WebView::quoteEvent()
++{
++	emit quote(selectedText());
++}
++
+ void WebView::contextMenuEvent(QContextMenuEvent* event)
+ {
+ 	if (isLoading_) return;
+@@ -85,6 +95,7 @@ void WebView::contextMenuEvent(QContextM
+ 		menu = new QMenu(this);
+ 		if (!page()->selectedText().isEmpty()) {
+ 			menu->addAction(pageAction(QWebPage::Copy));
++			menu->addAction(actQuote_);
+ 		} else {
+ 			if (!menu->isEmpty()) {
+ 				menu->addSeparator();
+--- psi.orig/src/webview.h
++++ psi/src/webview.h
+@@ -93,13 +93,17 @@ private:
+ 	bool isLoading_;
+ 	QStringList jsBuffer_;
+ 	QPoint dragStartPosition;
++	QAction *actQuote_;
+ 
++signals:
++	void quote(const QString &text);
+ 
+ protected slots:
+ 	void linkClickedEvent(const QUrl& url);
+ 	void textCopiedEvent();
+ 	void loadStartedEvent();
+ 	void loadFinishedEvent(bool);
++	void quoteEvent();
+ };
+ 
+ 
+--- psi.orig/src/widgets/psitextview.cpp
++++ psi/src/widgets/psitextview.cpp
+@@ -25,6 +25,7 @@
+ #include <QAbstractTextDocumentLayout>
+ #include <QTextDocumentFragment>
+ #include <QTextFragment>
++#include <QRegExp>
+ 
+ #include "urlobject.h"
+ #include "psirichtext.h"
+@@ -48,6 +49,7 @@ public:
+ 
+ 	QString anchorOnMousePress;
+ 	bool hadSelectionOnMousePress;
++	bool rightClickSelection;
+ 		
+ 	QString fragmentToPlainText(const QTextFragment &fragment);
+ 	QString blockToPlainText(const QTextBlock &block);
+@@ -86,6 +88,44 @@ PsiTextView::PsiTextView(QWidget *parent
+ }
+ 
+ /**
++ * Reimplemented createStandardContextMenu(const QPoint &position)
++ * for creating of custom context menu
++ */
++
++QMenu* PsiTextView::createStandardContextMenu(const QPoint &position)
++{
++	QTextCursor textcursor = cursorForPosition(position);
++	QMenu *menu;
++	QString anc = anchorAt(position);
++	if (!anc.isEmpty()) {
++		menu = URLObject::getInstance()->createPopupMenu(anc);
++
++		int posInBlock = textcursor.position() - textcursor.block().position();
++		QString textblock = textcursor.block().text();
++		int begin = textcursor.block().position() + textblock.lastIndexOf(QRegExp("\\s|^"), posInBlock) + 1;
++		int end = textcursor.block().position() + textblock.indexOf(QRegExp("\\s|$"), posInBlock);
++		textcursor.setPosition(begin);
++		textcursor.setPosition(end, QTextCursor::KeepAnchor);
++		setTextCursor(textcursor);
++
++		menu = URLObject::getInstance()->createPopupMenu(anc);
++	}
++	else {
++		if (d->rightClickSelection || !textCursor().hasSelection()) { // only if no selection we select text block
++			int begin = textcursor.block().position();
++			int end = begin + textcursor.block().length() - 1;
++			textcursor.setPosition(begin);
++			textcursor.setPosition(end, QTextCursor::KeepAnchor);
++			setTextCursor(textcursor);
++			d->rightClickSelection = true;
++		}
++		menu = QTextEdit::createStandardContextMenu();
++	}
++	return menu;
++}
++
++
++/**
+  * This function returns true if vertical scroll bar is 
+  * at its maximum position.
+  */
+@@ -181,11 +221,7 @@ QString PsiTextView::getPlainText() cons
+ 
+ void PsiTextView::contextMenuEvent(QContextMenuEvent *e) 
+ {
+-	QMenu *menu;
+-	if (!anchorAt(e->pos()).isEmpty())
+-		menu = URLObject::getInstance()->createPopupMenu(anchorAt(e->pos()));
+-	else
+-		menu = createStandardContextMenu();
++	QMenu *menu = createStandardContextMenu(e->pos());
+ 	menu->exec(e->globalPos());
+ 	e->accept();
+ 	delete menu;
+@@ -224,9 +260,11 @@ void PsiTextView::mouseReleaseEvent(QMou
+ {
+ 	QTextEdit::mouseReleaseEvent(e);
+ 
+-	if (!(e->button() & Qt::LeftButton))
++	if (!(e->button() & Qt::LeftButton)) {
+ 		return;
++	}
+ 
++	d->rightClickSelection = false;
+ 	const QString anchor = anchorAt(e->pos());
+ 
+ 	if (anchor.isEmpty())
+--- psi.orig/src/widgets/psitextview.h
++++ psi/src/widgets/psitextview.h
+@@ -32,6 +32,9 @@ class PsiTextView : public QTextEdit
+ public:
+ 	PsiTextView(QWidget *parent = 0);
+ 
++	// Reimplemented
++	QMenu* createStandardContextMenu(const QPoint &position);
++
+ 	bool atBottom();
+ 
+ 	virtual void appendText(const QString &text);	

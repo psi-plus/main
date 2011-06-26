@@ -1,0 +1,26 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -463,6 +463,7 @@ QLineEdit#le_status_text {
+ 				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
+ 				<use-tabs type="bool">true</use-tabs>
+ 				<mouse-middle-button type="QString">close</mouse-middle-button>
++				<mouse-doubleclick-action type="QString">detach</mouse-doubleclick-action>
+ 				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
+ 				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
+ 				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -418,7 +418,12 @@ void TabDlg::detachCurrentTab()
+ 
+ void TabDlg::mouseDoubleClickTab(QWidget* widget)
+ {
+-	if(userManagement_)
++	const QString act = PsiOptions::instance()->getOption("options.ui.tabs.mouse-doubleclick-action").toString();
++	if(act == "hide")
++		hideTab(static_cast<TabbableWidget*>(widget));
++	else if(act == "close")
++		closeTab(static_cast<TabbableWidget*>(widget));
++	else if(act == "detach" && userManagement_)
+ 		detachTab(static_cast<TabbableWidget*>(widget));
+ }
+ 

@@ -1,0 +1,648 @@
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -717,6 +717,11 @@ void ChatDlg::doSend()
+ 	if (isEncryptionEnabled()) {
+ 		m.setWasEncrypted(true);
+ 	}
++
++	HTMLElement html = chatEdit()->toHTMLElement();
++	if(!html.body().isNull())
++		m.setHTML(html);
++
+ 	QString id = account()->client()->genUniqueId();
+ 	m.setId(id); // we need id early for message manipulations in chatview
+ 
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -209,7 +209,7 @@ public:
+ 	QString password;
+ 	QString topic;
+ 	bool nonAnonymous;		 // got status code 100 ?
+-	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark;
++	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark, *act_html_text;
+ 	TypeAheadFindBar *typeahead;
+ #ifdef WHITEBOARDING
+ 	IconAction *act_whiteboard;
+@@ -679,6 +679,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	d->act_configure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("&Configure Room"), 0, this);
+ 	connect(d->act_configure, SIGNAL(triggered()), SLOT(configureRoom()));
+ 
++	d->act_html_text = new IconAction(tr("Set Text Format"), "psi/text", tr("Set Text Format"), 0, this);
++	connect(d->act_html_text, SIGNAL(triggered()), d->mle(), SLOT(doHTMLTextMenu()));
++
+ #ifdef WHITEBOARDING
+ 	d->act_whiteboard = new IconAction(tr("Open a Whiteboard"), "psi/whiteboard", tr("Open a &Whiteboard"), 0, this);
+ 	connect(d->act_whiteboard, SIGNAL(triggered()), SLOT(openWhiteboard()));
+@@ -725,6 +728,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	ui_.toolbar->addAction(d->act_clear);
+ 	ui_.toolbar->addAction(d->act_find);
+ 	ui_.toolbar->addAction(d->act_configure);
++	ui_.toolbar->addAction(d->act_html_text);
+ #ifdef WHITEBOARDING
+ 	ui_.toolbar->addAction(d->act_whiteboard);
+ #endif
+@@ -1077,6 +1081,11 @@ void GCMainDlg::mle_returnPressed()
+ 	Message m(jid());
+ 	m.setType("groupchat");
+ 	m.setBody(str);
++
++	HTMLElement html = d->mle()->toHTMLElement();
++	if(!html.body().isNull())
++		m.setHTML(html);
++
+ 	m.setTimeStamp(QDateTime::currentDateTime());
+ 	emit d->mle()->appendMessageHistory(m.body());
+ 
+@@ -1754,6 +1763,7 @@ void GCMainDlg::setLooks()
+ 	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
+ 	if (!css.isEmpty()) {
+ 		setStyleSheet(css);
++		d->mle()->setCssString(css);
+ 	}
+ 	ui_.vsplitter->optionsChanged();
+ 	ui_.mle->optionsChanged();
+--- /dev/null
++++ psi/src/htmltextcontroller.cpp
+@@ -0,0 +1,320 @@
++/*
++ * htmltextcontroller.cpp
++ * Copyright (C) 2010  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++#include "htmltextcontroller.h"
++#include <QMenu>
++#include <QFontDialog>
++#include <QColorDialog>
++
++class HTMLTextMenu : public QMenu
++{
++	Q_OBJECT
++public:
++	HTMLTextMenu(QWidget* parent = 0): QMenu(parent)
++	{
++		actBold = addAction(tr("Bold"));
++		actBold->setCheckable(true);
++		actBold->setData(QVariant(HTMLTextController::StateBold));
++
++		actItalic = addAction(tr("Italic"));
++		actItalic->setCheckable(true);
++		actItalic->setData(QVariant(HTMLTextController::StateItalic));
++
++		actUnderline = addAction(tr("Underline"));
++		actUnderline->setCheckable(true);
++		actUnderline->setData(QVariant(HTMLTextController::StateUnderline));
++
++		actStrikeOut = addAction(tr("Strike Out"));
++		actStrikeOut->setCheckable(true);
++		actStrikeOut->setData(QVariant(HTMLTextController::StateStrikeOut));
++
++		actTextColor = addAction(tr("Text Color"));
++		actTextColor->setCheckable(true);
++		actTextColor->setData(QVariant(HTMLTextController::StateTextColorChanged));
++
++		actBackgroundColor = addAction(tr("Background Color"));
++		actBackgroundColor->setCheckable(true);
++		actBackgroundColor->setData(QVariant(HTMLTextController::StateBackgroundColorChanged));
++
++		actText = addAction(tr("Font"));
++		actText->setCheckable(true);
++		actText->setData(QVariant(HTMLTextController::StateTextStyleChanged));
++
++		addSeparator();
++
++		actReset = addAction(tr("Reset"));
++		actReset->setData(QVariant(HTMLTextController::StateNone));
++	};
++
++	void setMenuState(QList<HTMLTextController::TextEditState> list)
++	{
++		foreach(HTMLTextController::TextEditState state, list) {
++			switch(state) {
++			case HTMLTextController::StateBold:
++				actBold->setChecked(true);
++				break;
++			case HTMLTextController::StateItalic:
++				actItalic->setChecked(true);
++				break;
++			case HTMLTextController::StateUnderline:
++				actUnderline->setChecked(true);
++				break;
++			case HTMLTextController::StateStrikeOut:
++				actStrikeOut->setChecked(true);
++				break;
++			case HTMLTextController::StateTextStyleChanged:
++				//actText->setChecked(true);
++				break;
++			case HTMLTextController::StateTextColorChanged:
++				actTextColor->setChecked(true);
++				break;
++			case HTMLTextController::StateBackgroundColorChanged:
++				actBackgroundColor->setChecked(true);
++				break;
++			default:
++				break;
++			}
++		}
++	};
++
++private:
++	QAction *actBold;
++	QAction *actUnderline;
++	QAction *actItalic;
++	QAction *actStrikeOut;
++	QAction *actText;
++	QAction *actTextColor;
++	QAction *actBackgroundColor;
++	QAction *actReset;
++
++};
++
++//----------------------------------------------------------------------------
++// HTMLTextController
++//----------------------------------------------------------------------------
++HTMLTextController::HTMLTextController(QTextEdit *parent)
++	: QObject()
++	, te_(parent)
++{
++	font_ = te_->font();
++	currentFont_ = font_;
++	background_ = te_->currentCharFormat().background();
++	currentBackground_ = background_;
++	foreground_ = te_->currentCharFormat().foreground();
++	currentForeground_ = foreground_;
++}
++
++void HTMLTextController::addState(TextEditState state)
++{
++	QTextCharFormat tcf;
++	switch(state) {
++	case StateBold:
++		tcf.setFontWeight(QFont::Bold);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateItalic:
++		tcf.setFontItalic(true);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateUnderline:
++		tcf.setFontUnderline(true);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateStrikeOut:
++		tcf.setFontStrikeOut(true);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateTextStyleChanged:
++		tcf.setFont(currentFont_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateTextColorChanged:
++		tcf.setForeground(currentForeground_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateBackgroundColorChanged:
++		tcf.setBackground(currentBackground_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateNone:
++		tcf.setFontWeight(QFont::Normal);
++		tcf.setFontItalic(false);
++		tcf.setFontUnderline(false);
++		tcf.setFontStrikeOut(false);
++		tcf.setFont(font_);
++		tcf.setBackground(background_);
++		tcf.setForeground(foreground_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++
++	default:
++		break;
++	}
++}
++
++void HTMLTextController::removeState(TextEditState state)
++{
++	QTextCharFormat tcf;
++	switch(state) {
++	case StateBold:
++		tcf.setFontWeight(QFont::Normal);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateItalic:
++		tcf.setFontItalic(false);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateUnderline:
++		tcf.setFontUnderline(false);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateStrikeOut:
++		tcf.setFontStrikeOut(false);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateTextStyleChanged:
++		tcf.setFont(font_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateTextColorChanged:
++		tcf.setForeground(foreground_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	case StateBackgroundColorChanged:
++		tcf.setBackground(background_);
++		te_->mergeCurrentCharFormat(tcf);
++		break;
++	default:
++		break;
++	}
++}
++
++QList<HTMLTextController::TextEditState>  HTMLTextController::state()
++{
++	QList<TextEditState> list;
++	const QTextCharFormat tcf = te_->textCursor().charFormat();
++	if(tcf.fontWeight() == QFont::Bold)
++		list.push_back(StateBold);
++	if(tcf.fontItalic())
++		list.push_back(StateItalic);
++	if(tcf.fontUnderline())
++		list.push_back(StateUnderline);
++	if(tcf.fontStrikeOut())
++		list.push_back(StateStrikeOut);
++	if(tcf.font() != font_)
++		list.push_back(StateTextStyleChanged);
++	if(tcf.background() != background_)
++		list.push_back(StateBackgroundColorChanged);
++	if(tcf.foreground() != foreground_)
++		list.push_back(StateTextColorChanged);
++
++	return list;
++}
++
++void HTMLTextController::doMenu()
++{
++	HTMLTextMenu *menu = new HTMLTextMenu();
++	menu->setMenuState(state());
++	if(!cssString_.isEmpty())
++		menu->setStyleSheet(cssString_);
++	QAction *act = menu->exec(QCursor::pos());
++	if(!act) {
++		delete menu;
++		return;
++	}
++	int data = act->data().toInt();
++	if(data == StateBold) {
++		if(act->isChecked())
++			addState(StateBold);
++		else
++			removeState(StateBold);
++	}
++	if(data == StateItalic) {
++		if(act->isChecked())
++			addState(StateItalic);
++		else
++			removeState(StateItalic);
++	}
++	else if(data == StateUnderline) {
++		if(act->isChecked())
++			addState(StateUnderline);
++		else
++			removeState(StateUnderline);
++	}
++	else if(data == StateStrikeOut) {
++		if(act->isChecked())
++			addState(StateStrikeOut);
++		else
++			removeState(StateStrikeOut);
++	}
++	else if(data == StateTextStyleChanged) {
++		if(act->isChecked()) {
++			bool ok;
++			QFont tmpFont = QFontDialog::getFont(&ok, font_);
++			if(ok) {
++				currentFont_ = tmpFont;
++				addState(StateTextStyleChanged);
++			}
++		}
++		else {
++			currentFont_ = font_;
++			removeState(StateTextStyleChanged);
++		}
++	}
++	else if(data == StateTextColorChanged) {
++		if(act->isChecked()) {
++			QColor color = QColorDialog::getColor(currentForeground_.color());
++			if(color.isValid()) {
++				currentForeground_ = QBrush(color);
++				addState(StateTextColorChanged);
++			}
++		}
++		else {
++			currentForeground_ = foreground_;
++			removeState(StateTextColorChanged);
++		}
++	}
++	else if(data == StateBackgroundColorChanged) {
++		if(act->isChecked()) {
++			QColor color = QColorDialog::getColor(currentBackground_.color());
++			if(color.isValid()) {
++				currentBackground_ = QBrush(color);
++				addState(StateBackgroundColorChanged);
++			}
++		}
++		else {
++			currentBackground_ = background_;
++			removeState(StateBackgroundColorChanged);
++		}
++	}
++	else if(data == StateNone)
++		addState(StateNone);
++
++	delete menu;
++	te_->window()->activateWindow();
++	te_->setFocus(Qt::MouseFocusReason);
++
++}
++
++void HTMLTextController::setFont(const QFont &f)
++{
++	font_ = f;
++}
++
++#include "htmltextcontroller.moc"
+--- /dev/null
++++ psi/src/htmltextcontroller.h
+@@ -0,0 +1,58 @@
++/*
++ * htmltextcontroller.h
++ * Copyright (C) 2010  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++#ifndef HTMLTEXTCONTROLLER_H
++#define HTMLTEXTCONTROLLER_H
++
++#include  <QTextEdit>
++
++class HTMLTextController : public QObject
++{
++	Q_OBJECT
++public:
++	enum TextEditState {
++		StateNone = 0,
++		StateBold = 1,
++		StateItalic = 2,
++		StateUnderline = 4,
++		StateTextStyleChanged = 8,
++		StateTextColorChanged = 16,
++		StateBackgroundColorChanged = 32,
++		StateStrikeOut = 64
++	};
++
++	HTMLTextController(QTextEdit *parent);	
++	void doMenu();
++	void setFont(const QFont &);
++	void setCssString(const QString& css) { cssString_ = css; };
++
++private:
++	void addState(TextEditState state);
++	void removeState(TextEditState state);
++	QList<TextEditState> state();
++	QString cssString_;
++
++private:
++	QTextEdit *te_;
++	QFont font_, currentFont_;
++	QBrush background_ ,currentBackground_;
++	QBrush foreground_, currentForeground_;
++};
++
++#endif // HTMLTEXTCONTROLLER_H
+--- psi.orig/src/messageview.cpp
++++ psi/src/messageview.cpp
+@@ -86,7 +86,12 @@ void MessageView::setPlainText(const QSt
+ void MessageView::setHtml(const QString &text)
+ {
+ 	if (type_ == Message) {
+-		emote_ = text.trimmed().startsWith(me_cmd);
++		QString str = TextUtil::rich2plain(text).trimmed();
++		emote_ = str.startsWith(me_cmd);
++		if(emote_) {
++			setPlainText(str);
++			return;
++		}
+ 	}
+ 	text_ = text;
+ }
+--- psi.orig/src/msgmle.cpp
++++ psi/src/msgmle.cpp
+@@ -37,6 +37,8 @@
+ #include "spellchecker/spellhighlighter.h"
+ #include "spellchecker/spellchecker.h"
+ #include "psioptions.h"
++#include "htmltextcontroller.h"
++
+ 
+ //----------------------------------------------------------------------------
+ // ChatEdit
+@@ -47,6 +49,8 @@ ChatEdit::ChatEdit(QWidget *parent)
+ 	, check_spelling_(false)
+ 	, spellhighlighter_(0)
+ {
++	controller_ = new HTMLTextController(this);
++
+ 	setWordWrapMode(QTextOption::WordWrap);
+ 	setAcceptRichText(false);
+ 
+@@ -68,6 +72,7 @@ ChatEdit::~ChatEdit()
+ {
+ 	clearMessageHistory();
+ 	delete spellhighlighter_;
++	delete controller_;
+ }
+ 
+ void ChatEdit::initActions()
+@@ -107,6 +112,12 @@ QSize ChatEdit::sizeHint() const
+ 	return minimumSizeHint();
+ }
+ 
++void ChatEdit::setFont(const QFont &f)
++{
++	QTextEdit::setFont(f);
++	controller_->setFont(f);
++}
++
+ bool ChatEdit::checkSpellingGloballyEnabled()
+ {
+ 	return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
+@@ -355,6 +366,42 @@ void ChatEdit::clearMessageHistory()
+ 	typedMsgsIndex = 0;
+ }
+ 
++XMPP::HTMLElement ChatEdit::toHTMLElement() {
++	XMPP::HTMLElement elem;
++	QString html = toHtml();
++	int index = html.indexOf("<body");
++	int lastIndex = html.lastIndexOf("</body>");
++	if(index == -1 || lastIndex == -1)
++		return elem;
++	lastIndex += 7;
++	html = html.mid(index, lastIndex-index);
++	QDomDocument doc;
++	if(!doc.setContent(html))
++		return elem;	
++	QDomElement htmlElem = doc.firstChildElement("body");
++	QDomElement p = htmlElem.firstChildElement("p");
++	QDomElement body = doc.createElementNS("http://www.w3.org/1999/xhtml", "body");
++	bool foundSpan = false;
++	while(!p.isNull()) {
++		p.removeAttribute("style");
++		body.appendChild(p.cloneNode(true).toElement());
++		if(!p.firstChildElement("span").isNull())
++			foundSpan = true;
++		p = p.nextSiblingElement("p");
++	}
++	if(foundSpan)
++		elem.setBody(body);
++	return elem;
++}
++
++void ChatEdit::doHTMLTextMenu() {
++	controller_->doMenu();
++}
++
++void ChatEdit::setCssString(const QString &css) {
++	controller_->setCssString(css);
++}
++
+ //----------------------------------------------------------------------------
+ // LineEdit
+ //----------------------------------------------------------------------------
+--- psi.orig/src/msgmle.h
++++ psi/src/msgmle.h
+@@ -23,6 +23,8 @@
+ 
+ #include <QTextEdit>
+ 
++#include "xmpp_htmlelement.h"
++
+ #define MAX_MESSAGE_HISTORY 50
+ 
+ class ChatEdit;
+@@ -31,6 +33,7 @@ class QKeyEvent;
+ class QResizeEvent;
+ class QTimer;
+ class SpellHighlighter;
++class HTMLTextController;
+ 
+ 
+ class ChatEdit : public QTextEdit
+@@ -45,13 +48,17 @@ public:
+ 
+ 	// reimplemented
+ 	QSize sizeHint() const;
++	void setFont(const QFont &);
+ 
+ 	static bool checkSpellingGloballyEnabled();
+ 	void setCheckSpelling(bool);
++	XMPP::HTMLElement toHTMLElement();
+ 
+ public slots:
+ 	void appendMessageHistory(const QString& text);
+ 	void clearMessageHistory();
++	void doHTMLTextMenu();
++	void setCssString(const QString& css);
+ 
+ protected slots:
+  	void applySuggestion();
+@@ -86,6 +93,7 @@ private:
+ 	QAction* act_showMessageFirst;
+ 	QAction* act_showMessageLast;
+ 	QString currentText;
++	HTMLTextController *controller_;
+ };
+ 
+ 
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -270,6 +270,7 @@ void PsiChatDlg::setLooks()
+ 	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
+ 	if (!css.isEmpty()) {
+ 		setStyleSheet(css);
++		chatEdit()->setCssString(css);
+ 	}
+ 	ui_.splitter->optionsChanged();
+ 	ui_.mle->optionsChanged();
+@@ -368,6 +369,9 @@ void PsiChatDlg::initToolButtons()
+ 	connect(act_find, SIGNAL(triggered()), typeahead, SLOT(toggleVisibility()));
+ // -- typeahead
+ 
++	act_html_text = new IconAction(tr("Set Text Format"), "psi/text", tr("Set Text Format"), 0, this);
++	connect(act_html_text, SIGNAL(triggered()), chatEdit(), SLOT(doHTMLTextMenu()));
++
+ 	connect(account()->psi()->iconSelectPopup(), SIGNAL(textSelected(QString)), this, SLOT(addEmoticon(QString)));
+ 	act_icon_ = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
+ 	act_icon_->setMenu(account()->psi()->iconSelectPopup());
+@@ -409,6 +413,7 @@ void PsiChatDlg::initToolBar()
+ // typeahead find bar
+ 	ui_.toolbar->addAction(act_find);
+ // -- typeahead
++	ui_.toolbar->addAction(act_html_text);
+ 	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
+ 	ui_.toolbar->addAction(act_icon_);
+ 	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
+--- psi.orig/src/psichatdlg.h
++++ psi/src/psichatdlg.h
+@@ -84,6 +84,7 @@ private:
+ 	IconAction* act_find;
+ 	IconAction* act_ps_;
+ 	IconAction* act_templates_;
++	IconAction* act_html_text;
+ 	QAction *act_mini_cmd_, *act_minimize_;
+ 
+ 	MCmdManager mCmdManager_;
+--- psi.orig/src/src.pri
++++ psi/src/src.pri
+@@ -135,6 +135,7 @@ HEADERS += \
+ 	$$PWD/accountregdlg.h \
+ 	$$PWD/accountmodifydlg.h \
+ 	$$PWD/changepwdlg.h \
++	$$PWD/htmltextcontroller.h \
+ 	$$PWD/msgmle.h \
+ 	$$PWD/chatviewshare.h \
+ 	$$PWD/chatview.h \
+@@ -278,6 +279,7 @@ SOURCES += \
+ 	$$PWD/accountregdlg.cpp \
+ 	$$PWD/accountmodifydlg.cpp \
+ 	$$PWD/changepwdlg.cpp \
++	$$PWD/htmltextcontroller.cpp \
+ 	$$PWD/msgmle.cpp \
+ 	$$PWD/chatviewshare.cpp \
+ 	$$PWD/messageview.cpp \

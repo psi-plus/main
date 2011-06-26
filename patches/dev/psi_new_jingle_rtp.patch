@@ -1,0 +1,2126 @@
+diff --git a/iris b/iris
+--- a/iris
++++ b/iris
+@@ -1 +1 @@
+-Subproject commit 6373822ebded777f9f26fe53374ae81262dfe2cc
++Subproject commit 6373822ebded777f9f26fe53374ae81262dfe2cc-dirty
+diff --git a/src/avcall/avcall.cpp b/src/avcall/avcall.cpp
+index c398bab..858ba7d 100644
+--- a/src/avcall/avcall.cpp
++++ b/src/avcall/avcall.cpp
+@@ -131,9 +131,9 @@ static void ensureLoaded()
+ 	}
+ }
+ 
+-static JingleRtpPayloadType payloadInfoToPayloadType(const PsiMedia::PayloadInfo &pi)
++static Jingle::Rtp::PayloadType payloadInfoToPayloadType(const PsiMedia::PayloadInfo &pi)
+ {
+-	JingleRtpPayloadType out;
++	Jingle::Rtp::PayloadType out;
+ 	out.id = pi.id();
+ 	out.name = pi.name();
+ 	out.clockrate = pi.clockrate();
+@@ -142,7 +142,7 @@ static JingleRtpPayloadType payloadInfoToPayloadType(const PsiMedia::PayloadInfo
+ 	out.maxptime = pi.maxptime();
+ 	foreach(const PsiMedia::PayloadInfo::Parameter &pip, pi.parameters())
+ 	{
+-		JingleRtpPayloadType::Parameter ptp;
++		Jingle::Rtp::PayloadType::Parameter ptp;
+ 		ptp.name = pip.name;
+ 		ptp.value = pip.value;
+ 		out.parameters += ptp;
+@@ -150,7 +150,7 @@ static JingleRtpPayloadType payloadInfoToPayloadType(const PsiMedia::PayloadInfo
+ 	return out;
+ }
+ 
+-static PsiMedia::PayloadInfo payloadTypeToPayloadInfo(const JingleRtpPayloadType &pt)
++static PsiMedia::PayloadInfo payloadTypeToPayloadInfo(const Jingle::Rtp::PayloadType &pt)
+ {
+ 	PsiMedia::PayloadInfo out;
+ 	out.setId(pt.id);
+@@ -160,7 +160,7 @@ static PsiMedia::PayloadInfo payloadTypeToPayloadInfo(const JingleRtpPayloadType
+ 	out.setPtime(pt.ptime);
+ 	out.setMaxptime(pt.maxptime);
+ 	QList<PsiMedia::PayloadInfo::Parameter> list;
+-	foreach(const JingleRtpPayloadType::Parameter &ptp, pt.parameters)
++	foreach(const Jingle::Rtp::PayloadType::Parameter &ptp, pt.parameters)
+ 	{
+ 		PsiMedia::PayloadInfo::Parameter pip;
+ 		pip.name = ptp.name;
+@@ -177,9 +177,9 @@ class AvTransmit : public QObject
+ 
+ public:
+ 	PsiMedia::RtpChannel *audio, *video;
+-	JingleRtpChannel *transport;
++	Jingle::Rtp::Channel *transport;
+ 
+-	AvTransmit(PsiMedia::RtpChannel *_audio, PsiMedia::RtpChannel *_video, JingleRtpChannel *_transport, QObject *parent = 0) :
++	AvTransmit(PsiMedia::RtpChannel *_audio, PsiMedia::RtpChannel *_video, Jingle::Rtp::Channel *_transport, QObject *parent = 0) :
+ 		QObject(parent),
+ 		audio(_audio),
+ 		video(_video),
+@@ -218,8 +218,8 @@ private slots:
+ 		{
+ 			PsiMedia::RtpPacket packet = audio->read();
+ 
+-			JingleRtp::RtpPacket jpacket;
+-			jpacket.type = JingleRtp::Audio;
++			Session::RtpPacket jpacket;
++			jpacket.type = Session::Audio;
+ 			jpacket.portOffset = packet.portOffset();
+ 			jpacket.value = packet.rawValue();
+ 
+@@ -233,8 +233,8 @@ private slots:
+ 		{
+ 			PsiMedia::RtpPacket packet = video->read();
+ 
+-			JingleRtp::RtpPacket jpacket;
+-			jpacket.type = JingleRtp::Video;
++			Session::RtpPacket jpacket;
++			jpacket.type = Session::Video;
+ 			jpacket.portOffset = packet.portOffset();
+ 			jpacket.value = packet.rawValue();
+ 
+@@ -246,11 +246,11 @@ private slots:
+ 	{
+ 		while(transport->packetsAvailable())
+ 		{
+-			JingleRtp::RtpPacket jpacket = transport->read();
++			Session::RtpPacket jpacket = transport->read();
+ 
+-			if(jpacket.type == JingleRtp::Audio)
++			if(jpacket.type == Session::Audio)
+ 				audio->write(PsiMedia::RtpPacket(jpacket.value, jpacket.portOffset));
+-			else if(jpacket.type == JingleRtp::Video)
++			else if(jpacket.type == Session::Video)
+ 				video->write(PsiMedia::RtpPacket(jpacket.value, jpacket.portOffset));
+ 		}
+ 	}
+@@ -341,7 +341,7 @@ class AvCallManagerPrivate : public QObject
+ public:
+ 	AvCallManager *q;
+ 	PsiAccount *pa;
+-	JingleRtpManager *rtpManager;
++	Jingle::Rtp::Manager *rtpManager;
+ 	QList<AvCall*> sessions;
+ 	QList<AvCall*> pending;
+ 
+@@ -362,7 +362,7 @@ public:
+ 	AvCall *q;
+ 	AvCallManagerPrivate *manager;
+ 	bool incoming;
+-	JingleRtp *sess;
++	Session *sess;
+ 	PsiMedia::RtpSession rtp;
+ 	XMPP::Jid peer;
+ 	AvCall::Mode mode;
+@@ -465,11 +465,11 @@ public:
+ 		//   localMediaUpdated()
+ 		int types;
+ 		if(mode == AvCall::Both)
+-			types = JingleRtp::Audio | JingleRtp::Video;
++			types = Session::Audio | Session::Video;
+ 		else if(mode == AvCall::Audio)
+-			types = JingleRtp::Audio;
++			types = Session::Audio;
+ 		else // Video
+-			types = JingleRtp::Video;
++			types = Session::Video;
+ 
+ 		sess->accept(types);
+ 		start_rtp();
+@@ -597,18 +597,18 @@ private:
+ 	{
+ 		if(transmitAudio)
+ 		{
+-			QList<JingleRtpPayloadType> payloadTypes = sess->remoteAudioPayloadTypes();
++			QList<Jingle::Rtp::PayloadType> payloadTypes = sess->remoteAudioPayloadTypes();
+ 			QList<PsiMedia::PayloadInfo> list;
+-			foreach(const JingleRtpPayloadType &pt, payloadTypes)
++			foreach(const Jingle::Rtp::PayloadType &pt, payloadTypes)
+ 				list += payloadTypeToPayloadInfo(pt);
+ 			rtp.setRemoteAudioPreferences(list);
+ 		}
+ 
+ 		if(transmitVideo)
+ 		{
+-			QList<JingleRtpPayloadType> payloadTypes = sess->remoteVideoPayloadTypes();
++			QList<Jingle::Rtp::PayloadType> payloadTypes = sess->remoteVideoPayloadTypes();
+ 			QList<PsiMedia::PayloadInfo> list;
+-			foreach(const JingleRtpPayloadType &pt, payloadTypes)
++			foreach(const Jingle::Rtp::PayloadType &pt, payloadTypes)
+ 				list += payloadTypeToPayloadInfo(pt);
+ 			rtp.setRemoteVideoPreferences(list);
+ 		}
+@@ -674,14 +674,14 @@ private slots:
+ 
+ 		if(pAudio)
+ 		{
+-			JingleRtpPayloadType pt = payloadInfoToPayloadType(*pAudio);
+-			sess->setLocalAudioPayloadTypes(QList<JingleRtpPayloadType>() << pt);
++			Jingle::Rtp::PayloadType pt = payloadInfoToPayloadType(*pAudio);
++			sess->setLocalAudioPayloadTypes(QList<Jingle::Rtp::PayloadType>() << pt);
+ 		}
+ 
+ 		if(pVideo)
+ 		{
+-			JingleRtpPayloadType pt = payloadInfoToPayloadType(*pVideo);
+-			sess->setLocalVideoPayloadTypes(QList<JingleRtpPayloadType>() << pt);
++			Jingle::Rtp::PayloadType pt = payloadInfoToPayloadType(*pVideo);
++			sess->setLocalVideoPayloadTypes(QList<Jingle::Rtp::PayloadType>() << pt);
+ 		}
+ 
+ 		if(!incoming)
+@@ -716,13 +716,13 @@ private slots:
+ 
+ 	void sess_error()
+ 	{
+-		JingleRtp::Error e = sess->errorCode();
+-		if(e == JingleRtp::ErrorTimeout)
++		Session::Error e = sess->errorCode();
++		if(e == Session::ErrorTimeout)
+ 		{
+ 			errorString = tr("Call negotiation timed out.");
+ 			cleanup();
+ 		}
+-		else if(e == JingleRtp::ErrorICE)
++		else if(e == Session::ErrorICE)
+ 		{
+ 			errorString = tr("Unable to establish peer-to-peer connection.");
+ 			reject();
+@@ -843,7 +843,7 @@ AvCallManagerPrivate::AvCallManagerPrivate(PsiAccount *_pa, AvCallManager *_q) :
+ 	q(_q),
+ 	pa(_pa)
+ {
+-	rtpManager = new JingleRtpManager(pa->client());
++	rtpManager = new Jingle::Rtp::Manager(pa->client());
+ 	connect(rtpManager, SIGNAL(incomingReady()), SLOT(rtp_incomingReady()));
+ }
+ 
+diff --git a/src/avcall/jinglertp.cpp b/src/avcall/jinglertp.cpp
+index c717c4d..11e1c5b 100755
+--- a/src/avcall/jinglertp.cpp
++++ b/src/avcall/jinglertp.cpp
+@@ -25,6 +25,11 @@
+ #include "iris/turnclient.h"
+ #include "iris/udpportreserver.h"
+ #include "xmpp_client.h"
++#include "jingle.h"
++
++namespace JingleRtp {
++
++using namespace XMPP::Jingle::Tasks;
+ 
+ // TODO: reject offers that don't contain at least one of audio or video
+ // TODO: support candidate negotiations over the JingleRtpChannel thread
+@@ -357,22 +362,22 @@ private slots:
+ //----------------------------------------------------------------------------
+ // JingleRtp
+ //----------------------------------------------------------------------------
+-class JingleRtpChannelPrivate : public QObject
++class Channel::Private : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
+-	JingleRtpChannel *q;
++	Channel *q;
+ 
+ 	QMutex m;
+ 	XMPP::UdpPortReserver *portReserver;
+ 	XMPP::Ice176 *iceA;
+ 	XMPP::Ice176 *iceV;
+ 	QTimer *rtpActivityTimer;
+-	QList<JingleRtp::RtpPacket> in;
++	QList<Session::RtpPacket> in;
+ 
+-	JingleRtpChannelPrivate(JingleRtpChannel *_q);
+-	~JingleRtpChannelPrivate();
++	Private(Channel *_q);
++	~Private();
+ 
+ 	void setIceObjects(XMPP::UdpPortReserver *_portReserver, XMPP::Ice176 *_iceA, XMPP::Ice176 *_iceV);
+ 	void restartRtpActivityTimer();
+@@ -384,12 +389,12 @@ private slots:
+ 	void rtpActivity_timeout();
+ };
+ 
+-class JingleRtpManagerPrivate : public QObject
++class Manager::Private : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
+-	JingleRtpManager *q;
++	Manager *q;
+ 
+ 	XMPP::Client *client;
+ 	QHostAddress selfAddr;
+@@ -406,38 +411,39 @@ public:
+ 	QString stunRelayTcpPass;
+ 	XMPP::TurnClient::Proxy stunProxy;
+ 	int basePort;
+-	QList<JingleRtp*> sessions;
+-	QList<JingleRtp*> pending;
+-	JT_PushJingleRtp *push_task;
++	QList<Session*> sessions;
++	QList<Session*> pending;
++	JingleRtp::XmlHerlper xmlHelper;
+ 
+-	JingleRtpManagerPrivate(XMPP::Client *_client, JingleRtpManager *_q);
+-	~JingleRtpManagerPrivate();
++	Private(XMPP::Client *_client, Manager *_q);
++	~Private();
+ 
+ 	QString createSid(const XMPP::Jid &peer) const;
+ 
+-	void unlink(JingleRtp *sess);
++	void unlink(Session *sess);
+ 
+ private slots:
+-	void push_task_incomingRequest(const XMPP::Jid &from, const QString &iq_id, const JingleRtpEnvelope &envelope);
++	void push_task_incomingRequest(const XMPP::Jid &from, const QString &iq_id,
++								   const XMPP::Jingle::Tasks::Envelope &envelope);
+ };
+ 
+-class JingleRtpPrivate : public QObject
++class Session::Private : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
+-	JingleRtp *q;
++	Session *q;
+ 
+-	JingleRtpManagerPrivate *manager;
++	Manager::Private *manager;
+ 	bool incoming;
+ 	XMPP::Jid peer;
+ 	QString sid;
+ 
+ 	int types;
+-	QList<JingleRtpPayloadType> localAudioPayloadTypes;
+-	QList<JingleRtpPayloadType> localVideoPayloadTypes;
+-	QList<JingleRtpPayloadType> remoteAudioPayloadTypes;
+-	QList<JingleRtpPayloadType> remoteVideoPayloadTypes;
++	QList<PayloadType> localAudioPayloadTypes;
++	QList<PayloadType> localVideoPayloadTypes;
++	QList<PayloadType> remoteAudioPayloadTypes;
++	QList<PayloadType> remoteVideoPayloadTypes;
+ 	int localMaximumBitrate;
+ 	int remoteMaximumBitrate;
+ 	QString audioName;
+@@ -452,7 +458,7 @@ public:
+ 	int stunBindPort, stunRelayUdpPort, stunRelayTcpPort;
+ 	XMPP::Ice176 *iceA;
+ 	XMPP::Ice176 *iceV;
+-	JingleRtpChannel *rtpChannel;
++	Channel *rtpChannel;
+ 
+ 	class IceStatus
+ 	{
+@@ -477,10 +483,10 @@ public:
+ 	bool session_accepted;
+ 	bool session_activated;
+ 	QTimer *handshakeTimer;
+-	JingleRtp::Error errorCode;
++	Session::Error errorCode;
+ 	XMPP::UdpPortReserver *portReserver;
+ 
+-	JingleRtpPrivate(JingleRtp *_q) :
++	Private(Session *_q) :
+ 		QObject(_q),
+ 		q(_q),
+ 		manager(0),
+@@ -503,10 +509,10 @@ public:
+ 		connect(handshakeTimer, SIGNAL(timeout()), SLOT(handshake_timeout()));
+ 		handshakeTimer->setSingleShot(true);
+ 
+-		rtpChannel = new JingleRtpChannel;
++		rtpChannel = new Channel;
+ 	}
+ 
+-	~JingleRtpPrivate()
++	~Private()
+ 	{
+ 		cleanup();
+ 		manager->unlink(q);
+@@ -526,12 +532,12 @@ public:
+ 		if(!localAudioPayloadTypes.isEmpty())
+ 		{
+ 			printf("there are audio payload types\n");
+-			types |= JingleRtp::Audio;
++			types |= Session::Audio;
+ 		}
+ 		if(!localVideoPayloadTypes.isEmpty())
+ 		{
+ 			printf("there are video payload types\n");
+-			types |= JingleRtp::Video;
++			types |= Session::Video;
+ 		}
+ 
+ 		printf("types=%d\n", types);
+@@ -552,9 +558,9 @@ public:
+ 		if(!incoming)
+ 		{
+ 			bool ok = true;
+-			if((types & JingleRtp::Audio) && !iceA_status.started)
++			if((types & Session::Audio) && !iceA_status.started)
+ 				ok = false;
+-			if((types & JingleRtp::Video) && !iceV_status.started)
++			if((types & Session::Video) && !iceV_status.started)
+ 				ok = false;
+ 
+ 			// we haven't even sent session-initiate
+@@ -574,10 +580,8 @@ public:
+ 			}
+ 		}
+ 
+-		JingleRtpEnvelope envelope;
+-		envelope.action = "session-terminate";
+-		envelope.sid = sid;
+-		envelope.reason.condition = JingleRtpReason::Gone;
++		Envelope envelope(Envelope::SessionTerminate, sid);
++		envelope.setReason(Reason::Gone);
+ 
+ 		JT_JingleRtp *task = new JT_JingleRtp(manager->client->rootTask());
+ 		task->request(peer, envelope);
+@@ -597,36 +601,35 @@ public:
+ 	// called by manager when request is received, including
+ 	//   session-initiate.
+ 	// note: manager will never send session-initiate twice.
+-	bool incomingRequest(const QString &iq_id, const JingleRtpEnvelope &envelope)
++	bool incomingRequest(const QString &iq_id, const XMPP::Jingle::Tasks::Envelope &envelope)
+ 	{
+ 		// TODO: jingle has a lot of fields, and we kind of skip over
+ 		//   most of them just to grab what we need.  perhaps in the
+ 		//   future we could do more integrity checking.
+ 
+-		if(envelope.action == "session-initiate")
++		if(envelope.action == Envelope::SessionInitiate)
+ 		{
+ 			// initially flag both types, so we don't drop any
+ 			//   transport-info before we accept (at which point
+ 			//   we specify what types we actually want)
+-			types = JingleRtp::Audio | JingleRtp::Video;
++			types = Session::Audio | Session::Video;
+ 
+ 			init_iq_id = iq_id;
+ 
+-			const JingleRtpContent *audioContent = 0;
+-			const JingleRtpContent *videoContent = 0;
++			const XMPP::Jingle::Tasks::Content *audioContent = 0;
++			const XMPP::Jingle::Tasks::Content *videoContent = 0;
+ 
+ 			// find content
+-			foreach(const JingleRtpContent &c, envelope.contentList)
++			foreach(const XMPP::Jingle::Tasks::Content &c, envelope.contentList)
+ 			{
+-				if((types & JingleRtp::Audio) && c.desc.media == "audio" && !audioContent)
++				Description *desc = static_cast<Description *>(c.description.data());
++				if((types & Session::Audio) && desc->media == "audio" && !audioContent)
+ 				{
+ 					audioContent = &c;
+-					break;
+ 				}
+-				else if((types & JingleRtp::Video) && c.desc.media == "video" && !videoContent)
++				else if((types & Session::Video) && desc->media == "video" && !videoContent)
+ 				{
+ 					videoContent = &c;
+-					break;
+ 				}
+ 			}
+ 
+@@ -661,31 +664,29 @@ public:
+ 		{
+ 			manager->push_task->respondSuccess(peer, iq_id);
+ 
+-			const JingleRtpContent *audioContent = 0;
+-			const JingleRtpContent *videoContent = 0;
++			const XMPP::Jingle::Tasks::Content *audioContent = 0;
++			const XMPP::Jingle::Tasks::Content *videoContent = 0;
+ 
+ 			// find content
+-			foreach(const JingleRtpContent &c, envelope.contentList)
++			foreach(const XMPP::Jingle::Tasks::Content &c, envelope.contentList)
+ 			{
+-				if((types & JingleRtp::Audio) && c.desc.media == "audio" && c.name == audioName && !audioContent)
++				if((types & Session::Audio) && c.desc.media == "audio" && c.name == audioName && !audioContent)
+ 				{
+ 					audioContent = &c;
+-					break;
+ 				}
+-				else if((types & JingleRtp::Video) && c.desc.media == "video" && c.name == videoName && !videoContent)
++				else if((types & Session::Video) && c.desc.media == "video" && c.name == videoName && !videoContent)
+ 				{
+ 					videoContent = &c;
+-					break;
+ 				}
+ 			}
+ 
+ 			// we support audio, peer doesn't
+-			if((types & JingleRtp::Audio) && !audioContent)
+-				types &= ~JingleRtp::Audio;
++			if((types & Session::Audio) && !audioContent)
++				types &= ~Session::Audio;
+ 
+ 			// we support video, peer doesn't
+-			if((types & JingleRtp::Video) && !videoContent)
+-				types &= ~JingleRtp::Video;
++			if((types & Session::Video) && !videoContent)
++				types &= ~Session::Video;
+ 
+ 			if(types == 0)
+ 			{
+@@ -734,21 +735,19 @@ public:
+ 		{
+ 			manager->push_task->respondSuccess(peer, iq_id);
+ 
+-			const JingleRtpContent *audioContent = 0;
+-			const JingleRtpContent *videoContent = 0;
++			const XMPP::Jingle::Tasks::Content *audioContent = 0;
++			const XMPP::Jingle::Tasks::Content *videoContent = 0;
+ 
+ 			// find content
+-			foreach(const JingleRtpContent &c, envelope.contentList)
++			foreach(const XMPP::Jingle::Tasks::Content &c, envelope.contentList)
+ 			{
+-				if((types & JingleRtp::Audio) && c.name == audioName && !audioContent)
++				if((types & Session::Audio) && c.name == audioName && !audioContent)
+ 				{
+ 					audioContent = &c;
+-					break;
+ 				}
+-				else if((types & JingleRtp::Video) && c.name == videoName && !videoContent)
++				else if((types & Session::Video) && c.name == videoName && !videoContent)
+ 				{
+ 					videoContent = &c;
+-					break;
+ 				}
+ 			}
+ 
+@@ -918,7 +917,7 @@ private:
+ 				printf("  %s\n", qPrintable(s));
+ 		}
+ 
+-		if(types & JingleRtp::Audio)
++		if(types & Session::Audio)
+ 		{
+ 			iceA = new XMPP::Ice176(this);
+ 			setup_ice(iceA, localAddrs);
+@@ -929,7 +928,7 @@ private:
+ 			iceA_status.channelsReady[1] = false;
+ 		}
+ 
+-		if(types & JingleRtp::Video)
++		if(types & Session::Video)
+ 		{
+ 			iceV = new XMPP::Ice176(this);
+ 			setup_ice(iceV, localAddrs);
+@@ -1032,16 +1031,16 @@ private:
+ 		{
+ 			sid = manager->createSid(peer);
+ 
+-			JingleRtpEnvelope envelope;
++			XMPP::Jingle::Tasks::Envelope envelope;
+ 			envelope.action = "session-initiate";
+ 			envelope.initiator = manager->client->jid().full();
+ 			envelope.sid = sid;
+ 
+-			if(types & JingleRtp::Audio)
++			if(types & Session::Audio)
+ 			{
+ 				audioName = "A";
+ 
+-				JingleRtpContent content;
++				XMPP::Jingle::Tasks::Content content;
+ 				content.creator = "initiator";
+ 				content.name = audioName;
+ 				content.senders = "both";
+@@ -1054,11 +1053,11 @@ private:
+ 				envelope.contentList += content;
+ 			}
+ 
+-			if(types & JingleRtp::Video)
++			if(types & Session::Video)
+ 			{
+ 				videoName = "V";
+ 
+-				JingleRtpContent content;
++				XMPP::Jingle::Tasks::Content content;
+ 				content.creator = "initiator";
+ 				content.name = videoName;
+ 				content.senders = "both";
+@@ -1106,15 +1105,15 @@ private:
+ 	{
+ 		printf("flushing local candidates\n");
+ 
+-		QList<JingleRtpContent> contentList;
++		QList<XMPP::Jingle::Tasks::Content> contentList;
+ 
+ 		// according to xep-166, creator is always whoever added
+ 		//   the content type, which in our case is always the
+ 		//   initiator
+ 
+-		if((types & JingleRtp::Audio) && !iceA_status.localCandidates.isEmpty())
++		if((types & Session::Audio) && !iceA_status.localCandidates.isEmpty())
+ 		{
+-			JingleRtpContent content;
++			XMPP::Jingle::Tasks::Content content;
+ 			//if(!incoming)
+ 				content.creator = "initiator";
+ 			//else
+@@ -1129,9 +1128,9 @@ private:
+ 			contentList += content;
+ 		}
+ 
+-		if((types & JingleRtp::Video) && !iceV_status.localCandidates.isEmpty())
++		if((types & Session::Video) && !iceV_status.localCandidates.isEmpty())
+ 		{
+-			JingleRtpContent content;
++			XMPP::Jingle::Tasks::Content content;
+ 			//if(!incoming)
+ 				content.creator = "initiator";
+ 			//else
+@@ -1148,7 +1147,7 @@ private:
+ 
+ 		if(!contentList.isEmpty())
+ 		{
+-			JingleRtpEnvelope envelope;
++			XMPP::Jingle::Tasks::Envelope envelope;
+ 			envelope.action = "transport-info";
+ 			envelope.sid = sid;
+ 			envelope.contentList = contentList;
+@@ -1167,7 +1166,7 @@ private:
+ 		//   unfortunately this means we can't upgrade to better
+ 		//   candidates on the fly.
+ 
+-		if(types & JingleRtp::Audio && iceA)
++		if(types & Session::Audio && iceA)
+ 		{
+ 			iceA->setPeerUfrag(iceA_status.remoteUfrag);
+ 			iceA->setPeerPassword(iceA_status.remotePassword);
+@@ -1178,7 +1177,7 @@ private:
+ 			}
+ 		}
+ 
+-		if(types & JingleRtp::Video && iceV)
++		if(types & Session::Video && iceV)
+ 		{
+ 			iceV->setPeerUfrag(iceV_status.remoteUfrag);
+ 			iceV->setPeerPassword(iceV_status.remotePassword);
+@@ -1203,14 +1202,14 @@ private:
+ 	{
+ 		if(local_media_ready && ice_connected && !session_accepted)
+ 		{
+-			JingleRtpEnvelope envelope;
++			XMPP::Jingle::Tasks::Envelope envelope;
+ 			envelope.action = "session-accept";
+ 			envelope.responder = manager->client->jid().full();
+ 			envelope.sid = sid;
+ 
+-			if(types & JingleRtp::Audio)
++			if(types & Session::Audio)
+ 			{
+-				JingleRtpContent content;
++				XMPP::Jingle::Tasks::Content content;
+ 				content.creator = "initiator";
+ 				content.name = audioName;
+ 				content.senders = "both";
+@@ -1223,9 +1222,9 @@ private:
+ 				envelope.contentList += content;
+ 			}
+ 
+-			if(types & JingleRtp::Video)
++			if(types & Session::Video)
+ 			{
+-				JingleRtpContent content;
++				XMPP::Jingle::Tasks::Content content;
+ 				content.creator = "initiator";
+ 				content.name = videoName;
+ 				content.senders = "both";
+@@ -1306,7 +1305,7 @@ private slots:
+ 	void handshake_timeout()
+ 	{
+ 		reject();
+-		errorCode = JingleRtp::ErrorTimeout;
++		errorCode = Session::ErrorTimeout;
+ 		emit q->error();
+ 	}
+ 
+@@ -1333,9 +1332,9 @@ private slots:
+ 		}
+ 
+ 		bool ok = true;
+-		if((types & JingleRtp::Audio) && !iceA_status.started)
++		if((types & Session::Audio) && !iceA_status.started)
+ 			ok = false;
+-		if((types & JingleRtp::Video) && !iceV_status.started)
++		if((types & Session::Video) && !iceV_status.started)
+ 			ok = false;
+ 
+ 		if(ok)
+@@ -1346,7 +1345,7 @@ private slots:
+ 	{
+ 		Q_UNUSED(e);
+ 
+-		errorCode = JingleRtp::ErrorICE;
++		errorCode = Session::ErrorICE;
+ 		emit q->error();
+ 	}
+ 
+@@ -1382,7 +1381,7 @@ private slots:
+ 
+ 		bool allReady = true;
+ 
+-		if(types & JingleRtp::Audio)
++		if(types & Session::Audio)
+ 		{
+ 			for(int n = 0; n < iceA_status.channelsReady.count(); ++n)
+ 			{
+@@ -1394,7 +1393,7 @@ private slots:
+ 			}
+ 		}
+ 
+-		if(types & JingleRtp::Video)
++		if(types & Session::Video)
+ 		{
+ 			for(int n = 0; n < iceV_status.channelsReady.count(); ++n)
+ 			{
+@@ -1433,78 +1432,78 @@ private slots:
+ 	}
+ };
+ 
+-JingleRtp::JingleRtp()
++Session::Session()
+ {
+-	d = new JingleRtpPrivate(this);
++	d = new Private(this);
+ }
+ 
+-JingleRtp::~JingleRtp()
++Session::~Session()
+ {
+ 	delete d;
+ }
+ 
+-XMPP::Jid JingleRtp::jid() const
++XMPP::Jid Session::jid() const
+ {
+ 	return d->peer;
+ }
+ 
+-QList<JingleRtpPayloadType> JingleRtp::remoteAudioPayloadTypes() const
++QList<PayloadType> Session::remoteAudioPayloadTypes() const
+ {
+ 	return d->remoteAudioPayloadTypes;
+ }
+ 
+-QList<JingleRtpPayloadType> JingleRtp::remoteVideoPayloadTypes() const
++QList<PayloadType> Session::remoteVideoPayloadTypes() const
+ {
+ 	return d->remoteVideoPayloadTypes;
+ }
+ 
+-int JingleRtp::remoteMaximumBitrate() const
++int Session::remoteMaximumBitrate() const
+ {
+ 	return d->remoteMaximumBitrate;
+ }
+ 
+-void JingleRtp::setLocalAudioPayloadTypes(const QList<JingleRtpPayloadType> &types)
++void Session::setLocalAudioPayloadTypes(const QList<PayloadType> &types)
+ {
+ 	d->localAudioPayloadTypes = types;
+ }
+ 
+-void JingleRtp::setLocalVideoPayloadTypes(const QList<JingleRtpPayloadType> &types)
++void Session::setLocalVideoPayloadTypes(const QList<PayloadType> &types)
+ {
+ 	d->localVideoPayloadTypes = types;
+ }
+ 
+-void JingleRtp::setLocalMaximumBitrate(int kbps)
++void Session::setLocalMaximumBitrate(int kbps)
+ {
+ 	d->localMaximumBitrate = kbps;
+ }
+ 
+-void JingleRtp::connectToJid(const XMPP::Jid &jid)
++void Session::connectToJid(const XMPP::Jid &jid)
+ {
+ 	d->peer = jid;
+ 	d->startOutgoing();
+ }
+ 
+-void JingleRtp::accept(int types)
++void Session::accept(int types)
+ {
+ 	d->accept(types);
+ }
+ 
+-void JingleRtp::reject()
++void Session::reject()
+ {
+ 	d->reject();
+ }
+ 
+-void JingleRtp::localMediaUpdate()
++void Session::localMediaUpdate()
+ {
+ 	d->localMediaUpdate();
+ }
+ 
+-JingleRtp::Error JingleRtp::errorCode() const
++Session::Error Session::errorCode() const
+ {
+ 	return d->errorCode;
+ }
+ 
+-JingleRtpChannel *JingleRtp::rtpChannel()
++Channel *Session::rtpChannel()
+ {
+ 	return d->rtpChannel;
+ }
+@@ -1512,7 +1511,7 @@ JingleRtpChannel *JingleRtp::rtpChannel()
+ //----------------------------------------------------------------------------
+ // JingleRtpChannel
+ //----------------------------------------------------------------------------
+-JingleRtpChannelPrivate::JingleRtpChannelPrivate(JingleRtpChannel *_q) :
++Channel::Private::Private(Channel *_q) :
+ 	QObject(_q),
+ 	q(_q),
+ 	portReserver(0),
+@@ -1523,7 +1522,7 @@ JingleRtpChannelPrivate::JingleRtpChannelPrivate(JingleRtpChannel *_q) :
+ 	connect(rtpActivityTimer, SIGNAL(timeout()), SLOT(rtpActivity_timeout()));
+ }
+ 
+-JingleRtpChannelPrivate::~JingleRtpChannelPrivate()
++Channel::Private::~Private()
+ {
+ 	if(portReserver)
+ 	{
+@@ -1557,7 +1556,7 @@ JingleRtpChannelPrivate::~JingleRtpChannelPrivate()
+ 	rtpActivityTimer->deleteLater();
+ }
+ 
+-void JingleRtpChannelPrivate::setIceObjects(XMPP::UdpPortReserver *_portReserver, XMPP::Ice176 *_iceA, XMPP::Ice176 *_iceV)
++void Channel::Private::setIceObjects(XMPP::UdpPortReserver *_portReserver, XMPP::Ice176 *_iceA, XMPP::Ice176 *_iceV)
+ {
+ 	if(QThread::currentThread() != thread())
+ 	{
+@@ -1609,14 +1608,14 @@ void JingleRtpChannelPrivate::setIceObjects(XMPP::UdpPortReserver *_portReserver
+ 	}
+ }
+ 
+-void JingleRtpChannelPrivate::restartRtpActivityTimer()
++void Channel::Private::restartRtpActivityTimer()
+ {
+ 	// if we go 5 seconds without an RTP packet, then that's
+ 	//   pretty bad
+ 	rtpActivityTimer->start(5000);
+ }
+ 
+-void JingleRtpChannelPrivate::start()
++void Channel::Private::start()
+ {
+ 	if(portReserver)
+ 		portReserver->setParent(this);
+@@ -1627,7 +1626,7 @@ void JingleRtpChannelPrivate::start()
+ 	restartRtpActivityTimer();
+ }
+ 
+-void JingleRtpChannelPrivate::ice_readyRead(int componentIndex)
++void Channel::Private::ice_readyRead(int componentIndex)
+ {
+ 	XMPP::Ice176 *ice = (XMPP::Ice176 *)sender();
+ 
+@@ -1638,8 +1637,8 @@ void JingleRtpChannelPrivate::ice_readyRead(int componentIndex)
+ 	{
+ 		while(iceA->hasPendingDatagrams(componentIndex))
+ 		{
+-			JingleRtp::RtpPacket packet;
+-			packet.type = JingleRtp::Audio;
++			Session::RtpPacket packet;
++			packet.type = Session::Audio;
+ 			packet.portOffset = componentIndex;
+ 			packet.value = iceA->readDatagram(componentIndex);
+ 			in += packet;
+@@ -1649,8 +1648,8 @@ void JingleRtpChannelPrivate::ice_readyRead(int componentIndex)
+ 	{
+ 		while(iceV->hasPendingDatagrams(componentIndex))
+ 		{
+-			JingleRtp::RtpPacket packet;
+-			packet.type = JingleRtp::Video;
++			Session::RtpPacket packet;
++			packet.type = Session::Video;
+ 			packet.portOffset = componentIndex;
+ 			packet.value = iceV->readDatagram(componentIndex);
+ 			in += packet;
+@@ -1660,52 +1659,52 @@ void JingleRtpChannelPrivate::ice_readyRead(int componentIndex)
+ 	emit q->readyRead();
+ }
+ 
+-void JingleRtpChannelPrivate::ice_datagramsWritten(int componentIndex, int count)
++void Channel::Private::ice_datagramsWritten(int componentIndex, int count)
+ {
+ 	Q_UNUSED(componentIndex);
+ 
+ 	emit q->packetsWritten(count);
+ }
+ 
+-void JingleRtpChannelPrivate::rtpActivity_timeout()
++void Channel::Private::rtpActivity_timeout()
+ {
+ 	printf("warning: 5 seconds passed without receiving audio RTP\n");
+ }
+ 
+-JingleRtpChannel::JingleRtpChannel()
++Channel::Channel()
+ {
+-	d = new JingleRtpChannelPrivate(this);
++	d = new Private(this);
+ }
+ 
+-JingleRtpChannel::~JingleRtpChannel()
++Channel::~Channel()
+ {
+ 	delete d;
+ }
+ 
+-bool JingleRtpChannel::packetsAvailable() const
++bool Channel::packetsAvailable() const
+ {
+ 	return !d->in.isEmpty();
+ }
+ 
+-JingleRtp::RtpPacket JingleRtpChannel::read()
++Session::RtpPacket Channel::read()
+ {
+ 	return d->in.takeFirst();
+ }
+ 
+-void JingleRtpChannel::write(const JingleRtp::RtpPacket &packet)
++void Channel::write(const Session::RtpPacket &packet)
+ {
+ 	QMutexLocker locker(&d->m);
+ 
+-	if(packet.type == JingleRtp::Audio && d->iceA)
++	if(packet.type == Session::Audio && d->iceA)
+ 		d->iceA->writeDatagram(packet.portOffset, packet.value);
+-	else if(packet.type == JingleRtp::Video && d->iceV)
++	else if(packet.type == Session::Video && d->iceV)
+ 		d->iceV->writeDatagram(packet.portOffset, packet.value);
+ }
+ 
+ //----------------------------------------------------------------------------
+-// JingleRtpManager
++// Manager
+ //----------------------------------------------------------------------------
+-JingleRtpManagerPrivate::JingleRtpManagerPrivate(XMPP::Client *_client, JingleRtpManager *_q) :
++Manager::Private::Private(XMPP::Client *_client, Manager *_q) :
+ 	QObject(_q),
+ 	q(_q),
+ 	client(_client),
+@@ -1714,16 +1713,17 @@ JingleRtpManagerPrivate::JingleRtpManagerPrivate(XMPP::Client *_client, JingleRt
+ 	stunRelayTcpPort(-1),
+ 	basePort(-1)
+ {
++	_client->jingleManager()->registerDetailedReason(RTP_ERROR_NS, &xmlHelper);
+ 	push_task = new JT_PushJingleRtp(client->rootTask());
+-	connect(push_task, SIGNAL(incomingRequest(const XMPP::Jid &, const QString &, const JingleRtpEnvelope &)), SLOT(push_task_incomingRequest(const XMPP::Jid &, const QString &, const JingleRtpEnvelope &)));
++	connect(push_task, SIGNAL(incomingRequest(const XMPP::Jid &, const QString &, const XMPP::Jingle::Tasks::Envelope &)), SLOT(push_task_incomingRequest(const XMPP::Jid &, const QString &, const XMPP::Jingle::Tasks::Envelope &)));
+ }
+ 
+-JingleRtpManagerPrivate::~JingleRtpManagerPrivate()
++Manager::Private::~Private()
+ {
+ 	delete push_task;
+ }
+ 
+-QString JingleRtpManagerPrivate::createSid(const XMPP::Jid &peer) const
++QString Manager::Private::createSid(const XMPP::Jid &peer) const
+ {
+ 	while(1)
+ 	{
+@@ -1744,12 +1744,13 @@ QString JingleRtpManagerPrivate::createSid(const XMPP::Jid &peer) const
+ 	}
+ }
+ 
+-void JingleRtpManagerPrivate::unlink(JingleRtp *sess)
++void Manager::Private::unlink(Session *sess)
+ {
+ 	sessions.removeAll(sess);
+ }
+ 
+-void JingleRtpManagerPrivate::push_task_incomingRequest(const XMPP::Jid &from, const QString &iq_id, const JingleRtpEnvelope &envelope)
++void Manager::Private::push_task_incomingRequest(const XMPP::Jid &from, const QString &iq_id,
++												 const XMPP::Jingle::Tasks::Envelope &envelope)
+ {
+ 	printf("incoming request: [%s]\n", qPrintable(envelope.action));
+ 
+@@ -1779,7 +1780,7 @@ void JingleRtpManagerPrivate::push_task_incomingRequest(const XMPP::Jid &from, c
+ 			return;
+ 		}
+ 
+-		JingleRtp *sess = new JingleRtp;
++		Session *sess = new Session;
+ 		sess->d->manager = this;
+ 		sess->d->incoming = true;
+ 		sess->d->peer = from;
+@@ -1819,48 +1820,48 @@ void JingleRtpManagerPrivate::push_task_incomingRequest(const XMPP::Jid &from, c
+ 	}
+ }
+ 
+-JingleRtpManager::JingleRtpManager(XMPP::Client *client) :
++Manager::Manager(XMPP::Client *client) :
+ 	QObject(0)
+ {
+-	d = new JingleRtpManagerPrivate(client, this);
++	d = new Manager::Private(client, this);
+ }
+ 
+-JingleRtpManager::~JingleRtpManager()
++Manager::~Manager()
+ {
+ 	delete d;
+ }
+ 
+-JingleRtp *JingleRtpManager::createOutgoing()
++Session *Manager::createOutgoing()
+ {
+-	JingleRtp *sess = new JingleRtp;
++	Session *sess = new Session;
+ 	sess->d->manager = d;
+ 	sess->d->incoming = false;
+ 	d->sessions += sess;
+ 	return sess;
+ }
+ 
+-JingleRtp *JingleRtpManager::takeIncoming()
++Session *Manager::takeIncoming()
+ {
+ 	return d->pending.takeFirst();
+ }
+ 
+-void JingleRtpManager::setSelfAddress(const QHostAddress &addr)
++void Manager::setSelfAddress(const QHostAddress &addr)
+ {
+ 	d->selfAddr = addr;
+ }
+ 
+-void JingleRtpManager::setExternalAddress(const QString &host)
++void Manager::setExternalAddress(const QString &host)
+ {
+ 	d->extHost = host;
+ }
+ 
+-void JingleRtpManager::setStunBindService(const QString &host, int port)
++void Manager::setStunBindService(const QString &host, int port)
+ {
+ 	d->stunBindHost = host;
+ 	d->stunBindPort = port;
+ }
+ 
+-void JingleRtpManager::setStunRelayUdpService(const QString &host, int port, const QString &user, const QString &pass)
++void Manager::setStunRelayUdpService(const QString &host, int port, const QString &user, const QString &pass)
+ {
+ 	d->stunRelayUdpHost = host;
+ 	d->stunRelayUdpPort = port;
+@@ -1868,7 +1869,7 @@ void JingleRtpManager::setStunRelayUdpService(const QString &host, int port, con
+ 	d->stunRelayUdpPass = pass;
+ }
+ 
+-void JingleRtpManager::setStunRelayTcpService(const QString &host, int port, const XMPP::AdvancedConnector::Proxy &proxy, const QString &user, const QString &pass)
++void Manager::setStunRelayTcpService(const QString &host, int port, const XMPP::AdvancedConnector::Proxy &proxy, const QString &user, const QString &pass)
+ {
+ 	d->stunRelayTcpHost = host;
+ 	d->stunRelayTcpPort = port;
+@@ -1891,9 +1892,11 @@ void JingleRtpManager::setStunRelayTcpService(const QString &host, int port, con
+ 	d->stunProxy = tproxy;
+ }
+ 
+-void JingleRtpManager::setBasePort(int port)
++void Manager::setBasePort(int port)
+ {
+ 	d->basePort = port;
+ }
+ 
++} //namespace JingleRtp
++
+ #include "jinglertp.moc"
+diff --git a/src/avcall/jinglertp.h b/src/avcall/jinglertp.h
+index c62c9bb..ad1ee7b 100644
+--- a/src/avcall/jinglertp.h
++++ b/src/avcall/jinglertp.h
+@@ -22,16 +22,19 @@
+ #include "xmpp.h"
+ #include "jinglertptasks.h"
+ 
+-class JingleRtpChannel;
+-class JingleRtpPrivate;
+-class JingleRtpChannelPrivate;
+-class JingleRtpManagerPrivate;
++namespace JingleRtp {
+ 
+-class JingleRtp : public QObject
++
++
++class Channel;
++
++class Session : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
++	class Private;
++
+ 	enum Error
+ 	{
+ 		ErrorGeneric,
+@@ -53,15 +56,15 @@ public:
+ 		QByteArray value;
+ 	};
+ 
+-	~JingleRtp();
++	~Session();
+ 
+ 	XMPP::Jid jid() const;
+-	QList<JingleRtpPayloadType> remoteAudioPayloadTypes() const;
+-	QList<JingleRtpPayloadType> remoteVideoPayloadTypes() const;
++	QList<PayloadType> remoteAudioPayloadTypes() const;
++	QList<PayloadType> remoteVideoPayloadTypes() const;
+ 	int remoteMaximumBitrate() const;
+ 
+-	void setLocalAudioPayloadTypes(const QList<JingleRtpPayloadType> &types);
+-	void setLocalVideoPayloadTypes(const QList<JingleRtpPayloadType> &types);
++	void setLocalAudioPayloadTypes(const QList<PayloadType> &types);
++	void setLocalVideoPayloadTypes(const QList<PayloadType> &types);
+ 	void setLocalMaximumBitrate(int kbps);
+ 
+ 	void connectToJid(const XMPP::Jid &jid);
+@@ -81,7 +84,7 @@ public:
+ 	//   JingleRtp's thread.  it can be moved to another thread as long
+ 	//   it is moved back to JingleRtp's thread before destructing
+ 	//   JingleRtp.
+-	JingleRtpChannel *rtpChannel();
++	Channel *rtpChannel();
+ 
+ signals:
+ 	void rejected();
+@@ -94,24 +97,24 @@ signals:
+ 	void remoteMediaUpdated();
+ 
+ private:
+-	Q_DISABLE_COPY(JingleRtp);
++	Q_DISABLE_COPY(Session);
+ 
+-	friend class JingleRtpPrivate;
+-	friend class JingleRtpManager;
+-	friend class JingleRtpManagerPrivate;
+-	JingleRtp();
++	friend class Private;
++	friend class Manager;
++	friend class ManagerPrivate;
++	Session();
+ 
+-	JingleRtpPrivate *d;
++	Private *d;
+ };
+ 
+-class JingleRtpChannel : public QObject
++class Channel : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
+ 	bool packetsAvailable() const;
+-	JingleRtp::RtpPacket read();
+-	void write(const JingleRtp::RtpPacket &packet);
++	Session::RtpPacket read();
++	void write(const Session::RtpPacket &packet);
+ 
+ signals:
+ 	void readyRead();
+@@ -120,26 +123,27 @@ signals:
+ 	void packetsWritten(int count);
+ 
+ private:
+-	Q_DISABLE_COPY(JingleRtpChannel);
++	Q_DISABLE_COPY(Channel);
+ 
+-	friend class JingleRtpChannelPrivate;
+-	friend class JingleRtpPrivate;
+-	JingleRtpChannel();
+-	~JingleRtpChannel();
++	friend class Session;
++	Channel();
++	~Channel();
+ 
+-	JingleRtpChannelPrivate *d;
++	class Private;
++	friend class Private;
++	Private *d;
+ };
+ 
+-class JingleRtpManager : public QObject
++class Manager : public QObject
+ {
+ 	Q_OBJECT
+ 
+ public:
+-	JingleRtpManager(XMPP::Client *client);
+-	~JingleRtpManager();
++	Manager(XMPP::Client *client);
++	~Manager();
+ 
+-	JingleRtp *createOutgoing();
+-	JingleRtp *takeIncoming();
++	Session *createOutgoing();
++	Session *takeIncoming();
+ 
+ 	void setSelfAddress(const QHostAddress &addr);
+ 	void setExternalAddress(const QString &host); // resolved locally
+@@ -152,13 +156,17 @@ signals:
+ 	void incomingReady();
+ 
+ private:
+-	Q_DISABLE_COPY(JingleRtpManager);
++	Q_DISABLE_COPY(Manager);
+ 
+-	friend class JingleRtpManagerPrivate;
+-	friend class JingleRtp;
+-	friend class JingleRtpPrivate;
++	friend class Private;
++	friend class Session;
++	friend class Session::Private;
+ 
+-	JingleRtpManagerPrivate *d;
++	class Private;
++	Private *d;
+ };
+ 
++
++} //namespace JingleRtp
++
+ #endif
+diff --git a/src/avcall/jinglertptasks.cpp b/src/avcall/jinglertptasks.cpp
+index fdf8b8c..fb65744 100644
+--- a/src/avcall/jinglertptasks.cpp
++++ b/src/avcall/jinglertptasks.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2009  Barracuda Networks, Inc.
++ * Copyright (C) 2011  rion
+  *
+  * This program is free software: you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -17,479 +17,239 @@
+  */
+ 
+ #include "jinglertptasks.h"
+-
+ #include "xmpp_xmlcommon.h"
+ 
+-static QDomElement candidateToElement(QDomDocument *doc, const XMPP::Ice176::Candidate &c)
+-{
+-	QDomElement e = doc->createElement("candidate");
+-	e.setAttribute("component", QString::number(c.component));
+-	e.setAttribute("foundation", c.foundation);
+-	e.setAttribute("generation", QString::number(c.generation));
+-	if(!c.id.isEmpty())
+-		e.setAttribute("id", c.id);
+-	e.setAttribute("ip", c.ip.toString());
+-	if(c.network != -1)
+-		e.setAttribute("network", QString::number(c.network));
+-	else // weird?
+-		e.setAttribute("network", QString::number(0));
+-	e.setAttribute("port", QString::number(c.port));
+-	e.setAttribute("priority", QString::number(c.priority));
+-	e.setAttribute("protocol", c.protocol);
+-	if(!c.rel_addr.isNull())
+-		e.setAttribute("rel-addr", c.rel_addr.toString());
+-	if(c.rel_port != -1)
+-		e.setAttribute("rel-port", QString::number(c.rel_port));
+-	// TODO: remove this?
+-	//if(!c.rem_addr.isNull())
+-	//	e.setAttribute("rem-addr", c.rem_addr.toString());
+-	//if(c.rem_port != -1)
+-	//	e.setAttribute("rem-port", QString::number(c.rem_port));
+-	e.setAttribute("type", c.type);
+-	return e;
+-}
+-
+-static XMPP::Ice176::Candidate elementToCandidate(const QDomElement &e)
+-{
+-	if(e.tagName() != "candidate")
+-		return XMPP::Ice176::Candidate();
+-
+-	XMPP::Ice176::Candidate c;
+-	c.component = e.attribute("component").toInt();
+-	c.foundation = e.attribute("foundation");
+-	c.generation = e.attribute("generation").toInt();
+-	c.id = e.attribute("id");
+-	c.ip = QHostAddress(e.attribute("ip"));
+-	c.network = e.attribute("network").toInt();
+-	c.port = e.attribute("port").toInt();
+-	c.priority = e.attribute("priority").toInt();
+-	c.protocol = e.attribute("protocol");
+-	c.rel_addr = QHostAddress(e.attribute("rel-addr"));
+-	c.rel_port = e.attribute("rel-port").toInt();
+-	// TODO: remove this?
+-	//c.rem_addr = QHostAddress(e.attribute("rem-addr"));
+-	//c.rem_port = e.attribute("rem-port").toInt();
+-	c.type = e.attribute("type");
+-	return c;
+-}
++namespace JingleRtp {
+ 
+-static QDomElement payloadTypeToElement(QDomDocument *doc, const JingleRtpPayloadType &type)
++//-----------------------------------------------------------------------------
++// PayloadType
++//-----------------------------------------------------------------------------
++QDomElement PayloadType::toXml(QDomDocument *doc) const
+ {
+ 	QDomElement e = doc->createElement("payload-type");
+-	e.setAttribute("id", QString::number(type.id));
+-	if(!type.name.isEmpty())
+-		e.setAttribute("name", type.name);
+-	e.setAttribute("clockrate", QString::number(type.clockrate));
+-	if(type.channels > 1)
+-		e.setAttribute("channels", QString::number(type.channels));
+-	if(type.ptime != -1)
+-		e.setAttribute("ptime", QString::number(type.ptime));
+-	if(type.maxptime != -1)
+-		e.setAttribute("maxptime", QString::number(type.maxptime));
+-	foreach(const JingleRtpPayloadType::Parameter &p, type.parameters)
+-	{
++	e.setAttribute("id", QString::number(id));
++	if(!name.isEmpty()) {
++		e.setAttribute("name", name);
++	}
++	e.setAttribute("clockrate", QString::number(clockrate));
++	if(channels > 1) {
++		e.setAttribute("channels", QString::number(channels));
++	}
++	if(ptime != -1) {
++		e.setAttribute("ptime", QString::number(ptime));
++	}
++	if(maxptime != -1) {
++		e.setAttribute("maxptime", QString::number(maxptime));
++	}
++	foreach(const QString &key, parameters.keys()) {
+ 		QDomElement pe = doc->createElement("parameter");
+-		pe.setAttribute("name", p.name);
+-		pe.setAttribute("value", p.value);
++		pe.setAttribute("name", key);
++		pe.setAttribute("value", parameters.value(key));
+ 		e.appendChild(pe);
+ 	}
+ 	return e;
+ }
+ 
+-static JingleRtpPayloadType elementToPayloadType(const QDomElement &e)
++bool PayloadType::fromXml(const QDomElement &e)
+ {
+ 	if(e.tagName() != "payload-type")
+-		return JingleRtpPayloadType();
++		return false;
+ 
+-	JingleRtpPayloadType out;
+ 	bool ok;
+ 	int x;
+ 
+ 	x = e.attribute("id").toInt(&ok);
+-	if(!ok)
+-		return JingleRtpPayloadType();
+-	out.id = x;
++	if(!ok || x < 0 || x > 255)
++		return false;
++	id = x;
+ 
+-	out.name = e.attribute("name");
++	name = e.attribute("name");
+ 
+ 	x = e.attribute("clockrate").toInt(&ok);
+ 	if(!ok)
+-		return JingleRtpPayloadType();
+-	out.clockrate = x;
++		return false;
++	clockrate = x;
+ 
+ 	x = e.attribute("channels").toInt(&ok);
+ 	if(ok)
+-		out.channels = x;
++		channels = x;
+ 
+ 	x = e.attribute("ptime").toInt(&ok);
+ 	if(ok)
+-		out.ptime = x;
++		ptime = x;
+ 
+ 	x = e.attribute("maxptime").toInt(&ok);
+ 	if(ok)
+-		out.maxptime = x;
++		maxptime = x;
+ 
+-	QList<JingleRtpPayloadType::Parameter> plist;
+-	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling())
+-	{
+-		if(!n.isElement())
+-			continue;
+-
+-		QDomElement pe = n.toElement();
+-		if(pe.tagName() == "parameter")
+-		{
+-			JingleRtpPayloadType::Parameter p;
+-			p.name = pe.attribute("name");
+-			p.value = pe.attribute("value");
+-			plist += p;
+-		}
++	for (QDomElement n = e.firstChildElement("parameter"); !n.isNull(); n = n.nextSiblingElement("parameter")) {
++		parameters.insert(n.attribute("name"), n.attribute("value"));
+ 	}
+-	out.parameters = plist;
+ 
+-	return out;
++	return true;
+ }
+ 
+-struct JingleCondEntry
+-{
+-	const char *str;
+-	int cond;
+-};
+-
+-static JingleCondEntry jingleCondTable[] =
++//-----------------------------------------------------------------------------
++// Crypto
++//-----------------------------------------------------------------------------
++QDomElement Crypto::toXml(QDomDocument *doc) const
+ {
+-	{ "alternative-session",      JingleRtpReason::AlternativeSession },
+-	{ "busy",                     JingleRtpReason::Busy },
+-	{ "cancel",                   JingleRtpReason::Cancel },
+-	{ "connectivity-error",       JingleRtpReason::ConnectivityError },
+-	{ "decline",                  JingleRtpReason::Decline },
+-	{ "expired",                  JingleRtpReason::Expired },
+-	{ "failed-application",       JingleRtpReason::FailedApplication },
+-	{ "failed-transport",         JingleRtpReason::FailedTransport },
+-	{ "general-error",            JingleRtpReason::GeneralError },
+-	{ "gone",                     JingleRtpReason::Gone },
+-	{ "incompatible-parameters",  JingleRtpReason::IncompatibleParameters },
+-	{ "media-error",              JingleRtpReason::MediaError },
+-	{ "security-error",           JingleRtpReason::SecurityError },
+-	{ "success",                  JingleRtpReason::Success },
+-	{ "timeout",                  JingleRtpReason::Timeout },
+-	{ "unsupported-applications", JingleRtpReason::UnsupportedApplications },
+-	{ "unsupported-transports",   JingleRtpReason::UnsupportedTransports },
+-	{ 0, 0 }
+-};
+-
+-static QString conditionToElementName(JingleRtpReason::Condition cond)
+-{
+-	for(int n = 0; jingleCondTable[n].str; ++n)
+-	{
+-		if(jingleCondTable[n].cond == cond)
+-			return QString::fromLatin1(jingleCondTable[n].str);
+-	}
+-	return QString();
++	QDomElement crypto = doc->createElement("crypto");
++	crypto.setAttribute("crypto-suite", suite);
++	crypto.setAttribute("key-params", keyParams);
++	crypto.setAttribute("session-params", sessionParams);
++	crypto.setAttribute("tag", QString::number(tag));
++	return crypto;
+ }
+ 
+-static int elementNameToCondition(const QString &in)
++bool Crypto::fromXml(const QDomElement &e)
+ {
+-	for(int n = 0; jingleCondTable[n].str; ++n)
+-	{
+-		if(QLatin1String(jingleCondTable[n].str) == in)
+-			return jingleCondTable[n].cond;
++	if (e.tagName() != "crypto") {
++		return false;
+ 	}
+-	return -1;
+-}
+-
+-static QDomElement reasonToElement(QDomDocument *doc, const JingleRtpReason &reason)
+-{
+-	QDomElement e = doc->createElement("reason");
+-	e.appendChild(doc->createElement(conditionToElementName(reason.condition)));
+-	if(!reason.text.isEmpty())
+-	{
+-		QDomElement text = doc->createElement("text");
+-		text.appendChild(doc->createTextNode(reason.text));
+-		e.appendChild(text);
++	suite = e.attribute("crypto-suite");
++	keyParams = e.attribute("key-params");
++	sessionParams = e.attribute("session-params");
++	bool ok;
++	tag = e.attribute("tag").toInt(&ok);
++	return ok && !suite.isEmpty();
++}
++
++//-----------------------------------------------------------------------------
++// Description
++//-----------------------------------------------------------------------------
++QDomElement Description::Bandwidth::toXml(QDomDocument *doc) const
++{
++	if (type != -1 && value) {
++		QDomElement bandwidth = textTag(doc, "bandwidth", QString::number(value));
++		QList<const char *> types = QList<const char *>() << "CT" << "AS" << "RS" << "RR" << "TIAS";
++		const char *typeStr = types.value(type);
++		if (typeStr) {
++			bandwidth.setAttribute("type", typeStr);
++			return bandwidth;
++		}
+ 	}
+-	return e;
++	return QDomElement();
+ }
+ 
+-static QDomElement firstChildElement(const QDomElement &in)
++bool Description::Bandwidth::fromXml(const QDomElement &e)
+ {
+-	for(QDomNode n = in.firstChild(); !n.isNull(); n = n.nextSibling())
+-	{
+-		if(!n.isElement())
+-			continue;
+-
+-		return n.toElement();
++	QList<const char *> types = QList<const char *>() << "CT" << "AS" << "RS" << "RR" << "TIAS";
++	type = (Type)types.indexOf(qPrintable(e.attribute("type")));
++	if (type != -1) {
++		value = e.text().toInt();
++		return true;
+ 	}
+-	return QDomElement();
++	return false;
+ }
+ 
+-static JingleRtpReason elementToReason(const QDomElement &e)
+-{
+-	if(e.tagName() != "reason")
+-		return JingleRtpReason();
+-
+-	QDomElement condElement = firstChildElement(e);
+-	if(condElement.isNull())
+-		return JingleRtpReason();
+-	int x = elementNameToCondition(condElement.tagName());
+-	if(x == -1)
+-		return JingleRtpReason();
+ 
+-	JingleRtpReason out;
+-	out.condition = (JingleRtpReason::Condition)x;
+-	bool found;
+-	QDomElement text = findSubTag(e, "text", &found);
+-	if(found)
+-		out.text = tagContent(text);
+-
+-	return out;
+-}
+-
+-//----------------------------------------------------------------------------
+-// JT_JingleRtp
+-//----------------------------------------------------------------------------
+-JT_JingleRtp::JT_JingleRtp(XMPP::Task *parent) :
+-	XMPP::Task(parent)
++QDomElement Description::toXml(QDomDocument *doc) const
+ {
+-}
++	QDomElement description = doc->createElementNS("urn:xmpp:jingle:apps:rtp:1", "description");
++	//description.setAttribute("xmlns", "urn:xmpp:jingle:apps:rtp:1");
++	description.setAttribute("media", media);
++	if (haveSsrc) {
++		description.setAttribute("ssrc", QString("%1").arg(ssrc));
++	}
++	foreach (const PayloadType &pt, payloadTypes) {
++		description.appendChild(pt.toXml(doc));
++	}
++	if (cryptoList.count()) {
++		QDomElement encryption = description.appendChild(doc->createElement("encryption")).toElement();
++		if (encryptionRequired) {
++			encryption.setAttribute("required", "1");
++		}
++		foreach (const Crypto &c, cryptoList) {
++			encryption.appendChild(c.toXml(doc));
++		}
++	}
++	if (!bandwidth.isValid()) {
++		description.appendChild(bandwidth.toXml(doc));
++	}
+ 
+-JT_JingleRtp::~JT_JingleRtp()
+-{
++	return description;
+ }
+ 
+-void JT_JingleRtp::request(const XMPP::Jid &to, const JingleRtpEnvelope &envelope)
++Description* Description::fromXml(const QDomElement &e)
+ {
+-	to_ = to;
+-	iq_ = createIQ(doc(), "set", to.full(), id());
+-	QDomElement query = doc()->createElement("jingle");
+-	query.setAttribute("xmlns", "urn:xmpp:jingle:1");
+-	query.setAttribute("action", envelope.action);
+-	if(!envelope.initiator.isEmpty())
+-		query.setAttribute("initiator", envelope.initiator);
+-	if(!envelope.responder.isEmpty())
+-		query.setAttribute("responder", envelope.responder);
+-	query.setAttribute("sid", envelope.sid);
+-
+-	if(envelope.action == "session-terminate")
+-	{
+-		// for session terminate, there is no content list, just
+-		//   a reason for termination
+-		query.appendChild(reasonToElement(doc(), envelope.reason));
++	QScopedPointer<Description> desc(new Description(e.attribute("media")));
++	if (desc->media.isEmpty()) {
++		return NULL;
++	}
++	if (e.hasAttribute("ssrc")) {
++		bool ok;
++		desc->ssrc = e.attribute("ssrc").toUInt(&ok);
++		if (!ok) {
++			return NULL;
++		}
++		desc->haveSsrc = true;
+ 	}
+-	else
+-	{
+-		foreach(const JingleRtpContent &c, envelope.contentList)
+-		{
+-			QDomElement content = doc()->createElement("content");
+-			content.setAttribute("creator", c.creator);
+-			if(!c.disposition.isEmpty())
+-				content.setAttribute("disposition", c.disposition);
+-			content.setAttribute("name", c.name);
+-			if(!c.senders.isEmpty())
+-				content.setAttribute("senders", c.senders);
+ 
+-			if(!c.desc.media.isEmpty())
+-			{
+-				// TODO: ssrc, bitrate, crypto
+-				QDomElement description = doc()->createElement("description");
+-				description.setAttribute("xmlns", "urn:xmpp:jingle:apps:rtp:1");
+-				description.setAttribute("media", c.desc.media);
+-				foreach(const JingleRtpPayloadType &pt, c.desc.payloadTypes)
+-				{
+-					QDomElement p = payloadTypeToElement(doc(), pt);
+-					if(!p.isNull())
+-						description.appendChild(p);
+-				}
+-				content.appendChild(description);
++	for(QDomElement n = e.firstChildElement(); !n.isNull(); n = n.nextSiblingElement()) {
++		if (n.tagName() == "payload-type") {
++			PayloadType pt;
++			if (!pt.fromXml(n)) {
++				return NULL;
+ 			}
+-
+-			if(!c.trans.user.isEmpty())
+-			{
+-				QDomElement transport = doc()->createElement("transport");
+-				transport.setAttribute("xmlns", "urn:xmpp:jingle:transports:ice-udp:1");
+-				transport.setAttribute("ufrag", c.trans.user);
+-				transport.setAttribute("pwd", c.trans.pass);
+-				foreach(const XMPP::Ice176::Candidate &ic, c.trans.candidates)
+-				{
+-					QDomElement e = candidateToElement(doc(), ic);
+-					if(!e.isNull())
+-						transport.appendChild(e);
++			desc->payloadTypes += pt;
++		}
++		else if (n.tagName() == "bandwidth") {
++			if (!desc->bandwidth.fromXml(n)) {
++				return NULL;
++			}
++		}
++		else if (n.tagName() == "encryption") {
++			for(QDomElement cel = n.firstChildElement(); !cel.isNull(); cel = cel.nextSiblingElement()) {
++				Crypto c;
++				if (!c.fromXml(cel)) {
++					return NULL;
+ 				}
+-				content.appendChild(transport);
++				desc->cryptoList += c;
++			}
++			desc->encryptionRequired = n.attribute("required") == "1" || n.attribute("required") == "true";
++			if (desc->encryptionRequired && !desc->cryptoList.count()) {
++				return NULL;
+ 			}
+-
+-			query.appendChild(content);
+ 		}
+ 	}
+-
+-	iq_.appendChild(query);
+-}
+-
+-void JT_JingleRtp::onGo()
+-{
+-	send(iq_);
+-}
+-
+-bool JT_JingleRtp::take(const QDomElement &x)
+-{
+-	if(!iqVerify(x, to_, id()))
+-		return false;
+-
+-	if(x.attribute("type") == "result")
+-		setSuccess();
+-	else
+-		setError(x);
+-
+-	return true;
++	return desc.take();
+ }
+ 
+-//----------------------------------------------------------------------------
+-// JT_PushJingleRtp
+-//----------------------------------------------------------------------------
+-JT_PushJingleRtp::JT_PushJingleRtp(XMPP::Task *parent) :
+-	XMPP::Task(parent)
++//-----------------------------------------------------------------------------
++// XmlHerlper
++//-----------------------------------------------------------------------------
++QDomElement DetailedReason::toXml(QDomDocument *doc) const
+ {
++	switch (type) {
++	case CryptoRequired:
++		return doc->createElement("crypto-rquired");
++	case InvalidCrypto:
++		return doc->createElement("invalid-crypto");
++	}
++	return QDomElement();
+ }
+ 
+-JT_PushJingleRtp::~JT_PushJingleRtp()
++DetailedReason* DetailedReason::fromXml(const QDomElement &e)
+ {
++	if (e.tagName() == "crypto-rquired") {
++		return new DetailedReason(CryptoRequired);
++	} else if (e.tagName() == "invalid-crypto") {
++		return new DetailedReason(InvalidCrypto);
++	}
++	return NULL;
+ }
+ 
+-void JT_PushJingleRtp::respondSuccess(const XMPP::Jid &to, const QString &id)
+-{
+-	QDomElement iq = createIQ(doc(), "result", to.full(), id);
+-	send(iq);
++//-----------------------------------------------------------------------------
++// XmlHerlper
++//-----------------------------------------------------------------------------
++using namespace XMPP::Jingle::Tasks;
++Xmlable* XmlHerlper::descriptionFromXml(const QDomElement &e) {
++	return Description::fromXml(e);
+ }
+ 
+-void JT_PushJingleRtp::respondError(const XMPP::Jid &to, const QString &id, int code, const QString &str)
+-{
+-	QDomElement iq = createIQ(doc(), "error", to.full(), id);
+-	QDomElement err = textTag(doc(), "error", str);
+-	err.setAttribute("code", QString::number(code));
+-	iq.appendChild(err);
+-	send(iq);
++Xmlable* XmlHerlper::detailedReasonFromXml(const QDomElement &e) {
++	return DetailedReason::fromXml(e);
+ }
+ 
+-bool JT_PushJingleRtp::take(const QDomElement &e)
+-{
+-	// must be an iq-set tag
+-	if(e.tagName() != "iq")
+-		return false;
+-	if(e.attribute("type") != "set")
+-		return false;
+-
+-	QDomElement je;
+-	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling())
+-	{
+-		if(!n.isElement())
+-			continue;
+-
+-		QDomElement e = n.toElement();
+-		if(e.tagName() == "jingle" && e.attribute("xmlns") == "urn:xmpp:jingle:1")
+-		{
+-			je = e;
+-			break;
+-		}
+-	}
+-
+-	if(je.isNull())
+-		return false;
+-
+-	XMPP::Jid from = e.attribute("from");
+-	QString iq_id = e.attribute("id");
+-
+-	JingleRtpEnvelope envelope;
+-	envelope.action = je.attribute("action");
+-	envelope.initiator = je.attribute("initiator");
+-	envelope.responder = je.attribute("responder");
+-	envelope.sid = je.attribute("sid");
+-
+-	if(envelope.action == "session-terminate")
+-	{
+-		bool found;
+-		QDomElement re = findSubTag(je, "reason", &found);
+-		if(!found)
+-		{
+-			respondError(from, iq_id, 400, QString());
+-			return true;
+-		}
+-
+-		envelope.reason = elementToReason(re);
+-		if((int)envelope.reason.condition == -1)
+-		{
+-			respondError(from, iq_id, 400, QString());
+-			return true;
+-		}
+-	}
+-	else
+-	{
+-		for(QDomNode n = je.firstChild(); !n.isNull(); n = n.nextSibling())
+-		{
+-			if(!n.isElement())
+-				continue;
+-
+-			QDomElement e = n.toElement();
+-			if(e.tagName() != "content")
+-				continue;
+-
+-			JingleRtpContent c;
+-			c.creator = e.attribute("creator");
+-			c.disposition = e.attribute("disposition");
+-			c.name = e.attribute("name");
+-			c.senders = e.attribute("senders");
+-
+-			for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling())
+-			{
+-				if(!n.isElement())
+-					continue;
+-
+-				QDomElement e = n.toElement();
+-				if(e.tagName() == "description" && e.attribute("xmlns") == "urn:xmpp:jingle:apps:rtp:1")
+-				{
+-					c.desc.media = e.attribute("media");
+-
+-					for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling())
+-					{
+-						if(!n.isElement())
+-							continue;
+-
+-						QDomElement e = n.toElement();
+-						JingleRtpPayloadType pt = elementToPayloadType(e);
+-						if(pt.id == -1)
+-						{
+-							respondError(from, iq_id, 400, QString());
+-							return true;
+-						}
+-
+-						c.desc.payloadTypes += pt;
+-					}
+-				}
+-				else if(e.tagName() == "transport" && e.attribute("xmlns") == "urn:xmpp:jingle:transports:ice-udp:1")
+-				{
+-					c.trans.user = e.attribute("ufrag");
+-					c.trans.pass = e.attribute("pwd");
+-
+-					for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling())
+-					{
+-						if(!n.isElement())
+-							continue;
+-
+-						QDomElement e = n.toElement();
+-						XMPP::Ice176::Candidate ic = elementToCandidate(e);
+-						if(ic.type.isEmpty())
+-						{
+-							respondError(from, iq_id, 400, QString());
+-							return true;
+-						}
+-
+-						c.trans.candidates += ic;
+-					}
+-				}
+-			}
+-
+-			envelope.contentList += c;
+-		}
+-	}
+-
+-	emit incomingRequest(from, iq_id, envelope);
+-	return true;
+-}
++} //namespace JingleRtp
+diff --git a/src/avcall/jinglertptasks.h b/src/avcall/jinglertptasks.h
+index 283812d..d52563d 100644
+--- a/src/avcall/jinglertptasks.h
++++ b/src/avcall/jinglertptasks.h
+@@ -19,31 +19,33 @@
+ #ifndef JINGLERTPTASKS_H
+ #define JINGLERTPTASKS_H
+ 
+-#include <QHostAddress>
+-#include <QDomElement>
++//#include <QDomElement>
+ #include "xmpp_jid.h"
+ #include "xmpp_task.h"
+ #include "iris/ice176.h"
++#include "iris/jingle.h"
+ 
+-class JingleRtpPayloadType
++namespace JingleRtp {
++
++class XmlHerlper : public XMPP::Jingle::Tasks::DetailedReasonFactory
++		, XMPP::Jingle::Tasks::DescriptionFactory
+ {
+-public:
+-	class Parameter
+-	{
+-	public:
+-		QString name;
+-		QString value;
+-	};
++	XMPP::Jingle::Tasks::Xmlable* descriptionFromXml(const QDomElement &e);
++	XMPP::Jingle::Tasks::Xmlable* detailedReasonFromXml(const QDomElement &e);
++};
+ 
+-	int id;
++class PayloadType
++{
++public:
++	quint8 id;
+ 	QString name;
+ 	int clockrate;
+ 	int channels;
+ 	int ptime;
+ 	int maxptime;
+-	QList<Parameter> parameters;
++	QHash<QString, QString> parameters;
+ 
+-	JingleRtpPayloadType() :
++	PayloadType() :
+ 		id(-1),
+ 		clockrate(-1),
+ 		channels(-1),
+@@ -51,151 +53,89 @@ public:
+ 		maxptime(-1)
+ 	{
+ 	}
++
++	QDomElement toXml(QDomDocument *doc) const;
++	bool fromXml(const QDomElement &e);
+ };
+ 
+-class JingleRtpCrypto
++class Crypto : public XMPP::Jingle::Tasks::Xmlable
+ {
+ public:
+ 	QString suite;
+ 	QString keyParams;
+ 	QString sessionParams;
+ 	int tag;
+-};
+ 
+-class JingleRtpDesc
+-{
+-public:
+-	QString media;
+-	bool haveSsrc;
+-	quint32 ssrc;
+-	QList<JingleRtpPayloadType> payloadTypes;
+-	int bitrate; // in Kbps
+-	bool encryptionRequired;
+-	QList<JingleRtpCrypto> cryptoList;
+-
+-	JingleRtpDesc() :
+-		haveSsrc(false),
+-		ssrc(0),
+-		bitrate(-1),
+-		encryptionRequired(false)
+-	{
+-	}
++	QDomElement toXml(QDomDocument *doc) const;
++	bool fromXml(const QDomElement &e);
+ };
+ 
+-class JingleRtpRemoteCandidate
++class Description : public XMPP::Jingle::Tasks::Xmlable
+ {
+ public:
+-	int component;
+-	QHostAddress addr;
+-	int port;
+ 
+-	JingleRtpRemoteCandidate() :
+-		component(-1),
+-		port(-1)
++	class Bandwidth : public XMPP::Jingle::Tasks::Xmlable
+ 	{
+-	}
+-};
++	public:
++		enum Type {
++			CT, // conference total (kbps). RFC4566
++			AS, // application specific (kbps). RFC4566
++			RS, // for active data senders (bps). rfc3566
++			RR, // for others besides RS (bps). rfc3566
++			TIAS // transport idependent modifies (bps). rfc3890
++		};
+ 
+-class JingleRtpTrans
+-{
+-public:
+-	QString user;
+-	QString pass;
+-	QList<XMPP::Ice176::Candidate> candidates;
+-	QList<JingleRtpRemoteCandidate> remoteCandidates;
+-};
++		Type type;
++		int value;
+ 
+-class JingleRtpContent
+-{
+-public:
+-	QString creator;
+-	QString disposition;
+-	QString name;
+-	QString senders;
++		Bandwidth(Type type = (Type)-1, int value = 0)
++			: type(type)
++			, value(value) {}
+ 
+-	JingleRtpDesc desc;
+-	JingleRtpTrans trans;
+-};
++		inline bool isValid() const { return type >= CT && type <= TIAS; }
+ 
+-class JingleRtpReason
+-{
+-public:
+-	enum Condition
+-	{
+-		AlternativeSession,
+-		Busy,
+-		Cancel,
+-		ConnectivityError,
+-		Decline,
+-		Expired,
+-		FailedApplication,
+-		FailedTransport,
+-		GeneralError,
+-		Gone,
+-		IncompatibleParameters,
+-		MediaError,
+-		SecurityError,
+-		Success,
+-		Timeout,
+-		UnsupportedApplications,
+-		UnsupportedTransports
++		QDomElement toXml(QDomDocument *doc) const;
++		bool fromXml(const QDomElement &e);
+ 	};
+ 
+-	Condition condition;
+-	QString text;
+-
+-	JingleRtpReason() :
+-		condition((Condition)-1)
+-	{
+-	}
+-};
+-
+-class JingleRtpEnvelope
+-{
+-public:
+-	QString action;
+-	QString initiator;
+-	QString responder;
+-	QString sid;
+-
+-	QList<JingleRtpContent> contentList;
+-
+-	JingleRtpReason reason;
+-};
+-
+-class JT_JingleRtp : public XMPP::Task
+-{
+-	Q_OBJECT
+-
+-public:
+-	JT_JingleRtp(XMPP::Task *parent);
+-	~JT_JingleRtp();
++	QString media;
++	Bandwidth bandwidth;
++	quint32 ssrc;
++	bool haveSsrc;
++	bool encryptionRequired;
++	QList<Crypto> cryptoList;
++	QList<PayloadType> payloadTypes;
+ 
+-	void request(const XMPP::Jid &to, const JingleRtpEnvelope &envelope);
++	Description(const QString &media, const QList<PayloadType> &payloadTypes = QList<PayloadType>())
++		: media(media)
++		, ssrc(0)
++		, haveSsrc(false)
++		, encryptionRequired(false)
++		, payloadTypes(payloadTypes) {}
+ 
+-	virtual void onGo();
+-	virtual bool take(const QDomElement &x);
++	QDomElement toXml(QDomDocument *doc) const;
++	static Description* fromXml(const QDomElement &e);
+ 
+ private:
+-	QDomElement iq_;
+-	XMPP::Jid to_;
++	Description() {}
+ };
+ 
+-class JT_PushJingleRtp : public XMPP::Task
++class DetailedReason : public XMPP::Jingle::Tasks::Xmlable
+ {
+-	Q_OBJECT
+-
+ public:
+-	JT_PushJingleRtp(XMPP::Task *parent);
+-	~JT_PushJingleRtp();
++	enum Type {
++		CryptoRequired,
++		InvalidCrypto
++	};
++	Type type;
+ 
+-	void respondSuccess(const XMPP::Jid &to, const QString &id);
+-	void respondError(const XMPP::Jid &to, const QString &id, int code, const QString &str);
++	DetailedReason(Type type = (Type)-1) : type(type) {}
+ 
+-	virtual bool take(const QDomElement &e);
++	QDomElement toXml(QDomDocument *doc) const;
++	static DetailedReason* fromXml(const QDomElement &e);
+ 
+-signals:
+-	void incomingRequest(const XMPP::Jid &from, const QString &iq_id, const JingleRtpEnvelope &envelope);
+ };
+ 
++} //namespace JingleRtp
++
+ #endif
+diff --git a/src/filetransdlg.cpp b/src/filetransdlg.cpp
+index 2c0a337..6e15c84 100644
+--- a/src/filetransdlg.cpp
++++ b/src/filetransdlg.cpp
+@@ -21,6 +21,7 @@
+ #include "psitooltip.h"
+ #include "psicontactlist.h"
+ #include "accountlabel.h"
++#include "accountscombobox.h"
+ #include "psioptions.h"
+ #include "fileutil.h"
+ 

@@ -1,0 +1,295 @@
+--- psi.orig/qcm/conf.qcm
++++ psi/qcm/conf.qcm
+@@ -17,6 +17,7 @@ public:
+ 	bool exec()
+ 	{
+ #ifdef Q_OS_WIN
++		conf->addExtra("CONFIG += QuickDirtyChecker");
+ 		return true;
+ #else
+ 		conf->addExtra(QString("PSI_LIBDIR=%1/psi").arg(conf->getenv("LIBDIR")));
+--- psi.orig/src/AutoUpdater/AutoUpdater.pri
++++ psi/src/AutoUpdater/AutoUpdater.pri
+@@ -16,3 +16,16 @@ Sparkle {
+ 	
+ 	LIBS += -framework Sparkle
+ }
++
++QuickDirtyChecker {
++        DEFINES += USE_QDCHECKER
++
++        HEADERS += \
++                $$PWD/QDChecker.h
++
++        SOURCES += \
++                $$PWD/QDChecker.cpp
++
++        FORMS += \
++                $$PWD/QDChangeLog.ui
++}
+--- psi.orig/src/AutoUpdater/QDChangeLog.ui
++++ psi/src/AutoUpdater/QDChangeLog.ui
+@@ -0,0 +1,71 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>ShowChangeLogForm</class>
++ <widget class="QWidget" name="ShowChangeLogForm">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>400</width>
++    <height>300</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>New version is available!</string>
++  </property>
++  <layout class="QGridLayout" name="gridLayout">
++   <property name="margin">
++    <number>6</number>
++   </property>
++   <property name="spacing">
++    <number>2</number>
++   </property>
++   <item row="0" column="0">
++    <widget class="QTextEdit" name="logText">
++     <property name="readOnly">
++      <bool>true</bool>
++     </property>
++     <property name="textInteractionFlags">
++      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set>
++     </property>
++    </widget>
++   </item>
++   <item row="1" column="0">
++    <layout class="QHBoxLayout" name="horizontalLayout">
++     <item>
++      <spacer name="horizontalSpacer">
++       <property name="orientation">
++        <enum>Qt::Horizontal</enum>
++       </property>
++       <property name="sizeHint" stdset="0">
++        <size>
++         <width>40</width>
++         <height>20</height>
++        </size>
++       </property>
++      </spacer>
++     </item>
++     <item>
++      <widget class="QLabel" name="label">
++       <property name="text">
++        <string>Open download page?</string>
++       </property>
++       <property name="alignment">
++        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <widget class="QDialogButtonBox" name="buttonBox">
++       <property name="standardButtons">
++        <set>QDialogButtonBox::No|QDialogButtonBox::Yes</set>
++       </property>
++      </widget>
++     </item>
++    </layout>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>
+--- psi.orig/src/AutoUpdater/QDChecker.cpp
++++ psi/src/AutoUpdater/QDChecker.cpp
+@@ -0,0 +1,100 @@
++/*
++ * Quick-and-dirty checker for updates.
++ * Written by Aleksey Palazhchenko.
++ * No rights reserved for this ugly code. This file is in public domain.
++ */
++
++#include "QDChecker.h"
++#include "ui_QDChangeLog.h"
++
++#include <QtCore/QUrl>
++#include <QtGui/QDesktopServices>
++#include <QtNetwork/QNetworkAccessManager>
++#include <QtNetwork/QNetworkRequest>
++#include <QtNetwork/QNetworkReply>
++#include <QtNetwork/QNetworkProxy>
++
++#include "psioptions.h"
++#include "proxy.h"
++
++const QUrl QDChecker::updateCheckUrl_ = QUrl("http://psi-dev.googlecode.com/svn/trunk/version.txt");
++const QUrl QDChecker::changelogUrl_ = QUrl("http://psi-dev.googlecode.com/svn/trunk/changelog.txt");
++const QUrl QDChecker::downloadPageUrl_ = QUrl("http://code.google.com/p/psi-dev/downloads/list?q=label:Windows+Installer");
++
++const QString QDChecker::settingsKey_ = QLatin1String("options.auto-update.last-check-value");
++
++QDChecker::QDChecker()
++	: manager_(new QNetworkAccessManager(this)), logForm_(0)
++{
++	ProxyItem it = ProxyManager::instance()->getItemForObject("Auto Updater");
++	ProxySettings ps = it.settings;
++	if(!ps.host.isEmpty()) {
++		QNetworkProxy prx(QNetworkProxy::HttpCachingProxy, ps.host, ps.port, ps.user, ps.pass);
++		if(it.type == "socks")
++			prx.setType(QNetworkProxy::Socks5Proxy);
++		manager_->setProxy(prx);
++	}
++}
++
++QDChecker::~QDChecker()
++{
++	delete logForm_;
++}
++
++void QDChecker::checkForUpdates()
++{
++	QNetworkRequest request(updateCheckUrl_);
++	QNetworkReply* reply = manager_->get(request);
++	connect(reply, SIGNAL(finished()), this, SLOT(onCheckFinished()));
++}
++
++void QDChecker::onCheckFinished()
++{
++	qDebug("onCheckFinished");
++	QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
++	if(reply && reply->error() == QNetworkReply::NoError) {
++		const QByteArray data = reply->readAll();
++		const quint16 newValue = qChecksum(data.constData(), data.size());
++		const quint16 oldValue = PsiOptions::instance()->getOption(settingsKey_).toUInt();
++
++		if(newValue != oldValue) {
++			QNetworkRequest request(changelogUrl_);
++			QNetworkReply* reply = manager_->get(request);
++			connect(reply, SIGNAL(finished()), this, SLOT(onDownloadLogFinished()));
++			PsiOptions::instance()->setOption(settingsKey_, newValue);
++		}
++
++		reply->deleteLater();
++	} else {
++		qCritical("WTF?! at %s %d", __FILE__, __LINE__);
++	}
++}
++
++void QDChecker::onDownloadLogFinished()
++{
++	qDebug("onDownloadLogFinished");
++	QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
++	if(reply && reply->error() == QNetworkReply::NoError) {
++		if(logForm_) {
++			logForm_->deleteLater();
++		}
++		Ui::ShowChangeLogForm ui;
++		logForm_ = new QWidget;
++		ui.setupUi(logForm_);
++
++		ui.logText->setText(QString::fromUtf8(reply->readAll()));
++
++		connect(ui.buttonBox, SIGNAL(accepted()), this, SLOT(onOpenDownloadPage()));
++		connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), logForm_, SLOT(hide()));
++		logForm_->show();
++
++		reply->deleteLater();
++	} else {
++		qCritical("WTF?! at %s %d", __FILE__, __LINE__);
++	}
++}
++
++void QDChecker::onOpenDownloadPage()
++{
++	QDesktopServices::openUrl(downloadPageUrl_);
++}
+--- psi.orig/src/AutoUpdater/QDChecker.h
++++ psi/src/AutoUpdater/QDChecker.h
+@@ -0,0 +1,44 @@
++/*
++ * Quick-and-dirty checker for updates.
++ * Written by Aleksey Palazhchenko.
++ * No rights reserved for this ugly code. This file is in public domain.
++ */
++
++#ifndef QDCHECKER_H
++#define QDCHECKER_H
++
++#include <QtCore/QObject>
++class QWidget;
++class QUrl;
++class QNetworkAccessManager;
++
++#include "AutoUpdater.h"
++
++class QDChecker : public QObject, public AutoUpdater
++{
++	Q_OBJECT
++
++public:
++	QDChecker();
++	virtual ~QDChecker();
++
++	// from AutoUpdater
++	virtual void checkForUpdates();
++
++private slots:
++	void onCheckFinished();
++	void onDownloadLogFinished();
++	void onOpenDownloadPage();
++
++private:
++	QNetworkAccessManager* manager_;
++	QWidget* logForm_;
++
++	static const QUrl updateCheckUrl_;
++	static const QUrl changelogUrl_;
++	static const QUrl downloadPageUrl_;
++
++	static const QString settingsKey_;
++};
++
++#endif // QDCHECKER_H
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -112,6 +112,8 @@
+ #include "AutoUpdater/AutoUpdater.h"
+ #ifdef HAVE_SPARKLE
+ #include "AutoUpdater/SparkleAutoUpdater.h"
++#elif defined(USE_QDCHECKER)
++#	include "AutoUpdater/QDChecker.h"
+ #endif
+ 
+ #ifdef Q_WS_MAC
+@@ -425,14 +427,6 @@ bool PsiCon::init()
+ 	d->tuneManager = new TuneControllerManager();
+ #endif
+ 
+-	// Auto updater initialization
+-#ifdef HAVE_SPARKLE
+-	d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
+-#endif
+-	if (d->autoUpdater && PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool()) {
+-		d->autoUpdater->checkForUpdates();
+-	}
+-
+ 	// calculate the small font size
+ 	const int minimumFontSize = 7;
+ 	common_smallFontSize = qApp->font().pointSize();
+@@ -468,6 +462,15 @@ bool PsiCon::init()
+ 	QDir profileDir( pathToProfile( activeProfile ) );
+ 	profileDir.rmdir( "info" ); // remove unused dir
+ 
++	// Auto updater initialization
++#ifdef HAVE_SPARKLE
++	d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
++#elif defined(USE_QDCHECKER)
++	d->autoUpdater = new QDChecker();
++#endif
++	if (PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool() && d->autoUpdater)
++		d->autoUpdater->checkForUpdates();
++
+ 	d->iconSelect = new IconSelectPopup(0);
+ 	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
+ 

@@ -1,0 +1,587 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -128,6 +128,8 @@
+ 				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
+ 				<log-height type="int">325</log-height>
+ 				<chatedit-height type="int">10</chatedit-height>
++				<default-jid-mode comment="Default jid mode: barejid | auto" type="QString">barejid</default-jid-mode>
++				<default-jid-mode-ignorelist comment="Default autojid mode ignore list: jid1,jid2,..." type="QString"></default-jid-mode-ignorelist>
+ 			</chat>
+ 			<save>
+ 				<toolbars-state type="QByteArray"/>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -105,6 +105,14 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
+ 
+ 	status_ = -1;
+ 
++	autoSelectContact_ = false;
++	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
++		UserListItem *uli = account()->findFirstRelevant(jid);
++		if (!uli || !uli->isPrivate()) {
++			autoSelectContact_ = true;
++		}
++	}
++
+ 	// Message events
+ 	contactChatState_ = XMPP::StateNone;
+ 	lastChatState_ = XMPP::StateNone;
+@@ -417,6 +425,7 @@ void ChatDlg::setJid(const Jid &j)
+ 		updateRealJid();
+ 		account()->dialogRegister(this, jid());
+ 		updateContact(jid(), false);
++		appendSysMsg(tr("Contact has been switched: %1").arg(JIDUtil::toString(j, true)));
+ 	}
+ }
+ 
+@@ -509,7 +518,7 @@ void ChatDlg::updateContact(const Jid &j
+ 			priority_ = userStatus.priority;
+ 		}
+ 
+-		contactUpdated(userStatus.userListItem, userStatus.statusType, userStatus.status);
++		contactUpdated(userStatus.userListItem, userStatus.statusType, userStatus.status, fromPresence);
+ 
+ 		if (userStatus.userListItem) {
+ 			dispNick_ = JIDUtil::nickOrJid(userStatus.userListItem->name(), userStatus.userListItem->jid().full());
+@@ -551,11 +560,12 @@ void ChatDlg::updateContact(const Jid &j
+ 	}
+ }
+ 
+-void ChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString)
++void ChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString, bool fromPresence)
+ {
+ 	Q_UNUSED(u);
+ 	Q_UNUSED(status);
+ 	Q_UNUSED(statusString);
++	Q_UNUSED(fromPresence);
+ }
+ 
+ void ChatDlg::doVoice()
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
+@@ -76,6 +76,7 @@ public:
+ 	PsiAccount* account() const;
+ 	void setText(const QString& );
+ 	Jid realJid() const;
++	bool autoSelectContact() const {return autoSelectContact_;};
+ 
+ signals:
+ 	void aInfo(const Jid &);
+@@ -101,6 +102,7 @@ protected:
+ 	void dropEvent(QDropEvent* event);
+ 	void dragEnterEvent(QDragEnterEvent* event);
+ 	bool eventFilter(QObject *obj, QEvent *event);
++	bool autoSelectContact_;
+ 
+ public slots:
+ 	// reimplemented
+@@ -155,7 +157,7 @@ protected:
+ 
+ 	virtual void initUi() = 0;
+ 	virtual void capsChanged();
+-	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
++	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString, bool fromPresence);
+ 
+ 	void appendMessage(const Message &, bool local = false);
+ 	virtual bool isEncryptionEnabled() const;
+--- psi.orig/src/chatdlg.ui
++++ psi/src/chatdlg.ui
+@@ -71,10 +71,22 @@
+           </widget>
+          </item>
+          <item>
+-          <widget class="QLineEdit" name="le_jid" >
+-           <property name="readOnly" >
++          <widget class="QComboBox" name="le_jid">
++           <property name="sizePolicy">
++            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
++             <horstretch>1</horstretch>
++             <verstretch>0</verstretch>
++            </sizepolicy>
++           </property>
++           <property name="editable">
+             <bool>true</bool>
+            </property>
++           <property name="sizeAdjustPolicy">
++            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
++           </property>
++           <property name="minimumContentsLength">
++            <number>10</number>
++           </property>
+           </widget>
+          </item>
+          <item>
+@@ -397,6 +409,15 @@
+    <header>iconlabel.h</header>
+   </customwidget>
+  </customwidgets>
++ <tabstops>
++  <tabstop>le_jid</tabstop>
++  <tabstop>tb_voice</tabstop>
++  <tabstop>tb_pgp</tabstop>
++  <tabstop>tb_emoticons</tabstop>
++  <tabstop>tb_actions</tabstop>
++  <tabstop>mle</tabstop>
++  <tabstop>pb_send</tabstop>
++ </tabstops>
+  <resources/>
+  <connections/>
+ </ui>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -2682,9 +2682,9 @@ void PsiAccount::processIncomingMessage(
+ 		return;
+ 	}
+ 
+-	c = findChatDialog(j);
++	/*c = findChatDialog(j);
+ 	if(!c)
+-		c = findChatDialog(m.from().full());
++		c = findChatDialog(m.from().full());*/
+ 
+ 	if(m.type() == "error") {
+ 		Stanza::Error err = m.error();
+@@ -2706,6 +2706,13 @@ void PsiAccount::processIncomingMessage(
+ 		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "chat")
+ 			m.setType("chat");
+ 		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "current-open") {
++			c = NULL;
++			foreach (ChatDlg *cl, findChatDialogs(m.from(), false)) {
++				if (cl->autoSelectContact() || cl->jid().resource().isEmpty() || m.from().resource() == cl->jid().resource()) {
++					c = cl;
++					break;
++				}
++			}
+ 			if (c != NULL && !c->isHidden())
+ 				m.setType("chat");
+ 			else
+@@ -3154,9 +3161,33 @@ bool PsiAccount::validRosterExchangeItem
+ 	return false;
+ }
+ 
+-ChatDlg* PsiAccount::findChatDialog(const Jid& jid) const
++ChatDlg* PsiAccount::findChatDialog(const Jid& jid, bool compareResource) const
++{
++	return findDialog<ChatDlg*>(jid, compareResource);
++}
++
++ChatDlg* PsiAccount::findChatDialogEx(const Jid& jid) const
+ {
+-	return findDialog<ChatDlg*>(jid, true);
++	ChatDlg* cm1 = NULL;
++	ChatDlg* cm2 = NULL;
++	foreach (ChatDlg *cl, findChatDialogs(jid, false)) {
++		if (cl->autoSelectContact())
++			return cl;
++		if (!cm1 && jid.resource() == cl->jid().resource()) {
++				cm1 = cl;
++				continue;
++		}
++		if (!cm2 && cl->jid().resource().isEmpty())
++			cm2 = cl;
++	}
++	if (cm1)
++		return cm1;
++	return cm2;
++}
++
++QList<ChatDlg*> PsiAccount::findChatDialogs(const Jid& jid, bool compareResource) const
++{
++	return findDialogs<ChatDlg*>(jid, compareResource);
+ }
+ 
+ QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
+@@ -3672,7 +3703,8 @@ EventDlg *PsiAccount::ensureEventDlg(con
+ 
+ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
+ {
+-	ChatDlg *c = findChatDialog(j);
++	/*ChatDlg *c = findChatDialog(j);*/
++	ChatDlg *c = findChatDialogEx(j);
+ 	if(!c) {
+ 		// create the chatbox
+ 		c = ChatDlg::create(j, this, d->tabManager);
+@@ -3690,6 +3722,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const
+ #endif
+ 	}
+ 	else {
++		c->setJid(j);
+ 		// on X11, do a special reparent to open on the right desktop
+ #ifdef Q_WS_X11
+ 		/* KIS added an exception for tabs here. We do *not* want chats flying
+@@ -4855,11 +4888,9 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		// Pass message events to chat window
+ 		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
+ 			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
+-				ChatDlg *c = findChatDialog(e->from());
+-				if (!c) {
+-					c = findChatDialog(e->jid());
+-				}
++				ChatDlg *c = findChatDialogEx(e->from());
+ 				if (c) {
++					c->setJid(e->from());
+ 					c->incomingMessage(m);
+ 				}
+ 			}
+@@ -4875,12 +4906,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		}
+ 		else if (m.messageReceipt() == ReceiptReceived) {
+ 			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
+-				ChatDlg *c = findChatDialog(e->from());
+-				if (!c) {
+-					c = findChatDialog(e->jid());
+-				}
+-				if (c) {
+-					c->incomingMessage(m);
++				foreach (ChatDlg *c, findChatDialogs(e->from(), false)) {
++					if (c->autoSelectContact()  || c->jid().resource().isEmpty() || e->from().resource() == c->jid().resource()) {
++						if (c->autoSelectContact())
++							c->setJid(e->from());
++						c->incomingMessage(m);
++					}
+ 				}
+ 			}
+ 			delete e;
+@@ -4889,13 +4920,11 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 
+ 		// pass chat messages directly to a chat window if possible (and deal with sound)
+ 		else if(m.type() == "chat") {
+-			ChatDlg *c = findChatDialog(e->from());
+-			if(!c)
+-				c = findChatDialog(e->jid());
+-
+-			if(c)
++			ChatDlg *c = findChatDialogEx(e->from());
++			if (c)
+ 				c->setJid(e->from());
+ 
++
+ 			//if the chat exists, and is either open in a tab,
+ 			//or in a window
+ #ifdef YAPSI_ACTIVEX_SERVER
+@@ -5370,7 +5399,7 @@ void PsiAccount::processReadNext(const U
+ void PsiAccount::processChatsHelper(const Jid& j, bool removeEvents)
+ {
+ 	//printf("processing chats for [%s]\n", j.full().latin1());
+-	ChatDlg *c = findChatDialog(j);
++	ChatDlg *c = findChatDialogEx(j);
+ 	if(!c)
+ 		return;
+ 
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -151,7 +151,9 @@ public:
+ 	QHostAddress *localAddress() const;
+ 	void passwordReady(QString password);
+ 
+-	ChatDlg* findChatDialog(const Jid& jid) const;
++	ChatDlg* findChatDialog(const Jid& jid, bool compareResource = true) const;
++	ChatDlg* findChatDialogEx(const Jid& jid) const;
++	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
+ 
+ 	template<typename T>
+ 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -168,7 +168,8 @@ private:
+ 
+ 
+ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
+-		: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_)
++		: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_),
++		contactComboChanged(false)
+ {
+ 	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
+ 	connect(account(), SIGNAL(addedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
+@@ -199,6 +200,19 @@ PsiChatDlg::~PsiChatDlg()
+ void PsiChatDlg::initUi()
+ {
+ 	ui_.setupUi(this);
++
++	ui_.le_jid->lineEdit()->setReadOnly(true);
++	if (autoSelectContact_) {
++		QStringList excl = PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode-ignorelist").toString().toLower().split(",", QString::SkipEmptyParts);
++		if (excl.indexOf(jid().bare()) == -1) {
++			ui_.le_jid->insertItem(0, "auto", jid().full());
++			ui_.le_jid->setCurrentIndex(0);
++		} else {
++			autoSelectContact_ = false;
++		}
++	}
++	connect(ui_.le_jid, SIGNAL(activated(int)), this, SLOT(contactChanged()));
++
+ 	ui_.lb_ident->setAccount(account());
+ 	ui_.lb_ident->setShowJid(false);
+ 
+@@ -538,10 +552,9 @@ void PsiChatDlg::setContactToolTip(QStri
+ 	ui_.avatar->setToolTip(text);
+ }
+ 
+-void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString)
++void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& /*statusString*/, bool fromPresence)
+ {
+-	Q_UNUSED(statusString);
+-
++	// Show status icon
+ 	if (status == -1 || !u) {
+ 		ui_.lb_status->setPsiIcon(IconsetFactory::iconPtr("status/noauth"));
+ 		setTabIcon(IconsetFactory::iconPtr("status/noauth")->icon());
+@@ -553,46 +566,158 @@ void PsiChatDlg::contactUpdated(UserList
+ 
+ 	if (u) {
+ 		setContactToolTip(u->makeTip(true, false));
+-	}
+-	else {
+-		setContactToolTip(QString());
+-	}
+ 
+-	if (u) {
+-		QString name;
+-		QString j;
+-		if (jid().resource().isEmpty())
+-			j = JIDUtil::toString(u->jid(), true);
+-		else
+-			j = JIDUtil::toString(u->jid().bare(), false) + '/' + jid().resource();
+-
+-		if (!u->name().isEmpty())
+-			name = u->name() + QString(" <%1>").arg(j);
+-		else
+-			name = j;
+-
+-		ui_.le_jid->setText(name);
+-		ui_.le_jid->setCursorPosition(0);
+-		ui_.le_jid->setToolTip(name);
++		UserResourceList res_list = u->userResourceList();
++		// Filling jid's combobox
++		if (!contactComboChanged) {
++			QComboBox *jidCombo = ui_.le_jid;
++			QString name = u->name();
++			if (!u->isPrivate()) {
++				// If no conference private chat
++				int combo_idx = jidCombo->currentIndex();
++				Jid old_jid = (combo_idx != -1) ? Jid(jidCombo->itemData(combo_idx).toString()) : Jid();
++				if (fromPresence || jid() != old_jid) {
++					bool auto_mode = autoSelectContact_;
++					int new_index = -1;
++					int curr_index = 1;
++					int new_auto_num = -10000;
++					Jid new_auto_jid = Jid();
++					int new_auto_prior = 0;
++					// Creating resouce and priority list
++					QList<Jid> itemsJid;
++					QList<QString> itemsPrior;
++					itemsJid.push_back(Jid(u->jid().bare()));
++					itemsPrior.push_back(QString());
++					bool find_last_res = false;
++					for (UserResourceList::ConstIterator it = res_list.begin(); it != res_list.end(); it++) {
++						UserResource r = *it;
++						if (!r.name().isEmpty()) {
++							Jid jid_tmp(u->jid().withResource(r.name()));
++							itemsJid.push_back(jid_tmp);
++							int priority = r.priority();
++							itemsPrior.push_back(QString::number(priority));
++							if (!auto_mode && new_index <= 0 && jid_tmp == jid()) {
++								new_index = curr_index;
++							}
++							if (!fromPresence) {
++								// New incoming message
++								if (jid_tmp == jid()) {
++									new_auto_num = priority;
++									new_auto_jid = jid_tmp;
++									new_auto_prior = priority;
++									find_last_res = true;
++								}
++							}
++							if (!find_last_res) {
++								// Change in resources
++								if (new_auto_num < r.priority()) {
++									new_auto_num = priority;
++									new_auto_jid = jid_tmp;
++									new_auto_prior = priority;
++								}
++							}
++							curr_index++;
++						}
++					}
++					if (!auto_mode && new_index == -1) {
++						// Current resource not online but has been selected manually
++						if (!jid().resource().isEmpty()) {
++							// Add in the list and select it
++							itemsJid.push_back(jid());
++							itemsPrior.push_back(tr("offline"));
++							new_index = curr_index;
++						} else{
++							new_index = 0;
++						}
++					}
++					// Filling address combobox
++					// auto
++					QString prior_str = QString::number(new_auto_prior);
++					if (new_auto_jid.isEmpty()) {
++						new_auto_jid = jid().bare();
++						prior_str = (status <= 0) ? tr("offline") : "0";
++					}
++					int cnt = jidCombo->count();
++					if (cnt == 0) {
++						jidCombo->insertItem(1, makeContactName(name, new_auto_jid, prior_str) + " (auto)", JIDUtil::toString(new_auto_jid, true));
++					} else {
++						jidCombo->setItemText(0, makeContactName(name, new_auto_jid, prior_str) + " (auto)");
++						jidCombo->setItemData(0, JIDUtil::toString(new_auto_jid, true));
++					}
++					// other
++					curr_index = 1;
++					while (!itemsJid.isEmpty()) {
++						Jid jid_tmp = itemsJid.takeFirst();
++						QString prior_str = itemsPrior.takeFirst();
++						if (curr_index < cnt) {
++							jidCombo->setItemText(curr_index, makeContactName(name, jid_tmp, prior_str));
++							jidCombo->setItemData(curr_index, JIDUtil::toString(jid_tmp, true));
++						} else {
++							jidCombo->insertItem(jidCombo->count(), makeContactName(name, jid_tmp, prior_str), JIDUtil::toString(jid_tmp, true));
++						}
++						curr_index++;
++					}
++					// Сlean combobox's tail
++					while (curr_index < jidCombo->count())
++						jidCombo->removeItem(curr_index);
++
++					ui_.le_jid->setCurrentIndex(new_index + 1);
++
++					if (auto_mode && new_auto_jid != jid()) {
++						contactComboChanged = true;
++						setJid(new_auto_jid);
++					}
++				}
++			} else {
++				// Conference private chat
++				UserResourceList::ConstIterator it = res_list.begin();
++				if (it != res_list.end()) {
++					UserResource res = *it;
++					Jid jid_tmp(u->jid().node(), u->jid().domain(), res.name());
++					QString jid_str = u->jid().bare() + "/" + res.name();
++					QString prior_str = (status == -1) ? tr("offline") : QString::number(res.priority());
++					if (jidCombo->count() > 0) {
++						jidCombo->setItemText(0, makeContactName(name, jid_tmp, prior_str));
++						jidCombo->setItemData(0, jid_str);
++					} else {
++						jidCombo->insertItem(1, makeContactName(name, jid_tmp, prior_str), jid_str);
++					}
++				} else if (jidCombo->count() > 0) {
++					Jid jid_tmp(jidCombo->itemData(0).toString());
++					if (jid_tmp.isValid()) {
++						jidCombo->setItemText(0, makeContactName(jid_tmp.resource(), jid_tmp, tr("offline")));
++					}
++				}
++				// Сlean combobox's tail
++				while (jidCombo->count() > 1)
++					jidCombo->removeItem(1);
++				//-
++				jidCombo->setCurrentIndex(0);
++			}
++		}
+ 
+-		UserResourceList srl = u->userResourceList();
+-		if(!srl.isEmpty()) {			
++		// Show client icon
++		if(!res_list.isEmpty()) {
+ 			UserResource r;
+ 			if(!jid().resource().isEmpty()) {
+ 				QString res = jid().resource();
+-				UserResourceList::ConstIterator it = srl.find(res);
+-				if(it != srl.end())
++				UserResourceList::ConstIterator it = res_list.find(res);
++				if(it != res_list.end())
+ 					r = *it;
+ 			}
+ 			if(r.clientName().isEmpty()) {
+-				srl.sort();
+-				r = srl.first();
++				res_list.sort();
++				r = res_list.first();
+ 			}
+ 			const QPixmap &pix = IconsetFactory::iconPixmap("clients/" + u->findClient(r.clientName().toLower()) );
+ 			ui_.lb_client->setPixmap(pix);
+ 			ui_.lb_client->setToolTip(r.versionString());
+ 		}
+ 	}
++	else {
++		setContactToolTip(QString());
++	}
++	contactComboChanged = false;
+ }
+ 
+ void PsiChatDlg::updateAvatar()
+@@ -854,4 +979,30 @@ void PsiChatDlg::setMargins()
+ 	}
+ }
+ 
++QString PsiChatDlg::makeContactName(const QString &name, const Jid &jid, const QString &prior_str) const
++{
++	QString name_;
++	QString j = JIDUtil::toString(jid, true);
++	if (!name.isEmpty())
++		name_ = name + QString(" <%1>").arg(j);
++	else
++		name_ = j;
++	if (!prior_str.isEmpty())
++		name_.append(QString(" [%1]").arg(prior_str));
++	return name_;
++}
++
++void PsiChatDlg::contactChanged()
++{
++	int curr_index = ui_.le_jid->currentIndex();
++	autoSelectContact_ = (curr_index == 0 && ui_.le_jid->count() > 1);
++	if (curr_index != -1) {
++		Jid jid_(ui_.le_jid->itemData(curr_index).toString());
++		if (jid_ != jid()) {
++			contactComboChanged = true;
++			setJid(jid_);
++		}
++	}
++}
++
+ #include "psichatdlg.moc"
+--- psi.orig/src/psichatdlg.h
++++ psi/src/psichatdlg.h
+@@ -54,6 +54,8 @@ private slots:
+ 	void sendTemp(const QString &);
+ 	void psButtonEnabled();
+ 	void verticalSplitterMoved(int, int);
++	void contactChanged();
++	QString makeContactName(const QString &name, const Jid &jid, const QString &prior_str) const;
+ 
+ private:
+ 	void initToolBar();
+@@ -63,7 +65,7 @@ private:
+ 	void initUi();
+ 	void capsChanged();
+ 	bool isEncryptionEnabled() const;
+-	void contactUpdated(UserListItem* u, int status, const QString& statusString);
++	void contactUpdated(UserListItem* u, int status, const QString& statusString, bool fromPresence);
+ 	void updateAvatar();
+ 	void optionsUpdate();
+ 	void updatePGP();
+@@ -108,6 +110,8 @@ private:
+ 	int logHeight;
+ 	int chateditHeight;
+ 
++	bool contactComboChanged;
++
+ private:
+ 	bool tabmode;
+ 	QPointer <PsiWindowHeader> winHeader_;
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -1716,9 +1716,9 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 		if ( PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && sentToChatWindow ) {
+ 			// Message already displayed, need only to pop up chat dialog, so that
+ 			// it will be read (or marked as read)
+-			ChatDlg *c = account->findChatDialog(from);
++			ChatDlg *c = account->findChatDialogEx(from);
+ 			if(!c)
+-				c = account->findChatDialog(e->jid());
++				c = account->findChatDialogEx(e->jid());
+ 			if(!c)
+ 				return; // should never happen
+ 

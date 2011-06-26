@@ -1,0 +1,198 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -214,7 +214,7 @@
+ 					<width>580</width>
+ 					<height>420</height>
+ 				</size>
+-				<use-highlighting type="bool">true</use-highlighting><use-nick-coloring type="bool">true</use-nick-coloring>
++				<use-highlighting type="bool">true</use-highlighting><use-nick-coloring type="bool">true</use-nick-coloring><use-hash-nick-coloring type="bool">true</use-hash-nick-coloring><colored-history type="bool">true</colored-history>
+ 			</muc>
+ 			<show-deprecated comment="Deprecated functionality or protocols">
+ 				<service-discovery comment="Service discovery dialog">
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -293,7 +293,7 @@ void ChatView::renderMucMessage(const Me
+ 		alerttagsc = "</b>";
+ 	}
+ 
+-	if(mv.isSpooled()) {
++	if(mv.isSpooled() && !PsiOptions::instance()->getOption("options.ui.muc.colored-history").toBool()) {
+ 		nickcolor = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
+ 	} else {
+ 		nickcolor = share_.getMucNickColor(mv.nick(), mv.isLocal());
+--- psi.orig/src/chatviewshare.cpp
++++ psi/src/chatviewshare.cpp
+@@ -20,6 +20,8 @@
+ 
+ #include "chatviewshare.h"
+ #include "psioptions.h"
++#include <QColor>
++#include <QRegExp>
+ 
+ ChatViewShare::ChatViewShare(QObject *parent)
+ 		: QObject(parent)
+@@ -35,32 +37,72 @@ bool ChatViewShare::updateLastMsgTime(QD
+ 	return doInsert;
+ }
+ 
+-QString ChatViewShare::getMucNickColor(QString nick, bool isSelf, QStringList validList)
++QString ChatViewShare::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
+ {
++	QString nickwoun = nick; // nick without underscores
++	nickwoun.replace(QRegExp("^_*"), "");
++	nickwoun.replace(QRegExp("_*$"), "");
++
+ 	int sender;
+-	if(isSelf || nick.isEmpty()) {
++	if(isSelf || nickwoun.isEmpty()) {
+ 		sender = -1;
+ 	} else {
+-		if (!nicks.contains(nick)) {
++		if (!nicks.contains(nickwoun)) {
+ 			//not found in map
+-			nicks.insert(nick,nickNumber_);
++			nicks.insert(nickwoun,nickNumber_);
+ 			nickNumber_++;
+ 		}
+-		sender=nicks[nick];
++		sender=nicks[nickwoun];
+ 	}
+ 
+ 	QStringList nickColors = validList.isEmpty()
+ 		? PsiOptions::instance()->getOption("options.ui.look.colors.muc.nick-colors").toStringList()
+ 		: validList;
+ 
+-	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() || nickColors.empty()) {
++	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool()) {
+ 		return "#000000";
+-	}
+-	else if(sender == -1 || nickColors.size() == 1) {
+-		return nickColors[nickColors.size()-1];
+-	}
+-	else {
+-		int n = sender % (nickColors.size()-1);
+-		return nickColors[n];
++	} else {
++		if (PsiOptions::instance()->getOption("options.ui.muc.use-hash-nick-coloring").toBool()) {
++			/* Hash-driven colors */
++			unsigned char hash[4];
++			unsigned char prev_hash[4];
++			QByteArray cnick = nickwoun.toUtf8();
++			unsigned nicklen, i, *h = reinterpret_cast<unsigned *>(hash);
++			nicklen = cnick.length();
++			*h = 12345;
++			memcpy(prev_hash, hash, sizeof(hash));
++			for (i = 0; i < nicklen; i++) {
++				*h *= cnick[i];
++				if(hash[0] || hash[1] || hash[2]) {
++					memcpy(prev_hash, hash, sizeof(hash));
++				} else {
++					*h = 12345;
++					memcpy(prev_hash, hash, sizeof(hash));
++				}
++			}
++			/* I hope, nobody will use this on big-endian 64bit CPUs */
++			QColor precolor;
++			QString color;
++			color.sprintf("#%02hhX%02hhX%02hhX", prev_hash[0], prev_hash[1], prev_hash[2]);
++			precolor.setNamedColor(QString(color));
++			if ( precolor.saturation() < 150 ){
++			    precolor.setHsv( precolor.hue(), 250, precolor.value());
++			}
++			if ( precolor.value() > 210 ) {
++			    precolor.setHsv( precolor.hue(), precolor.saturation() , 210);
++			}
++			return precolor.name();
++		} else {
++			/* Colors from list */
++			if (nickColors.empty()) {
++				return "#000000";
++			}
++			if(sender == -1 || nickColors.size() == 1) {
++				return nickColors[nickColors.size()-1];
++			} else {
++				int n = sender % (nickColors.size()-1);
++				return nickColors[n];
++			}
++		}
+ 	}
+ }
+--- psi.orig/src/chatviewshare.h
++++ psi/src/chatviewshare.h
+@@ -41,7 +41,7 @@ private:
+ 	QMap<QString,int> nicks;
+ 
+ public slots:
+-	QString getMucNickColor(QString, bool, QStringList validList = QStringList());
++	QString getMucNickColor(const QString&, bool, QStringList validList = QStringList());
+ };
+ 
+ #endif
+--- psi.orig/src/options/opt_general_groupchat.ui
++++ psi/src/options/opt_general_groupchat.ui
+@@ -157,6 +157,13 @@
+        </property>
+       </widget>
+      </item>
++      <item>
++      <widget class="QCheckBox" name="ck_gcHashNickColoring" >
++       <property name="text" >
++        <string>Enable hash nick coloring</string>
++       </property>
++      </widget>
++     </item>
+      <item>
+       <widget class="QGroupBox" name="ncGroupBox" >
+        <property name="title" >
+@@ -296,11 +303,29 @@
+   <tabstop>pb_removeHighlightWord</tabstop>
+   <tabstop>pb_addHighlightWord</tabstop>
+   <tabstop>ck_gcNickColoring</tabstop>
++  <tabstop>ck_gcHashNickColoring</tabstop>
+   <tabstop>le_newNickColor</tabstop>
+   <tabstop>pb_nickColor</tabstop>
+   <tabstop>pb_removeNickColor</tabstop>
+   <tabstop>pb_addNickColor</tabstop>
+  </tabstops>
+  <resources/>
+- <connections/>
+-</ui>
++ <connections>
++  <connection>
++   <sender>ck_gcNickColoring</sender>
++   <signal>toggled(bool)</signal>
++   <receiver>ck_gcHashNickColoring</receiver>
++   <slot>setEnabled(bool)</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>326</x>
++     <y>18</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>326</x>
++     <y>42</y>
++    </hint>
++   </hints>
++  </connection>
++ </connections>
++ </ui>
+\ No newline at end of file
+--- psi.orig/src/options/opt_groupchat.cpp
++++ psi/src/options/opt_groupchat.cpp
+@@ -67,6 +67,7 @@ void OptionsTabGroupchat::applyOptions()
+ 	GeneralGroupchatUI *d = (GeneralGroupchatUI *)w;
+ 	PsiOptions::instance()->setOption("options.ui.muc.use-highlighting", d->ck_gcHighlights->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.muc.use-nick-coloring", d->ck_gcNickColoring->isChecked());
++	PsiOptions::instance()->setOption("options.ui.muc.use-hash-nick-coloring", d->ck_gcHashNickColoring->isChecked());
+ 
+ 	QStringList highlight;
+ 	int i;
+@@ -96,6 +97,8 @@ void OptionsTabGroupchat::restoreOptions
+ 	d->ck_gcHighlights->setChecked( PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool() );
+ 	d->ck_gcNickColoring->setChecked( true );
+ 	d->ck_gcNickColoring->setChecked( PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() );
++	d->ck_gcHashNickColoring->setChecked( true );
++	d->ck_gcHashNickColoring->setChecked( PsiOptions::instance()->getOption("options.ui.muc.use-hash-nick-coloring").toBool() );
+ 	d->lw_highlightWords->clear();
+ 	d->lw_highlightWords->addItems( PsiOptions::instance()->getOption("options.ui.muc.highlight-words").toStringList() );
+ 	d->lw_nickColors->clear();

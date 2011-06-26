@@ -1,0 +1,75 @@
+--- psi.orig/src/chatdlg.ui
++++ psi/src/chatdlg.ui
+@@ -184,7 +184,7 @@
+             <enum>QToolButton::InstantPopup</enum>
+            </property>
+            <property name="arrowType" >
+-            <enum>Qt::DownArrow</enum>
++            <enum>Qt::NoArrow</enum>
+            </property>
+           </widget>
+          </item>
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -706,6 +706,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	d->pm_settings = new QMenu(this);
+ 	connect(d->pm_settings, SIGNAL(aboutToShow()), SLOT(buildMenu()));
+ 	ui_.tb_actions->setMenu(d->pm_settings);
++	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
+ 	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
+ 
+ 	// resize the horizontal splitter
+--- psi.orig/src/groupchatdlg.ui
++++ psi/src/groupchatdlg.ui
+@@ -148,7 +148,7 @@
+              <enum>QToolButton::InstantPopup</enum>
+             </property>
+             <property name="arrowType" >
+-             <enum>Qt::DownArrow</enum>
++             <enum>Qt::NoArrow</enum>
+             </property>
+            </widget>
+           </item>
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -206,6 +206,7 @@ void PsiChatDlg::initUi()
+ 	pm_settings_ = new QMenu(this);
+ 	connect(pm_settings_, SIGNAL(aboutToShow()), SLOT(buildMenu()));
+ 	ui_.tb_actions->setMenu(pm_settings_);
++	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
+ 	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
+ 
+ 	connect(account()->capsManager(), SIGNAL(capsChanged(const Jid&)), SLOT(capsChanged(const Jid&)));
+--- psi.orig/src/psitoolbar.cpp
++++ psi/src/psitoolbar.cpp
+@@ -26,6 +26,7 @@
+ #include <QContextMenuEvent>
+ #include <QList>
+ #include <QMainWindow>
++#include <QToolButton>
+ 
+ #include "iconset.h"
+ #include "iconaction.h"
+@@ -97,6 +98,9 @@ void PsiToolBar::initialize()
+ 	setWindowTitle(o->getOption(base_ + ".name").toString());
+ 
+ 	ActionList actions = actionList_->suitableActions(PsiActionList::Actions_MainWin | PsiActionList::Actions_Common);
++	QList<QString> skipList;
++	skipList << "button_options" << "button_status" << "event_notifier" << "spacer";
++
+ 	foreach(QString actionName, o->getOption(base_ + ".actions").toStringList()) {
+ 		IconAction* action = actions.action(actionName);
+ 
+@@ -104,6 +108,12 @@ void PsiToolBar::initialize()
+ 			if (action->isSeparator()) {
+ 				addSeparator();
+ 			}
++			else if (!skipList.contains(actionName)) {
++				QToolButton *button = new QToolButton;
++				button->setDefaultAction(action);
++				button->setPopupMode(QToolButton::InstantPopup);
++				addWidget(button);
++			}
+ 			else {
+ 				action->addTo(this);
+ 			}

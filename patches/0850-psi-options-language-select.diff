@@ -1,0 +1,122 @@
+--- psi.orig/src/main.cpp
++++ psi/src/main.cpp
+@@ -106,7 +106,7 @@ PsiMain::~PsiMain()
+ 
+ 	QSettings s(ApplicationInfo::homeDir() + "/psirc", QSettings::IniFormat);
+ 	s.setValue("last_profile", lastProfile);
+-	s.setValue("last_lang", lastLang);
++	//s.setValue("last_lang", lastLang);
+ 	s.setValue("auto_open", autoOpen);
+ }
+ 
+@@ -272,6 +272,9 @@ void PsiMain::chooseProfile()
+ 	// only set lastProfile if the user opened it
+ 	lastProfile = str;
+ 
++	QSettings s(ApplicationInfo::homeDir() + "/psirc", QSettings::IniFormat);
++	s.setValue("last_lang", lastLang);
++
+ 	activeProfile = str;
+ 	sessionStart();
+ }
+--- psi.orig/src/options/opt_application.cpp
++++ psi/src/options/opt_application.cpp
+@@ -3,11 +3,16 @@
+ #include "iconwidget.h"
+ #include "psioptions.h"
+ #include "proxy.h"
++#include "translationmanager.h"
++#include "varlist.h"
++#include "applicationinfo.h"
+ 
+ #include <QCheckBox>
+ #include <QComboBox>
+ #include <QLineEdit>
++#include "qsettings.h"
+ #include <QList>
++#include <QMessageBox>
+ 
+ #include "ui_opt_application.h"
+ 
+@@ -106,6 +111,23 @@ void OptionsTabApplication::applyOptions
+ 
+ 	//Proxy
+ 	ProxyManager::instance()->proxyForObject()->save();
++
++	// Language
++	QString curLang = TranslationManager::instance()->currentLanguage();
++	QString lang = d->cb_lang->currentText();
++	QString itemData;
++	foreach(VarListItem it, TranslationManager::instance()->availableTranslations() ) {
++		if(it.data() == lang) {
++			itemData = it.key();
++			break;
++		}
++	}
++	if(curLang != itemData && !itemData.isEmpty()) {
++		TranslationManager::instance()->loadTranslation(itemData);
++		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
++	}
++	QSettings s(ApplicationInfo::homeDir() + "/psirc", QSettings::IniFormat);
++	s.setValue("last_lang", itemData);
+ }
+ 
+ void OptionsTabApplication::restoreOptions()
+@@ -129,6 +151,21 @@ void OptionsTabApplication::restoreOptio
+ 	// data transfer
+ 	d->le_dtPort->setText( QString::number(PsiOptions::instance()->getOption("options.p2p.bytestreams.listen-port").toInt()) );
+ 	d->le_dtExternal->setText( PsiOptions::instance()->getOption("options.p2p.bytestreams.external-address").toString() );
++
++	// Language
++	VarList vList = TranslationManager::instance()->availableTranslations();
++	QStringList lang = vList.varsToStringList();
++	d->cb_lang->addItem(tr("Default"));
++	foreach(QString item, lang) {
++		d->cb_lang->addItem(vList.get(item));
++	}
++	QString curLang = TranslationManager::instance()->currentLanguage();
++	QSettings s(ApplicationInfo::homeDir() + "/psirc", QSettings::IniFormat);
++	QString curL = s.value("last_lang", "").toString();
++	if (curL.isEmpty())
++		d->cb_lang->setCurrentIndex( 0 );
++	else if(!curLang.isEmpty() && lang.contains(curLang) )
++		d->cb_lang->setCurrentIndex( d->cb_lang->findText(vList.get(curLang)) );
+ }
+ 
+ void OptionsTabApplication::doEnableQuitOnClose(int state)
+--- psi.orig/src/options/opt_application.ui
++++ psi/src/options/opt_application.ui
+@@ -186,6 +186,33 @@
+     </widget>
+    </item>
+    <item>
++    <layout class="QHBoxLayout" name="horizontalLayout">
++     <item>
++      <widget class="QLabel" name="label_2">
++       <property name="text">
++        <string>Language</string>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <widget class="QComboBox" name="cb_lang"/>
++     </item>
++     <item>
++      <spacer name="horizontalSpacer">
++       <property name="orientation">
++        <enum>Qt::Horizontal</enum>
++       </property>
++       <property name="sizeHint" stdset="0">
++        <size>
++         <width>40</width>
++         <height>20</height>
++        </size>
++       </property>
++      </spacer>
++     </item>
++    </layout>
++   </item>
++   <item>
+     <spacer>
+      <property name="orientation" >
+       <enum>Qt::Vertical</enum>

@@ -1,0 +1,43 @@
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -1677,6 +1677,18 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 	}
+ }
+ 
++void PsiCon::removeEvent(PsiEvent *e)
++{
++	PsiAccount* account = e->account();
++	if (!account)
++		return;
++	UserListItem *u = account->find(e->jid());
++	account->eventQueue()->dequeue(e);
++	account->queueChanged();
++	if(u)
++		account->cpUpdate(*u);
++}
++
+ void PsiCon::updateS5BServerAddresses()
+ {
+ 	if(!d->s5bServer)
+--- psi.orig/src/psicon.h
++++ psi/src/psicon.h
+@@ -119,6 +119,7 @@ public:
+ 	IconSelectPopup *iconSelectPopup() const;
+ 	bool filterEvent(const PsiAccount*, const PsiEvent*) const;
+ 	void processEvent(PsiEvent*, ActivationType activationType);
++	void removeEvent(PsiEvent* e);
+ 
+ 	Status::Type currentStatusType() const;
+ 	QString currentStatusMessage() const;
+--- psi.orig/src/psipopup.cpp
++++ psi/src/psipopup.cpp
+@@ -182,6 +182,9 @@ void PsiPopup::Private::popupClicked(int
+ 			account->actionDefault( j );
+ 		}
+ 	}
++	else if ( event && event->account() && button == (int)Qt::RightButton ) {
++		event->account()->psi()->removeEvent(event);
++	}
+ }
+ 
+ void PsiPopup::Private::eventDestroyed()

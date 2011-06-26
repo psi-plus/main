@@ -1,0 +1,893 @@
+--- psi.orig/iris/src/xmpp/xmpp-im/types.cpp
++++ psi/iris/src/xmpp/xmpp-im/types.cpp
+@@ -1949,8 +1949,15 @@ bool Message::fromStanza(const Stanza &s
+ 		d->httpAuthRequest = HttpAuthRequest();
+ 	}
+ 
++	QDomElement captcha = childElementsByTagNameNS(root, "urn:xmpp:captcha",
++												 "captcha").item(0).toElement();
++	QDomElement xdataRoot = root;
++	if (!captcha.isNull()) {
++		//xdataRoot = captcha;
++	}
++
+ 	// data form
+-	t = childElementsByTagNameNS(root, "jabber:x:data", "x").item(0).toElement();
++	t = childElementsByTagNameNS(xdataRoot, "jabber:x:data", "x").item(0).toElement();
+ 	if (!t.isNull()) {
+ 		d->xdata.fromXml(t);
+ 	}
+--- psi.orig/iris/src/xmpp/xmpp-im/xmpp_xdata.cpp
++++ psi/iris/src/xmpp/xmpp-im/xmpp_xdata.cpp
+@@ -62,6 +62,16 @@ void XData::Field::setOptions(XData::Fie
+ 	_options = o;
+ }
+ 
++XData::Field::MediaElement XData::Field::mediaElement() const
++{
++	return _mediaElement;
++}
++
++void XData::Field::setMediaElement(const XData::Field::MediaElement &el)
++{
++	_mediaElement = el;
++}
++
+ bool XData::Field::required() const
+ {
+ 	return _required;
+@@ -221,6 +231,33 @@ void XData::Field::fromXml(const QDomEle
+ 		else if ( tag == "value" ) {
+ 			_value.append(i.text());
+ 		}
++		else if (tag == "media" && (i.namespaceURI() == "urn:xmpp:media-element"
++				 || i.attribute("xmlns") == "urn:xmpp:media-element")) { // allow only one media element
++			QSize s;
++			if (i.hasAttribute("width")) {
++				s.setWidth(i.attribute("width").toInt());
++			}
++			if (i.hasAttribute("height")) {
++				s.setHeight(i.attribute("height").toInt());
++			}
++			_mediaElement.setMediaSize(s);
++			for(QDomNode un = i.firstChild(); !un.isNull(); un = un.nextSibling()) {
++				QDomElement uel = un.toElement();
++				if(uel.isNull() || uel.tagName() != "uri") {
++					continue;
++				}
++				QStringList type = uel.attribute("type").split(';');
++				QHash<QString,QString> params;
++				for (int i = 1; i < type.size(); ++i) {
++					QStringList p = type.value(i).split('=');
++					QString key = p[0].trimmed();
++					if (!key.isEmpty()) {
++						params[key] = p.value(1).trimmed();
++					}
++				}
++				_mediaElement.append(type.value(0).trimmed(), uel.text(), params);
++			}
++		}
+ 	}
+ }
+ 
+@@ -281,9 +318,72 @@ QDomElement XData::Field::toXml(QDomDocu
+ 			f.appendChild( textTag(doc, "value", *it) );
+ 	}
+ 
++	if ( !_mediaElement.isEmpty() ) {
++		QDomElement media = doc->createElementNS("urn:xmpp:media-element", "media");
++		QSize s = _mediaElement.mediaSize();
++		if (!s.isEmpty()) {
++			media.setAttribute("width", s.width());
++			media.setAttribute("height", s.height());
++		}
++		foreach(const MediaUri &uri, _mediaElement) {
++			QDomElement uriEl = doc->createElement("uri");
++			QString type = uri.type;
++			foreach (const QString &k, uri.params.keys()) {
++				type += ";" + k + "=" + uri.params[k];
++			}
++			uriEl.setAttribute("type", type);
++			uriEl.appendChild(doc->createTextNode(uri.uri));
++			media.appendChild(uriEl);
++		}
++		f.appendChild(media);
++	}
++
+ 	return f;
+ }
+ 
++
++
++
++//----------------------------------------------------------------------------
++// MediaElement
++//----------------------------------------------------------------------------
++
++void XData::Field::MediaElement::append(const QString &type, const QString &uri,
++										QHash<QString,QString> params)
++{
++	XData::Field::MediaUri u;
++	u.type = type;
++	u.uri = uri;
++	u.params = params;
++	QList<XData::Field::MediaUri>::append(u);
++}
++
++void XData::Field::MediaElement::setMediaSize(const QSize &size)
++{
++	_size = size;
++}
++
++QSize XData::Field::MediaElement::mediaSize() const
++{
++	return _size;
++}
++
++bool XData::Field::MediaElement::checkSupport(const QStringList &wildcards)
++{
++	foreach (const XData::Field::MediaUri &uri, *this) {
++		foreach (const QString &wildcard, wildcards) {
++			if (QRegExp(wildcard, Qt::CaseSensitive, QRegExp::Wildcard)
++					.exactMatch(uri.type)) {
++				return true;
++			}
++		}
++	}
++	return false;
++}
++
++
++
++
+ //----------------------------------------------------------------------------
+ // XData
+ //----------------------------------------------------------------------------
+@@ -324,6 +424,11 @@ void XData::setType(Type t)
+ 	d->type = t;
+ }
+ 
++QString XData::registrarType() const
++{
++	return d->registrarType;
++}
++
+ XData::FieldList XData::fields() const
+ {
+ 	return d->fields;
+@@ -364,6 +469,9 @@ void XData::fromXml(const QDomElement &e
+ 			Field f;
+ 			f.fromXml(i);
+ 			d->fields.append(f);
++			if (f.type() == Field::Field_Hidden && f.var() == "FORM_TYPE") {
++				d->registrarType = f.value().value(0);
++			}
+ 		}
+ 		else if ( i.tagName() == "reported" ) {
+ 			d->report.clear();
+--- psi.orig/iris/src/xmpp/xmpp-im/xmpp_xdata.h
++++ psi/iris/src/xmpp/xmpp-im/xmpp_xdata.h
+@@ -27,6 +27,8 @@
+ #include <QList>
+ #include <QSharedDataPointer>
+ #include <QStringList>
++#include <QSize>
++#include <QHash>
+ 
+ class QDomElement;
+ class QDomDocument;
+@@ -53,6 +55,7 @@ namespace XMPP {
+ 
+ 		Type type() const;
+ 		void setType(Type);
++		QString registrarType() const;
+ 
+ 		struct ReportField {
+ 			ReportField() { }
+@@ -83,10 +86,31 @@ namespace XMPP {
+ 				QString value;
+ 			};
+ 
++			struct MediaUri {
++				QString type;
++				QString uri;
++				QHash<QString,QString> params;
++			};
++
++			class MediaElement : public QList<MediaUri>
++			{
++			public:
++				void append(const QString &type, const QString &uri, QHash<QString,QString> params);
++				void setMediaSize(const QSize &size);
++				QSize mediaSize() const;
++				bool checkSupport(const QStringList &wildcards);
++
++			private:
++				QSize _size;
++			};
++
+ 			typedef QList<Option> OptionList;
+ 			OptionList options() const;
+ 			void setOptions(OptionList);
+ 
++			MediaElement mediaElement() const;
++			void setMediaElement(const MediaElement &);
++
+ 			bool required() const;
+ 			void setRequired(bool);
+ 
+@@ -128,6 +152,7 @@ namespace XMPP {
+ 		private:
+ 			QString _desc, _label, _var;
+ 			QList<Option> _options;
++			MediaElement _mediaElement;
+ 			bool _required;
+ 			Type _type;
+ 			QStringList _value;
+@@ -143,6 +168,7 @@ namespace XMPP {
+ 		public:
+ 			QString title, instructions;
+ 			XData::Type type;
++			QString registrarType;
+ 			FieldList fields;
+ 			QList<ReportField> report;
+ 			QList<ReportItem>  reportItems;
+--- psi.orig/src/accountregdlg.cpp
++++ psi/src/accountregdlg.cpp
+@@ -261,7 +261,7 @@ void AccountRegDlg::getFields_finished()
+ 	ui_.busy->stop();
+ 	if (reg->success()) {
+ 		unblock();
+-		fields_ =  new XDataWidget(ui_.page_fields);
++		fields_ =  new XDataWidget(ui_.page_fields, client_->client(), reg->form().jid());
+ 		XData xdata;
+ 		if (reg->hasXData()) {
+ 			isOld_ = false;
+--- psi.orig/src/ahcformdlg.cpp
++++ psi/src/ahcformdlg.cpp
+@@ -53,8 +53,8 @@ AHCFormDlg::AHCFormDlg(const AHCommand& 
+ 	ui_.lb_instructions->setVisible(!r.data().instructions().isEmpty());
+ 
+ 	// XData form
+-	xdata_ = new XDataWidget(this);
+-	xdata_->setFields(r.data().fields());
++	xdata_ = new XDataWidget(this, client_, receiver);
++	xdata_->setForm(r.data(), false);
+ 	ui_.scrollArea->setWidget(xdata_);
+ 
+ 	ui_.busy->setVisible(!final);
+--- psi.orig/src/eventdlg.cpp
++++ psi/src/eventdlg.cpp
+@@ -892,7 +892,7 @@ void EventDlg::init()
+ 	d->w_http_id->hide();
+ 
+ 	// data form
+-	d->xdata = new XDataWidget(this);
++	d->xdata = new XDataWidget(this, d->pa->client(), d->jid);
+ 	d->xdata_form = new QWidget(this);
+ 	QVBoxLayout *vb_xdata = new QVBoxLayout(d->xdata_form);
+ 	d->xdata_instruction = new QLabel(d->xdata_form);
+@@ -1909,7 +1909,7 @@ void EventDlg::updateEvent(PsiEvent *e)
+ 				setWindowTitle( form.title() );
+ 			
+ 			//show data form
+-			d->xdata->setFields( form.fields() );
++			d->xdata->setForm( form, false );
+ 			d->xdata_form->show();
+ 			
+ 			//set instructions
+--- psi.orig/src/mucconfigdlg.cpp
++++ psi/src/mucconfigdlg.cpp
+@@ -232,8 +232,8 @@ void MUCConfigDlg::getConfiguration_succ
+ 	if (affiliation_ == MUCItem::Owner) {
+ 		ui_.busy->stop();
+ 		delete data_;
+-		data_ = new XDataWidget(ui_.pg_general_data);
+-		data_->setFields(d.fields());
++		data_ = new XDataWidget(ui_.pg_general_data, manager_->client(), manager_->room());
++		data_->setForm(d, false);
+ 		data_container_->setWidget(data_);
+ 		data_container_->updateGeometry();
+ 		ui_.sw_general->setCurrentWidget(ui_.pg_general_data);
+--- psi.orig/src/mucmanager.cpp
++++ psi/src/mucmanager.cpp
+@@ -257,6 +257,11 @@ void MUCManager::destroy(const QString& 
+ 	t->go(true);
+ }
+ 
++XMPP::Client* MUCManager::client() const
++{
++	return client_;
++}
++
+ void MUCManager::setItems(const QList<MUCItem>& items)
+ {
+ 	MUCItemsTask* t = new MUCItemsTask(room_, client_->rootTask());
+--- psi.orig/src/mucmanager.h
++++ psi/src/mucmanager.h
+@@ -59,6 +59,7 @@ public:
+ 	void setItems(const QList<MUCItem>&);
+ 	void getItemsByAffiliation(MUCItem::Affiliation);
+ 	void destroy(const QString& reason = QString(), const Jid& venue = Jid());
++	XMPP::Client* client() const;
+ 
+ 	// Basic operations
+ 	void kick(const QString&, const QString& = QString());
+--- psi.orig/src/registrationdlg.cpp
++++ psi/src/registrationdlg.cpp
+@@ -283,9 +283,9 @@ void RegistrationDlg::processXData(const
+ 	if (d->xdata)
+ 		delete d->xdata;
+ 
+-	d->xdata = new XDataWidget(d->gr_form);
++	d->xdata = new XDataWidget(d->gr_form, d->pa->client(), d->jid);
+ 	d->gr_form_layout->addWidget(d->xdata); // FIXME
+-	d->xdata->setFields(form.fields());
++	d->xdata->setForm(form, false);
+ 
+ 	d->xdata->show();
+ }
+@@ -333,7 +333,7 @@ void RegistrationDlg::updateData(JT_XReg
+ 		if (!iq.isNull()) {
+ 			XData form;
+ 			form.fromXml(iq);
+-			d->xdata->setFields(form.fields());
++			d->xdata->setForm(form, false);
+ 		}
+ 	}
+ }
+--- psi.orig/src/searchdlg.cpp
++++ psi/src/searchdlg.cpp
+@@ -332,9 +332,9 @@ void SearchDlg::jt_finished()
+ 						QString str = TextUtil::plain2rich( form.instructions() );
+ 						lb_instructions->setText(str);
+ 
+-						d->xdata = new XDataWidget( d->gr_form );
++						d->xdata = new XDataWidget( d->gr_form, d->pa->client(), d->form.jid() );
+ 						d->gr_form_layout->addWidget(d->xdata); // FIXME
+-						d->xdata->setFields( form.fields() );
++						d->xdata->setForm( form, false );
+ 
+ 						d->xdata->show();
+ 
+--- psi.orig/src/xdata_widget.cpp
++++ psi/src/xdata_widget.cpp
+@@ -30,21 +30,114 @@
+ #include <QObject>
+ #include <QTextEdit>
+ #include <QGridLayout>
++#include <QNetworkAccessManager>
++#include <QNetworkRequest>
++#include <QNetworkReply>
+ 
+ #include "desktoputil.h"
+ #include "xmpp_xdata.h"
++#include "xmpp_client.h"
++#include "xmpp_tasks.h"
+ 
+ using namespace XMPP;
+ 
++
++
++class XDataMediaWidget : public QLabel
++{
++	Q_OBJECT
++
++public:
++	XDataMediaWidget(XData::Field::MediaUri uri, QSize s,
++					 Client* client, Jid j, QWidget *parent)
++		: QLabel(parent)
++		, _client(client)
++		, _size(s)
++		, _type(uri.type)
++	{
++		if (uri.uri.startsWith("cid:")) {
++			JT_BitsOfBinary *task = new JT_BitsOfBinary(client->rootTask());
++			connect(task, SIGNAL(bob(BoBData)), SLOT(bobReceived(BoBData)));
++			task->get(j, uri.uri.mid(4));
++			task->go(true);
++		} else {
++			QNetworkAccessManager *manager = new QNetworkAccessManager(this);
++			connect(manager, SIGNAL(finished(QNetworkReply*)),
++					SLOT(oobReceived(QNetworkReply*)));
++			manager->get(QNetworkRequest(QUrl(uri.uri)));
++		}
++	}
++
++	static QList<XDataMediaWidget*> fromMediaElement(
++		XData::Field::MediaElement m,
++		Client* client,
++		Jid j,
++		QWidget *parent)
++	{
++		QList<XDataMediaWidget*> result;
++		// simple image filter
++		// TODO add support for other formats
++		foreach (const XData::Field::MediaUri &uri, m) {
++			if (uri.type.startsWith("image")) {
++				XDataMediaWidget *mw = new XDataMediaWidget(uri, m.mediaSize(),
++															client, j, parent);
++				result.append(mw);
++			}
++		}
++		return result;
++	}
++
++	static QStringList supportedMedia()
++	{
++		static QStringList wildcards;
++		if (wildcards.isEmpty()) {
++			wildcards << "image/*";
++		}
++		return wildcards;
++	}
++
++private:
++	void onDataReceived(const QByteArray &data)
++	{
++		if (!data.isNull()) {
++			QPixmap mpix;
++			mpix.loadFromData(data);
++			if (_size.isEmpty()) {
++				setPixmap(mpix);
++			} else {
++				setPixmap(mpix.scaled(_size));
++			}
++		}
++	}
++
++private slots:
++	void bobReceived(const BoBData &bob)
++	{
++		onDataReceived(bob.data());
++	}
++
++	void oobReceived(QNetworkReply* reply)
++	{
++		onDataReceived(reply->readAll());
++		delete reply->manager();
++	}
++
++private:
++	Client* _client;
++	QSize _size;
++	QString _type;
++};
++
+ //----------------------------------------------------------------------------
+ // XDataField
+ //----------------------------------------------------------------------------
+ class XDataField
+ {
+ public:
+-	XDataField(XData::Field f)
++	XDataField(XData::Field f, XMPP::Client *client = 0)
+ 	{
+ 		_field = f;
++		_client = client;
+ 	}
+ 	virtual ~XDataField()
+ 	{
+@@ -83,6 +176,9 @@ public:
+ 
+ private:
+ 	XData::Field _field;
++
++protected:
++	XMPP::Client *_client;
+ };
+ 
+ ////////////////////////////////////////
+@@ -101,9 +197,10 @@ public:
+ class XDataField_Boolean : public XDataField
+ {
+ public:
+-	XDataField_Boolean(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_Boolean(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
+ 		bool checked = false;
+ 		if ( f.value().count() ) {
+ 			QString s = f.value().first();
+@@ -146,9 +243,10 @@ private:
+ class XDataField_Fixed : public XDataField
+ {
+ public:
+-	XDataField_Fixed(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_Fixed(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
+ 		QString text;
+ 		QStringList val = f.value();
+ 		QStringList::Iterator it = val.begin();
+@@ -172,9 +270,27 @@ public:
+ class XDataField_TextSingle : public XDataField
+ {
+ public:
+-	XDataField_TextSingle(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_TextSingle(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
++		XData::Field::MediaElement me = f.mediaElement();
++		if (!me.isEmpty()) {
++			XDataField *fromField = 0;
++			Jid j = ((XDataWidget *)parent)->owner();
++			if (((XDataWidget *)parent)->registrarType() == "urn:xmpp:captcha"
++				&& (fromField = ((XDataWidget *)parent)->fieldByVar("from"))) {
++				j = Jid(fromField->field().value().value(0));
++			}
++			QList<XDataMediaWidget*> mediaWidgets = XDataMediaWidget::fromMediaElement(
++				me, _client, j, parent
++			);
++			foreach (XDataMediaWidget* w, mediaWidgets) {
++				grid->addWidget(w, row, 0, 1, 3, Qt::AlignCenter);
++				row++;
++			}
++		}
++
+ 		QString text;
+ 		if ( f.value().count() )
+ 			text = f.value().first();
+@@ -214,8 +330,8 @@ protected:
+ class XDataField_TextPrivate : public XDataField_TextSingle
+ {
+ public:
+-	XDataField_TextPrivate(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField_TextSingle(f, grid, row, parent)
++	XDataField_TextPrivate(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField_TextSingle(f, grid, parent)
+ 	{
+ 		edit->setEchoMode(QLineEdit::Password);
+ 	}
+@@ -226,8 +342,8 @@ public:
+ class XDataField_JidSingle : public XDataField_TextSingle
+ {
+ public:
+-	XDataField_JidSingle(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField_TextSingle(f, grid, row, parent)
++	XDataField_JidSingle(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField_TextSingle(f, grid, parent)
+ 	{
+ 		// TODO: add proper validation
+ 	}
+@@ -238,9 +354,10 @@ public:
+ class XDataField_ListSingle : public XDataField
+ {
+ public:
+-	XDataField_ListSingle(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_ListSingle(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
+ 		QLabel *label = new QLabel(labelText(), parent);
+ 		grid->addWidget(label, row, 0);
+ 
+@@ -303,9 +420,10 @@ private:
+ class XDataField_ListMulti : public XDataField
+ {
+ public:
+-	XDataField_ListMulti(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_ListMulti(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
+ 		QLabel *label = new QLabel(labelText(), parent);
+ 		grid->addWidget(label, row, 0);
+ 
+@@ -372,9 +490,10 @@ private:
+ class XDataField_TextMulti : public XDataField
+ {
+ public:
+-	XDataField_TextMulti(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField(f)
++	XDataField_TextMulti(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField(f, ((XDataWidget *)parent)->client())
+ 	{
++		int row = grid->rowCount();
+ 		QLabel *label = new QLabel(labelText(), parent);
+ 		grid->addWidget(label, row, 0);
+ 
+@@ -417,8 +536,8 @@ private:
+ class XDataField_JidMulti : public XDataField_TextMulti
+ {
+ public:
+-	XDataField_JidMulti(XData::Field f, QGridLayout *grid, int row, QWidget *parent)
+-	: XDataField_TextMulti(f, grid, row, parent)
++	XDataField_JidMulti(XData::Field f, QGridLayout *grid, QWidget *parent)
++	: XDataField_TextMulti(f, grid, parent)
+ 	{
+ 		// TODO: improve validation
+ 	}
+@@ -428,10 +547,12 @@ public:
+ // XDataWidget
+ //----------------------------------------------------------------------------
+ 
+-XDataWidget::XDataWidget(QWidget *parent, const char *name)
+-: QWidget(parent)
++XDataWidget::XDataWidget(QWidget *parent, XMPP::Client* client, XMPP::Jid owner)
++	: QWidget(parent)
++	, client_(client)
++	, consistent_(true)
+ {
+-	setObjectName(name);
++	owner_ = owner;
+ 	layout_ = new QVBoxLayout(this);
+ }
+ 
+@@ -440,30 +561,38 @@ XDataWidget::~XDataWidget()
+ 	qDeleteAll(fields_);
+ }
+ 
+-void XDataWidget::setInstructions(const QString& instructions)
++XMPP::Client* XDataWidget::client() const
+ {
+-	instructions_ = instructions;
++	return client_;
+ }
+ 
+-void XDataWidget::setForm(const XMPP::XData& d) 
++QString XDataWidget::registrarType() const
+ {
+-	setInstructions(d.instructions());
+-	setFields(d.fields());
++	return registrarType_;
+ }
+ 
++XMPP::Jid XDataWidget::owner() const
++{
++	return owner_;
++}
+ 
+-XData::FieldList XDataWidget::fields() const
++XMPP::Stanza::Error XDataWidget::consistencyError() const
+ {
+-	XData::FieldList f;
++	return consistencyError_;
++}
+ 
+-	for (QList<XDataField*>::ConstIterator it = fields_.begin() ; it != fields_.end(); it ++) {
+-		f.append( (*it)->field() );
++void XDataWidget::setInstructions(const QString& instructions)
++{
++	if (!instructions.isEmpty()) {
++		QLabel* l = new QLabel(instructions, this);
++		l->setWordWrap(true);
++		l->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::LinksAccessibleByMouse);
++		connect(l,SIGNAL(linkActivated(const QString&)),SLOT(linkActivated(const QString&)));
++		layout_->addWidget(l);
+ 	}
+-
+-	return f;
+ }
+ 
+-void XDataWidget::setFields(const XData::FieldList &f)
++void XDataWidget::setForm(const XMPP::XData& d, bool withInstructions)
+ {
+ 	qDeleteAll(fields_);
+ 	fields_.clear();
+@@ -474,61 +603,141 @@ void XDataWidget::setFields(const XData:
+ 		delete child;
+ 	}
+ 
+-	if (!instructions_.isEmpty()) {
+-		QLabel* l = new QLabel(instructions_, this);
+-		l->setWordWrap(true);
+-		l->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::LinksAccessibleByMouse);
+-		connect(l,SIGNAL(linkActivated(const QString&)),SLOT(linkActivated(const QString&)));
+-		layout_->addWidget(l);
++	registrarType_ = d.registrarType();
++	XData::FieldList fields;
++	if (registrarType_ == "urn:xmpp:captcha") {
++		QStringList supportedMedia = XDataMediaWidget::supportedMedia();
++		QStringList mediaVars;
++		mediaVars << "audio_recog" << "ocr" << "picture_q" << "picture_recog"
++				  << "speech_q" << "speech_recog" << "video_q" << "video_recog";
++		short maxAnswers = 0;
++		short requestedAnswers = 0;
++		Jid from;
++		foreach (const XData::Field &field, d.fields()) {
++			if (!field.var().isEmpty()) {
++				if (field.var() == "answers") {
++					requestedAnswers = field.value().value(0).toInt();
++				}
++				if (field.var() == "from") {
++					from = field.value().value(0);
++				}
++				if (field.var() == "SHA-256") {
++					if (field.required()) {
++						consistent_ = false; //sha-256 is not supported atm
++						break;
++					}
++					continue; // unlikely, but who knows
++				}
++				bool isMedia = mediaVars.contains(field.var());
++				if (isMedia || field.var() == "qa") {
++					if (isMedia) {
++						if (!field.mediaElement().checkSupport(supportedMedia)) {
++							if (field.required()) {
++								consistent_ = false;
++								break;
++							}
++							continue;
++						}
++					}
++					maxAnswers++;
++				}
++			}
++			fields.append(field);
++		}
++		if (requestedAnswers > maxAnswers) {
++			consistent_ = false;
++		}
++		if (owner_.domain() != from.domain() || (!owner_.node().isEmpty() &&
++												owner_.node() != from.node())) {
++			consistent_ = false;
++		}
++		if (!consistent_) {
++			consistencyError_ = Stanza::Error(Stanza::Error::Modify,
++											  Stanza::Error::NotAcceptable);
++		}
++		//TODO check if captcha was sent too late (more than 2 minutes)
++	} else {
++		fields = d.fields();
++	}
++	if (withInstructions) {
++		setInstructions(d.instructions());
++	}
++	setFields(fields);
++}
++
++
++XData::FieldList XDataWidget::fields() const
++{
++	XData::FieldList f;
++
++	for (QList<XDataField*>::ConstIterator it = fields_.begin() ; it != fields_.end(); it ++) {
++		f.append( (*it)->field() );
+ 	}
++
++	return f;
++}
++
++void XDataWidget::setFields(const XData::FieldList &f)
++{
+ 	QWidget *fields = new QWidget(this);
+ 	layout_->addWidget(fields);
+ 	if ( f.count() ) {
+ 		// FIXME
+ 		QGridLayout *grid = new QGridLayout(fields);
+ 
+-		int row = 0;
+ 		XData::FieldList::ConstIterator it = f.begin();
+-		for ( ; it != f.end(); ++it, ++row) {
++		for ( ; it != f.end(); ++it) {
+ 			XDataField *f;
+ 			switch ( (*it).type() ) {
+ 				case XData::Field::Field_Boolean:
+-					f = new XDataField_Boolean(*it, grid, row, this);
++					f = new XDataField_Boolean(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_Fixed:
+-					f = new XDataField_Fixed(*it, grid, row, this);
++					f = new XDataField_Fixed(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_Hidden:
+ 					f = new XDataField_Hidden(*it);
+ 					break;
+ 				case XData::Field::Field_JidSingle:
+-					f = new XDataField_JidSingle(*it, grid, row, this);
++					f = new XDataField_JidSingle(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_ListMulti:
+-					f = new XDataField_ListMulti(*it, grid, row, this);
++					f = new XDataField_ListMulti(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_ListSingle:
+-					f = new XDataField_ListSingle(*it, grid, row, this);
++					f = new XDataField_ListSingle(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_TextMulti:
+-					f = new XDataField_TextMulti(*it, grid, row, this);
++					f = new XDataField_TextMulti(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_JidMulti:
+-					f = new XDataField_JidMulti(*it, grid, row, this);
++					f = new XDataField_JidMulti(*it, grid, this);
+ 					break;
+ 				case XData::Field::Field_TextPrivate:
+-					f = new XDataField_TextPrivate(*it, grid, row, this);
++					f = new XDataField_TextPrivate(*it, grid, this);
+ 					break;
+ 
+ 				default:
+-					f = new XDataField_TextSingle(*it, grid, row, this);
++					f = new XDataField_TextSingle(*it, grid, this);
+ 			}
+ 			fields_.append(f);
+ 		}
+ 	}
+ }
+ 
++XDataField* XDataWidget::fieldByVar(const QString &var) const
++{
++	foreach (XDataField* field, fields_) {
++		if (field->field().var() == var) {
++			return field;
++		}
++	}
++	return 0;
++}
++
+ void XDataWidget::linkActivated(const QString& link)
+ {
+ 	DesktopUtil::openUrl(link);
+ }
++
++#include "xdata_widget.moc"
+--- psi.orig/src/xdata_widget.h
++++ psi/src/xdata_widget.h
+@@ -26,33 +26,50 @@
+ #include <QString>
+ #include <QVBoxLayout>
+ 
++#include "xmpp_stanza.h"
+ #include "xmpp_xdata.h"
++#include "xmpp/jid/jid.h"
+ 
+ class XDataField;
+ 
++namespace XMPP {
++	class Client;
++}
++
+ class XDataWidget : public QWidget
+ {
+ 	Q_OBJECT
+ 
+ public:
+-	XDataWidget(QWidget *parent = 0, const char *name = 0);
++	XDataWidget(QWidget *parent, XMPP::Client* client, XMPP::Jid owner);
+ 	~XDataWidget();
+ 
+-	void setForm(const XMPP::XData&);
++	XMPP::Client* client() const;
++	QString registrarType() const;
++	XMPP::Jid owner() const;
++	XMPP::Stanza::Error consistencyError() const;
+ 
+-	XMPP::XData::FieldList fields() const;
+-	void setFields(const XMPP::XData::FieldList &);
++	void setForm(const XMPP::XData&, bool withInstructions = true);
+ 
+-	void setInstructions(const QString&);
++	XMPP::XData::FieldList fields() const;
++	XDataField* fieldByVar(const QString &) const;
+ 
+ protected slots:
+ 	void linkActivated(const QString&);
+ 
+ private:
++	void setInstructions(const QString&);
++	void setFields(const XMPP::XData::FieldList &);
++
++private:
+ 	typedef QList<XDataField*> XDataFieldList;
+ 	XDataFieldList fields_;
+-	QString instructions_;
++	QString registrarType_;
+ 	QVBoxLayout* layout_;
++	XMPP::Client* client_;
++	XMPP::Jid owner_;
++	bool consistent_;
++	XMPP::Stanza::Error consistencyError_;
+ };
+ 
+ #endif

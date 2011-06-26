@@ -1,0 +1,111 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -342,6 +342,54 @@
+ 			</tabs>
+ 		</ui>
+ 		<shortcuts comment="Shortcuts">
++			<alist comment="Action List" >
++				<menu_disco type="QKeySequence" comment="Service Discovery"></menu_disco>
++				<menu_add_contact type="QKeySequence" comment="Add Contact"></menu_add_contact>
++				<menu_new_message type="QKeySequence" comment="New Message"></menu_new_message>
++				<menu_join_groupchat type="QKeySequence" comment="Join Group Chat"></menu_join_groupchat>
++				<menu_account_setup type="QKeySequence" comment="Account Setup"></menu_account_setup>
++				<menu_options type="QKeySequence" comment="Options"></menu_options>
++				<menu_file_transfer type="QKeySequence" comment="File Transfer"></menu_file_transfer>
++				<menu_toolbars type="QKeySequence" comment="Toolbars"></menu_toolbars>
++				<menu_xml_console type="QKeySequence" comment="XML Console"></menu_xml_console>
++				<menu_change_profile type="QKeySequence" comment="Change Profile"></menu_change_profile>
++				<menu_play_sounds type="QKeySequence" comment="Play Sounds"></menu_play_sounds>
++				<menu_quit type="QKeySequence" comment="Quit"></menu_quit>
++				<button_options type="QKeySequence" comment="Options"></button_options>
++				<button_status type="QKeySequence" comment="Status"></button_status>
++				<event_notifier type="QKeySequence" comment="Event Notifier"></event_notifier>
++				<view_groups type="QKeySequence" comment="View Groups"></view_groups>
++				<show_offline type="QKeySequence" comment="Show Offline Contacts"></show_offline>
++				<show_away type="QKeySequence" comment="Show Away Contacts"></show_away>
++				<show_hidden type="QKeySequence" comment="Show Hidden Contacts"></show_hidden>
++				<show_agents type="QKeySequence" comment="Show Agents"></show_agents>
++				<show_self type="QKeySequence" comment="Show Self"></show_self>
++				<show_statusmsg type="QKeySequence" comment="Show Status Message"></show_statusmsg>
++				<publish_tune type="QKeySequence" comment="Publish Tune"></publish_tune>
++				<status_all type="QKeySequence" comment="Status All"></status_all>
++				<status_chat type="QKeySequence" comment="Status Chat"></status_chat>
++				<status_online type="QKeySequence" comment="Status Online"></status_online>
++				<status_away type="QKeySequence" comment="Status Away"></status_away>
++				<status_xa type="QKeySequence" comment="Status XA"></status_xa>
++				<status_dnd type="QKeySequence" comment="Status DND"></status_dnd>
++				<status_invisible type="QKeySequence" comment="Status Invisible"></status_invisible>
++				<status_offline type="QKeySequence" comment="Status Offline"></status_offline>
++				<help_readme type="QKeySequence" comment="README"></help_readme>
++				<help_tip type="QKeySequence" comment="Tips"></help_tip>
++				<help_online_forum type="QKeySequence" comment="Psi Forum (Online)"></help_online_forum>
++				<separator type="QKeySequence"/>
++				<spacer type="QKeySequence"/>
++				<help_online_help type="QKeySequence" comment="Open Help"></help_online_help>
++				<help_online_wiki type="QKeySequence" comment="Open Wiki"></help_online_wiki>
++				<help_online_home type="QKeySequence" comment="Open Home Page"></help_online_home>
++				<help_psi_muc type="QKeySequence" comment="Help Psi MUC"></help_psi_muc>
++				<help_report_bug type="QKeySequence" comment="Report Bug"></help_report_bug>
++				<help_about type="QKeySequence" comment="About Psi"></help_about>
++				<help_about_psimedia type="QKeySequence"/>
++				<help_about_qt type="QKeySequence" comment="About Qt"></help_about_qt>
++				<help_diag_qcaplugin type="QKeySequence" comment="QCA plugin diag"></help_diag_qcaplugin>
++				<help_diag_qcakeystore type="QKeySequence" comment="QCA key store diag"></help_diag_qcakeystore>
++			</alist>
+ 			<chat comment="Shortcuts in the chat dialog">
+ 				<next-tab type="QVariantList" comment="Switch to the next tab">
+ 					<item type="QKeySequence">Ctrl+PgDown</item>
+--- psi.orig/src/psiactionlist.cpp
++++ psi/src/psiactionlist.cpp
+@@ -19,15 +19,20 @@
+  */
+ 
+ #include "psiactionlist.h"
++#include "shortcutmanager.h"
+ 
+ #include <QObject>
+ #include <QPointer>
++#include <map>
++#include <utility>
+ 
+ #include "iconset.h"
+ #include "psioptions.h"
+ 
+ #include "mainwin_p.h"
+ 
++using namespace std;
++
+ //----------------------------------------------------------------------------
+ // PsiActionList::Private
+ //----------------------------------------------------------------------------
+@@ -43,6 +48,7 @@ private:
+ 	PsiActionList *list;
+ 	PsiCon *psi;
+ 	QPointer<ActionList> statusActionList;
++	map<QString,IconAction*> actionmap;
+ 
+ 	void createCommon();
+ 	void createMainWin();
+@@ -96,7 +102,11 @@ ActionList* PsiActionList::Private::crea
+ 	for ( int i = 0; !(aName = QString(actionlist[i].name)).isEmpty(); i++ ) {
+ 		IconAction *action = actionlist[i].action;
+ 		if (action)
++		{
+ 			actions->addAction( aName, action );
++			action->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + aName));
++			actionmap[aName] = action;
++		}
+ 	}
+ 
+ 	list->addList( actions );
+@@ -411,6 +421,10 @@ void PsiActionList::Private::optionsChan
+ 	statusActionList->action("status_chat")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.chat").toBool());
+ 	statusActionList->action("status_xa")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool());
+ 	statusActionList->action("status_invisible")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.invisible").toBool());
++	for(map<QString,IconAction*>::iterator i=actionmap.begin(); i!=actionmap.end(); i++)
++	{
++	    i->second->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + i->first));
++	}
+ }
+ 
+ //----------------------------------------------------------------------------

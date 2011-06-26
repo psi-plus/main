@@ -1,0 +1,131 @@
+diff -ru psimedia-1.0.3/gstprovider/modes.cpp psimedia-1.0.3-hacked/gstprovider/modes.cpp
+--- psimedia-1.0.3/gstprovider/modes.cpp	2009-03-04 22:26:59.000000000 +0100
++++ psimedia-1.0.3-hacked/gstprovider/modes.cpp	2010-03-05 00:42:20.000000000 +0100
+@@ -67,7 +67,7 @@
+ 		p.sampleSize = 16;
+ 		p.channels = 1;
+ 		list += p;
+-	}
++	}*/
+ 	{
+ 		PAudioParams p;
+ 		p.codec = "speex";
+@@ -75,7 +75,7 @@
+ 		p.sampleSize = 16;
+ 		p.channels = 1;
+ 		list += p;
+-	}*/
++	}
+ 	{
+ 		PAudioParams p;
+ 		p.codec = "speex";
+diff -ru psimedia-1.0.3/gstprovider/rtpworker.cpp psimedia-1.0.3-hacked/gstprovider/rtpworker.cpp
+--- psimedia-1.0.3/gstprovider/rtpworker.cpp	2009-05-17 20:32:59.000000000 +0200
++++ psimedia-1.0.3-hacked/gstprovider/rtpworker.cpp	2010-03-05 00:50:59.000000000 +0100
+@@ -969,6 +969,11 @@
+ 
+ bool RtpWorker::startSend()
+ {
++  return startSend(16000);
++}
++
++bool RtpWorker::startSend(int rate)
++{
+ 	// file source
+ 	if(!infile.isEmpty() || !indata.isEmpty())
+ 	{
+@@ -1055,7 +1060,7 @@
+ 
+ 	if(audiosrc)
+ 	{
+-		if(!addAudioChain())
++		if(!addAudioChain(rate))
+ 		{
+ 			delete pd_audiosrc;
+ 			pd_audiosrc = 0;
+@@ -1192,15 +1197,22 @@
+ 
+ 	// TODO: support more than speex
+ 	int speex_at = -1;
++	int samplerate = -1;
+ 	for(int n = 0; n < remoteAudioPayloadInfo.count(); ++n)
+ 	{
+ 		const PPayloadInfo &ri = remoteAudioPayloadInfo[n];
+-		if(ri.name.toUpper() == "SPEEX" && ri.clockrate == 16000)
++		if(ri.name.toUpper() == "SPEEX")
+ 		{
+-			speex_at = n;
+-			break;
++			if (ri.clockrate > samplerate) {
++			  speex_at = n;
++			  samplerate = ri.clockrate;
++			}
+ 		}
+ 	}
++	if (samplerate != 16000) {
++	  cleanup();
++	  startSend(samplerate);
++	}
+ 
+ 	// TODO: support more than theora
+ 	int theora_at = -1;
+@@ -1460,9 +1472,13 @@
+ 
+ bool RtpWorker::addAudioChain()
+ {
++  return addAudioChain(16000);
++}
++
++bool RtpWorker::addAudioChain(int rate)
++{
+ 	// TODO: support other codecs.  for now, we only support speex 16khz
+ 	QString codec = "speex";
+-	int rate = 16000;
+ 	int size = 16;
+ 	int channels = 1;
+ 	//QString codec = localAudioParams[0].codec;
+@@ -1478,7 +1494,7 @@
+ 	for(int n = 0; n < remoteAudioPayloadInfo.count(); ++n)
+ 	{
+ 		const PPayloadInfo &ri = remoteAudioPayloadInfo[n];
+-		if(ri.name.toUpper() == "SPEEX" && ri.clockrate == 16000)
++		if(ri.name.toUpper() == "SPEEX" && ri.clockrate == rate)
+ 		{
+ 			pt = ri.id;
+ 			break;
+@@ -1683,7 +1699,20 @@
+ 
+ 		gst_caps_unref(caps);
+ 
+-		localAudioPayloadInfo = QList<PPayloadInfo>() << pi;
++		PPayloadInfo speexnb;
++		speexnb.id = 97;
++		speexnb.name = "SPEEX";
++		speexnb.clockrate = 8000;
++		speexnb.channels = 1;
++		speexnb.ptime = pi.ptime;
++		speexnb.maxptime = pi.maxptime;
++		
++		QList<PPayloadInfo> ppil;
++		ppil << pi;
++		ppil << speexnb;
++		
++		
++		localAudioPayloadInfo = ppil;
+ 		canTransmitAudio = true;
+ 	}
+ 
+diff -ru psimedia-1.0.3/gstprovider/rtpworker.h psimedia-1.0.3-hacked/gstprovider/rtpworker.h
+--- psimedia-1.0.3/gstprovider/rtpworker.h	2009-03-13 20:46:42.000000000 +0100
++++ psimedia-1.0.3-hacked/gstprovider/rtpworker.h	2010-03-05 00:50:37.000000000 +0100
+@@ -177,8 +177,10 @@
+ 
+ 	bool setupSendRecv();
+ 	bool startSend();
++	bool startSend(int rate);
+ 	bool startRecv();
+ 	bool addAudioChain();
++	bool addAudioChain(int rate);
+ 	bool addVideoChain();
+ 	bool getCaps();
+ 	bool updateTheoraConfig();

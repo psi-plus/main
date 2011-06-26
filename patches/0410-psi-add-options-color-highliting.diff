@@ -1,0 +1,48 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -283,6 +283,7 @@
+ 						<sent type="QColor" comment="Color used to indicate sent messages.">#ff0000</sent>
+ 						<informational type="QColor" comment="Color used to indicate informational (status change, spooled) messages.">#008000</informational>
+ 						<usertext type="QColor" comment="Color used to indicate additional text for informational messages.">#606060</usertext>
++						<highlighting type="QColor">#FF0000</highlighting>
+ 					</messages>
+ 					<passive-popup>
+ 						<border type="QColor">#5297f9</border>
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -288,7 +288,7 @@ void ChatView::renderMucMessage(const Me
+ 	QString icon = useMessageIcons_?
+ 					(QString("<img src=\"%1\" />").arg(mv.isLocal()?"icon:log_icon_delivered":"icon:log_icon_receive")):"";
+ 	if(mv.isAlert()) {
+-		textcolor = "#FF0000";
++		textcolor = PsiOptions::instance()->getOption("options.ui.look.colors.messages.highlighting").value<QColor>().name();
+ 		alerttagso = "<b>";
+ 		alerttagsc = "</b>";
+ 	}
+--- psi.orig/themes/chatview/psi/classic/index.html
++++ psi/themes/chatview/psi/classic/index.html
+@@ -16,7 +16,7 @@ body > div > img:first-child { vertical-
+ .received {}
+ .infmsg {}
+ .usertext {}
+-.alert {font-weight:bold; color:red;}
++.alert {font-weight:bold;}
+ .nicklink { text-decoration:none; color:inherit; }
+   </style>
+ </head>
+@@ -35,6 +35,7 @@ window[chatServer.jsNamespace()].theme =
+ 	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
+ 	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
+ 	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
++	var cssAlertMsg = chat.util.findStyleSheet(document.styleSheets[0], ".alert").style;
+ 	var useMessageIcons, messageIconsSize = 0;
+ 	
+ 	var applyPsiSettings = function() {
+@@ -44,6 +45,7 @@ window[chatServer.jsNamespace()].theme =
+ 		cssReceivedMsg.color = shared.colorOption("options.ui.look.colors.messages.received");
+ 		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
+ 		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
++		cssAlertMsg.color = shared.psiOption("options.ui.look.colors.messages.highlighting");
+ 		useMessageIcons = shared.psiOption("options.ui.chat.use-message-icons");
+ 		if (shared.psiOption("options.ui.chat.scaled-message-icons")) {
+ 			var d = document.createElement("div");

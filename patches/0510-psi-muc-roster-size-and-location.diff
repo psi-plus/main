@@ -1,0 +1,107 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -212,6 +212,9 @@
+ 				</view>
+ 			</menu>
+ 			<muc comment="Multi-User Chat options">
++				<log-width type="int">500</log-width>
++				<roster-width type="int">80</roster-width>
++				<roster-at-left type="bool">false</roster-at-left>
+ 				<highlight-words type="QStringList" />
+ 				<size comment="Remembered window size" type="QSize">
+ 					<width>580</width>
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -234,6 +234,9 @@ public:
+ 
+ 	QPointer<MUCConfigDlg> configDlg;
+ 	QPointer<GroupchatTopicDlg> topicDlg;
++
++	int logSize;
++	int rosterSize;
+ public:
+ 	bool trackBar;
+ 
+@@ -744,12 +747,24 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
+ 	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
+ 
++	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved(int,int)));
++
+ 	// resize the horizontal splitter
++	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
++	d->rosterSize = PsiOptions::instance()->getOption("options.ui.muc.roster-width").toInt();
+ 	QList<int> list;
+-	list << 500;
+-	list << 80;
++	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
++	if(leftRoster)
++		list << d->rosterSize << d->logSize;
++	else
++		list <<  d->logSize << d->rosterSize;
++
+ 	ui_.hsplitter->setSizes(list);
+ 
++	if (leftRoster)
++		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
++
++	// resize the vertical splitter
+ 	list.clear();
+ 	list << 324;
+ 	list << 10;
+@@ -780,6 +795,10 @@ void GCMainDlg::vcard(const QString& _st
+ 
+ GCMainDlg::~GCMainDlg()
+ {
++	//  Save splitters size
++	PsiOptions::instance()->setOption("options.ui.muc.log-width", d->logSize);
++	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
++
+ 	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
+ 		account()->groupChatLeave(jid().domain(), jid().node());
+ 	}
+@@ -800,15 +819,32 @@ GCMainDlg::~GCMainDlg()
+ 	}
+ }
+ 
++void GCMainDlg::horizSplitterMoved(int/* pos*/, int /*index*/)
++{
++	QList<int> list = ui_.hsplitter->sizes();
++	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
++	d->rosterSize = !leftRoster ? list.last() : list.first();
++	d->logSize = leftRoster ? list.last() : list.first();
++
++	PsiOptions::instance()->setOption("options.ui.muc.log-width", d->logSize);
++	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
++}
++
+ void GCMainDlg::ensureTabbedCorrectly() {
+ 	TabbableWidget::ensureTabbedCorrectly();
+ 	setShortcuts();
+ 	// QSplitter is broken again, force resize so that
+ 	// lv_users gets initizalised properly and context menu
+ 	// works in tabs too.
+-	QList<int> tmp = ui_.hsplitter->sizes();
++	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
++	d->rosterSize = PsiOptions::instance()->getOption("options.ui.muc.roster-width").toInt();
++	QList<int> list;
++	if(PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool())
++		list << d->rosterSize << d->logSize;
++	else
++		list <<  d->logSize << d->rosterSize;
+ 	ui_.hsplitter->setSizes(QList<int>() << 0);
+-	ui_.hsplitter->setSizes(tmp);
++	ui_.hsplitter->setSizes(list);
+ 	UserListItem* u = account()->find(jid().bare());
+ 	if(u) {
+ 		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -143,6 +143,7 @@ private slots:
+ 	void doRemoveBookmark();
+ 	void sendTemp(const QString &);
+ 	void psButtonEnabled();
++	void horizSplitterMoved(int pos, int index);
+ 
+ public:
+ 	class Private;

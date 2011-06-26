@@ -1,0 +1,70 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -283,6 +283,11 @@
+ 						<status-change-animation2 type="QColor">#969696</status-change-animation2>
+ 						<status-messages type="QColor">#808080</status-messages>
+ 					</contactlist>
++					<tooltip>
++						<enable comment="Enable tooltip coloring feature" type="bool">true</enable>
++						<background comment="Tooltip background color" type="QColor">#e9ecc7</background>
++						<text comment="Tooltip text color" type="QColor">#000000</text>
++					</tooltip>
+ 					<muc>
+ 						<nick-colors type="QStringList" >
+ 							<item>Blue</item>
+--- psi.orig/src/widgets/psitiplabel.cpp
++++ psi/src/widgets/psitiplabel.cpp
+@@ -11,6 +11,7 @@
+ #include <QTextEdit>
+ 
+ #include "psirichtext.h"
++#include "psioptions.h"
+ 
+ PsiTipLabel *PsiTipLabel::instance_ = 0;
+ 
+@@ -35,7 +36,21 @@ void PsiTipLabel::init(const QString& te
+ 	qApp->installEventFilter(this);
+ 	startHideTimer();
+ 	setWindowOpacity(style()->styleHint(QStyle::SH_ToolTipLabel_Opacity, 0, this) / 255.0);
+-	setPalette(QToolTip::palette());
++
++	QPalette palette(QToolTip::palette());
++	enableColoring_ = PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.enable").toBool();
++	if(enableColoring_){
++		QString textColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.text").toString());
++		QString baseColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.background").toString());
++		if(textColor == baseColor) { //options values are not set
++			palette.setColor(QPalette::WindowText, palette.color(QPalette::ToolTipText));
++			palette.setColor(QPalette::Window, palette.color(QPalette::ToolTipBase));
++		} else {
++			palette.setColor(QPalette::WindowText, QColor(textColor));
++			palette.setColor(QPalette::Window, QColor(baseColor));
++		}
++	}
++	setPalette(palette);
+ }
+ 
+ void PsiTipLabel::setText(const QString& text)
+@@ -158,7 +173,11 @@ void PsiTipLabel::paintEvent(QPaintEvent
+ 	QStylePainter p(this);
+ 	QStyleOptionFrame opt;
+ 	opt.init(this);
+-	p.drawPrimitive(QStyle::PE_PanelTipLabel, opt);
++	if(enableColoring_) {
++		p.drawPrimitive(QStyle::PE_Frame, opt);
++	} else {
++		p.drawPrimitive(QStyle::PE_PanelTipLabel, opt);
++	}
+ 	p.end();
+ 
+ 	// stolen from QLabel::paintEvent
+--- psi.orig/src/widgets/psitiplabel.h
++++ psi/src/widgets/psitiplabel.h
+@@ -40,6 +40,7 @@ private:
+ 	QString theText_;
+ 	bool isRichText;
+ 	int margin;
++	bool enableColoring_;
+ 	// int indent;
+ 
+ 	virtual void initUi();
