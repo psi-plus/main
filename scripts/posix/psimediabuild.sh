@@ -5,8 +5,8 @@ cd ${HOME}
 svn co https://delta.affinix.com/svn/trunk/psimedia
 cd psimedia
 
-svn co http://psi-dev.googlecode.com/svn/trunk/patches/psimedia patches
-for i in patches/*.diff
+git clone git://github.com/psi-plus/main.git
+for i main/patches/psimedia/*.diff
 do
 	patch -p1 < $i
 done

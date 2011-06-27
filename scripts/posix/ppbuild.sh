@@ -1,4 +1,8 @@
 # !/bin/bash
+
+echo "This script is MUST BE fixed to use git instead of svn"
+exit 1
+
 home=/home/$USER
 buildpsi=${home}/build_psi
 orig_src=${buildpsi}/psi-plus

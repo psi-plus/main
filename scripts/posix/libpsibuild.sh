@@ -35,7 +35,6 @@ GIT_REPO_PLUGINS=git://github.com/psi-plus/plugins.git
 LANGS_REPO_URI="git://pv.et-inf.fho-emden.de/git/psi-l10n"
 RU_LANG_REPO_URI="http://psi-ru.googlecode.com/svn/branches/psi-plus"
 
-SVN_BASE_REPO="http://psi-dev.googlecode.com/svn/trunk"
 SVN_FETCH="${SVN_FETCH:-svn co --trust-server-cert --non-interactive}"
 SVN_UP="${SVN_UP:-svn up --trust-server-cert --non-interactive}"
 

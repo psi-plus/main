@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo "This script is MUST BE fixed to use git instead of svn"
+exit 1
+
 #desc: build script for psi+
 #downloads original psi from git, downloads psi+ patches and resources from svn
 #exports and makes debian-package

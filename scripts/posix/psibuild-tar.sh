@@ -1,4 +1,8 @@
 #!/bin/bash
+
+cho "This script is MUST BE fixed to use git instead of svn"
+exit 1
+
 #######################################################################
 #                                                                     #
 #       Universal make dist script of Psi+ under Linux                #
