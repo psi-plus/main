@@ -208,6 +208,7 @@ CONTENT
     ;;
   esac
   
+  [ -n "${PSI_DIR}" ] && case "${PSI_DIR}" in /*) ;; *) PSI_DIR="$(pwd)/${PSI_DIR}"; ;; esac
   PSI_DIR="${PSI_DIR:-${HOME}/psi}"
   PATCH_LOG="${PATCH_LOG:-${PSI_DIR}/psipatch.log}"
   CONFIGURE="${CONFIGURE:-configure}"
