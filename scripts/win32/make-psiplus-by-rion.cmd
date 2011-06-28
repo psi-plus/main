@@ -13,16 +13,16 @@ if defined GITDIR goto :findSVN
 call :getInstallDirFromRegistryWOW64 Git_is1
 set GITDIR=%InstallationLocation%bin\
 
-:findSVN
-if defined SVNDIR goto :checkUtils
-FOR /F "tokens=2,*" %%A IN ('REG QUERY "HKLM\Software\SlikSvn\Install" /v Location ^| findstr Location') DO SET SVNDIR=%%B
+:::findSVN
+::if defined SVNDIR goto :checkUtils
+::FOR /F "tokens=2,*" %%A IN ('REG QUERY "HKLM\Software\SlikSvn\Install" /v Location ^| findstr Location') DO SET SVNDIR=%%B
 
 :checkUtils
 set GIT=%GITDIR%git.exe
 set SED=%GITDIR%sed.exe
 set PATCH=%GITDIR%patch.exe
-set SVN=%SVNDIR%svn.exe
-set SVNVERSION=%SVNDIR%svnversion.exe
+::set SVN=%SVNDIR%svn.exe
+::set SVNVERSION=%SVNDIR%svnversion.exe
 set WORKDIR=%CD%\psi
 
 if defined MINGWDIR goto :ensureExist
@@ -32,7 +32,7 @@ set MINGWDIR=%InstallationLocation%\mingw\bin
 set PATH=%MINGWDIR%;%PATH%
 
 :ensureExist
-if not exist "%SVN%" @echo Please set proper SVNDIR before start&goto :failExit
+::if not exist "%SVN%" @echo Please set proper SVNDIR before start&goto :failExit
 if not exist "%GIT%" @echo git.exe not found. Please set GITDIR before start&goto :failExit
 if not exist "%PATCH%" @echo patch.exe not found. Please set GITDIR before start&goto :failExit
 if not exist "%SED%" @echo sed.exe not found. Please set GITDIR before start&goto :failExit
