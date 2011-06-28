@@ -38,7 +38,10 @@ RU_LANG_REPO_URI="http://psi-ru.googlecode.com/svn/branches/psi-plus"
 SVN_FETCH="${SVN_FETCH:-svn co --trust-server-cert --non-interactive}"
 SVN_UP="${SVN_UP:-svn up --trust-server-cert --non-interactive}"
 
-
+# convert INSTALL_ROOT to absolute path
+case "${INSTALL_ROOT}" in /*) ;; *) INSTALL_ROOT="$(pwd)/${INSTALL_ROOT}"; ;; esac
+# convert PSI_DIR to absolute path
+[ -n "${PSI_DIR}" ] && case "${PSI_DIR}" in /*) ;; *) PSI_DIR="$(pwd)/${PSI_DIR}"; ;; esac
 
 PLUGINS_PREFIXES="${PLUGINS_PREFIXES:-generic}" # will be updated later while detecting platform specific settings
 #######################
@@ -190,7 +193,6 @@ CONTENT
     PATH="${QTDIR}/bin:$(dirname ${MAKE}):${PATH}"
     CONFIGURE="configure.exe"
     CONF_OPTS="${CONF_OPTS} --qtdir=${QTDIR}"
-    PSI_DIR="${PSI_DIR:-/c/psi}"
     ;;
   *)
     MAKEOPT=${MAKEOPT:--j$((`cat /proc/cpuinfo | grep processor | wc -l`+1))}
@@ -207,8 +209,7 @@ CONTENT
     PLUGINS_PREFIXES="${PLUGINS_PREFIXES} unix"
     ;;
   esac
-  
-  [ -n "${PSI_DIR}" ] && case "${PSI_DIR}" in /*) ;; *) PSI_DIR="$(pwd)/${PSI_DIR}"; ;; esac
+   
   PSI_DIR="${PSI_DIR:-${HOME}/psi}"
   PATCH_LOG="${PATCH_LOG:-${PSI_DIR}/psipatch.log}"
   CONFIGURE="${CONFIGURE:-configure}"
