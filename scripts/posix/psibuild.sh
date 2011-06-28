@@ -52,16 +52,17 @@ QCONFDIR="${QCONFDIR}"
 PLUGINS="${PLUGINS:-}"
 
 # checkout libpsibuild
+die() { echo "$@"; exit 1; }
 if [ ! -f ./libpsibuild.sh -o "$WORK_OFFLINE" = 0 ]; then
-  [ -f libpsibuild.sh ] && { rm libpsibuild.sh || echo "delete error"; exit 1; }
-  wget --no-check-certificate "https://raw.github.com/psi-plus/main/master/scripts/posix/libpsibuild.sh" || { echo "Failed to update libpsibuild"; exit 1; }
+  [ -f libpsibuild.sh ] && { rm libpsibuild.sh || die "delete error"; }
+  wget --no-check-certificate "https://raw.github.com/psi-plus/main/master/scripts/posix/libpsibuild.sh" || die "Failed to update libpsibuild";
 fi
 . ./libpsibuild.sh
 
 #############
 # Go Go Go! #
 #############
-check_env
+check_env $CONF_OPTS
 prepare_workspace
 fetch_all
 prepare_all

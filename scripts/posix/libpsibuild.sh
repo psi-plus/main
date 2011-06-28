@@ -67,6 +67,7 @@ QCONFDIR              Каталог с банирником qconf при руч
                       с сайта
 SYSLIBDIRNAME         Имя системного каталога с библиотеками (lib64/lib32/lib)
                       Автодетектится если не указана
+PLUGINS_PREFIXES      Список префиксов плагинов через пробел (generic/unix/etc)
 END
     ;;
     *) cat <<END
@@ -88,6 +89,7 @@ CCACHE_BIN_DIR        Bin directory of compiler cache util
 QCONFDIR              qconf's binary directory when compiled manually
 SYSLIBDIRNAME         System libraries directory name (lib64/lib32/lib)
                       Autodetected when not given
+PLUGINS_PREFIXES      Space-separated list of plugin prefixes (generic/unix/etc)
 END
   esac
   exit 0
@@ -111,6 +113,24 @@ winpath2unix() {
 
 check_env() {
   echo "Testing environment.. "
+
+  unset COMPILE_PREFIX
+  unset PSILIBDIR
+  until [ -z "$1" ]; do
+    case "$1" in
+      "-h" | "--help")
+        helper
+        ;;
+      "--prefix="*)
+        COMPILE_PREFIX=${1#--prefix=}
+        ;;
+      "--libdir="*)
+        PSILIBDIR=${1#--libdir=}
+        ;;
+    esac
+    shift
+  done
+
   # Setting some internal variables
   local have_prefix=0 # compile prefix is set by --prefix argv
   [ -n "${COMPILE_PREFIX}" ] && have_prefix=1
@@ -648,20 +668,3 @@ install_all() {
   install_plugins
   exec_install_batch
 }
-
-unset COMPILE_PREFIX
-unset PSILIBDIR
-until [ -z "$1" ]; do
-  case "$1" in
-    "-h" | "--help")
-      helper
-      ;;
-    "--prefix="*)
-      COMPILE_PREFIX=${1#--prefix=}
-      ;;
-    "--libdir="*)
-      PSILIBDIR=${1#--libdir=}
-      ;;
-  esac
-  shift
-done
