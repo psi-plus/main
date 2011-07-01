@@ -68,9 +68,9 @@
 +
 +OptionsTabStatusPep::OptionsTabStatusPep(QObject *parent)
 +: OptionsTab(parent, "status_tunes", "", tr("PEP"), tr("Tunes no-video filter and controllers switcher"))
-+, w(0)
++, w_(0)
 +, psi_(0)
-+, controllersChanged(false)
++, controllersChanged_(false)
 +{
 +}
 +
@@ -80,21 +80,21 @@
 +
 +QWidget *OptionsTabStatusPep::widget()
 +{
-+	if (w) {
++	if (w_) {
 +		return 0;
 +	}
 +
-+	w = new OptStatusPepUI();
-+	return w;
++	w_ = new OptStatusPepUI();
++	return w_;
 +}
 +
 +void OptionsTabStatusPep::applyOptions()
 +{
-+	if (!w) {
++	if (!w_) {
 +		return;
 +	}
 +
-+	OptStatusPepUI *d = (OptStatusPepUI *)w;
++	OptStatusPepUI *d = (OptStatusPepUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
 +	QStringList newTuneFilters = d->tuneExtensions->text().split(QRegExp("\\W+"));
 +	QString tuneExstensionsFilter;
@@ -104,27 +104,27 @@
 +		tuneExstensionsFilter = newTuneFilters.join(" ").toLower();
 +		d->tuneExtensions->setText(tuneExstensionsFilter);
 +	}
-+	QString controllerFilter = blackList.join(",");
-+	if (tuneExstensionsFilter != tuneFilters) {
++	QString controllerFilter = blackList_.join(",");
++	if (tuneExstensionsFilter != tuneFilters_) {
 +		o->setOption(tuneUrlFilterOptionPath, tuneExstensionsFilter);
 +	}
-+	if (controllersChanged) {
++	if (controllersChanged_) {
 +		o->setOption(tuneControllerFilterOptionPath, controllerFilter);
 +	}
 +}
 +
 +void OptionsTabStatusPep::restoreOptions()
 +{
-+	if (!w) {
++	if (!w_) {
 +		return;
 +	}
 +
-+	OptStatusPepUI *d = (OptStatusPepUI *)w;
++	OptStatusPepUI *d = (OptStatusPepUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
-+	tuneFilters = o->getOption(tuneUrlFilterOptionPath).toString();
-+	d->tuneExtensions->setText(tuneFilters);
++	tuneFilters_ = o->getOption(tuneUrlFilterOptionPath).toString();
++	d->tuneExtensions->setText(tuneFilters_);
 +	QStringList controllers = psi_->tuneManager()->controllerNames();
-+	blackList = o->getOption(tuneControllerFilterOptionPath).toString().split(QRegExp("[,]\\s*"), QString::SkipEmptyParts);
++	blackList_ = o->getOption(tuneControllerFilterOptionPath).toString().split(QRegExp("[,]\\s*"), QString::SkipEmptyParts);
 +	foreach(const QString &name, controllers) {
 +		QCheckBox* cb = new QCheckBox(name);
 +		QString caption = name + " controller";
@@ -132,7 +132,7 @@
 +		cb->setObjectName(name);
 +		int i = controllers.indexOf(name);
 +		d->gridLayout->addWidget(cb,i/3,i%3);
-+		cb->setChecked(!blackList.contains(name));
++		cb->setChecked(!blackList_.contains(name));
 +		connect(cb, SIGNAL(toggled(bool)), SLOT(controllerSelected(bool)));
 +	}
 +}
@@ -142,13 +142,13 @@
 +	QCheckBox *box = qobject_cast<QCheckBox*>(sender());
 +	QString name_ = box->objectName();
 +	if (!name_.isEmpty()) {
-+		if (!checked && !blackList.contains(name_, Qt::CaseInsensitive)) {
-+			blackList << name_;
-+			controllersChanged = true;
++		if (!checked && !blackList_.contains(name_, Qt::CaseInsensitive)) {
++			blackList_ << name_;
++			controllersChanged_ = true;
 +		}
 +		else if (checked) {
-+			blackList.removeAll(name_);
-+			controllersChanged = true;
++			blackList_.removeAll(name_);
++			controllersChanged_ = true;
 +		}
 +	}
 +}
@@ -187,11 +187,11 @@
 +	void controllerSelected(bool);
 +
 +private:
-+	QWidget *w;
++	QWidget *w_;
 +	PsiCon *psi_;
-+	QStringList blackList;
-+	QString tuneFilters;
-+	bool controllersChanged;
++	QStringList blackList_;
++	QString tuneFilters_;
++	bool controllersChanged_;
 +};
 +
 +
@@ -307,3 +307,46 @@
 + <resources/>
 + <connections/>
 +</ui>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -85,9 +85,6 @@
+ #include "mood.h"
+ #include "activity.h"
+ #include "tune.h"
+-#ifdef USE_PEP
+-#include "tunecontroller.h"
+-#endif
+ #ifdef GROUPCHAT
+ #include "groupchatdlg.h"
+ #endif
+--- psi.orig/src/tools/tunecontroller/tunecontrollermanager.cpp
++++ psi/src/tools/tunecontroller/tunecontrollermanager.cpp
+@@ -69,7 +69,7 @@ Tune TuneControllerManager::currentTune(
+ {
+ 	foreach(const TuneControllerPtr &c, controllers_.values()) {
+ 		Tune t = c->currentTune();
+-		if (!t.isNull()) {
++		if (!t.isNull() && checkTune(t)) {
+ 			return t;
+ 		}
+ 	}
+@@ -142,14 +142,13 @@ bool TuneControllerManager::checkTune(co
+ 			return false;
+ 		}
+ 	}
+-	else {
+-		QString extension;
++	if (!tune.url().isEmpty()) {
+ 		int index = tune.url().lastIndexOf(".");
+ 		if (index != -1) {
+-			extension = tune.url().right(tune.url().length() - (index+1)).toLower();
+-		}
+-		if (!extension.isEmpty() && tuneUrlFilters_.contains(extension)) {
+-			return false;
++			QString extension = tune.url().right(tune.url().length() - (index+1)).toLower();
++			if (!extension.isEmpty() && tuneUrlFilters_.contains(extension)) {
++				return false;
++			}
+ 		}
+ 	}
+ 	return true;
