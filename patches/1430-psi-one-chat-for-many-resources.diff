@@ -1,35 +1,29 @@
 --- psi.orig/iconsets/system/default/icondef.xml
 +++ psi/iconsets/system/default/icondef.xml
-@@ -700,6 +700,16 @@
+@@ -700,6 +700,11 @@
  		<x xmlns='name'>psi/themeTitleTexture</x>
  		<object mime='image/png'>psiplus/theme_title_texture.png</object>
  	</icon>	
 +
 +	<icon>
-+		<x xmlns='name'>psi/autojid_enable</x>
-+		<object mime='image/png'>psiplus/autojid_en.png</object>
-+	</icon>
-+
-+	<icon>
-+		<x xmlns='name'>psi/autojid_disable</x>
-+		<object mime='image/png'>psiplus/autojid_dis.png</object>
++		<x xmlns='name'>psi/autojid</x>
++		<object mime='image/png'>psiplus/autojid.png</object>
 +	</icon>
  	<!-- End psi Plus icons -->
  		
  	<!-- Icons for screenshot-plugin -->
 --- psi.orig/iconsets.qrc
 +++ psi/iconsets.qrc
-@@ -206,5 +206,7 @@
+@@ -196,5 +196,6 @@
  		<file>iconsets/emoticons/default/unhappy.png</file>
  		<file>iconsets/emoticons/default/wink.png</file>
  		<file>iconsets/emoticons/default/yes.png</file>
-+		<file>iconsets/system/default/psiplus/autojid_en.png</file>
-+		<file>iconsets/system/default/psiplus/autojid_dis.png</file>
++		<file>iconsets/system/default/psiplus/autojid.png</file>
  	</qresource>
  </RCC>
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -128,6 +128,8 @@
+@@ -129,6 +129,8 @@
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  				<log-height type="int">325</log-height>
  				<chatedit-height type="int">10</chatedit-height>
@@ -189,7 +183,7 @@
  </ui>
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -2725,9 +2725,9 @@ void PsiAccount::processIncomingMessage(
+@@ -2724,9 +2724,9 @@ void PsiAccount::processIncomingMessage(
  		return;
  	}
  
@@ -201,7 +195,7 @@
  
  	if(m.type() == "error") {
  		Stanza::Error err = m.error();
-@@ -2749,6 +2749,13 @@ void PsiAccount::processIncomingMessage(
+@@ -2748,6 +2748,13 @@ void PsiAccount::processIncomingMessage(
  		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "chat")
  			m.setType("chat");
  		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "current-open") {
@@ -215,19 +209,19 @@
  			if (c != NULL && !c->isHidden())
  				m.setType("chat");
  			else
-@@ -3197,9 +3204,33 @@ bool PsiAccount::validRosterExchangeItem
+@@ -3196,9 +3203,33 @@ bool PsiAccount::validRosterExchangeItem
  	return false;
  }
  
 -ChatDlg* PsiAccount::findChatDialog(const Jid& jid) const
 +ChatDlg* PsiAccount::findChatDialog(const Jid& jid, bool compareResource) const
- {
--	return findDialog<ChatDlg*>(jid, true);
++{
 +	return findDialog<ChatDlg*>(jid, compareResource);
 +}
 +
 +ChatDlg* PsiAccount::findChatDialogEx(const Jid& jid) const
-+{
+ {
+-	return findDialog<ChatDlg*>(jid, true);
 +	ChatDlg* cm1 = NULL;
 +	ChatDlg* cm2 = NULL;
 +	foreach (ChatDlg *cl, findChatDialogs(jid, false)) {
@@ -251,7 +245,7 @@
  }
  
  QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
-@@ -3715,7 +3746,8 @@ EventDlg *PsiAccount::ensureEventDlg(con
+@@ -3714,7 +3745,8 @@ EventDlg *PsiAccount::ensureEventDlg(con
  
  ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  {
@@ -261,7 +255,7 @@
  	if(!c) {
  		// create the chatbox
  		c = ChatDlg::create(j, this, d->tabManager);
-@@ -3733,6 +3765,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const
+@@ -3732,6 +3764,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const
  #endif
  	}
  	else {
@@ -269,7 +263,7 @@
  		// on X11, do a special reparent to open on the right desktop
  #ifdef Q_WS_X11
  		/* KIS added an exception for tabs here. We do *not* want chats flying
-@@ -4925,11 +4958,9 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4924,11 +4957,9 @@ void PsiAccount::handleEvent(PsiEvent* e
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
  			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
@@ -283,7 +277,7 @@
  					c->incomingMessage(m);
  				}
  			}
-@@ -4945,12 +4976,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4944,12 +4975,12 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
@@ -302,7 +296,7 @@
  				}
  			}
  			delete e;
-@@ -4959,13 +4990,11 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4958,13 +4989,11 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		else if(m.type() == "chat") {
@@ -319,7 +313,7 @@
  			//if the chat exists, and is either open in a tab,
  			//or in a window
  #ifdef YAPSI_ACTIVEX_SERVER
-@@ -5473,7 +5502,7 @@ void PsiAccount::processReadNext(const U
+@@ -5472,7 +5501,7 @@ void PsiAccount::processReadNext(const U
  void PsiAccount::processChatsHelper(const Jid& j, bool removeEvents)
  {
  	//printf("processing chats for [%s]\n", j.full().latin1());
@@ -364,9 +358,9 @@
 +	UserListItem *ul = account()->findFirstRelevant(jid());
 +	if (!ul || !ul->isPrivate()) {
 +		act_autojid = new IconAction(this);
++		updateAutojidIcon();
 +		connect(act_autojid, SIGNAL(triggered()), SLOT(doSwitchJidMode()));
 +		le_autojid->addAction(act_autojid);
-+		updateAutojidIcon();
 +	}
 +
  	ui_.lb_ident->setAccount(account());
@@ -386,7 +380,7 @@
  	if (status == -1 || !u) {
  		ui_.lb_status->setPsiIcon(IconsetFactory::iconPtr("status/noauth"));
  		setTabIcon(IconsetFactory::iconPtr("status/noauth")->icon());
-@@ -557,46 +579,108 @@ void PsiChatDlg::contactUpdated(UserList
+@@ -557,46 +579,104 @@ void PsiChatDlg::contactUpdated(UserList
  
  	if (u) {
  		setContactToolTip(u->makeTip(true, false));
@@ -448,14 +442,15 @@
 +						}
 +					}
 +					if (new_index == -1) {
-+						// contact logout
++						new_index = 0;
 +						if (autoSelectContact_) {
-+							new_index = 0;
 +							new_auto_jid = jid().bare();
 +						} else {
-+							new_index = jidCombo->count();
-+							setJidComboItem(curr_index, makeContactName(name, jid()), jid(), "");
-+							new_index = curr_index++;
++							if (!jid().resource().isEmpty()) {
++								new_index = jidCombo->count();
++								setJidComboItem(curr_index, makeContactName(name, jid()), jid(), "");
++								new_index = curr_index++;
++							}
 +						}
 +					}
 +					// Сlean combobox's tail
@@ -475,12 +470,7 @@
 +				UserResourceList::ConstIterator it = res_list.begin();
 +				if (it != res_list.end()) {
 +					Jid tmp_jid = u->jid().withResource((*it).name());
-+					if (jidCombo->count() > 0) {
-+						jidCombo->setItemText(0, makeContactName(name, tmp_jid));
-+						jidCombo->setItemData(0, JIDUtil::toString(tmp_jid, true));
-+					} else {
-+						jidCombo->insertItem(1, makeContactName(name, tmp_jid), JIDUtil::toString(tmp_jid, true));
-+					}
++					setJidComboItem(0, makeContactName(name, tmp_jid), tmp_jid, "clients/" + u->findClient((*it).clientName().toLower()));
 +				} else if (jidCombo->count() > 0) {
 +					Jid tmp_jid(jidCombo->itemData(0).toString());
 +					if (tmp_jid.isValid()) {
@@ -524,7 +514,7 @@
  }
  
  void PsiChatDlg::updateAvatar()
-@@ -868,4 +952,74 @@ void PsiChatDlg::setMargins()
+@@ -868,4 +948,77 @@ void PsiChatDlg::setMargins()
  	}
  }
  
@@ -553,14 +543,17 @@
 +
 +void PsiChatDlg::updateAutojidIcon()
 +{
++	QIcon icon(IconsetFactory::iconPixmap("psi/autojid"));
++	QPixmap pix;
 +	QString text;
 +	if (autoSelectContact_) {
-+		act_autojid->setPsiIcon("psi/autojid_enable");
++		pix = icon.pixmap(QSize(16, 16), QIcon::Normal, QIcon::Off);
 +		text = "turn off autojid";
 +	} else {
-+		act_autojid->setPsiIcon("psi/autojid_disable");
++		pix = icon.pixmap(QSize(16, 16), QIcon::Disabled, QIcon::Off);
 +		text = "turn on autojid";
 +	}
++	act_autojid->setIcon(QIcon(pix));
 +	act_autojid->setText(text);
 +	act_autojid->setToolTip(text);
 +	act_autojid->setStatusTip(text);
