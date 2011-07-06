@@ -1,6 +1,6 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -113,6 +113,7 @@
+@@ -116,6 +116,7 @@
  				<css type="QString" />
  				<only-paste-template type="bool">false</only-paste-template>
  				<disable-paste-send type="bool">false</disable-paste-send>
@@ -8,7 +8,7 @@
  			</chat>
  			<save>
  				<toolbars-state type="QByteArray"/>
-@@ -439,6 +440,7 @@ QLineEdit#le_status_text {
+@@ -442,6 +443,7 @@ QLineEdit#le_status_text {
  				<show-tab-close-buttons type="bool">true</show-tab-close-buttons>
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">true</use-tabs>
@@ -16,7 +16,7 @@
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
  				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
  				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
-@@ -533,9 +535,13 @@ QLineEdit#le_status_text {
+@@ -536,9 +538,13 @@ QLineEdit#le_status_text {
  				<scroll-up type="QKeySequence" comment="Scroll up">Shift+PgUp</scroll-up>
  				<scroll-down type="QKeySequence" comment="Scroll down">Shift+PgDown</scroll-down>
  				<close type="QVariantList" comment="Close the current window/tab">
@@ -303,7 +303,7 @@
  	d->act_scrollup = new QAction(this);
  	addAction(d->act_scrollup);
  	connect(d->act_scrollup,SIGNAL(triggered()), SLOT(scrollUp()));
-@@ -869,6 +874,7 @@ void GCMainDlg::setShortcuts()
+@@ -875,6 +880,7 @@ void GCMainDlg::setShortcuts()
  	} else {
  		d->act_close->QAction::setShortcuts (QList<QKeySequence>());
  	}
@@ -311,7 +311,7 @@
  	d->act_scrollup->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-up"));
  	d->act_scrolldown->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-down"));
  	d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
-@@ -885,6 +891,8 @@ void GCMainDlg::scrollDown() {
+@@ -891,6 +897,8 @@ void GCMainDlg::scrollDown() {
  void GCMainDlg::closeEvent(QCloseEvent *e)
  {
  	e->accept();
@@ -320,7 +320,7 @@
  }
  
  void GCMainDlg::resizeEvent(QResizeEvent* e)
-@@ -906,6 +914,12 @@ void GCMainDlg::activated()
+@@ -912,6 +920,12 @@ void GCMainDlg::activated()
  
  	if(d->pending > 0) {
  		d->pending = 0;
@@ -333,7 +333,7 @@
  		invalidateTab();
  	}
  	doFlash(false);
-@@ -1316,6 +1330,14 @@ void GCMainDlg::presence(const QString &
+@@ -1322,6 +1336,14 @@ void GCMainDlg::presence(const QString &
  	if (nick == d->self) {
  		if(s.isAvailable())
  			setStatusTabIcon(s.type());
@@ -348,7 +348,7 @@
  		// Update configuration dialog
  		if (d->configDlg) {
  			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
-@@ -1598,6 +1620,7 @@ void GCMainDlg::joined()
+@@ -1604,6 +1626,7 @@ void GCMainDlg::joined()
  		setConnecting();
  		appendSysMsg(tr("Connected."), true);
  	}
@@ -356,7 +356,7 @@
  }
  
  void GCMainDlg::setPassword(const QString& p)
-@@ -1667,6 +1690,13 @@ void GCMainDlg::appendMessage(const Mess
+@@ -1673,6 +1696,13 @@ void GCMainDlg::appendMessage(const Mess
  	// if we're not active, notify the user by changing the title
  	if(!isActiveTab() && !mv.isLocal()) {
  		++d->pending;
@@ -419,7 +419,7 @@
  		updateOnlineContactsCount();
  	}
  
-@@ -3805,6 +3806,14 @@ void PsiAccount::actionDefault(const Jid
+@@ -3807,6 +3808,14 @@ void PsiAccount::actionDefault(const Jid
  
  	if(d->eventQueue->count(u->jid()) > 0)
  		openNextEvent(*u, UserAction);
@@ -434,7 +434,17 @@
  	else {
  		if(PsiOptions::instance()->getOption("options.messages.default-outgoing-message-type").toString() == "message")
  			actionSendMessage(u->jid());
-@@ -4946,6 +4955,7 @@ UserListItem* PsiAccount::addUserListIte
+@@ -4751,7 +4760,8 @@ void PsiAccount::handleEvent(PsiEvent* e
+ #endif
+ 				c->incomingMessage(m);
+ 				soundType = eChat2;
+-				if(PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && !c->isActiveTab()) {
++				if((PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && !c->isActiveTab())
++					|| (c->isTabbed() && c->getManagingTabDlg()->isHidden()) ) {
+ 					// to alert the chat also, we put it in the queue
+ 					me->setSentToChatWindow(true);
+ 				}
+@@ -4948,6 +4958,7 @@ UserListItem* PsiAccount::addUserListIte
  	u->setInList(false);
  	u->setAvatarFactory(avatarFactory());
  	u->setName(nick);
@@ -442,7 +452,7 @@
  
  	// is it a private groupchat?
  	Jid j = u->jid();
-@@ -4961,6 +4971,21 @@ UserListItem* PsiAccount::addUserListIte
+@@ -4963,6 +4974,21 @@ UserListItem* PsiAccount::addUserListIte
  		u->userResourceList().append(ur);
  	}
  
@@ -464,7 +474,7 @@
  	// treat it like a push  [pushinfo]
  	//VCard info;
  	//if(readUserInfo(item->jid, &info) && !info.field[vNickname].isEmpty())
-@@ -4975,6 +5000,20 @@ UserListItem* PsiAccount::addUserListIte
+@@ -4977,6 +5003,20 @@ UserListItem* PsiAccount::addUserListIte
  	return u;
  }
  
@@ -485,7 +495,7 @@
  // put an event into the event queue, and update the related alerts
  void PsiAccount::queueEvent(PsiEvent* e, ActivationType activationType)
  {
-@@ -5069,8 +5108,12 @@ void PsiAccount::openNextEvent(Activatio
+@@ -5071,8 +5111,12 @@ void PsiAccount::openNextEvent(Activatio
  	}
  
  	UserListItem *u = find(e->jid());
@@ -500,7 +510,7 @@
  	openNextEvent(*u, activationType);
  }
  
-@@ -5283,17 +5326,6 @@ void PsiAccount::edb_finished()
+@@ -5285,17 +5329,6 @@ void PsiAccount::edb_finished()
  void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType)
  {
  #ifdef GROUPCHAT
@@ -518,7 +528,7 @@
  	GCMainDlg *w = new GCMainDlg(this, j, d->tabManager);
  	w->setPassword(d->client->groupChatPassword(j.node(),j.domain()));
  	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
-@@ -5327,8 +5359,14 @@ void PsiAccount::groupChatSetStatus(cons
+@@ -5329,8 +5362,14 @@ void PsiAccount::groupChatSetStatus(cons
  
  void PsiAccount::groupChatLeave(const QString &host, const QString &room)
  {
@@ -556,7 +566,7 @@
  }
  
  /**
-@@ -947,6 +948,11 @@ bool PsiContact::isAgent() const
+@@ -923,6 +924,11 @@ bool PsiContact::isAgent() const
  	return userListItem().isTransport();
  }
  
@@ -980,7 +990,7 @@
  }
  
  UserListItem::~UserListItem()
-@@ -625,6 +628,32 @@ bool UserListItem::isTransport() const
+@@ -627,6 +630,32 @@ bool UserListItem::isTransport() const
  	return v_isTransport;
  }
  
@@ -1013,7 +1023,7 @@
  bool UserListItem::isAvailable() const
  {
  	return !v_url.isEmpty();
-@@ -741,7 +770,7 @@ QString UserListItem::makeBareTip(bool t
+@@ -743,7 +772,7 @@ QString UserListItem::makeBareTip(bool t
  		str += QString("<div style='white-space:pre'>%1</div>").arg(Qt::escape(nick));
  
  	// subscription
@@ -1022,7 +1032,7 @@
  		str += QString("<div style='white-space:pre'>") + QObject::tr("Subscription") + ": " + subscription().toString() + "</div>";
  
  	if(!v_keyID.isEmpty())
-@@ -845,7 +874,7 @@ QString UserListItem::makeBareTip(bool t
+@@ -847,7 +876,7 @@ QString UserListItem::makeBareTip(bool t
  			}
  
  			// MUC
