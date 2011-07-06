@@ -1,0 +1,106 @@
+--- psi.orig/src/discodlg.cpp
++++ psi/src/discodlg.cpp
+@@ -925,7 +925,7 @@ public: // data
+ 	IconAction *actBrowse, *actBack, *actForward, *actRefresh, *actStop;
+ 
+ 	// custom actions, that will be added to toolbar and context menu
+-	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
++	IconAction *actRegister, *actUnregister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
+ 
+ 	typedef QList<History*> HistoryList;
+ 	HistoryList backHistory, forwardHistory;
+@@ -1030,6 +1030,9 @@ DiscoDlg::Private::Private(DiscoDlg *par
+ 	actRegister = new IconAction (tr("Register"), "psi/register", tr("&Register"), 0, dlg);
+ 	connect (actRegister, SIGNAL(triggered()), sm, SLOT(map()));
+ 	sm->setMapping(actRegister, Features::FID_Register);
++	actUnregister = new IconAction (tr("Unregister"), "psi/cancel", tr("&Unregister"), 0, dlg);
++	connect (actUnregister, SIGNAL(triggered()), sm, SLOT(map()));
++	sm->setMapping(actUnregister, Features::FID_Gateway);
+ 	actSearch = new IconAction (tr("Search"), "psi/search", tr("&Search"), 0, dlg);
+ 	connect (actSearch, SIGNAL(triggered()), sm, SLOT(map()));
+ 	sm->setMapping(actSearch, Features::FID_Search);
+@@ -1067,6 +1070,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
+ 	// custom actions
+ 	toolBar->addSeparator();
+ 	toolBar->addAction(actRegister);
++	toolBar->addAction(actUnregister);
+ 	toolBar->addAction(actSearch);
+ 	toolBar->addAction(actJoin);
+ 
+@@ -1243,6 +1247,7 @@ void DiscoDlg::Private::enableButtons(co
+ 	// custom actions
+ 	Features f = it.features();
+ 	actRegister->setEnabled( f.canRegister() );
++	actUnregister->setEnabled( f.canRegister() );
+ 	actSearch->setEnabled( f.canSearch() );
+ 	actJoin->setEnabled( f.canGroupchat() );
+ 	actAdd->setEnabled( itemSelected );
+@@ -1370,6 +1375,7 @@ bool DiscoDlg::Private::eventFilter (QOb
+ 			// custom actions
+ 			p.addSeparator();
+ 			actRegister->addTo(&p);
++			actUnregister->addTo(&p);
+ 			actSearch->addTo(&p);
+ 			actJoin->addTo(&p);
+ 
+@@ -1378,7 +1384,7 @@ bool DiscoDlg::Private::eventFilter (QOb
+ 			actVCard->addTo(&p);
+ 			actAHCommand->addTo(&p);
+ 			actQueryVersion->addTo(&p);
+-			
++
+ 			// popup with all available features
+ 			QMenu *fm = new QMenu(&p);
+ 			QHash<QAction*, int> actions;
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -3372,8 +3372,12 @@ void PsiAccount::featureActivated(QStrin
+ 		actionExecuteCommand(jid, node);
+ 	else if ( f.canDisco() )
+ 		actionDisco(jid, node);
+-	else if ( f.isGateway() )
+-		; // TODO
++	else if ( f.isGateway() ) {
++		if(QMessageBox::question(0, tr("Unregister from %1").arg(jid.bare()),
++					 tr("Are you sure?"),
++					 QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
++			actionUnregister(jid);
++	}
+ 	else if ( f.haveVCard() )
+ 		actionInfo(jid);
+ 	else if ( f.id() == Features::FID_Add ) {
+@@ -4408,6 +4412,13 @@ void PsiAccount::actionRegister(const Ji
+ 	}
+ }
+ 
++void PsiAccount::actionUnregister(const Jid &j)
++{
++	JT_UnRegister *ju = new JT_UnRegister(d->client->rootTask());
++	ju->unreg(j);
++	ju->go(true);
++}
++
+ void PsiAccount::actionSearch(const Jid &j)
+ {
+ 	if(!checkConnected())
+@@ -4786,9 +4797,7 @@ void PsiAccount::dj_remove(const Jid &j)
+ 
+ 		// if it looks like a transport, unregister (but not if it is the server!!)
+ 		if(u->isTransport() && !Jid(d->client->host()).compare(u->jid())) {
+-			JT_UnRegister *ju = new JT_UnRegister(d->client->rootTask());
+-			ju->unreg(j);
+-			ju->go(true);
++			actionUnregister(j);
+ 		}
+ 	}
+ }
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -356,6 +356,7 @@ public slots:
+ 	void actionGroupsSet(const Jid &, const QStringList &);
+ 	void actionHistoryBox(PsiEvent *);
+ 	void actionRegister(const Jid &);
++	void actionUnregister(const Jid &);
+ 	void actionSearch(const Jid &);
+ 	void actionManageBookmarks();
+ 	void actionJoin(const Jid& mucJid, const QString& password = QString());
