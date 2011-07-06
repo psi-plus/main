@@ -1,0 +1,50 @@
+--- psi.orig/src/widgets/actionlineedit.cpp
++++ psi/src/widgets/actionlineedit.cpp
+@@ -25,6 +25,7 @@
+ #include <QAction>
+ #include <QActionEvent>
+ #include <QIcon>
++#include <QMenu>
+ #include "actionlineedit.h"
+ 
+ ActionLineEditButton::ActionLineEditButton( QWidget *parent )
+@@ -208,3 +209,26 @@ void ActionLineEdit::actionEvent ( QActi
+ 	setStyleSheet(QString("padding-right:%1px").arg(sumWidth)); //this breaks height of widget.. Qt bug?
+ #endif
+ }
++
++void ActionLineEdit::contextMenuEvent(QContextMenuEvent *e)
++{
++	QMenu *menu = createStandardContextMenu();
++	int inserted = 0;
++	QAction *before = NULL;
++	if (menu->actions().count() > 0) {
++		before = menu->actions().first();
++	}
++	QHBoxLayout *lo = (QHBoxLayout *)layout();
++	for (int i=1, count=lo->count(); i<count; i++) {
++		QAction *act = ((ActionLineEditButton *)lo->itemAt(i)->widget())->defaultAction();
++		if (act) {
++			menu->insertAction(before, act);
++			inserted++;
++		}
++	}
++	if (inserted && before) {
++		menu->insertSeparator(before);
++	}
++	menu->exec(e->globalPos());
++	delete menu;
++}
+--- psi.orig/src/widgets/actionlineedit.h
++++ psi/src/widgets/actionlineedit.h
+@@ -63,6 +63,10 @@ public:
+ 	Qt::ToolButtonStyle toolButtonStyle() const { return toolButtonStyle_; }
+ 	void setToolButtonStyle(const Qt::ToolButtonStyle newStyle) { toolButtonStyle_ = newStyle; }
+ 
++protected:
++	// reimplemented
++	void contextMenuEvent(QContextMenuEvent *e);
++
+ private:
+ 	Qt::ToolButtonStyle toolButtonStyle_;
+ };

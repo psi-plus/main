@@ -1,0 +1,64 @@
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -54,6 +54,7 @@
+ #include <QDialogButtonBox>
+ #include <QFormLayout>
+ #include <QDesktopWidget>
++#include <QClipboard>
+ 
+ #include "psicon.h"
+ #include "psiaccount.h"
+@@ -214,6 +214,7 @@ public:
+ 	QString topic;
+ 	bool nonAnonymous;		 // got status code 100 ?
+ 	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark, *act_html_text;
++	QAction *act_copy_muc_jid;
+ 	TypeAheadFindBar *typeahead;
+ //#ifdef WHITEBOARDING
+ //	IconAction *act_whiteboard;
+@@ -733,6 +734,11 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 	d->act_bookmark = new IconAction(this);
+ 	connect(d->act_bookmark, SIGNAL(triggered()), SLOT(doBookmark()));
+ 	ui_.le_topic->addAction(d->act_bookmark);
++
++	d->act_copy_muc_jid = new QAction(tr("Copy MUC JID"), this);
++	connect(d->act_copy_muc_jid, SIGNAL(triggered()), SLOT(copyMucJid()));
++	ui_.le_topic->addAction(d->act_copy_muc_jid);
++
+ 	BookmarkManager *bm = account()->bookmarkManager();
+ 	d->act_bookmark->setVisible(bm->isAvailable());
+ 	if (bm->isAvailable()) {
+@@ -2158,6 +2163,11 @@ void GCMainDlg::doBookmark()
+ 	delete dlg;
+ }
+ 
++void GCMainDlg::copyMucJid()
++{
++	QApplication::clipboard()->setText(jid().bare());
++}
++
+ void GCMainDlg::doRemoveBookmark()
+ {
+ 	BookmarkManager *bm = account()->bookmarkManager();
+--- a/src/groupchatdlg.h
++++ b/src/groupchatdlg.h
+@@ -141,6 +141,7 @@ private slots:
+ 	void editTemplates();
+ 	void doPasteAndSend();
+ 	void doBookmark();
++	void copyMucJid();
+ 	void doRemoveBookmark();
+ 	void sendTemp(const QString &);
+ 	void psButtonEnabled();
+--- a/src/infodlg.cpp
++++ b/src/infodlg.cpp
+@@ -159,7 +159,8 @@ InfoDlg::InfoDlg(int type, const Jid &j, const VCard &vcard, PsiAccount *pa, QWi
+ 	d->namesDlg->setLayout(fl);
+ 	// end names editing dialog
+ 
+-	QAction *editnames = new QAction(IconsetFactory::icon(d->type == Self?"psi/options":"psi/info").icon(), "", this);
++	QAction *editnames = new QAction(IconsetFactory::icon(d->type == Self ? "psi/options" : "psi/info").icon(),
++									 d->type == Self ? tr("Edit names") : tr("View names") , this);
+ 	ui_.le_fullname->addAction(editnames);
+ 	ui_.le_fullname->widgetForAction(editnames)->setPopup(d->namesDlg);
+ 	d->homepageAction = new QAction(IconsetFactory::icon("psi/arrowRight").icon(), "", this);
