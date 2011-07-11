@@ -1,0 +1,105 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -681,6 +681,7 @@ QLineEdit#le_status_text {
+ 		</p2p>
+ 		<service-discovery>
+ 			<enable-entity-capabilities type="bool">true</enable-entity-capabilities>
++			<last-activity type="bool">true</last-activity>
+ 		</service-discovery>
+ 		<status>
+ 			<ask-for-message-on-offline type="bool">false</ask-for-message-on-offline>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -311,6 +311,48 @@ bool BlockTransportPopupList::find(const
+ 	return false;
+ }
+ 
++
++//----------------------------------------------------------------------------
++// IdleServer
++//----------------------------------------------------------------------------
++class IdleServer : public XMPP::Task
++{
++	Q_OBJECT
++public:
++	IdleServer(PsiAccount *pa, Task *parent)
++		: Task(parent)
++		, pa_(pa)
++	{
++	}
++
++	~IdleServer()
++	{
++	}
++
++	bool take(const QDomElement &e)
++	{
++		if (e.tagName() != "iq" || e.attribute("type") != "get")
++			return false;
++
++		const QString ns = queryNS(e, "query");
++		if (ns == "jabber:iq:last") {
++			QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
++			QDomElement query = doc()->createElement("query");
++			query.setAttribute("xmlns", ns);
++			iq.appendChild(query);
++			query.setAttribute("seconds", pa_->idle());
++
++			send(iq);
++			return true;
++		}
++		return false;
++	}
++
++private:
++	PsiAccount *pa_;
++};
++
++
+ //----------------------------------------------------------------------------
+ // PsiAccount
+ //----------------------------------------------------------------------------
+@@ -1180,6 +1222,12 @@ PsiAccount::PsiAccount(const UserAccount
+ 	d->rcLeaveMucServer =0;
+ 	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
+ 
++	//Idle server
++	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
++		new IdleServer(this, d->client->rootTask());
++		d->client->addExtension("last-act", QStringList("jabber:iq:last"));
++	}
++
+ 	// HTML
+ 	if(PsiOptions::instance()->getOption("options.html.chat.render").toBool())
+ 		d->client->addExtension("html",Features("http://jabber.org/protocol/xhtml-im"));
+@@ -1578,6 +1626,11 @@ QString PsiAccount::nameWithJid() const
+ 	return (name() + " (" + JIDUtil::toString(jid(),true) + ')');
+ }
+ 
++int PsiAccount::idle() const
++{
++	return d->lastIdle;
++}
++
+ void PsiAccount::autoLogin()
+ {
+ 	// auto-login ?
+@@ -3098,6 +3151,7 @@ void PsiAccount::publishTune(const Tune&
+ 
+ void PsiAccount::secondsIdle(int seconds)
+ {
++	d->lastIdle = seconds;
+ 	int minutes = seconds / 60;
+ 
+ 	if(PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() && PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt() > 0 && minutes >= PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt())
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -126,6 +126,8 @@ public:
+ 	const Jid & jid() const;
+ 	QString nameWithJid() const;
+ 
++	int idle() const;
++
+ 	XMPP::Client *client() const;
+ 	virtual ContactProfile *contactProfile() const;
+ 	EventQueue *eventQueue() const;
