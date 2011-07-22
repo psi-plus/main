@@ -1,0 +1,41 @@
+--- psi.orig/src/chatdlg.ui
++++ psi/src/chatdlg.ui
+@@ -372,6 +372,9 @@
+            <property name="text" >
+             <string>Avatar</string>
+            </property>
++           <property name="alignment">
++            <set>Qt::AlignCenter</set>
++           </property>
+           </widget>
+          </item>
+         </layout>
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -705,13 +705,20 @@ void PsiChatDlg::updateAvatar()
+ 			account()->avatarFactory()->getMucAvatar(jid().withResource(res)) :
+ 			account()->avatarFactory()->getAvatar(jid().withResource(res));
+ 	if (p.isNull()) {
+-		ui_.avatar->hide();
+-	}
+-	else {
+-		int size = PsiOptions::instance()->getOption("options.ui.chat.avatars.size").toInt();
+-		ui_.avatar->setPixmap(p.scaled(QSize(size, size), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+-		ui_.avatar->show();
++		if (!PsiOptions::instance()->getOption("options.ui.contactlist.avatars.use-default-avatar").toBool()) {
++			ui_.avatar->hide();
++			return;
++		}
++		p = IconsetFactory::iconPixmap("psi/default_avatar");
+ 	}
++	int size = PsiOptions::instance()->getOption("options.ui.chat.avatars.size").toInt();
++	ui_.avatar->setFixedWidth(size);
++	ui_.avatar->setFixedHeight(size);
++	int p_size = qMax(p.width(), p.height());
++	if (p_size > size)
++		p_size = size;
++	ui_.avatar->setPixmap(p.scaled(QSize(p_size, p_size), Qt::KeepAspectRatio, Qt::SmoothTransformation));
++	ui_.avatar->show();
+ }
+ 
+ void PsiChatDlg::optionsUpdate()
