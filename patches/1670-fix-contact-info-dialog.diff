@@ -1,0 +1,44 @@
+--- psi.orig/src/infodlg.cpp
++++ psi/src/infodlg.cpp
+@@ -162,8 +162,9 @@ InfoDlg::InfoDlg(int type, const Jid &j,
+ 	QAction *editnames = new QAction(IconsetFactory::icon(d->type == Self ? "psi/options" : "psi/info").icon(),
+ 									 d->type == Self ? tr("Edit names") : tr("View names") , this);
+ 	ui_.le_fullname->addAction(editnames);
+-	ui_.le_fullname->widgetForAction(editnames)->setPopup(d->namesDlg);
+-	d->homepageAction = new QAction(IconsetFactory::icon("psi/arrowRight").icon(), "", this);
++	ActionLineEditButton *pb_fullname = ui_.le_fullname->widgetForAction(editnames);
++	pb_fullname->setPopup(d->namesDlg);
++	d->homepageAction = new QAction(IconsetFactory::icon("psi/arrowRight").icon(), tr("Open web browser"), this);
+ 	d->homepageAction->setToolTip(tr("Open web browser"));
+ 	d->homepageAction->setVisible(false);
+ 	ui_.le_homepage->addAction(d->homepageAction);
+@@ -177,7 +178,9 @@ InfoDlg::InfoDlg(int type, const Jid &j,
+ 	connect(ui_.pb_close, SIGNAL(clicked()), this, SLOT(close()));
+ 	connect(ui_.tb_photo, SIGNAL(clicked()), SLOT(showPhoto()));
+ 	connect(ui_.pb_disco, SIGNAL(clicked()), this, SLOT(doDisco()));
+-	//connect(editnames, SIGNAL(triggered()), d->namesDlg, SLOT(show()));
++
++	disconnect(pb_fullname, SIGNAL(clicked()), editnames, SLOT(trigger()));
++	connect(editnames, SIGNAL(triggered()), pb_fullname, SIGNAL(clicked()));
+ 
+ 	if(d->type == Self) {
+ 		d->bdayPopup = new QFrame(this);
+@@ -200,11 +203,15 @@ InfoDlg::InfoDlg(int type, const Jid &j,
+ 
+ 		d->bdayPopup->setLayout(vbox);
+ 
+-		QAction *showcal = new QAction(IconsetFactory::icon("psi/options").icon(), "", this);
++		QAction *showcal = new QAction(IconsetFactory::icon("psi/options").icon(), tr("Edit birthday"), this);
++		showcal->setToolTip(tr("Edit birthday"));
+ 		ui_.le_bday->addAction(showcal);
+-		ui_.le_bday->widgetForAction(showcal)->setPopup(d->bdayPopup);
++		ActionLineEditButton *pb_bday = ui_.le_bday->widgetForAction(showcal);
++		pb_bday->setPopup(d->bdayPopup);
+ 		connect(ui_.pb_submit, SIGNAL(clicked()), this, SLOT(doSubmit()));
+-		connect(showcal, SIGNAL(triggered()), this, SLOT(doShowCal()));
++		disconnect(pb_bday, SIGNAL(clicked()), showcal, SLOT(trigger()));
++		connect(showcal, SIGNAL(triggered()), pb_bday, SIGNAL(clicked()));
++		connect(pb_bday, SIGNAL(clicked()), this, SLOT(doShowCal()));
+ 		connect(d->calendar, SIGNAL(clicked(QDate)), this, SLOT(doUpdateFromCalendar(QDate)));
+ 		connect(d->calendar, SIGNAL(activated(QDate)), this, SLOT(doUpdateFromCalendar(QDate)));
+ 		connect(d->noBdayButton, SIGNAL(clicked()), SLOT(doClearBirthDate()));
