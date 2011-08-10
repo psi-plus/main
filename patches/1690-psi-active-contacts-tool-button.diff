@@ -1,0 +1,166 @@
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
+@@ -665,6 +665,8 @@ void MainWin::registerAction( IconAction
+ 	} actionlist[] = {
+ 		{ "choose_status", activated, this, SLOT( actChooseStatusActivated() ) },
+ 		{ "reconnect_all", activated, this, SLOT( actReconnectActivated() ) },
++
++		{ "active_contacts",activated, this, SLOT( actActiveContacts() ) },
+ #ifndef NEWCONTACTLIST
+ 		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
+ 		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
+@@ -1251,6 +1253,21 @@ void MainWin::actSetGeolocActivated()
+ 	}
+ }
+ 
++void MainWin::actActiveContacts()
++{
++	QMenu acm;
++	foreach(PsiAccount *pa, d->psi->contactList()->accounts()) {
++		if(!pa->enabled())
++			continue;
++
++		foreach(const QString& jid, pa->activeContacts()) {
++			new ActiveContactAction(jid, PsiIconset::instance()->statusPtr(Jid(jid), Status::Online)->icon(), pa, &acm);
++		}
++	}
++	if(!acm.actions().isEmpty())
++		acm.exec(QCursor::pos());
++}
++
+ void MainWin::activatedAccOption(PsiAccount* pa, int x)
+ {
+ 	if(x == 0) {
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
+@@ -147,6 +147,7 @@ private slots:
+ 	void actSetMoodActivated();
+ 	void actSetActivityActivated();
+ 	void actSetGeolocActivated();
++	void actActiveContacts();
+ 
+ 	bool showDockMenu(const QPoint &);
+ 	void dockActivated();
+--- psi.orig/src/mainwin_p.cpp
++++ psi/src/mainwin_p.cpp
+@@ -364,6 +364,23 @@ PopupAction &PopupAction::operator=( con
+ }
+ 
+ //----------------------------------------------------------------------------
++//  ActiveContactAction
++//----------------------------------------------------------------------------
++
++ActiveContactAction::ActiveContactAction(const QString &jid, const QIcon &icon, PsiAccount *pa, QMenu *parent)
++	: QAction(icon, jid, parent)
++	, pa_(pa)
++{
++	parent->addAction(this);
++	connect(this, SIGNAL(triggered()), SLOT(actionActivated()));
++}
++
++void ActiveContactAction::actionActivated()
++{
++	pa_->actionDefault(Jid(text()));
++}
++
++//----------------------------------------------------------------------------
+ // MLabel -- a clickable label
+ //----------------------------------------------------------------------------
+ 
+--- psi.orig/src/mainwin_p.h
++++ psi/src/mainwin_p.h
+@@ -114,6 +114,19 @@ public:
+ 	virtual PopupAction &operator=( const PopupAction & );
+ };
+ 
++class ActiveContactAction : public QAction
++{
++	Q_OBJECT
++public:
++	ActiveContactAction(const QString& jid, const QIcon& icon, PsiAccount* pa, QMenu* parent);
++
++private slots:
++	void actionActivated();
++
++private:
++	PsiAccount* pa_;
++};
++
+ class MLabel : public QLabel
+ {
+ 	Q_OBJECT
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -3288,6 +3288,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
+ 	return findDialogs<ChatDlg*>(jid, compareResource);
+ }
+ 
++QStringList PsiAccount::activeContacts() const
++{
++	QStringList ret;
++	foreach(PsiContact *pc, contactList()) {
++		if(pc->isActiveContact()) {
++			ret.append(pc->jid().full());
++		}
++	}
++	return ret;
++}
++
+ QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
+ {
+ 	return d->findDialog(mo, jid, compareResource);
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -157,6 +157,8 @@ public:
+ 	ChatDlg* findChatDialogEx(const Jid& jid) const;
+ 	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
+ 
++	QStringList activeContacts() const;
++
+ 	template<typename T>
+ 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
+ 		return static_cast<T>(findDialog(((T)0)->staticMetaObject, jid, compareResource));
+--- psi.orig/src/psiactionlist.cpp
++++ psi/src/psiactionlist.cpp
+@@ -186,9 +186,13 @@ void PsiActionList::Private::createMainW
+ 		IconAction *eventNotifier = new EventNotifierAction(this, "EventNotifierAction");
+ 		eventNotifier->setWhatsThis (tr("Special item that displays number of pending events"));
+ 
++		IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
++		actActiveContacts->setWhatsThis (tr("Simple way to find contacts with opened chats"));
++
+ 		ActionNames actions[] = {
+ 			{ "button_options", optionsButton },
+ 			{ "button_status",  statusButton  },
++			{ "active_contacts",actActiveContacts},
+ 			{ "event_notifier", eventNotifier },
+ 			{ "", 0 }
+ 		};
+--- psi.orig/src/psicontact.cpp
++++ psi/src/psicontact.cpp
+@@ -540,6 +540,14 @@ bool PsiContact::isAnimated() const
+ }
+ 
+ /**
++ * Returns true if there is opened chat with this contact
++ */
++bool PsiContact::isActiveContact() const
++{
++	return account()->findChatDialog(jid());
++}
++
++/**
+  * Contact should always be visible if it's alerting.
+  */
+ bool PsiContact::shouldBeVisible() const
+--- psi.orig/src/psicontact.h
++++ psi/src/psicontact.h
+@@ -66,6 +66,8 @@ public:
+ 
+ 	virtual bool isAnimated() const;
+ 
++	bool isActiveContact() const;
++
+ 	void activate();
+ 
+ 	virtual void setEditing(bool editing);
