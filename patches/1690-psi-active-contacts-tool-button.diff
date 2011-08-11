@@ -9,7 +9,7 @@
  #ifndef NEWCONTACTLIST
  		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
  		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
-@@ -1251,6 +1253,21 @@ void MainWin::actSetGeolocActivated()
+@@ -1251,6 +1253,23 @@ void MainWin::actSetGeolocActivated()
  	}
  }
  
@@ -20,8 +20,10 @@
 +		if(!pa->enabled())
 +			continue;
 +
-+		foreach(const QString& jid, pa->activeContacts()) {
-+			new ActiveContactAction(jid, PsiIconset::instance()->statusPtr(Jid(jid), Status::Online)->icon(), pa, &acm);
++		QList< QPair<QString, QString> > list = pa->activeContacts();
++		for(int i = 0; i < list.size(); i++) {
++			QPair<QString, QString> pair = list.at(i);
++			new ActiveContactAction(pair.first, pair.second, PsiIconset::instance()->statusPtr(Jid(pair.first), Status::Online)->icon(), pa, &acm);
 +		}
 +	}
 +	if(!acm.actions().isEmpty())
@@ -43,16 +45,17 @@
  	void dockActivated();
 --- psi.orig/src/mainwin_p.cpp
 +++ psi/src/mainwin_p.cpp
-@@ -364,6 +364,23 @@ PopupAction &PopupAction::operator=( con
+@@ -364,6 +364,24 @@ PopupAction &PopupAction::operator=( con
  }
  
  //----------------------------------------------------------------------------
 +//  ActiveContactAction
 +//----------------------------------------------------------------------------
 +
-+ActiveContactAction::ActiveContactAction(const QString &jid, const QIcon &icon, PsiAccount *pa, QMenu *parent)
-+	: QAction(icon, jid, parent)
++ActiveContactAction::ActiveContactAction(const QString &jid, const QString& nick, const QIcon &icon, PsiAccount *pa, QMenu *parent)
++	: QAction(icon, nick, parent)
 +	, pa_(pa)
++	, jid_(jid)
 +{
 +	parent->addAction(this);
 +	connect(this, SIGNAL(triggered()), SLOT(actionActivated()));
@@ -60,7 +63,7 @@
 +
 +void ActiveContactAction::actionActivated()
 +{
-+	pa_->actionDefault(Jid(text()));
++	pa_->actionDefault(Jid(jid_));
 +}
 +
 +//----------------------------------------------------------------------------
@@ -69,7 +72,7 @@
  
 --- psi.orig/src/mainwin_p.h
 +++ psi/src/mainwin_p.h
-@@ -114,6 +114,19 @@ public:
+@@ -114,6 +114,20 @@ public:
  	virtual PopupAction &operator=( const PopupAction & );
  };
  
@@ -77,13 +80,14 @@
 +{
 +	Q_OBJECT
 +public:
-+	ActiveContactAction(const QString& jid, const QIcon& icon, PsiAccount* pa, QMenu* parent);
++	ActiveContactAction(const QString& jid, const QString& nick, const QIcon& icon, PsiAccount* pa, QMenu* parent);
 +
 +private slots:
 +	void actionActivated();
 +
 +private:
 +	PsiAccount* pa_;
++	QString jid_;
 +};
 +
  class MLabel : public QLabel
@@ -91,16 +95,16 @@
  	Q_OBJECT
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -3288,6 +3288,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
+@@ -3276,6 +3276,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
  	return findDialogs<ChatDlg*>(jid, compareResource);
  }
  
-+QStringList PsiAccount::activeContacts() const
++QList < QPair<QString, QString> > PsiAccount::activeContacts() const
 +{
-+	QStringList ret;
++	QList < QPair<QString, QString> > ret;
 +	foreach(PsiContact *pc, contactList()) {
 +		if(pc->isActiveContact()) {
-+			ret.append(pc->jid().full());
++			ret.append(QPair<QString, QString>(pc->jid().full(), pc->name()));
 +		}
 +	}
 +	return ret;
@@ -115,7 +119,7 @@
  	ChatDlg* findChatDialogEx(const Jid& jid) const;
  	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
  
-+	QStringList activeContacts() const;
++	QList< QPair<QString, QString> > activeContacts() const;
 +
  	template<typename T>
  	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
