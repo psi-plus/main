@@ -128,7 +128,15 @@
  void ChatView::embedJsObject()
  {
  	ChatViewTheme *theme = currentTheme();
-@@ -282,6 +288,7 @@ void ChatView::dispatchMessage(const Mes
+@@ -169,6 +175,7 @@ void ChatView::markReceived(QString id)
+ 	QVariantMap m;
+ 	m["type"] = "receipt";
+ 	m["id"] = id;
++	m["encrypted"] = isEncryptionEnabled_;
+ 	sendJsObject(m);
+ }
+ 
+@@ -282,6 +289,7 @@ void ChatView::dispatchMessage(const Mes
  	QVariantMap vm = mv.toVariantMap(isMuc_, true);
  	vm["mtype"] = vm["type"];
  	vm["type"] = "message";
@@ -157,7 +165,7 @@
  	PsiAccount *account_;
 --- psi.orig/src/psichatdlg.cpp
 +++ psi/src/psichatdlg.cpp
-@@ -747,6 +747,8 @@ void PsiChatDlg::updatePGP()
+@@ -743,6 +743,8 @@ void PsiChatDlg::updatePGP()
  	ui_.tb_pgp->setVisible(account()->hasPGP() &&
  	                       !smallChat_ &&
  	                       !PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool());
@@ -166,7 +174,7 @@
  }
  
  void PsiChatDlg::doClearButton()
-@@ -776,6 +778,7 @@ void PsiChatDlg::doClearButton()
+@@ -772,6 +774,7 @@ void PsiChatDlg::doClearButton()
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
  	act_pgp_->setChecked(enabled);
@@ -176,6 +184,15 @@
  void PsiChatDlg::toggleSmallChat()
 --- psi.orig/themes/chatview/psi/classic/index.html
 +++ psi/themes/chatview/psi/classic/index.html
+@@ -91,7 +91,7 @@ window[chatServer.jsNamespace()].theme =
+ 				var img = document.getElementById("receipt"+shared.cdata.id);
+ 				if (img) {
+ 					var sizeUri = messageIconsSize?"?w="+messageIconsSize+"&h="+messageIconsSize:"";
+-					img.src = "icon:psi/notification_chat_delivery_ok"+sizeUri;
++					img.src = (shared.cdata.encrypted?"icon:psi/notification_chat_delivery_ok_pgp":"icon:psi/notification_chat_delivery_ok")+sizeUri;
+ 				}
+ 			}
+ 			if (shared.cdata.mtype == "message") {
 @@ -128,6 +128,9 @@ window[chatServer.jsNamespace()].theme =
  							icon = shared.cdata.local?(shared.cdata.awaitingReceipt?
  								"psi/notification_chat_send":"psi/notification_chat_delivery_ok")

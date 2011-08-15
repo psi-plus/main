@@ -1,6 +1,6 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -107,6 +107,8 @@
+@@ -110,6 +110,8 @@
  				<use-chat-says-style type="bool">false</use-chat-says-style>
  				<use-expanding-line-edit type="bool">true</use-expanding-line-edit>
  				<use-small-chats type="bool">false</use-small-chats>
@@ -9,7 +9,7 @@
  				<warn-before-clear type="bool">true</warn-before-clear>
  			</chat>
  			<history comment="History dialog options">
-@@ -281,6 +283,8 @@
+@@ -284,6 +286,8 @@
  			<notifications>
  				<alert-style type="QString">animate</alert-style>
  				<bounce-dock type="QString">forever</bounce-dock>
@@ -398,7 +398,7 @@
  
  	//connect(d->client, SIGNAL(connected()), SLOT(client_connected()));
  	//connect(d->client, SIGNAL(handshaken()), SLOT(client_handshaken()));
-@@ -2545,7 +2546,7 @@ void PsiAccount::client_messageReceived(
+@@ -2546,7 +2547,7 @@ void PsiAccount::client_messageReceived(
  void PsiAccount::processIncomingMessage(const Message &_m)
  {
  	// skip empty messages, but not if the message contains a data form
@@ -407,7 +407,7 @@
  		return;
  
  	// skip headlines?
-@@ -2645,6 +2646,17 @@ void PsiAccount::processIncomingMessage(
+@@ -2646,6 +2647,17 @@ void PsiAccount::processIncomingMessage(
  	//if(m.type() == "chat" && (!m.urlList().isEmpty() || !m.subject().isEmpty()))
  	//	m.setType("");
  
@@ -425,7 +425,7 @@
  	MessageEvent *me = new MessageEvent(m, this);
  	me->setOriginLocal(false);
  	handleEvent(me, IncomingStanza);
-@@ -4633,6 +4645,19 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4634,6 +4646,19 @@ void PsiAccount::handleEvent(PsiEvent* e
  			delete e;
  			return;
  		}
@@ -445,7 +445,17 @@
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		if(m.type() == "chat") {
-@@ -5712,6 +5737,9 @@ void PsiAccount::optionsUpdate()
+@@ -5597,7 +5622,9 @@ void PsiAccount::pgp_encryptFinished()
+ 		if (m.containsEvent(DisplayedEvent)) mwrap.addEvent(DisplayedEvent);
+ 		if (m.containsEvent(ComposingEvent)) mwrap.addEvent(ComposingEvent);
+ 		if (m.containsEvent(CancelEvent)) mwrap.addEvent(CancelEvent);
++		if (m.messageReceipt() == ReceiptRequest) mwrap.setMessageReceipt(ReceiptRequest);
+ 		mwrap.setChatState(m.chatState());
++		mwrap.setId(m.id());
+ 		dj_sendMessage(mwrap);
+ 	}
+ 	emit encryptedMessageSent(x, pt->success(), pt->errorCode(), pt->diagnosticText());
+@@ -5713,6 +5740,9 @@ void PsiAccount::optionsUpdate()
  	// Chat states
  	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
  
@@ -455,7 +465,7 @@
  	// Remote Controlling
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
-@@ -5756,6 +5784,19 @@ void PsiAccount::setSendChatState(bool b
+@@ -5757,6 +5787,19 @@ void PsiAccount::setSendChatState(bool b
  	}
  }
  
