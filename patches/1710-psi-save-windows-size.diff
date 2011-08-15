@@ -1,0 +1,394 @@
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -82,6 +82,8 @@
+ 
+ #include "psichatdlg.h"
+ 
++static const QString geometryOption = "options.ui.chat.size";
++
+ ChatDlg* ChatDlg::create(const Jid& jid, PsiAccount* account, TabManager* tabManager)
+ {
+ 	ChatDlg* chat = new PsiChatDlg(jid, account, tabManager);
+@@ -166,11 +168,11 @@ void ChatDlg::init()
+ 	chatView()->setFocusPolicy(Qt::NoFocus);
+ 	chatEdit()->setFocus();
+ 
+-	// TODO: port to restoreSavedSize() (and adapt it from restoreSavedGeometry())
+-	QSize size = PsiOptions::instance()->getOption("options.ui.chat.size").toSize();
+-	if (!size.isEmpty()) {
+-		resize(size);
+-	} else {
++
++	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++		setGeometryOptionPath(geometryOption);
++	}
++	else {
+ 		resize(defaultSize());
+ 	}
+ }
+@@ -239,12 +241,12 @@ void ChatDlg::scrollDown()
+ 	chatView()->scrollDown();
+ }
+ 
+-void ChatDlg::resizeEvent(QResizeEvent *e)
+-{
+-	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
+-		PsiOptions::instance()->setOption("options.ui.chat.size", e->size());
+-	}
+-}
++//void ChatDlg::resizeEvent(QResizeEvent *e)
++//{
++//	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++//		PsiOptions::instance()->setOption("options.ui.chat.size", e->size());
++//	}
++//}
+ 
+ void ChatDlg::closeEvent(QCloseEvent *e)
+ {
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
+@@ -108,7 +108,7 @@ protected:
+ 
+ 	// reimplemented
+ 	void closeEvent(QCloseEvent *);
+-	void resizeEvent(QResizeEvent *);
++	//void resizeEvent(QResizeEvent *);
+ 	void hideEvent(QHideEvent *);
+ 	void showEvent(QShowEvent *);
+ 	void dropEvent(QDropEvent* event);
+--- psi.orig/src/eventdlg.cpp
++++ psi/src/eventdlg.cpp
+@@ -77,6 +77,8 @@
+ #endif
+ #include "psirichtext.h"
+ 
++static const QString geometryOption = "options.ui.message.size";
++
+ static QString findJid(const QString &s, int x, int *p1, int *p2)
+ {
+ 	// scan backward for the beginning of a Jid
+@@ -995,9 +997,8 @@ void EventDlg::init()
+ 	connect(d->pa, SIGNAL(pgpKeyChanged()), SLOT(updatePGP()));
+ 	connect(d->pa, SIGNAL(encryptedMessageSent(int, bool, int, const QString &)), SLOT(encryptedMessageSent(int, bool, int, const QString &)));
+ 
+-	bool use = PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool();
+-	if (PsiOptions::instance()->getOption("options.ui.message.size").toSize().isValid() && use) {
+-		resize(PsiOptions::instance()->getOption("options.ui.message.size").toSize());
++	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++		setGeometryOptionPath(geometryOption);
+ 	} else {
+ 		resize(defaultSize());
+ 	}
+@@ -1411,12 +1412,12 @@ void EventDlg::showEvent(QShowEvent *e)
+ 	}
+ }
+ 
+-void EventDlg::resizeEvent(QResizeEvent *e)
+-{
+-	if(PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
+-		PsiOptions::instance()->setOption("options.ui.message.size", e->size());
+-	}
+-}
++//void EventDlg::resizeEvent(QResizeEvent *e)
++//{
++//	if(PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++//		PsiOptions::instance()->setOption("options.ui.message.size", e->size());
++//	}
++//}
+ 
+ void EventDlg::keyPressEvent(QKeyEvent *e)
+ {
+--- psi.orig/src/eventdlg.h
++++ psi/src/eventdlg.h
+@@ -145,7 +145,7 @@ signals:
+ protected:
+ 	// reimplemented
+ 	void showEvent(QShowEvent *);
+-	void resizeEvent(QResizeEvent *);
++	//void resizeEvent(QResizeEvent *);
+ 	void keyPressEvent(QKeyEvent *);
+ 	void closeEvent(QCloseEvent *);
+ 
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -104,7 +104,7 @@
+ #define MCMDMUC		"http://psi-im.org/ids/mcmd#mucmain"
+ #define MCMDMUCNICK	"http://psi-im.org/ids/mcmd#mucnick"
+ 
+-
++static const QString geometryOption = "options.ui.muc.size";
+ 
+ 
+ #include "groupchattopicdlg.h"
+@@ -864,7 +864,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	X11WM_CLASS("groupchat");
+ 
+ 	ui_.mle->chatEdit()->setFocus();
+-	resize(PsiOptions::instance()->getOption("options.ui.muc.size").toSize());
++
++	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++		setGeometryOptionPath(geometryOption);
++	}
++	else {
++		resize(QSize(320, 280));
++	}
+ 
+ 	// Connect signals from MUC manager
+ 	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
+@@ -1007,11 +1013,11 @@ void GCMainDlg::closeEvent(QCloseEvent *
+ 		account()->groupChatLeave(d->dlg->jid().domain(),d->dlg->jid().node());
+ }
+ 
+-void GCMainDlg::resizeEvent(QResizeEvent* e)
+-{
+-	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool())
+-		PsiOptions::instance()->setOption("options.ui.muc.size", e->size());
+-}
++//void GCMainDlg::resizeEvent(QResizeEvent* e)
++//{
++//	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool())
++//		PsiOptions::instance()->setOption("options.ui.muc.size", e->size());
++//}
+ 
+ void GCMainDlg::deactivated()
+ {
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -92,7 +92,7 @@ protected:
+ 	void dragEnterEvent(QDragEnterEvent *);
+ 	void dropEvent(QDropEvent *);
+ 	void closeEvent(QCloseEvent *);
+-	void resizeEvent(QResizeEvent*);
++	//void resizeEvent(QResizeEvent*);
+ 	void mucInfoDialog(const QString& title, const QString& message, const Jid& actor, const QString& reason);
+ 	void setStatusTabIcon(int status);
+ 
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -44,6 +44,8 @@
+ #include <windows.h>
+ #endif
+ 
++static const QString geometryOption = "options.ui.tabs.size";
++
+ //----------------------------------------------------------------------------
+ // TabDlgDelegate
+ //----------------------------------------------------------------------------
+@@ -112,7 +114,7 @@ bool TabDlgDelegate::eventFilter(QWidget
+  *        will manage some aspects of the TabDlg behavior.  Ownership is not
+  *        passed.
+  */ 
+-TabDlg::TabDlg(TabManager* tabManager, QSize size, TabDlgDelegate *delegate)
++TabDlg::TabDlg(TabManager* tabManager, const QString& geometryOption, TabDlgDelegate *delegate)
+ 		: AdvancedWidget<QWidget>(0, delegate ? delegate->initWindowFlags() : (Qt::WindowFlags)0)
+ 		, delegate_(delegate)
+ 		, tabWidget_(0)
+@@ -189,9 +191,10 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+ 		addAction(action);
+ 	}
+ 
+-	if (size.isValid()) {
+-		resize(size);
+-	} else {
++	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++		setGeometryOptionPath(geometryOption);
++	}
++	else {
+ 		resize(ChatDlg::defaultSize()); //TODO: no!
+ 	}
+ 	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
+@@ -69,7 +69,7 @@ class TabDlg : public AdvancedWidget<QWi
+ {
+ 	Q_OBJECT
+ public:
+-	TabDlg(TabManager* tabManager, QSize size, TabDlgDelegate *delegate = 0);
++	TabDlg(TabManager* tabManager, const QString& geometryOption, TabDlgDelegate *delegate = 0);
+ 	~TabDlg();
+ 	bool managesTab(const TabbableWidget*) const;
+ 	bool tabOnTop(const TabbableWidget*) const;
+--- psi.orig/src/tabs/tabmanager.cpp
++++ psi/src/tabs/tabmanager.cpp
+@@ -64,12 +64,12 @@ bool TabManager::shouldBeTabbed(QWidget 
+ 	return false;
+ }
+ 
+-void TabManager::tabResized(QSize size) {
+-	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
+-		PsiOptions::instance()->mapPut("options.ui.tabs.group-state", 
+-					tabsetToKinds_[static_cast<TabDlg*>(sender())], "size", size);
+-	}
+-}
++//void TabManager::tabResized(QSize size) {
++//	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
++//		PsiOptions::instance()->mapPut("options.ui.tabs.group-state",
++//					tabsetToKinds_[static_cast<TabDlg*>(sender())], "size", size);
++//	}
++//}
+ 
+ TabDlg* TabManager::newTabs(QWidget *widget)
+ {
+@@ -84,17 +84,18 @@ TabDlg* TabManager::newTabs(QWidget *wid
+ 	
+ 	
+ 	QVariantList savedSizes = PsiOptions::instance()->mapKeyList("options.ui.tabs.group-state");
+-	QSize size = PsiOptions::instance()->getOption("options.ui.tabs.size").toSize();
++	QString geometryOption = "options.ui.tabs.size";
+ 	if (savedSizes.contains(group)) {
+-		size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", group, "size").toSize();
++		geometryOption = QString("options.ui.tabs.group-state.%1.size").arg(group);
+ 	} else {
+-		foreach(QVariant v, savedSizes) {
++		foreach(const QVariant& v, savedSizes) {
+ 			if (v.toString().contains(kind)) {
+-				size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", v.toString(), "size").toSize();
++				geometryOption = QString("options.ui.tabs.group-state.%1.size").arg(v.toString());
++				break;
+ 			}
+ 		}
+ 	}
+-	TabDlg *tab = new TabDlg(this, size, tabDlgDelegate_);
++	TabDlg *tab = new TabDlg(this, geometryOption, tabDlgDelegate_);
+ 	tab->setUserManagementEnabled(userManagement_);
+ 	tab->setTabBarShownForSingles(tabSingles_);
+ 	tab->setSimplifiedCaptionEnabled(simplifiedCaption_);
+@@ -107,7 +108,7 @@ TabDlg* TabManager::newTabs(QWidget *wid
+ 	}
+ 	tabs_.append(tab);
+ 	connect(tab, SIGNAL(destroyed(QObject*)), SLOT(tabDestroyed(QObject*)));
+-	connect(tab, SIGNAL(resized(QSize)), SLOT(tabResized(QSize)));
++	//connect(tab, SIGNAL(resized(QSize)), SLOT(tabResized(QSize)));
+ 	connect(psiCon_, SIGNAL(emitOptionsUpdate()), tab, SLOT(optionsUpdate()));
+ 	return tab;
+ }
+--- psi.orig/src/tabs/tabmanager.h
++++ psi/src/tabs/tabmanager.h
+@@ -117,7 +117,7 @@ public:
+ 
+ public slots:
+ 	void tabDestroyed(QObject*);
+-	void tabResized(QSize);
++	//void tabResized(QSize);
+ 
+ private:
+ 	QMap<QChar, TabDlg*> preferedTabsetForKind_;
+--- psi.orig/src/tools/advwidget/advwidget.cpp
++++ psi/src/tools/advwidget/advwidget.cpp
+@@ -98,6 +98,7 @@ protected:
+ private:
+ 	QTimer* saveGeometryTimer_;
+ 	QRect newGeometry_;
++	QRect normalGeometry_;
+ 
+ public slots:
+ 	void saveGeometry();
+@@ -121,8 +122,6 @@ GAdvancedWidget::Private::Private(QWidge
+ 	if (!advancedWidgetShared)
+ 		advancedWidgetShared = new AdvancedWidgetShared();
+ 
+-	parentWidget_ = parent;
+-
+ 	saveGeometryTimer_ = new QTimer(this);
+ 	saveGeometryTimer_->setInterval(100);
+ 	saveGeometryTimer_->setSingleShot(true);
+@@ -325,23 +324,25 @@ void GAdvancedWidget::Private::updateGeo
+ }
+ 
+ void GAdvancedWidget::Private::saveGeometry()
+-{
+-	PsiOptions::instance()->setOption(geometryOptionPath_, parentWidget_->normalGeometry());
+-	PsiOptions::instance()->setOption(geometryOptionPath_ + "-frame", parentWidget_->frameGeometry());
++{ 
++	QWidget *window = parentWidget_->window();
++	PsiOptions::instance()->setOption(geometryOptionPath_, normalGeometry_);
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-frame", window->frameGeometry());
+ 	PsiOptions::instance()->setOption(geometryOptionPath_ + "-screen", QApplication::desktop()->screenNumber(parentWidget_));
+-	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", (parentWidget_->windowState() & Qt::WindowMaximized) != 0);
+-	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", (parentWidget_->windowState() & Qt::WindowFullScreen) != 0);
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", (window->windowState() & Qt::WindowMaximized) != 0);
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", (window->windowState() & Qt::WindowFullScreen) != 0);
+ }
+ 
+ void GAdvancedWidget::Private::restoreGeometry()
+ {
+ 	PsiOptions *o = PsiOptions::instance();
+ 	QVariant v(o->getOption(geometryOptionPath_));
++	QWidget *window = parentWidget_->window();
+ 
+ 	if (v.type() == QVariant::ByteArray) {
+ 		// migrate options back from format used for a short time before
+ 		// 0.12-RC2. This can be removed later.
+-		parentWidget_->restoreGeometry(v.toByteArray());
++		window->restoreGeometry(v.toByteArray());
+ 	} else if (o->getOption(geometryOptionPath_ + "-frame").toRect() != QRect(0,0,0,0)) {
+ 		// this is at least as safe as saving this kind of binary blob into the options file.
+ 		// if future Qt versions drop support for restoring from this format old options files
+@@ -357,31 +358,33 @@ void GAdvancedWidget::Private::restoreGe
+ 		quint16 majorVersion = 1;
+ 		quint16 minorVersion = 0;
+ 		QRect restoredFrameGeometry = o->getOption(geometryOptionPath_ + "-frame").toRect();
+-		QRect restoredNormalGeometry = o->getOption(geometryOptionPath_).toRect();
++		normalGeometry_ = o->getOption(geometryOptionPath_).toRect();
+ 
+ 		stream << magicNumber
+ 			<< majorVersion
+ 			<< minorVersion
+ 			<< restoredFrameGeometry
+-			<< restoredNormalGeometry
++			<< normalGeometry_
+ 			<< qint32(o->getOption(geometryOptionPath_ + "-screen").toInt())
+ 			<< quint8(o->getOption(geometryOptionPath_ + "-maximized").toBool())
+ 			<< quint8(o->getOption(geometryOptionPath_ + "-fullscreen").toBool());
+ 
+-		parentWidget_->restoreGeometry(array);
++		window->restoreGeometry(array);
+ 		return;
+ 	} else {
+ 		// used for bootstrapping and for pre 0.12-RC1 options files.
+-		QRect savedGeometry = o->getOption(geometryOptionPath_).toRect();
+-		if (!savedGeometry.isEmpty()) {
+-			restoreGeometry(savedGeometry);
++		normalGeometry_ = o->getOption(geometryOptionPath_).toRect();
++		if (normalGeometry_.isEmpty()) {
++			normalGeometry_.setSize(QSize(320, 280)); // FIXME!!!! default size for ChatDlg
+ 		}
++		restoreGeometry(normalGeometry_);
+ 	}
+ }
+ 
+ // FIXME: should use frameGeometry
+ void GAdvancedWidget::Private::restoreGeometry(QRect savedGeometry)
+ {
++	QWidget *window = parentWidget_->window();
+ 	QRect geom = savedGeometry;
+ 	QDesktopWidget *pdesktop = QApplication::desktop();
+ 	int nscreen = pdesktop->screenNumber(geom.topLeft());
+@@ -402,16 +405,25 @@ void GAdvancedWidget::Private::restoreGe
+ 	if ((geom.height() + pad * 2) > r.height())
+ 		geom.setHeight(r.height() - pad * 2);
+ 
+-	parentWidget_->move(geom.topLeft());
+-	parentWidget_->resize(geom.size());
++	window->move(geom.topLeft());
++	window->resize(geom.size());
+ }
+ 
+ bool GAdvancedWidget::Private::eventFilter(QObject* obj, QEvent* e)
+ {
+ 	if (obj == parentWidget_) {
+ 		if (e->type() == QEvent::Move || e->type() == QEvent::Resize) {
++			if(parentWidget_->window()->windowState() != Qt::WindowMaximized) {
++				normalGeometry_ = parentWidget_->window()->frameGeometry();
++			}
+ 			saveGeometryTimer_->start();
+ 		}
++		else if(e->type() == QEvent::WindowStateChange) {
++			if( ((QWindowStateChangeEvent*)e)->oldState() == Qt::WindowNoState) {
++				normalGeometry_ = parentWidget_->window()->frameGeometry();
++				saveGeometryTimer_->start();
++			}
++		}
+ 
+ 		return false;
+ 	}
