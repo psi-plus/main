@@ -1,8 +1,8 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -303,6 +303,21 @@ QLineEdit#le_status_text {
- 				<x type="int">10</x>
- 				<y type="int">10</y>
+@@ -296,6 +296,21 @@ QLineEdit#le_status_text {
+ 			</menu>
+ 			<muc comment="Multi-User Chat options">
  				<hide-on-autojoin type="bool">false</hide-on-autojoin>
 +				<userlist comment="Userlist options">
 +					<show-groups type="bool">true</show-groups>
@@ -22,7 +22,7 @@
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  				<show-initial-joins comment="Show joins on your MUC join (with status and priority, depends on options)" type="bool">false</show-initial-joins>
  				<log-width type="int">500</log-width>
-@@ -378,6 +393,10 @@ QLineEdit#le_status_text {
+@@ -371,6 +386,10 @@ QLineEdit#le_status_text {
  							<item>Purple</item>
  							<item>Red</item>
  						</nick-colors>
@@ -629,7 +629,7 @@
  	enum Role { Moderator = 0, Participant = 1, Visitor = 2 };
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -87,6 +87,7 @@
+@@ -86,6 +86,7 @@
  #include "lastactivitytask.h"
  #include "psirichtext.h"
  #include "psiwindowheader.h"
@@ -637,7 +637,7 @@
  
  #include "mcmdsimplesite.h"
  
-@@ -823,6 +824,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -818,6 +819,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  
  	// Connect signals from MUC manager
  	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
@@ -645,7 +645,7 @@
  
  	setLooks();
  	setShortcuts();
-@@ -831,6 +833,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -826,6 +828,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
  
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
@@ -654,7 +654,7 @@
  }
  
  void GCMainDlg::vcard(const QString& _str)
-@@ -1511,6 +1515,8 @@ void GCMainDlg::presence(const QString &
+@@ -1492,6 +1496,8 @@ void GCMainDlg::presence(const QString &
  			}
  		}
  		ui_.lv_users->updateEntry(nick, s);
@@ -663,7 +663,7 @@
  	} 
  	else {
  		// Unavailable
-@@ -1605,6 +1611,22 @@ void GCMainDlg::presence(const QString &
+@@ -1586,6 +1592,22 @@ void GCMainDlg::presence(const QString &
  		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
  	}
  
@@ -686,7 +686,7 @@
  }
  
  void GCMainDlg::message(const Message &_m)
-@@ -1866,6 +1888,8 @@ void GCMainDlg::setLooks()
+@@ -1847,6 +1869,8 @@ void GCMainDlg::setLooks()
  #ifndef Q_WS_MAC
  	setWindowIcon(IconsetFactory::icon("psi/groupChat").icon());
  #endif
@@ -705,10 +705,10 @@
  
  
  
-@@ -174,6 +175,7 @@ private:
+@@ -173,6 +174,7 @@ private:
+ 	QDateTime lastMsgTime_;
  
  	void setMargins();
- 	void setInitSize(QSize size, int x, int y);
 +	inline XMPP::Jid jidForNick(const QString &nick) const;
  };
  
@@ -1040,7 +1040,7 @@
  	$$PWD/opt_general_groupchat.ui \
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -6167,6 +6167,7 @@ void PsiAccount::invokeGCChat(const Jid 
+@@ -6171,6 +6171,7 @@ void PsiAccount::invokeGCChat(const Jid 
  	u->setInList(false);
  	u->setName(j.resource());
  	u->setPrivate(true);
@@ -1050,7 +1050,7 @@
  	UserResource ur;
 --- psi.orig/src/psichatdlg.cpp
 +++ psi/src/psichatdlg.cpp
-@@ -731,6 +731,7 @@ void PsiChatDlg::updateAvatar()
+@@ -691,6 +691,7 @@ void PsiChatDlg::updateAvatar()
  	}
  
  	UserListItem *ul = account()->findFirstRelevant(jid());
@@ -1058,7 +1058,7 @@
  	if (ul && !ul->userResourceList().isEmpty()) {
  		UserResourceList::Iterator it = ul->userResourceList().find(jid().resource());
  		if (it == ul->userResourceList().end())
-@@ -738,9 +739,12 @@ void PsiChatDlg::updateAvatar()
+@@ -698,9 +699,12 @@ void PsiChatDlg::updateAvatar()
  
  		res = (*it).name();
  		client = (*it).clientName();
@@ -1216,7 +1216,7 @@
  QString status2name(int s);
 --- psi.orig/src/userlist.cpp
 +++ psi/src/userlist.cpp
-@@ -765,14 +765,18 @@ QString UserListItem::makeBareTip(bool t
+@@ -767,14 +767,18 @@ QString UserListItem::makeBareTip(bool t
  		mucItem = userResourceList()[0].status().hasMUCItem();
  	}
  
