@@ -298,7 +298,7 @@
  				migrateBoolEntry(tag, "excludeGroupChatIgnore", "options.messages.exclude-muc-from-ignore");
 --- psi.orig/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp
-@@ -112,7 +114,7 @@ bool TabDlgDelegate::eventFilter(QWidget
+@@ -112,7 +112,7 @@ bool TabDlgDelegate::eventFilter(QWidget
   *        will manage some aspects of the TabDlg behavior.  Ownership is not
   *        passed.
   */ 
@@ -307,7 +307,7 @@
  		: AdvancedWidget<QWidget>(0, delegate ? delegate->initWindowFlags() : (Qt::WindowFlags)0)
  		, delegate_(delegate)
  		, tabWidget_(0)
-@@ -189,11 +191,8 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+@@ -189,11 +189,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
  		addAction(action);
  	}
  
@@ -316,7 +316,8 @@
 -	} else {
 -		resize(ChatDlg::defaultSize()); //TODO: no!
 -	}
-+	setGeometryOptionPath(geometryOption);
++	if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
++		setGeometryOptionPath(geometryOption);
 +
  	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  }
@@ -393,6 +394,14 @@
  	QMap<QChar, TabDlg*> preferedTabsetForKind_;
 --- psi.orig/src/tools/advwidget/advwidget.cpp
 +++ psi/src/tools/advwidget/advwidget.cpp
+@@ -98,6 +98,7 @@ protected:
+ private:
+ 	QTimer* saveGeometryTimer_;
+ 	QRect newGeometry_;
++	QRect normalGeometry_;
+ 
+ public slots:
+ 	void saveGeometry();
 @@ -121,8 +122,6 @@ GAdvancedWidget::Private::Private(QWidge
  	if (!advancedWidgetShared)
  		advancedWidgetShared = new AdvancedWidgetShared();
@@ -402,6 +411,54 @@
  	saveGeometryTimer_ = new QTimer(this);
  	saveGeometryTimer_->setInterval(100);
  	saveGeometryTimer_->setSingleShot(true);
+@@ -326,11 +325,17 @@ void GAdvancedWidget::Private::updateGeo
+ 
+ void GAdvancedWidget::Private::saveGeometry()
+ {
+-	PsiOptions::instance()->setOption(geometryOptionPath_, parentWidget_->normalGeometry());
++	bool isMaximized = parentWidget_->windowState() & Qt::WindowMaximized;
++	//if window is maximized normalGeometry() returns null rect. So in this case we use cached geometry
++	PsiOptions::instance()->setOption(geometryOptionPath_, isMaximized ? normalGeometry_ : parentWidget_->normalGeometry());
+ 	PsiOptions::instance()->setOption(geometryOptionPath_ + "-frame", parentWidget_->frameGeometry());
+ 	PsiOptions::instance()->setOption(geometryOptionPath_ + "-screen", QApplication::desktop()->screenNumber(parentWidget_));
+-	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", (parentWidget_->windowState() & Qt::WindowMaximized) != 0);
+-	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", (parentWidget_->windowState() & Qt::WindowFullScreen) != 0);
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", isMaximized);
++#ifdef Q_OS_WIN
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", isMaximized);  //sick!!!!
++#else
++	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", bool(parentWidget_->windowState() & Qt::WindowFullScreen));
++#endif
+ }
+ 
+ void GAdvancedWidget::Private::restoreGeometry()
+@@ -357,13 +362,13 @@ void GAdvancedWidget::Private::restoreGe
+ 		quint16 majorVersion = 1;
+ 		quint16 minorVersion = 0;
+ 		QRect restoredFrameGeometry = o->getOption(geometryOptionPath_ + "-frame").toRect();
+-		QRect restoredNormalGeometry = o->getOption(geometryOptionPath_).toRect();
++		normalGeometry_ = o->getOption(geometryOptionPath_).toRect();
+ 
+ 		stream << magicNumber
+ 			<< majorVersion
+ 			<< minorVersion
+ 			<< restoredFrameGeometry
+-			<< restoredNormalGeometry
++			<< normalGeometry_
+ 			<< qint32(o->getOption(geometryOptionPath_ + "-screen").toInt())
+ 			<< quint8(o->getOption(geometryOptionPath_ + "-maximized").toBool())
+ 			<< quint8(o->getOption(geometryOptionPath_ + "-fullscreen").toBool());
+@@ -410,6 +415,10 @@ bool GAdvancedWidget::Private::eventFilt
+ {
+ 	if (obj == parentWidget_) {
+ 		if (e->type() == QEvent::Move || e->type() == QEvent::Resize) {
++			Qt::WindowStates ws = parentWidget_->windowState();
++			if( !(ws & Qt::WindowMaximized) && !(ws & Qt::WindowFullScreen) ) {
++				normalGeometry_ = parentWidget_->normalGeometry();
++			}
+ 			saveGeometryTimer_->start();
+ 		}
+ 
 --- psi.orig/src/whiteboarding/wbdlg.cpp
 +++ psi/src/whiteboarding/wbdlg.cpp
 @@ -34,6 +34,7 @@
