@@ -64,7 +64,7 @@
  	QList<UserListItem*> ul = account()->findRelevant(jid());
  	UserStatus userStatus = userStatusFor(jid(), ul, false);
  	setTabIcon(PsiIconset::instance()->statusPtr(jid(), userStatus.statusType)->icon());
-+	if(!isTabbed()) {
++	if(!isTabbed() && geometryOptionPath().isEmpty()) {
 +		setGeometryOptionPath(geometryOption);
 +	}
 +
@@ -185,7 +185,7 @@
  		setStatusTabIcon((d->state == Private::Connected ? STATUS_ONLINE : STATUS_OFFLINE));
  	}
 +
-+	if(!isTabbed()) {
++	if(!isTabbed() && geometryOptionPath().isEmpty()) {
 +		setGeometryOptionPath(geometryOption);
 +	}
  }
@@ -349,36 +349,34 @@
  TabDlg* TabManager::newTabs(QWidget *widget)
  {
  	QChar kind = tabKind(widget);
-@@ -84,17 +77,18 @@ TabDlg* TabManager::newTabs(QWidget *wid
- 	
- 	
- 	QVariantList savedSizes = PsiOptions::instance()->mapKeyList("options.ui.tabs.group-state");
--	QSize size = PsiOptions::instance()->getOption("options.ui.tabs.size").toSize();
-+	QString geometryOption = "options.ui.tabs.size";
- 	if (savedSizes.contains(group)) {
--		size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", group, "size").toSize();
-+		geometryOption = QString("options.ui.tabs.group-state.%1.size").arg(group);
- 	} else {
--		foreach(QVariant v, savedSizes) {
-+		foreach(const QVariant& v, savedSizes) {
- 			if (v.toString().contains(kind)) {
--				size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", v.toString(), "size").toSize();
-+				geometryOption = QString("options.ui.tabs.group-state.%1.size").arg(v.toString());
-+				break;
- 			}
+@@ -82,19 +75,9 @@ TabDlg* TabManager::newTabs(QWidget *wid
  		}
  	}
+ 	
+-	
+-	QVariantList savedSizes = PsiOptions::instance()->mapKeyList("options.ui.tabs.group-state");
+-	QSize size = PsiOptions::instance()->getOption("options.ui.tabs.size").toSize();
+-	if (savedSizes.contains(group)) {
+-		size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", group, "size").toSize();
+-	} else {
+-		foreach(QVariant v, savedSizes) {
+-			if (v.toString().contains(kind)) {
+-				size = PsiOptions::instance()->mapGet("options.ui.tabs.group-state", v.toString(), "size").toSize();
+-			}
+-		}
+-	}
 -	TabDlg *tab = new TabDlg(this, size, tabDlgDelegate_);
++	QString geometryOption = QString("options.ui.tabs.group-state.%1.size").arg(group);
++
 +	TabDlg *tab = new TabDlg(this, geometryOption, tabDlgDelegate_);
  	tab->setUserManagementEnabled(userManagement_);
  	tab->setTabBarShownForSingles(tabSingles_);
  	tab->setSimplifiedCaptionEnabled(simplifiedCaption_);
-@@ -107,7 +101,7 @@ TabDlg* TabManager::newTabs(QWidget *wid
+@@ -107,7 +90,6 @@ TabDlg* TabManager::newTabs(QWidget *wid
  	}
  	tabs_.append(tab);
  	connect(tab, SIGNAL(destroyed(QObject*)), SLOT(tabDestroyed(QObject*)));
 -	connect(tab, SIGNAL(resized(QSize)), SLOT(tabResized(QSize)));
-+	//connect(tab, SIGNAL(resized(QSize)), SLOT(tabResized(QSize)));
  	connect(psiCon_, SIGNAL(emitOptionsUpdate()), tab, SLOT(optionsUpdate()));
  	return tab;
  }
@@ -459,6 +457,16 @@
  			saveGeometryTimer_->start();
  		}
  
+@@ -454,6 +463,9 @@ void GAdvancedWidget::setGeometryOptionP
+ {
+ 	Q_ASSERT(d->geometryOptionPath_.isEmpty());
+ 	Q_ASSERT(!optionPath.isEmpty());
++	if(optionPath.isEmpty()) {
++		return;
++	}
+ 	d->geometryOptionPath_ = optionPath;
+ 	d->restoreGeometry();
+ 	d->parentWidget_->installEventFilter(d);
 --- psi.orig/src/whiteboarding/wbdlg.cpp
 +++ psi/src/whiteboarding/wbdlg.cpp
 @@ -34,6 +34,7 @@
