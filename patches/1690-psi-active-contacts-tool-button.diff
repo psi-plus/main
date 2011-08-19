@@ -1,6 +1,128 @@
+--- psi.orig/src/activecontactsmenu.cpp
++++ psi/src/activecontactsmenu.cpp
+@@ -0,0 +1,70 @@
++/*
++ * activecontactsmenu.cpp
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include "activecontactsmenu.h"
++#include "psiaccount.h"
++#include "psicontact.h"
++#include "psiiconset.h"
++#include "psicon.h"
++
++
++class ActiveContactAction : public QAction
++{
++	Q_OBJECT
++public:
++	ActiveContactAction(const QString& jid, const QString& nick, const QIcon& icon, PsiAccount* pa, QMenu* parent)
++		: QAction(icon, nick, parent)
++		, pa_(pa)
++		, jid_(jid)
++	{
++		parent->addAction(this);
++		connect(this, SIGNAL(triggered()), SLOT(actionActivated()));
++	}
++
++private slots:
++	void actionActivated()
++	{
++		pa_->actionDefault(Jid(jid_));
++	}
++
++private:
++	PsiAccount* pa_;
++	QString jid_;
++};
++
++
++
++ActiveContactsMenu::ActiveContactsMenu(PsiCon *psi, QWidget *parent)
++	: QMenu(parent)
++	, psi_(psi)
++{
++	foreach(PsiAccount *pa, psi_->contactList()->accounts()) {
++		if(!pa->enabled())
++			continue;
++
++		QList<PsiContact*> list = pa->activeContacts();
++		foreach(PsiContact* pc, list) {
++			new ActiveContactAction(pc->jid().full(), pc->name(), PsiIconset::instance()->statusPtr(pc->jid(), pc->status())->icon(), pa, this);
++		}
++	}
++}
++
++
++#include "activecontactsmenu.moc"
+--- psi.orig/src/activecontactsmenu.h
++++ psi/src/activecontactsmenu.h
+@@ -0,0 +1,38 @@
++/*
++ * activecontactsmenu.h
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef ACTIVECONTACTSMENU_H
++#define ACTIVECONTACTSMENU_H
++
++#include <QMenu>
++
++class PsiCon;
++
++class ActiveContactsMenu : public QMenu
++{
++	Q_OBJECT
++public:
++	ActiveContactsMenu(PsiCon* psi, QWidget* parent);
++
++private:
++	PsiCon* psi_;
++};
++
++#endif
 --- psi.orig/src/mainwin.cpp
 +++ psi/src/mainwin.cpp
-@@ -665,6 +665,8 @@ void MainWin::registerAction( IconAction
+@@ -75,6 +75,7 @@
+ #include "mooddlg.h"
+ #include "activitydlg.h"
+ #include "geolocationdlg.h"
++#include "activecontactsmenu.h"
+ 
+ #include "mainwin_p.h"
+ 
+@@ -665,6 +666,8 @@ void MainWin::registerAction( IconAction
  	} actionlist[] = {
  		{ "choose_status", activated, this, SLOT( actChooseStatusActivated() ) },
  		{ "reconnect_all", activated, this, SLOT( actReconnectActivated() ) },
@@ -9,25 +131,16 @@
  #ifndef NEWCONTACTLIST
  		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
  		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
-@@ -1251,6 +1253,23 @@ void MainWin::actSetGeolocActivated()
+@@ -1251,6 +1254,14 @@ void MainWin::actSetGeolocActivated()
  	}
  }
  
 +void MainWin::actActiveContacts()
 +{
-+	QMenu acm;
-+	foreach(PsiAccount *pa, d->psi->contactList()->accounts()) {
-+		if(!pa->enabled())
-+			continue;
-+
-+		QList< QPair<QString, QString> > list = pa->activeContacts();
-+		for(int i = 0; i < list.size(); i++) {
-+			QPair<QString, QString> pair = list.at(i);
-+			new ActiveContactAction(pair.first, pair.second, PsiIconset::instance()->statusPtr(Jid(pair.first), Status::Online)->icon(), pa, &acm);
-+		}
-+	}
-+	if(!acm.actions().isEmpty())
-+		acm.exec(QCursor::pos());
++	ActiveContactsMenu* acm = new ActiveContactsMenu(d->psi, this);
++	if(!acm->actions().isEmpty())
++		acm->exec(QCursor::pos());
++	delete acm;
 +}
 +
  void MainWin::activatedAccOption(PsiAccount* pa, int x)
@@ -43,68 +156,18 @@
  
  	bool showDockMenu(const QPoint &);
  	void dockActivated();
---- psi.orig/src/mainwin_p.cpp
-+++ psi/src/mainwin_p.cpp
-@@ -364,6 +364,24 @@ PopupAction &PopupAction::operator=( con
- }
- 
- //----------------------------------------------------------------------------
-+//  ActiveContactAction
-+//----------------------------------------------------------------------------
-+
-+ActiveContactAction::ActiveContactAction(const QString &jid, const QString& nick, const QIcon &icon, PsiAccount *pa, QMenu *parent)
-+	: QAction(icon, nick, parent)
-+	, pa_(pa)
-+	, jid_(jid)
-+{
-+	parent->addAction(this);
-+	connect(this, SIGNAL(triggered()), SLOT(actionActivated()));
-+}
-+
-+void ActiveContactAction::actionActivated()
-+{
-+	pa_->actionDefault(Jid(jid_));
-+}
-+
-+//----------------------------------------------------------------------------
- // MLabel -- a clickable label
- //----------------------------------------------------------------------------
- 
---- psi.orig/src/mainwin_p.h
-+++ psi/src/mainwin_p.h
-@@ -114,6 +114,20 @@ public:
- 	virtual PopupAction &operator=( const PopupAction & );
- };
- 
-+class ActiveContactAction : public QAction
-+{
-+	Q_OBJECT
-+public:
-+	ActiveContactAction(const QString& jid, const QString& nick, const QIcon& icon, PsiAccount* pa, QMenu* parent);
-+
-+private slots:
-+	void actionActivated();
-+
-+private:
-+	PsiAccount* pa_;
-+	QString jid_;
-+};
-+
- class MLabel : public QLabel
- {
- 	Q_OBJECT
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
 @@ -3276,6 +3276,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
  	return findDialogs<ChatDlg*>(jid, compareResource);
  }
  
-+QList < QPair<QString, QString> > PsiAccount::activeContacts() const
++QList<PsiContact*> PsiAccount::activeContacts() const
 +{
-+	QList < QPair<QString, QString> > ret;
++	QList<PsiContact*> ret;
 +	foreach(PsiContact *pc, contactList()) {
 +		if(pc->isActiveContact()) {
-+			ret.append(QPair<QString, QString>(pc->jid().full(), pc->name()));
++			ret.append(pc);
 +		}
 +	}
 +	return ret;
@@ -119,7 +182,7 @@
  	ChatDlg* findChatDialogEx(const Jid& jid) const;
  	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
  
-+	QList< QPair<QString, QString> > activeContacts() const;
++	QList<PsiContact*> activeContacts() const;
 +
  	template<typename T>
  	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
@@ -140,6 +203,67 @@
  			{ "event_notifier", eventNotifier },
  			{ "", 0 }
  		};
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -31,6 +31,7 @@
+ #include "messageview.h"
+ #include "iconselect.h"
+ #include "avatars.h"
++#include "activecontactsmenu.h"
+ #include "psitooltip.h"
+ #include "psioptions.h"
+ #include "coloropt.h"
+@@ -483,6 +484,9 @@ void PsiChatDlg::initToolButtons()
+ 
+ 	act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
+ 	act_templates_->setMenu(getTemplateMenu());
++
++	act_active_contacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
++	connect(act_active_contacts, SIGNAL(triggered()), SLOT(actActiveContacts()));
+ }
+ 
+ void PsiChatDlg::initToolBar()
+@@ -512,6 +516,7 @@ void PsiChatDlg::initToolBar()
+ 		ui_.toolbar->addAction(act_voice_);
+ 	}
+ 	ui_.toolbar->addAction(act_add_contact);
++	ui_.toolbar->addAction(act_active_contacts);
+ }
+ 
+ void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
+@@ -560,6 +565,14 @@ void PsiChatDlg::setContactToolTip(QStri
+ 	ui_.avatar->setToolTip(text);
+ }
+ 
++void PsiChatDlg::actActiveContacts()
++{
++	ActiveContactsMenu* acm = new ActiveContactsMenu(account()->psi(), this);
++	if(!acm->actions().isEmpty())
++		acm->exec(QCursor::pos());
++	delete acm;
++}
++
+ void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& /*statusString*/, bool fromPresence)
+ {
+ 	static bool internal_change = false;
+--- psi.orig/src/psichatdlg.h
++++ psi/src/psichatdlg.h
+@@ -59,6 +59,7 @@ private slots:
+ 	void contactChanged();
+ 	QString makeContactName(const QString &name, const Jid &jid) const;
+ 	void doSwitchJidMode();
++	void actActiveContacts();
+ 
+ private:
+ 	void initToolBar();
+@@ -106,6 +107,7 @@ private:
+ 
+ 	ActionLineEdit *le_autojid;
+ 	IconAction *act_autojid;
++	IconAction *act_active_contacts;
+ 
+ 	MCmdManager mCmdManager_;
+ 	MCmdSimpleSite mCmdSite_;
 --- psi.orig/src/psicontact.cpp
 +++ psi/src/psicontact.cpp
 @@ -540,6 +540,17 @@ bool PsiContact::isAnimated() const
@@ -171,3 +295,21 @@
  	void activate();
  
  	virtual void setEditing(bool editing);
+--- psi.orig/src/src.pri
++++ psi/src/src.pri
+@@ -143,6 +143,7 @@ HEADERS += \
+ 	$$PWD/statusdlg.h \
+ 	$$PWD/statuscombobox.h \
+ 	$$PWD/eventdlg.h \
++	$$PWD/activecontactsmenu.h \
+ 	$$PWD/chatdlg.h \
+ 	$$PWD/psichatdlg.h \
+ 	$$PWD/chatsplitter.h \
+@@ -288,6 +289,7 @@ SOURCES += \
+ 	$$PWD/statusdlg.cpp \
+ 	$$PWD/statuscombobox.cpp \
+ 	$$PWD/eventdlg.cpp \
++	$$PWD/activecontactsmenu.cpp \
+ 	$$PWD/chatdlg.cpp \
+ 	$$PWD/psichatdlg.cpp \
+ 	$$PWD/chatsplitter.cpp \
