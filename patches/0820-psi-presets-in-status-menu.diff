@@ -52,7 +52,7 @@
  		void setType(QString);
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -55,6 +55,7 @@
+@@ -58,6 +58,7 @@
  				<maximum comment="The maximum number of recently joined rooms that should be remembered" type="int">10</maximum>
  			</recent-joins>
  			<reasons type="QStringList" />
@@ -60,7 +60,7 @@
  		</muc> 
  		<pgp comment="PGP encryption options">
  			<enable comment="Enable PGP globally" type="bool">true</enable>
-@@ -114,6 +115,7 @@
+@@ -117,6 +118,7 @@
  				<only-paste-template type="bool">false</only-paste-template>
  				<disable-paste-send type="bool">false</disable-paste-send>
  				<hide-when-closing type="bool">false</hide-when-closing>
@@ -68,7 +68,7 @@
  			</chat>
  			<save>
  				<toolbars-state type="QByteArray"/>
-@@ -282,6 +284,8 @@ QLineEdit#le_status_text {
+@@ -286,6 +288,8 @@ QLineEdit#le_status_text {
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -77,7 +77,7 @@
  				<log-width type="int">500</log-width>
  				<roster-width type="int">80</roster-width>
  				<roster-at-left type="bool">false</roster-at-left>
-@@ -484,6 +488,7 @@ QLineEdit#le_status_text {
+@@ -488,6 +492,7 @@ QLineEdit#le_status_text {
  				<show_statusmsg type="QKeySequence" comment="Show Status Message"></show_statusmsg>
  				<publish_tune type="QKeySequence" comment="Publish Tune"></publish_tune>
  				<status_all type="QKeySequence" comment="Status All"></status_all>
@@ -85,7 +85,7 @@
  				<status_chat type="QKeySequence" comment="Status Chat"></status_chat>
  				<status_online type="QKeySequence" comment="Status Online"></status_online>
  				<status_away type="QKeySequence" comment="Status Away"></status_away>
-@@ -491,6 +496,8 @@ QLineEdit#le_status_text {
+@@ -495,6 +500,8 @@ QLineEdit#le_status_text {
  				<status_dnd type="QKeySequence" comment="Status DND"></status_dnd>
  				<status_invisible type="QKeySequence" comment="Status Invisible"></status_invisible>
  				<status_offline type="QKeySequence" comment="Status Offline"></status_offline>
@@ -94,7 +94,7 @@
  				<help_readme type="QKeySequence" comment="README"></help_readme>
  				<help_tip type="QKeySequence" comment="Tips"></help_tip>
  				<help_online_forum type="QKeySequence" comment="Psi Forum (Online)"></help_online_forum>
-@@ -628,17 +635,41 @@ QLineEdit#le_status_text {
+@@ -632,17 +639,41 @@ QLineEdit#le_status_text {
  		<status>
  			<ask-for-message-on-offline type="bool">false</ask-for-message-on-offline>
  			<ask-for-message-on-online type="bool">false</ask-for-message-on-online>
@@ -610,7 +610,7 @@
  XMPP::Status makeStatus(int, const QString &);
  XMPP::Status makeStatus(int, const QString &, int);
  XMPP::Status::Type makeSTATUS(const XMPP::Status &);
-@@ -135,6 +138,7 @@ void x11wmClass(Display *dsp, WId wid, Q
+@@ -157,6 +160,7 @@ void x11wmClass(Display *dsp, WId wid, Q
  #else
  #define X11WM_CLASS(x)	/* dummy */
  #endif
@@ -763,7 +763,7 @@
 +#endif // GLOBALSTATUSMENU_H
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -1357,9 +1357,8 @@ void GCMainDlg::presence(const QString &
+@@ -1366,9 +1366,8 @@ void GCMainDlg::presence(const QString &
  		GCUserViewItem* contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
  		if (contact == NULL) {
  			//contact joining
@@ -774,7 +774,7 @@
  				if ( options_->getOption("options.muc.show-role-affiliation").toBool() ) {
  					if (s.mucItem().role() != MUCItem::NoRole) {
  						if (s.mucItem().affiliation() != MUCItem::NoAffiliation) {
-@@ -1378,6 +1377,15 @@ void GCMainDlg::presence(const QString &
+@@ -1387,6 +1386,15 @@ void GCMainDlg::presence(const QString &
  				} else {
  					message = message.arg(nick);
  				}
@@ -790,7 +790,7 @@
  				appendSysMsg(message);
  			}
  		}
-@@ -1402,17 +1410,15 @@ void GCMainDlg::presence(const QString &
+@@ -1411,17 +1419,15 @@ void GCMainDlg::presence(const QString &
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -929,7 +929,7 @@
  	int sbState;
  	QString nickname;
  	PsiTrayIcon* tray;
-@@ -125,6 +128,7 @@ public:
+@@ -126,6 +129,7 @@ public:
  
  	PopupAction* optionsButton, *statusButton;
  	IconActionGroup* statusGroup, *viewGroups;
@@ -937,8 +937,8 @@
  	EventNotifierAction* eventNotifier;
  	PsiCon* psi;
  	MainWin* mainWin;
-@@ -168,12 +172,13 @@ public:
- MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), psi(_psi), mainWin(_mainWin)
+@@ -169,12 +173,13 @@ public:
+ MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
  {
  
 -	statusGroup   = (IconActionGroup *)getAction("status_all");
@@ -952,7 +952,7 @@
  
  	statusMapper = new QSignalMapper(mainWin);
  	mainWin->connect(statusMapper, SIGNAL(mapped(int)), mainWin, SLOT(activatedStatusAction(int)));
-@@ -430,8 +435,12 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -435,8 +440,12 @@ MainWin::MainWin(bool _onTop, bool _asTo
  	d->vb_roster->addWidget(d->rosterWidget_);
  #endif
  
@@ -966,7 +966,7 @@
  	d->optionsMenu = new QMenu(tr("General"), this);
  	d->optionsMenu->setObjectName("optionsMenu");
  #ifdef Q_WS_MAC
-@@ -530,6 +539,7 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -535,6 +544,7 @@ MainWin::MainWin(bool _onTop, bool _asTo
  	d->optionsButton->setMenu( d->optionsMenu );
  	d->statusButton->setMenu( d->statusMenu );
  	d->rosterAvatar->setStatusMenu( d->statusMenu );
@@ -974,7 +974,7 @@
  
  	buildToolbars();
  	// setUnifiedTitleAndToolBarOnMac(true);
-@@ -636,6 +646,8 @@ void MainWin::registerAction( IconAction
+@@ -635,6 +645,8 @@ void MainWin::registerAction( IconAction
  		QObject* receiver;
  		const char* slot;
  	} actionlist[] = {
@@ -983,7 +983,7 @@
  #ifndef NEWCONTACTLIST
  		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
  		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
-@@ -819,22 +831,7 @@ void MainWin::setUseDock(bool use)
+@@ -818,22 +830,7 @@ void MainWin::setUseDock(bool use)
  void MainWin::buildStatusMenu()
  {
  	d->statusMenu->clear();
@@ -1007,7 +1007,7 @@
  #ifdef USE_PEP
  	d->statusMenu->addSeparator();
  	d->getAction("publish_tune")->addTo(d->statusMenu);
-@@ -845,10 +842,10 @@ void MainWin::activatedStatusAction(int 
+@@ -844,10 +841,10 @@ void MainWin::activatedStatusAction(int 
  {
  	QList<IconAction*> l = d->statusGroup->findChildren<IconAction*>();
  	foreach(IconAction* action, l) {
@@ -1020,7 +1020,7 @@
  }
  
  QMenuBar* MainWin::mainMenuBar() const
-@@ -1144,6 +1141,25 @@ void MainWin::actDiagQCAKeyStoreActivate
+@@ -1143,6 +1140,25 @@ void MainWin::actDiagQCAKeyStoreActivate
  	w->show();
  }
  
@@ -1046,7 +1046,7 @@
  void MainWin::actPlaySoundsActivated (bool state)
  {
  	PsiOptions::instance()->setOption("options.ui.notifications.sounds.enable", state);
-@@ -1343,31 +1359,30 @@ void MainWin::decorateButton(int status)
+@@ -1342,31 +1358,30 @@ void MainWin::decorateButton(int status)
  	}
  
  	setTrayToolTip();
@@ -1094,7 +1094,7 @@
  
  class QMenuBar;
  class QAction;
-@@ -84,7 +85,7 @@ protected:
+@@ -85,7 +86,7 @@ protected:
  #endif
  
  signals:
@@ -1103,7 +1103,7 @@
  	void statusMessageChanged(QString);
  	void changeProfile();
  	void blankMessage();
-@@ -138,6 +139,8 @@ private slots:
+@@ -139,6 +140,8 @@ private slots:
  	void actTipActivated();
  	void actDiagQCAPluginActivated();
  	void actDiagQCAKeyStoreActivated();
@@ -3778,7 +3778,7 @@
  			}
  
  			switch (autoAway) {
-@@ -1533,16 +1544,38 @@ void PsiAccount::autoLogin()
+@@ -1535,16 +1546,38 @@ void PsiAccount::autoLogin()
  	if (enabled()) {
  		bool autoLogin = d->acc.opt_auto;
  		if (autoLogin) {
@@ -3823,7 +3823,7 @@
  // logs on with the active account settings
  void PsiAccount::login()
  {
-@@ -1655,7 +1688,7 @@ void PsiAccount::forceDisconnect(bool fa
+@@ -1657,7 +1690,7 @@ void PsiAccount::forceDisconnect(bool fa
  		d->client->removeExtension("pep");
  
  		// send logout status
@@ -3832,7 +3832,7 @@
  		d->client->setPresence(s);
  	}
  
-@@ -2759,7 +2792,7 @@ Status PsiAccount::loggedOutStatus()
+@@ -2763,7 +2796,7 @@ Status PsiAccount::loggedOutStatus()
  #ifdef YAPSI
  	return Status(Status::Offline);
  #else
@@ -3841,7 +3841,7 @@
  #endif
  }
  
-@@ -2767,10 +2800,16 @@ void PsiAccount::setStatus(const Status 
+@@ -2771,10 +2804,16 @@ void PsiAccount::setStatus(const Status 
  {
  	Status s = _s;
  	if (!withPriority)
@@ -3859,7 +3859,7 @@
  	}
  
  	// Block all transports' contacts' status change popups from popping
-@@ -2828,18 +2867,37 @@ void PsiAccount::setStatus(const Status 
+@@ -2832,18 +2871,37 @@ void PsiAccount::setStatus(const Status 
  	}
  }
  
@@ -3899,7 +3899,7 @@
  
  	// using pgp?
  	if(!d->cur_pgpSecretKey.isNull()) {
-@@ -3619,25 +3677,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const
+@@ -3623,25 +3681,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const
  	return c;
  }
  
@@ -3975,7 +3975,7 @@
  	}
  }
  
-@@ -5367,7 +5461,7 @@ void PsiAccount::groupChatLeave(const QS
+@@ -5372,7 +5466,7 @@ void PsiAccount::groupChatLeave(const QS
  {
  	Jid j(room + '@' + host);
  	d->groupchats.removeAll(j.bare());
@@ -4081,7 +4081,7 @@
  
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -512,7 +512,7 @@ bool PsiCon::init()
+@@ -517,7 +517,7 @@ bool PsiCon::init()
  	connect(d->mainwin, SIGNAL(doManageAccounts()), SLOT(doManageAccounts()));
  	connect(d->mainwin, SIGNAL(doGroupChat()), SLOT(doGroupChat()));
  	connect(d->mainwin, SIGNAL(blankMessage()), SLOT(doNewBlankMessage()));
@@ -4090,7 +4090,7 @@
  	connect(d->mainwin, SIGNAL(statusMessageChanged(QString)), SLOT(setStatusMessage(QString)));
  	connect(d->mainwin, SIGNAL(doOptions()), SLOT(doOptions()));
  	connect(d->mainwin, SIGNAL(doToolbars()), SLOT(doToolbars()));
-@@ -683,6 +683,11 @@ bool PsiCon::haveAutoUpdater() const
+@@ -694,6 +694,11 @@ bool PsiCon::haveAutoUpdater() const
  	return d->autoUpdater != 0;
  }
  
@@ -4102,7 +4102,7 @@
  void PsiCon::registerCaps(const QString& ext, const QStringList& features)
  {
  	DiscoItem::Identity identity = { "client", ApplicationInfo::name(), "pc" };
-@@ -805,7 +810,7 @@ void PsiCon::changeProfile()
+@@ -816,7 +821,7 @@ void PsiCon::changeProfile()
  		if (messageBox.clickedButton() == cancel)
  			return;
  
@@ -4111,7 +4111,7 @@
  	}
  
  	doQuit(QuitProfile);
-@@ -963,37 +968,67 @@ void PsiCon::removeAccount(PsiAccount *p
+@@ -974,37 +979,67 @@ void PsiCon::removeAccount(PsiAccount *p
  	d->contactList->removeAccount(pa);
  }
  
@@ -4203,7 +4203,7 @@
  #else
  	setGlobalStatus(makeStatus(x, currentStatusMessage()), false, true);
  #endif
-@@ -1026,16 +1061,6 @@ XMPP::Status::Type PsiCon::currentStatus
+@@ -1037,16 +1072,6 @@ XMPP::Status::Type PsiCon::currentStatus
  #endif
  }
  
@@ -4220,7 +4220,7 @@
  QString PsiCon::currentStatusMessage() const
  {
  #ifdef YAPSI
-@@ -1043,16 +1068,15 @@ QString PsiCon::currentStatusMessage() c
+@@ -1054,16 +1079,15 @@ QString PsiCon::currentStatusMessage() c
  		return QString();
  	return d->mainwin->statusMessage();
  #else
@@ -4245,7 +4245,7 @@
  }
  
  void PsiCon::setStatusFromCommandline(const QString &status, const QString &message)
-@@ -1088,6 +1112,20 @@ void PsiCon::setGlobalStatus(const Statu
+@@ -1099,6 +1123,20 @@ void PsiCon::setGlobalStatus(const Statu
  	emit statusMessageChanged(s.status());
  }
  
@@ -4266,7 +4266,7 @@
  void PsiCon::setStatusMessage(QString message)
  {
  	XMPP::Status s;
-@@ -1270,6 +1308,21 @@ void PsiCon::doToolbars()
+@@ -1281,6 +1319,21 @@ void PsiCon::doToolbars()
  	}
  }
  
@@ -4288,7 +4288,7 @@
  void PsiCon::optionChanged(const QString& option)
  {
  	bool notifyRestart = true;
-@@ -1698,7 +1751,14 @@ void PsiCon::doWakeup()
+@@ -1724,7 +1777,14 @@ void PsiCon::doWakeup()
  	foreach(PsiAccount* account, d->contactList->enabledAccounts()) {
  		if (account->userAccount().opt_connectAfterSleep) {
  			// Should we do this when the network comes up ?
@@ -4306,7 +4306,7 @@
  }
 --- psi.orig/src/psicon.h
 +++ psi/src/psicon.h
-@@ -121,10 +121,10 @@ public:
+@@ -122,10 +122,10 @@ public:
  	void processEvent(PsiEvent*, ActivationType activationType);
  
  	Status::Type currentStatusType() const;
@@ -4318,7 +4318,7 @@
  
  signals:
  	void quit(int);
-@@ -136,10 +136,13 @@ signals:
+@@ -137,10 +137,13 @@ signals:
  	void emitOptionsUpdate();
  	void restoringSavedChatsChanged();
  	void statusMessageChanged(QString);
@@ -4333,7 +4333,7 @@
  	void checkAccountsEmpty();
  
  public slots:
-@@ -152,14 +155,13 @@ public slots:
+@@ -153,14 +156,13 @@ public slots:
  	void doNewBlankMessage();
  	void doOptions();
  	void doFileTransDlg();

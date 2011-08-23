@@ -1,17 +1,18 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -111,6 +111,10 @@
+@@ -114,6 +114,11 @@
  				<scaled-message-icons type="bool">false</scaled-message-icons>
  				<warn-before-clear type="bool">true</warn-before-clear>
  			</chat>
 +			<save>
 +				<toolbars-state type="QByteArray"/>
-+				<splitter-state type="QByteArray"/>
++				<log-width type="int">500</log-width>
++				<roster-width type="int">80</roster-width>
 +			</save>
  			<history comment="History dialog options">
  				<size comment="Remembered window size" type="QSize">
  					<width>640</width>
-@@ -162,10 +166,10 @@
+@@ -165,10 +170,10 @@
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
  				<toolbars/>
@@ -23,7 +24,7 @@
  				<use-transport-icons type="bool">true</use-transport-icons>
  				<saved-window-geometry type="QRect" >
  					<x>64</x>
-@@ -353,7 +357,7 @@
+@@ -356,7 +361,7 @@
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">true</use-tabs>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
@@ -51,7 +52,7 @@
  #include "common.h"
  #include "showtextdlg.h"
  #include "psicon.h"
-@@ -98,14 +101,19 @@ public:
+@@ -98,14 +101,20 @@ public:
  	Private(PsiCon *, MainWin *);
  	~Private();
  
@@ -67,32 +68,33 @@
 +	TabDlg *mainTabs;
  	QString statusTip;
 +	PsiToolBar *viewToolBar;
-+	QSize rosterGeometry;
-+	QSize tabsGeometry;
++	int tabsSize;
++	int rosterSize;
++	bool isLeftRoster;
  
  	PopupAction* optionsButton, *statusButton;
  	IconActionGroup* statusGroup;
-@@ -137,7 +145,7 @@ public:
+@@ -137,7 +146,7 @@ public:
  	void updateMenu(QStringList actions, QMenu* menu);
  };
  
 -MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : psi(_psi), mainWin(_mainWin)
-+MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), psi(_psi), mainWin(_mainWin)
++MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
  {
  
  	statusGroup   = (IconActionGroup *)getAction("status_all");
-@@ -258,6 +266,10 @@ void MainWin::Private::updateMenu(QStrin
+@@ -258,6 +267,10 @@ void MainWin::Private::updateMenu(QStrin
  #define TOOLW_FLAGS ((Qt::WFlags) 0)
  #endif
  
 +const QString toolbarsStateOptionPath = "options.ui.save.toolbars-state";
-+const QString rosterGeometryPath      = "options.ui.save.roster-geometry";
-+const QString tabsGeometryPath        = "options.ui.save.tabs-geometry";
++const QString rosterGeometryPath      = "options.ui.save.roster-width";
++const QString tabsGeometryPath        = "options.ui.save.tabs-width";
 +
  MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  :AdvancedWidget<QMainWindow>(0, (_onTop ? Qt::WindowStaysOnTopHint : Qt::Widget) | (_asTool ? (Qt::Tool |TOOLW_FLAGS) : Qt::Widget))
  {
-@@ -283,14 +295,39 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -283,14 +296,43 @@ MainWin::MainWin(bool _onTop, bool _asTo
  	d->statusTip = "";
  	d->nickname = "";
  
@@ -112,19 +114,23 @@
 +		d->psi->tabManager()->setPreferredTabsForKind('C', d->mainTabs);
 +		d->psi->tabManager()->setPreferredTabsForKind('M', d->mainTabs);
 +
-+		if ( PsiOptions::instance()->getOption("options.ui.contactlist.roster-at-left-when-all-in-one-window").toBool() ) {
++		QList<int> sizes;
++		d->rosterSize = PsiOptions::instance()->getOption(rosterGeometryPath).toInt();
++		d->tabsSize = PsiOptions::instance()->getOption(tabsGeometryPath).toInt();
++		d->isLeftRoster = PsiOptions::instance()->getOption("options.ui.contactlist.roster-at-left-when-all-in-one-window").toBool();
++		if (d->isLeftRoster) {
 +			d->splitter->addWidget(rosterBar);
 +			d->splitter->addWidget(d->mainTabs);
++			sizes << d->rosterSize << d->tabsSize;
 +		} else {
 +			d->splitter->addWidget(d->mainTabs);
 +			d->splitter->addWidget(rosterBar);
++			sizes << d->tabsSize << d->rosterSize;
 +		}
 +
-+		d->rosterGeometry = PsiOptions::instance()->getOption(rosterGeometryPath).toSize();
-+		d->tabsGeometry = PsiOptions::instance()->getOption(tabsGeometryPath).toSize();
-+		rosterBar->resize(d->rosterGeometry);
-+		d->mainTabs->resize(d->tabsGeometry);
-+	} else setCentralWidget(rosterBar);
++		d->splitter->setSizes(sizes);
++	} else
++		setCentralWidget(rosterBar);
  
 -	d->vb_main = new QVBoxLayout(center);
 +	d->vb_roster = new QVBoxLayout(rosterBar);
@@ -137,7 +143,7 @@
  	d->rosterWidget_->setContactList(psi->contactList());
  #endif
  
-@@ -304,13 +341,31 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -304,13 +346,31 @@ MainWin::MainWin(bool _onTop, bool _asTo
  	// d->contactListView_->setFrameShape(QFrame::NoFrame);
  #endif
  #endif
@@ -173,7 +179,7 @@
  	QHBoxLayout* searchLayout = new QHBoxLayout(d->searchWidget);
  	searchLayout->setMargin(0);
  	searchLayout->setSpacing(0);
-@@ -327,15 +382,15 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -327,15 +387,15 @@ MainWin::MainWin(bool _onTop, bool _asTo
  
  	//add contact view
  #ifndef NEWCONTACTLIST
@@ -192,7 +198,7 @@
  #endif
  
  	d->statusMenu = new QMenu(tr("Status"), this);
-@@ -392,12 +447,11 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -392,12 +452,11 @@ MainWin::MainWin(bool _onTop, bool _asTo
  
  	mainMenuBar()->addMenu(d->statusMenu);
  
@@ -208,14 +214,14 @@
  	d->getAction("show_hidden")->addTo(viewMenu);
  	d->getAction("show_agents")->addTo(viewMenu);
  	d->getAction("show_self")->addTo(viewMenu);
-@@ -461,9 +515,28 @@ MainWin::~MainWin()
+@@ -461,9 +520,22 @@ MainWin::~MainWin()
  	}
  
  	saveToolbarsState();
 +
-+	if(d->splitter != NULL) {
-+		PsiOptions::instance()->setOption(rosterGeometryPath, d->rosterGeometry);
-+		PsiOptions::instance()->setOption(tabsGeometryPath, d->tabsGeometry);
++	if(d->splitter) {
++		PsiOptions::instance()->setOption(rosterGeometryPath, d->rosterSize);
++		PsiOptions::instance()->setOption(tabsGeometryPath, d->tabsSize);
 +	}
 +
  	delete d;
@@ -223,21 +229,15 @@
  
 +void MainWin::splitterMoved(int /*pos*/, int /*index*/)
 +{
-+	int rosterIdx = 1;
-+	if (PsiOptions::instance()->getOption("options.ui.contactlist.roster-at-left-when-all-in-one-window").toBool())
-+		rosterIdx = 0;
-+
-+	QWidget * rosterBar = d->splitter->widget(rosterIdx);
-+	if (rosterBar && d->mainTabs) {
-+		d->rosterGeometry = rosterBar->size();
-+		d->tabsGeometry = d->mainTabs->size();
-+	}
++	QList<int> list = d->splitter->sizes();
++	d->rosterSize = !d->isLeftRoster ? list.last() : list.first();
++	d->tabsSize = d->isLeftRoster ? list.last() : list.first();
 +}
 +
  void MainWin::registerAction( IconAction* action )
  {
  	const char *activated  = SIGNAL( triggered() );
-@@ -695,8 +768,6 @@ QMenuBar* MainWin::mainMenuBar() const
+@@ -695,8 +767,6 @@ QMenuBar* MainWin::mainMenuBar() const
  	return menuBar();
  }
  
@@ -246,7 +246,7 @@
  void MainWin::saveToolbarsState()
  {
  	PsiOptions::instance()->setOption(toolbarsStateOptionPath, saveState());
-@@ -717,8 +788,21 @@ void MainWin::buildToolbars()
+@@ -717,8 +787,21 @@ void MainWin::buildToolbars()
  	qDeleteAll(toolbars_);
  	toolbars_.clear();
  
@@ -269,7 +269,7 @@
  		tb->initialize();
  		connect(tb, SIGNAL(customize()), d->psi, SLOT(doToolbars()));
  		toolbars_ << tb;
-@@ -740,6 +824,11 @@ void MainWin::buildToolbars()
+@@ -740,6 +823,11 @@ void MainWin::buildToolbars()
  	foreach(PsiToolBar* tb, toolbars_) {
  		tb->setUpdatesEnabled(true);
  	}
@@ -281,7 +281,7 @@
  }
  
  bool MainWin::showDockMenu(const QPoint &)
-@@ -1093,6 +1182,17 @@ void MainWin::closeEvent(QCloseEvent* e)
+@@ -1093,6 +1181,17 @@ void MainWin::closeEvent(QCloseEvent* e)
  #endif
  }
  
@@ -299,17 +299,46 @@
  void MainWin::keyPressEvent(QKeyEvent* e)
  {
  #ifdef Q_WS_MAC
+@@ -1531,4 +1630,26 @@ void MainWin::avcallConfig()
+ 		AvCallManager::config();
+ }
+ 
++void MainWin::resizeEvent(QResizeEvent *e)
++{
++	AdvancedWidget<QMainWindow>::resizeEvent(e);
++
++	if(d->splitter) {
++		QList<int> sizes = d->splitter->sizes();
++		int tabsWidth = !d->isLeftRoster ? sizes.first() : sizes.last();
++		int rosterWidth = d->isLeftRoster ? sizes.first() : sizes.last();
++		int dw = rosterWidth - d->rosterSize;
++		sizes.clear();
++		sizes.append(tabsWidth + dw);
++		if(d->isLeftRoster) {
++			sizes.prepend(d->rosterSize);
++		}
++		else {
++			sizes.append(d->rosterSize);
++		}
++		d->splitter->setSizes(sizes);
++		splitterMoved(0,0);
++	}
++}
++
+ //#endif
 --- psi.orig/src/mainwin.h
 +++ psi/src/mainwin.h
-@@ -73,6 +73,7 @@ public:
+@@ -72,7 +72,9 @@ public:
+ 
  protected:
  	// reimplemented
++	void resizeEvent(QResizeEvent *e);
  	void closeEvent(QCloseEvent *);
 +	void changeEvent(QEvent *event);
  	void keyPressEvent(QKeyEvent *);
  	QMenuBar* mainMenuBar() const;
  #ifdef Q_WS_WIN
-@@ -141,6 +142,7 @@ private slots:
+@@ -141,6 +143,7 @@ private slots:
  	void searchTextStarted(QString const &text);
  
  	void registerAction( IconAction * );
@@ -376,7 +405,7 @@
           <string>[customized]</string>
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -1261,7 +1261,8 @@ void PsiCon::optionChanged(const QString
+@@ -1272,7 +1272,8 @@ void PsiCon::optionChanged(const QString
  		alertIconUpdateAlertStyle();
  	}
  
@@ -388,7 +417,7 @@
  	}
 --- psi.orig/src/psicon.h
 +++ psi/src/psicon.h
-@@ -47,6 +47,7 @@ class QThread;
+@@ -48,6 +48,7 @@ class QThread;
  class PsiActionList;
  class PsiToolBar;
  class TabDlg;
@@ -411,7 +440,7 @@
  	menu.exec(e->globalPos());
  }
  
-+QString PsiToolBar::base()
++QString PsiToolBar::base() const
 +{
 +	return base_;
 +}
@@ -450,7 +479,7 @@
  
  	void initialize();
  	void updateVisibility();
-+	QString base();
++	QString base() const;
  
  	static void structToOptions(PsiOptions* options, const ToolbarPrefs& s);
  
