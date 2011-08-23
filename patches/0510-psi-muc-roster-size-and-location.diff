@@ -1,6 +1,6 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -212,6 +212,9 @@
+@@ -216,6 +216,9 @@
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -26,7 +26,7 @@
  	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
-+	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved(int,int)));
++	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
 +
  	// resize the horizontal splitter
 +	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
@@ -64,7 +64,7 @@
  	}
  }
  
-+void GCMainDlg::horizSplitterMoved(int/* pos*/, int /*index*/)
++void GCMainDlg::horizSplitterMoved()
 +{
 +	QList<int> list = ui_.hsplitter->sizes();
 +	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
@@ -95,13 +95,50 @@
  	UserListItem* u = account()->find(jid().bare());
  	if(u) {
  		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
+@@ -1979,6 +2015,28 @@ void GCMainDlg::sendTemp(const QString &
+ 	}
+ }
+ 
++void GCMainDlg::resizeEvent(QResizeEvent *e)
++{
++	TabbableWidget::resizeEvent(e);
++
++	QList<int> sizes = ui_.hsplitter->sizes();
++	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
++
++	int logWidth = !leftRoster ? sizes.first() : sizes.last();
++	int rosterWidth = leftRoster ? sizes.first() : sizes.last();
++	int dw = rosterWidth - d->rosterSize;
++	sizes.clear();
++	sizes.append(logWidth + dw);
++	if(leftRoster) {
++		sizes.prepend(d->rosterSize);
++	}
++	else {
++		sizes.append(d->rosterSize);
++	}
++	ui_.hsplitter->setSizes(sizes);
++	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
++}
++
+ //----------------------------------------------------------------------------
+ // GCFindDlg
+ //----------------------------------------------------------------------------
 --- psi.orig/src/groupchatdlg.h
 +++ psi/src/groupchatdlg.h
-@@ -143,6 +143,7 @@ private slots:
+@@ -88,6 +88,7 @@ protected:
+ 	void setShortcuts();
+ 
+ 	// reimplemented
++	void resizeEvent(QResizeEvent *e);
+ 	void dragEnterEvent(QDragEnterEvent *);
+ 	void dropEvent(QDropEvent *);
+ 	void closeEvent(QCloseEvent *);
+@@ -143,6 +144,7 @@ private slots:
  	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();
-+	void horizSplitterMoved(int pos, int index);
++	void horizSplitterMoved();
  
  public:
  	class Private;
