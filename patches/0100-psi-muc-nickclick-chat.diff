@@ -1,5 +1,5 @@
---- psi.orig/src/chatdlg.cpp
-+++ psi/src/chatdlg.cpp
+--- git.orig/src/chatdlg.cpp
++++ git/src/chatdlg.cpp
 @@ -74,6 +74,7 @@
  #include "accountlabel.h"
  #include "psirichtext.h"
@@ -25,8 +25,8 @@
  void ChatDlg::init()
  {
  	initUi();
---- psi.orig/src/chatdlg.h
-+++ psi/src/chatdlg.h
+--- git.orig/src/chatdlg.h
++++ git/src/chatdlg.h
 @@ -110,6 +110,7 @@ public slots:
  	void incomingMessage(const Message &);
  	virtual void updateAvatar() = 0;
@@ -35,9 +35,9 @@
  
  protected slots:
  	void scrollUp();
---- psi.orig/src/chatview_te.cpp
-+++ psi/src/chatview_te.cpp
-@@ -111,6 +111,19 @@ void ChatView::clear()
+--- git.orig/src/chatview_te.cpp
++++ git/src/chatview_te.cpp
+@@ -112,6 +112,19 @@ void ChatView::clear()
  	addLogIconsResources();
  }
  
@@ -57,7 +57,7 @@
  void ChatView::addLogIconsResources()
  {
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
-@@ -285,16 +298,18 @@ void ChatView::renderMucMessage(const Me
+@@ -286,16 +299,18 @@ void ChatView::renderMucMessage(const Me
  	} else {
  		nickcolor = share_.getMucNickColor(mv.nick(), mv.isLocal());
  	}
@@ -79,8 +79,8 @@
  		}
  	}
  
---- psi.orig/src/chatview_te.h
-+++ psi/src/chatview_te.h
+--- git.orig/src/chatview_te.h
++++ git/src/chatview_te.h
 @@ -24,6 +24,7 @@
  #include <QWidget>
  #include <QDateTime>
@@ -107,8 +107,8 @@
  private:
  	bool isMuc_;
  	QString jid_;
---- psi.orig/src/chatview_webkit.cpp
-+++ psi/src/chatview_webkit.cpp
+--- git.orig/src/chatview_webkit.cpp
++++ git/src/chatview_webkit.cpp
 @@ -189,6 +189,15 @@ void ChatView::setSessionData(bool isMuc
  	name_ = name;
  }
@@ -125,8 +125,8 @@
  bool ChatView::focusNextPrevChild(bool next)
  {
  	return QWidget::focusNextPrevChild(next);
---- psi.orig/src/chatview_webkit.h
-+++ psi/src/chatview_webkit.h
+--- git.orig/src/chatview_webkit.h
++++ git/src/chatview_webkit.h
 @@ -70,6 +70,7 @@ public:
  	void setSessionData(bool isMuc, const QString &jid, const QString name);
  	void setAccount(PsiAccount *acc) { account_ = acc; }
@@ -145,8 +145,8 @@
  private:
  	ChatViewTheme* currentTheme();
  
---- psi.orig/src/desktoputil.cpp
-+++ psi/src/desktoputil.cpp
+--- git.orig/src/desktoputil.cpp
++++ git/src/desktoputil.cpp
 @@ -84,7 +84,10 @@ static bool doOpenUrl(const QUrl& url)
   */
  bool DesktopUtil::openUrl(const QString& url)
@@ -159,9 +159,9 @@
  	if (ascii == url)
  		return doOpenUrl(QUrl::fromEncoded(ascii));
  	else
---- psi.orig/src/gcuserview.cpp
-+++ psi/src/gcuserview.cpp
-@@ -394,13 +394,8 @@ void GCUserView::qlv_doubleClicked(const
+--- git.orig/src/gcuserview.cpp
++++ git/src/gcuserview.cpp
+@@ -393,13 +393,8 @@ void GCUserView::qlv_doubleClicked(const
  	}
  }
  
@@ -176,7 +176,7 @@
  	QPointer<GCUserViewItem> lvi = (GCUserViewItem *)i;
  	bool self = gcDlg_->nick() == i->text(0);
  	GCUserViewItem* c = (GCUserViewItem*) findEntry(gcDlg_->nick());
-@@ -533,6 +528,16 @@ void GCUserView::contextMenuRequested(co
+@@ -532,6 +527,16 @@ void GCUserView::contextMenuRequested(co
  	action(lvi->text(0), lvi->s, x);
  }
  
@@ -193,9 +193,9 @@
  void GCUserView::mousePressEvent(QMouseEvent *event)
  {
  	QTreeWidget::mousePressEvent(event);
---- psi.orig/src/gcuserview.h
-+++ psi/src/gcuserview.h
-@@ -78,6 +78,7 @@ public:
+--- git.orig/src/gcuserview.h
++++ git/src/gcuserview.h
+@@ -75,6 +75,7 @@ public:
  	void updateEntry(const QString &, const Status &);
  	void removeEntry(const QString &);
  	QStringList nickList() const;
@@ -203,8 +203,8 @@
  
  protected:
  	enum Role { Moderator = 0, Participant = 1, Visitor = 2 };
---- psi.orig/src/groupchatdlg.cpp
-+++ psi/src/groupchatdlg.cpp
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
 @@ -72,6 +72,7 @@
  #include "psitooltip.h"
  #include "psioptions.h"
@@ -252,26 +252,24 @@
  	connect(ui_.pb_topic, SIGNAL(clicked()), SLOT(openTopic()));
  	PsiToolTip::install(ui_.le_topic);
  
-@@ -698,8 +724,17 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -698,6 +724,15 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	setShortcuts();
  	invalidateTab();
  	setConnecting();
 +	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
- }
- 
++}
++
 +void GCMainDlg::vcard(const QString& _str)
 +{
 +	QString str = _str;
 +	str.remove(0, str.indexOf(":")+1);
 +	XMPP::Jid jd(str);
 +	account()->actionInfo(jd);
-+}
-+
+ }
+ 
  GCMainDlg::~GCMainDlg()
- {
- 	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
---- psi.orig/src/groupchatdlg.h
-+++ psi/src/groupchatdlg.h
+--- git.orig/src/groupchatdlg.h
++++ git/src/groupchatdlg.h
 @@ -104,8 +104,11 @@ public slots:
  	virtual void ensureTabbedCorrectly();
  
@@ -284,8 +282,8 @@
  	void scrollUp();
  	void scrollDown();
  	void mle_returnPressed();
---- psi.orig/src/webview.cpp
-+++ psi/src/webview.cpp
+--- git.orig/src/webview.cpp
++++ git/src/webview.cpp
 @@ -75,6 +75,10 @@ void WebView::contextMenuEvent(QContextM
  	QMenu *menu;
  
@@ -297,8 +295,8 @@
  		menu = URLObject::getInstance()->createPopupMenu(r.linkUrl().toEncoded());
  		//menu->addAction(pageAction(QWebPage::CopyLinkToClipboard));
  	} else {
---- psi.orig/src/widgets/urlobject.cpp
-+++ psi/src/widgets/urlobject.cpp
+--- git.orig/src/widgets/urlobject.cpp
++++ git/src/widgets/urlobject.cpp
 @@ -34,7 +34,7 @@ class URLObject::Private : QObject
  	Q_OBJECT
  public:
@@ -338,8 +336,8 @@
  		m->addAction(d->act_xmpp);
  		m->addAction(d->act_chat);
  		m->addAction(d->act_send_message);
---- psi.orig/src/widgets/urlobject.h
-+++ psi/src/widgets/urlobject.h
+--- git.orig/src/widgets/urlobject.h
++++ git/src/widgets/urlobject.h
 @@ -47,6 +47,7 @@ public:
  	
  signals:
@@ -348,8 +346,8 @@
  	
  public:
  	class Private;
---- psi.orig/themes/chatview/psi/classic/index.html
-+++ psi/themes/chatview/psi/classic/index.html
+--- git.orig/themes/chatview/psi/classic/index.html
++++ git/themes/chatview/psi/classic/index.html
 @@ -17,6 +17,7 @@ body > div > img:first-child { vertical-
  .infmsg {}
  .usertext {}
