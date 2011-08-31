@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -476,7 +476,6 @@ QLineEdit#le_status_text {
  				</sounds>
  				<successful-subscription type="bool">true</successful-subscription>
@@ -8,8 +8,8 @@
  			<decorate-windows type="bool">true</decorate-windows>
  			<service-discovery>
  				<automatically-get-info type="bool">false</automatically-get-info>
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
 @@ -82,6 +82,8 @@
  
  #include "psichatdlg.h"
@@ -71,8 +71,8 @@
  }
  
  void ChatDlg::updateContact(const Jid &j, bool fromPresence)
---- git.orig/src/chatdlg.h
-+++ git/src/chatdlg.h
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
 @@ -74,8 +74,6 @@ public:
  	void setJid(const Jid &);
  	const QString & getDisplayName();
@@ -90,8 +90,8 @@
  	void hideEvent(QHideEvent *);
  	void showEvent(QShowEvent *);
  	void dropEvent(QDropEvent* event);
---- git.orig/src/eventdlg.cpp
-+++ git/src/eventdlg.cpp
+--- psi.orig/src/eventdlg.cpp
++++ psi/src/eventdlg.cpp
 @@ -77,6 +77,8 @@
  #endif
  #include "psirichtext.h"
@@ -142,8 +142,8 @@
  void EventDlg::keyPressEvent(QKeyEvent *e)
  {
  	// FIXMEKEY
---- git.orig/src/eventdlg.h
-+++ git/src/eventdlg.h
+--- psi.orig/src/eventdlg.h
++++ psi/src/eventdlg.h
 @@ -128,8 +128,6 @@ public:
  
  	PsiAccount *psiAccount();
@@ -161,8 +161,8 @@
  	void keyPressEvent(QKeyEvent *);
  	void closeEvent(QCloseEvent *);
  
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
 @@ -103,7 +103,7 @@
  #define MCMDMUC		"http://psi-im.org/ids/mcmd#mucmain"
  #define MCMDMUCNICK	"http://psi-im.org/ids/mcmd#mucnick"
@@ -204,8 +204,8 @@
  void GCMainDlg::deactivated()
  {
  	TabbableWidget::deactivated();
---- git.orig/src/groupchatdlg.h
-+++ git/src/groupchatdlg.h
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
 @@ -93,7 +93,6 @@ protected:
  	void dragEnterEvent(QDragEnterEvent *);
  	void dropEvent(QDropEvent *);
@@ -214,8 +214,8 @@
  	void mucInfoDialog(const QString& title, const QString& message, const Jid& actor, const QString& reason);
  	void setStatusTabIcon(int status);
  
---- git.orig/src/historydlg.cpp
-+++ git/src/historydlg.cpp
+--- psi.orig/src/historydlg.cpp
++++ psi/src/historydlg.cpp
 @@ -147,11 +147,9 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
  	listAccounts();
  	loadContacts();
@@ -242,8 +242,8 @@
  	delete d;
  }
  
---- git.orig/src/options/opt_application.cpp
-+++ git/src/options/opt_application.cpp
+--- psi.orig/src/options/opt_application.cpp
++++ psi/src/options/opt_application.cpp
 @@ -52,9 +52,6 @@ QWidget *OptionsTabApplication::widget()
  	w = new OptApplicationUI();
  	OptApplicationUI *d = (OptApplicationUI *)w;
@@ -270,8 +270,8 @@
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
  	d->ck_quitOnClose->setChecked(PsiOptions::instance()->getOption("options.ui.contactlist.quit-on-close").toBool());
  	d->ck_winDecor->setChecked(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
---- git.orig/src/options/opt_application.ui
-+++ git/src/options/opt_application.ui
+--- psi.orig/src/options/opt_application.ui
++++ psi/src/options/opt_application.ui
 @@ -21,13 +21,6 @@
      </widget>
     </item>
@@ -286,8 +286,8 @@
      <widget class="QCheckBox" name="ck_docklet" >
       <property name="text" >
        <string>Enable docklet</string>
---- git.orig/src/psi_profiles.cpp
-+++ git/src/psi_profiles.cpp
+--- psi.orig/src/psi_profiles.cpp
++++ psi/src/psi_profiles.cpp
 @@ -878,7 +878,6 @@ bool OptionsMigration::fromFile(const QS
  				}
  				PsiOptions::instance()->setOption("options.ui.chat.delete-contents-after", delafter);
@@ -296,9 +296,17 @@
  				migrateBoolEntry(tag, "ignoreHeadline", "options.messages.ignore-headlines");
  				migrateBoolEntry(tag, "ignoreNonRoster", "options.messages.ignore-non-roster-contacts");
  				migrateBoolEntry(tag, "excludeGroupChatIgnore", "options.messages.exclude-muc-from-ignore");
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -112,7 +112,7 @@ bool TabDlgDelegate::eventFilter(QWidget
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -33,6 +33,7 @@
+ #include <QDropEvent>
+ #include <QCloseEvent>
+ #include <QSignalMapper>
++#include <QTimer>
+ 
+ #include "psitabwidget.h"
+ #include "psioptions.h"
+@@ -112,7 +113,7 @@ bool TabDlgDelegate::eventFilter(QWidget
   *        will manage some aspects of the TabDlg behavior.  Ownership is not
   *        passed.
   */ 
@@ -307,7 +315,7 @@
  		: AdvancedWidget<QWidget>(0, delegate ? delegate->initWindowFlags() : (Qt::WindowFlags)0)
  		, delegate_(delegate)
  		, tabWidget_(0)
-@@ -189,11 +189,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+@@ -189,11 +190,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
  		addAction(action);
  	}
  
@@ -322,8 +330,19 @@
  	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  }
  
---- git.orig/src/tabs/tabdlg.h
-+++ git/src/tabs/tabdlg.h
+@@ -400,9 +399,9 @@ void TabDlg::addTab(TabbableWidget* tab)
+ 	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
+ 	connect(tab, SIGNAL(vSplitterMoved(int,int)), SLOT(updateVSplitters(int,int)));
+ 
+-	this->showWithoutActivation();
+ 	updateTab(tab);
+ 	setUpdatesEnabled(true);
++	QTimer::singleShot(0, this, SLOT(showWithoutActivation()));
+ }
+ 
+ void TabDlg::hideCurrentTab()
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
 @@ -69,7 +69,7 @@ class TabDlg : public AdvancedWidget<QWi
  {
  	Q_OBJECT
@@ -333,8 +352,8 @@
  	~TabDlg();
  	bool managesTab(const TabbableWidget*) const;
  	bool tabOnTop(const TabbableWidget*) const;
---- git.orig/src/tabs/tabmanager.cpp
-+++ git/src/tabs/tabmanager.cpp
+--- psi.orig/src/tabs/tabmanager.cpp
++++ psi/src/tabs/tabmanager.cpp
 @@ -64,13 +64,6 @@ bool TabManager::shouldBeTabbed(QWidget 
  	return false;
  }
@@ -380,8 +399,8 @@
  	connect(psiCon_, SIGNAL(emitOptionsUpdate()), tab, SLOT(optionsUpdate()));
  	return tab;
  }
---- git.orig/src/tabs/tabmanager.h
-+++ git/src/tabs/tabmanager.h
+--- psi.orig/src/tabs/tabmanager.h
++++ psi/src/tabs/tabmanager.h
 @@ -117,7 +117,6 @@ public:
  
  public slots:
@@ -390,8 +409,8 @@
  
  private:
  	QMap<QChar, TabDlg*> preferedTabsetForKind_;
---- git.orig/src/tools/advwidget/advwidget.cpp
-+++ git/src/tools/advwidget/advwidget.cpp
+--- psi.orig/src/tools/advwidget/advwidget.cpp
++++ psi/src/tools/advwidget/advwidget.cpp
 @@ -98,6 +98,7 @@ protected:
  private:
  	QTimer* saveGeometryTimer_;
@@ -409,7 +428,7 @@
  	saveGeometryTimer_ = new QTimer(this);
  	saveGeometryTimer_->setInterval(100);
  	saveGeometryTimer_->setSingleShot(true);
-@@ -326,11 +325,17 @@ void GAdvancedWidget::Private::updateGeo
+@@ -326,11 +325,13 @@ void GAdvancedWidget::Private::updateGeo
  
  void GAdvancedWidget::Private::saveGeometry()
  {
@@ -422,15 +441,11 @@
 -	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", (parentWidget_->windowState() & Qt::WindowMaximized) != 0);
 -	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", (parentWidget_->windowState() & Qt::WindowFullScreen) != 0);
 +	PsiOptions::instance()->setOption(geometryOptionPath_ + "-maximized", isMaximized);
-+#ifdef Q_OS_WIN
-+	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", isMaximized);  //sick!!!!
-+#else
 +	PsiOptions::instance()->setOption(geometryOptionPath_ + "-fullscreen", bool(parentWidget_->windowState() & Qt::WindowFullScreen));
-+#endif
  }
  
  void GAdvancedWidget::Private::restoreGeometry()
-@@ -357,13 +362,13 @@ void GAdvancedWidget::Private::restoreGe
+@@ -357,13 +358,13 @@ void GAdvancedWidget::Private::restoreGe
  		quint16 majorVersion = 1;
  		quint16 minorVersion = 0;
  		QRect restoredFrameGeometry = o->getOption(geometryOptionPath_ + "-frame").toRect();
@@ -446,7 +461,7 @@
  			<< qint32(o->getOption(geometryOptionPath_ + "-screen").toInt())
  			<< quint8(o->getOption(geometryOptionPath_ + "-maximized").toBool())
  			<< quint8(o->getOption(geometryOptionPath_ + "-fullscreen").toBool());
-@@ -410,6 +415,10 @@ bool GAdvancedWidget::Private::eventFilt
+@@ -410,6 +411,10 @@ bool GAdvancedWidget::Private::eventFilt
  {
  	if (obj == parentWidget_) {
  		if (e->type() == QEvent::Move || e->type() == QEvent::Resize) {
@@ -457,7 +472,7 @@
  			saveGeometryTimer_->start();
  		}
  
-@@ -454,6 +463,9 @@ void GAdvancedWidget::setGeometryOptionP
+@@ -454,6 +459,9 @@ void GAdvancedWidget::setGeometryOptionP
  {
  	Q_ASSERT(d->geometryOptionPath_.isEmpty());
  	Q_ASSERT(!optionPath.isEmpty());
@@ -467,8 +482,8 @@
  	d->geometryOptionPath_ = optionPath;
  	d->restoreGeometry();
  	d->parentWidget_->installEventFilter(d);
---- git.orig/src/whiteboarding/wbdlg.cpp
-+++ git/src/whiteboarding/wbdlg.cpp
+--- psi.orig/src/whiteboarding/wbdlg.cpp
++++ psi/src/whiteboarding/wbdlg.cpp
 @@ -34,6 +34,7 @@
  #include "stretchwidget.h"
  #include "iconset.h"
@@ -499,8 +514,8 @@
  void WbDlg::showEvent(QShowEvent *) {
  	setSelfDestruct(0);
  }
---- git.orig/src/whiteboarding/wbdlg.h
-+++ git/src/whiteboarding/wbdlg.h
+--- psi.orig/src/whiteboarding/wbdlg.h
++++ psi/src/whiteboarding/wbdlg.h
 @@ -100,8 +100,6 @@ protected:
  	void keyPressEvent(QKeyEvent *);
  	/*! \brief Sets the destruction times as specified by options.*/
