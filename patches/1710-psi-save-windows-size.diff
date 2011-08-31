@@ -216,7 +216,16 @@
  
 --- psi.orig/src/historydlg.cpp
 +++ psi/src/historydlg.cpp
-@@ -147,11 +147,9 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+@@ -37,6 +37,8 @@
+ #include "userlist.h"
+ #include "common.h"
+ 
++static const QString geometryOption = "options.ui.history.size";
++
+ static QString getNext(QString *str)
+ {
+ 	int n = 0;
+@@ -147,21 +149,13 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
  	listAccounts();
  	loadContacts();
  
@@ -225,20 +234,17 @@
 -		if (!s.isEmpty()) {
 -			resize(s);
 -		}
-+	QSize s = PsiOptions::instance()->getOption("options.ui.history.size").value<QSize>();
-+	if (!s.isEmpty()) {
-+		resize(s);
- 	}
+-	}
++	setGeometryOptionPath(geometryOption);
  
  	ui_.jidList->setFocus();
-@@ -159,9 +157,7 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ }
  
  HistoryDlg::~HistoryDlg()
  {
 -	if (PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool()) {
 -		PsiOptions::instance()->setOption("options.ui.history.size", size());
 -	}
-+	PsiOptions::instance()->setOption("options.ui.history.size", size());
  	delete d;
  }
  
@@ -306,7 +312,7 @@
  
  #include "psitabwidget.h"
  #include "psioptions.h"
-@@ -112,7 +113,7 @@ bool TabDlgDelegate::eventFilter(QWidget
+@@ -126,7 +127,7 @@ bool TabDlgDelegate::eventFilter(QWidget
   *        will manage some aspects of the TabDlg behavior.  Ownership is not
   *        passed.
   */ 
@@ -315,7 +321,7 @@
  		: AdvancedWidget<QWidget>(0, delegate ? delegate->initWindowFlags() : (Qt::WindowFlags)0)
  		, delegate_(delegate)
  		, tabWidget_(0)
-@@ -189,11 +190,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+@@ -204,11 +205,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
  		addAction(action);
  	}
  
@@ -330,7 +336,7 @@
  	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  }
  
-@@ -400,9 +399,9 @@ void TabDlg::addTab(TabbableWidget* tab)
+@@ -415,9 +414,9 @@ void TabDlg::addTab(TabbableWidget* tab)
  	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
  	connect(tab, SIGNAL(vSplitterMoved(int,int)), SLOT(updateVSplitters(int,int)));
  
