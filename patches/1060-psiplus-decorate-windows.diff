@@ -1,15 +1,15 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -446,6 +446,7 @@ QLineEdit#le_status_text {
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -445,6 +445,7 @@ QLineEdit#le_status_text {
+ 				</sounds>
  				<successful-subscription type="bool">true</successful-subscription>
  			</notifications>
- 			<remember-window-sizes type="bool">true</remember-window-sizes>
 +			<decorate-windows type="bool">true</decorate-windows>
  			<service-discovery>
  				<automatically-get-info type="bool">false</automatically-get-info>
  				<automatically-get-items type="bool">false</automatically-get-items>
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
 @@ -85,6 +85,7 @@
  #include "mcmdmanager.h"
  #include "lastactivitytask.h"
@@ -47,8 +47,8 @@
  #ifdef WEBKIT
  	ui_.log->setAccount(account());
  #endif
-@@ -2112,6 +2125,25 @@ void GCMainDlg::resizeEvent(QResizeEvent
- 	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
+@@ -2086,6 +2099,25 @@ void GCMainDlg::sendTemp(const QString &
+ 	}
  }
  
 +void GCMainDlg::setMargins()
@@ -73,9 +73,9 @@
  //----------------------------------------------------------------------------
  // GCFindDlg
  //----------------------------------------------------------------------------
---- git.orig/src/groupchatdlg.h
-+++ git/src/groupchatdlg.h
-@@ -170,6 +170,8 @@ private:
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -169,6 +169,8 @@ private:
  
  	PsiOptions* options_;
  	QDateTime lastMsgTime_;
@@ -84,8 +84,8 @@
  };
  
  class GCFindDlg : public QDialog
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
 @@ -147,6 +147,8 @@ public:
  	QTimer *hideTimer;
  	int hideTimerInterval; //interval in sec
@@ -179,8 +179,8 @@
 +}
 +
  //#endif
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
 @@ -26,6 +26,7 @@
  #include <QList>
  #include <QString>
@@ -198,12 +198,12 @@
  
  signals:
  	void statusChanged(XMPP::Status::Type);
---- git.orig/src/options/opt_application.cpp
-+++ git/src/options/opt_application.cpp
-@@ -47,7 +47,9 @@ QWidget *OptionsTabApplication::widget()
- 	d->ck_keepSizes->setWhatsThis(
- 		tr("Makes Psi remember window size and positions for chats and messages."
- 		"  If disabled, the windows will always appear in their default positions and sizes."));
+--- psi.orig/src/options/opt_application.cpp
++++ psi/src/options/opt_application.cpp
+@@ -43,7 +43,9 @@ QWidget *OptionsTabApplication::widget()
+ 
+ 	w = new OptApplicationUI();
+ 	OptApplicationUI *d = (OptApplicationUI *)w;
 -
 +	d->ck_winDecor->setWhatsThis(
 +		tr("Set or remove window decorations for roster and chats."
@@ -211,25 +211,25 @@
  	// docklet
  	d->ck_docklet->setWhatsThis(
  		tr("Makes Psi use a docklet icon, also known as system tray icon."));
-@@ -95,6 +97,7 @@ void OptionsTabApplication::applyOptions
+@@ -90,6 +92,7 @@ void OptionsTabApplication::applyOptions
+ 	OptApplicationUI *d = (OptApplicationUI *)w;
  
- 	PsiOptions::instance()->setOption("options.ui.remember-window-sizes",d->ck_keepSizes->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.quit-on-close", d->ck_quitOnClose->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.decorate-windows", d->ck_winDecor->isChecked());
  
  	// Auto-update
  	PsiOptions::instance()->setOption("options.auto-update.check-on-startup", d->ck_autoUpdate->isChecked());
-@@ -140,6 +143,7 @@ void OptionsTabApplication::restoreOptio
- 	d->ck_keepSizes->setChecked( PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool() );
+@@ -134,6 +137,7 @@ void OptionsTabApplication::restoreOptio
+ 
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
  	d->ck_quitOnClose->setChecked(PsiOptions::instance()->getOption("options.ui.contactlist.quit-on-close").toBool());
 +	d->ck_winDecor->setChecked(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  
  	// docklet
  	d->ck_docklet->setChecked( PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() );
---- git.orig/src/options/opt_application.ui
-+++ git/src/options/opt_application.ui
-@@ -31,6 +31,16 @@
+--- psi.orig/src/options/opt_application.ui
++++ psi/src/options/opt_application.ui
+@@ -24,6 +24,16 @@
      </widget>
     </item>
     <item>
@@ -246,7 +246,7 @@
      <widget class="QGroupBox" name="gb_docklet" >
       <property name="title" >
        <string>Docklet</string>
-@@ -235,6 +245,7 @@
+@@ -228,6 +238,7 @@
    <tabstop>ck_useleft</tabstop>
    <tabstop>ck_showMenubar</tabstop>
    <tabstop>ck_docklet</tabstop>
@@ -254,8 +254,8 @@
    <tabstop>ck_dockDCstyle</tabstop>
    <tabstop>ck_dockHideMW</tabstop>
    <tabstop>ck_dockToolMW</tabstop>
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
 @@ -175,6 +175,8 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
  	connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
  	connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
@@ -325,8 +325,8 @@
 +}
 +
  #include "psichatdlg.moc"
---- git.orig/src/psichatdlg.h
-+++ git/src/psichatdlg.h
+--- psi.orig/src/psichatdlg.h
++++ psi/src/psichatdlg.h
 @@ -9,6 +9,7 @@
  
  #include "ui_chatdlg.h"
@@ -355,9 +355,9 @@
  };
  
  #endif
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -149,9 +149,19 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -165,9 +165,19 @@ TabDlg::TabDlg(TabManager* tabManager, c
  		delegate_->tabWidgetCreated(this, tabWidget_);
  
  	QVBoxLayout *vert1 = new QVBoxLayout(this);
@@ -378,16 +378,16 @@
  	setAcceptDrops(true);
  
  	X11WM_CLASS("tabs");
-@@ -185,6 +195,7 @@ TabDlg::TabDlg(TabManager* tabManager, Q
- 	} else {
- 		resize(ChatDlg::defaultSize()); //TODO: no!
+@@ -214,6 +224,7 @@ TabDlg::~TabDlg()
+ 	if (delegate_) {
+ 		delegate_->destroy(this);
  	}
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  }
  
- TabDlg::~TabDlg()
---- git.orig/src/tabs/tabdlg.h
-+++ git/src/tabs/tabdlg.h
+ // FIXME: This is a bad idea to store pointers in QMimeData
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
 @@ -29,6 +29,7 @@
  #include "advwidget.h"
  
@@ -404,8 +404,8 @@
  };
  
  #endif
---- git.orig/src/tools/advwidget/advwidget.h
-+++ git/src/tools/advwidget/advwidget.h
+--- psi.orig/src/tools/advwidget/advwidget.h
++++ psi/src/tools/advwidget/advwidget.h
 @@ -21,6 +21,7 @@
  #ifndef ADVWIDGET_H
  #define ADVWIDGET_H
@@ -736,8 +736,8 @@
  };
  
  #endif
---- /dev/null
-+++ git/src/widgets/psiwindowheader.cpp
+--- psi.orig/src/widgets/psiwindowheader.cpp
++++ psi/src/widgets/psiwindowheader.cpp
 @@ -0,0 +1,228 @@
 +/*
 + * psiwindowheader.cpp
@@ -967,8 +967,8 @@
 +	}
 +	e->accept();
 +}
---- /dev/null
-+++ git/src/widgets/psiwindowheader.h
+--- psi.orig/src/widgets/psiwindowheader.h
++++ psi/src/widgets/psiwindowheader.h
 @@ -0,0 +1,65 @@
 +/*
 + * psiwindowheader.cpp
@@ -1035,8 +1035,8 @@
 +};
 +
 +#endif // PSIWINDOWHEADER_H
---- /dev/null
-+++ git/src/widgets/psiwindowheader.ui
+--- psi.orig/src/widgets/psiwindowheader.ui
++++ psi/src/widgets/psiwindowheader.ui
 @@ -0,0 +1,120 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -1158,8 +1158,8 @@
 + <resources/>
 + <connections/>
 +</ui>
---- git.orig/src/widgets/widgets.pri
-+++ git/src/widgets/widgets.pri
+--- psi.orig/src/widgets/widgets.pri
++++ psi/src/widgets/widgets.pri
 @@ -16,6 +16,7 @@ SOURCES += \
  	$$PWD/psitiplabel.cpp \
  	$$PWD/psitabwidget.cpp \

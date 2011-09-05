@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -216,6 +216,9 @@
  				</view>
  			</menu>
@@ -10,8 +10,8 @@
  				<highlight-words type="QStringList" />
  				<size comment="Remembered window size" type="QSize">
  					<width>580</width>
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
 @@ -234,6 +234,9 @@ public:
  
  	QPointer<MUCConfigDlg> configDlg;
@@ -49,7 +49,7 @@
  	list.clear();
  	list << 324;
  	list << 10;
-@@ -780,6 +795,10 @@ void GCMainDlg::vcard(const QString& _st
+@@ -779,6 +794,10 @@ void GCMainDlg::vcard(const QString& _st
  
  GCMainDlg::~GCMainDlg()
  {
@@ -60,7 +60,7 @@
  	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
  		account()->groupChatLeave(jid().domain(), jid().node());
  	}
-@@ -800,15 +819,32 @@ GCMainDlg::~GCMainDlg()
+@@ -799,6 +818,17 @@ GCMainDlg::~GCMainDlg()
  	}
  }
  
@@ -75,9 +75,10 @@
 +	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
 +}
 +
- void GCMainDlg::ensureTabbedCorrectly() {
+ void GCMainDlg::ensureTabbedCorrectly()
+ {
  	TabbableWidget::ensureTabbedCorrectly();
- 	setShortcuts();
+@@ -806,9 +836,15 @@ void GCMainDlg::ensureTabbedCorrectly()
  	// QSplitter is broken again, force resize so that
  	// lv_users gets initizalised properly and context menu
  	// works in tabs too.
@@ -95,40 +96,8 @@
  	UserListItem* u = account()->find(jid().bare());
  	if(u) {
  		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
-@@ -1979,6 +2015,31 @@ void GCMainDlg::sendTemp(const QString &
- 	}
- }
- 
-+void GCMainDlg::resizeEvent(QResizeEvent *e)
-+{
-+	TabbableWidget::resizeEvent(e);
-+
-+	if(!isVisible())
-+		return;
-+
-+	QList<int> sizes = ui_.hsplitter->sizes();
-+	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
-+
-+	int logWidth = !leftRoster ? sizes.first() : sizes.last();
-+	int rosterWidth = leftRoster ? sizes.first() : sizes.last();
-+	int dw = rosterWidth - d->rosterSize;
-+	sizes.clear();
-+	sizes.append(logWidth + dw);
-+	if(leftRoster) {
-+		sizes.prepend(d->rosterSize);
-+	}
-+	else {
-+		sizes.append(d->rosterSize);
-+	}
-+	ui_.hsplitter->setSizes(sizes);
-+	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
-+}
-+
- //----------------------------------------------------------------------------
- // GCFindDlg
- //----------------------------------------------------------------------------
---- git.orig/src/groupchatdlg.h
-+++ git/src/groupchatdlg.h
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
 @@ -88,6 +88,7 @@ protected:
  	void setShortcuts();
  
@@ -137,7 +106,7 @@
  	void dragEnterEvent(QDragEnterEvent *);
  	void dropEvent(QDropEvent *);
  	void closeEvent(QCloseEvent *);
-@@ -143,6 +144,7 @@ private slots:
+@@ -142,6 +143,7 @@ private slots:
  	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();

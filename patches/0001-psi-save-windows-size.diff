@@ -1,16 +1,16 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -476,7 +476,6 @@ QLineEdit#le_status_text {
+@@ -317,7 +317,6 @@
  				</sounds>
- 				<successful-subscription type="bool">true</successful-subscription>
+ 				<successful-subscription type="bool">false</successful-subscription>
  			</notifications>
 -			<remember-window-sizes type="bool">true</remember-window-sizes>
- 			<decorate-windows type="bool">true</decorate-windows>
  			<service-discovery>
- 				<automatically-get-info type="bool">false</automatically-get-info>
+ 				<automatically-get-info type="bool">true</automatically-get-info>
+ 				<automatically-get-items type="bool">false</automatically-get-items>
 --- psi.orig/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp
-@@ -82,6 +82,8 @@
+@@ -80,6 +80,8 @@
  
  #include "psichatdlg.h"
  
@@ -19,7 +19,7 @@
  ChatDlg* ChatDlg::create(const Jid& jid, PsiAccount* account, TabManager* tabManager)
  {
  	ChatDlg* chat = new PsiChatDlg(jid, account, tabManager);
-@@ -165,14 +167,6 @@ void ChatDlg::init()
+@@ -141,14 +143,6 @@ void ChatDlg::init()
  
  	chatView()->setFocusPolicy(Qt::NoFocus);
  	chatEdit()->setFocus();
@@ -34,8 +34,23 @@
  }
  
  ChatDlg::~ChatDlg()
-@@ -239,13 +233,6 @@ void ChatDlg::scrollDown()
- 	chatView()->scrollDown();
+@@ -181,9 +175,13 @@ void ChatDlg::initActions()
+ 	connect(act_scrolldown_, SIGNAL(triggered()), SLOT(scrollDown()));
+ }
+ 
+-void ChatDlg::ensureTabbedCorrectly() {
++void ChatDlg::ensureTabbedCorrectly()
++{
+ 	TabbableWidget::ensureTabbedCorrectly();
+ 	setShortcuts();
++	if(!isTabbed() && geometryOptionPath().isEmpty()) {
++		setGeometryOptionPath(geometryOption);
++	}
+ }
+ 
+ 
+@@ -210,13 +208,6 @@ void ChatDlg::scrollDown()
+ 	chatView()->verticalScrollBar()->setValue(chatView()->verticalScrollBar()->value() + chatView()->verticalScrollBar()->pageStep() / 2);
  }
  
 -void ChatDlg::resizeEvent(QResizeEvent *e)
@@ -48,7 +63,7 @@
  void ChatDlg::closeEvent(QCloseEvent *e)
  {
  	if (readyToHide()) {
-@@ -420,11 +407,6 @@ const QString& ChatDlg::getDisplayName()
+@@ -385,11 +376,6 @@ const QString& ChatDlg::getDisplayName()
  	return dispNick_;
  }
  
@@ -57,23 +72,12 @@
 -	return QSize(320, 280);
 -}
 -
- UserStatus ChatDlg::userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource)
- {
- 	if (ul.isEmpty())
-@@ -469,6 +451,10 @@ void ChatDlg::ensureTabbedCorrectly()
- 	QList<UserListItem*> ul = account()->findRelevant(jid());
- 	UserStatus userStatus = userStatusFor(jid(), ul, false);
- 	setTabIcon(PsiIconset::instance()->statusPtr(jid(), userStatus.statusType)->icon());
-+	if(!isTabbed() && geometryOptionPath().isEmpty()) {
-+		setGeometryOptionPath(geometryOption);
-+	}
-+
- }
- 
- void ChatDlg::updateContact(const Jid &j, bool fromPresence)
+ struct UserStatus {
+ 	UserStatus()
+ 			: userListItem(0)
 --- psi.orig/src/chatdlg.h
 +++ psi/src/chatdlg.h
-@@ -74,8 +74,6 @@ public:
+@@ -63,8 +63,6 @@ public:
  	void setJid(const Jid &);
  	const QString & getDisplayName();
  
@@ -82,7 +86,7 @@
  	// reimplemented
  	virtual bool readyToHide();
  	virtual TabbableWidget::State state() const;
-@@ -108,7 +106,6 @@ protected:
+@@ -93,7 +91,6 @@ protected:
  
  	// reimplemented
  	void closeEvent(QCloseEvent *);
@@ -163,7 +167,7 @@
  
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -103,7 +103,7 @@
+@@ -92,7 +92,7 @@
  #define MCMDMUC		"http://psi-im.org/ids/mcmd#mucmain"
  #define MCMDMUCNICK	"http://psi-im.org/ids/mcmd#mucnick"
  
@@ -171,8 +175,8 @@
 +static const QString geometryOption = "options.ui.muc.size";
  
  
- #include "groupchattopicdlg.h"
-@@ -860,7 +860,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ //----------------------------------------------------------------------------
+@@ -753,7 +753,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	X11WM_CLASS("groupchat");
  
  	ui_.mle->chatEdit()->setFocus();
@@ -180,19 +184,44 @@
  
  	// Connect signals from MUC manager
  	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
-@@ -969,6 +968,10 @@ void GCMainDlg::ensureTabbedCorrectly() 
- 	else {
- 		setStatusTabIcon((d->state == Private::Connected ? STATUS_ONLINE : STATUS_OFFLINE));
- 	}
-+
+@@ -779,7 +778,8 @@ GCMainDlg::~GCMainDlg()
+ 	delete d;
+ }
+ 
+-void GCMainDlg::ensureTabbedCorrectly() {
++void GCMainDlg::ensureTabbedCorrectly()
++{
+ 	TabbableWidget::ensureTabbedCorrectly();
+ 	setShortcuts();
+ 	// QSplitter is broken again, force resize so that
+@@ -788,6 +788,9 @@ void GCMainDlg::ensureTabbedCorrectly() 
+ 	QList<int> tmp = ui_.hsplitter->sizes();
+ 	ui_.hsplitter->setSizes(QList<int>() << 0);
+ 	ui_.hsplitter->setSizes(tmp);
 +	if(!isTabbed() && geometryOptionPath().isEmpty()) {
 +		setGeometryOptionPath(geometryOption);
 +	}
  }
  
  void GCMainDlg::setShortcuts()
-@@ -1003,12 +1006,6 @@ void GCMainDlg::closeEvent(QCloseEvent *
- 		account()->groupChatLeave(d->dlg->jid().domain(),d->dlg->jid().node());
+@@ -805,11 +808,13 @@ void GCMainDlg::setShortcuts()
+ 	d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
+ }
+ 
+-void GCMainDlg::scrollUp() {
++void GCMainDlg::scrollUp()
++{
+ 	ui_.log->verticalScrollBar()->setValue(ui_.log->verticalScrollBar()->value() - ui_.log->verticalScrollBar()->pageStep()/2);
+ }
+ 
+-void GCMainDlg::scrollDown() {
++void GCMainDlg::scrollDown()
++{
+ 	ui_.log->verticalScrollBar()->setValue(ui_.log->verticalScrollBar()->value() + ui_.log->verticalScrollBar()->pageStep()/2);
+ }
+ 
+@@ -818,12 +823,6 @@ void GCMainDlg::closeEvent(QCloseEvent *
+ 	e->accept();
  }
  
 -void GCMainDlg::resizeEvent(QResizeEvent* e)
@@ -206,14 +235,14 @@
  	TabbableWidget::deactivated();
 --- psi.orig/src/groupchatdlg.h
 +++ psi/src/groupchatdlg.h
-@@ -93,7 +93,6 @@ protected:
+@@ -89,7 +89,6 @@ protected:
  	void dragEnterEvent(QDragEnterEvent *);
  	void dropEvent(QDropEvent *);
  	void closeEvent(QCloseEvent *);
 -	void resizeEvent(QResizeEvent*);
  	void mucInfoDialog(const QString& title, const QString& message, const Jid& actor, const QString& reason);
- 	void setStatusTabIcon(int status);
  
+ signals:
 --- psi.orig/src/historydlg.cpp
 +++ psi/src/historydlg.cpp
 @@ -37,6 +37,8 @@
@@ -250,35 +279,35 @@
  
 --- psi.orig/src/options/opt_application.cpp
 +++ psi/src/options/opt_application.cpp
-@@ -52,9 +52,6 @@ QWidget *OptionsTabApplication::widget()
- 	w = new OptApplicationUI();
- 	OptApplicationUI *d = (OptApplicationUI *)w;
- 
+@@ -43,9 +43,6 @@ QWidget *OptionsTabApplication::widget()
+ 		tr("Makes the main Psi window always be in front of other windows."));
+ 	d->ck_autoRosterSize->setWhatsThis(
+ 		tr("Makes the main Psi window resize automatically to fit all contacts."));
 -	d->ck_keepSizes->setWhatsThis(
 -		tr("Makes Psi remember window size and positions for chats and messages."
 -		"  If disabled, the windows will always appear in their default positions and sizes."));
- 	d->ck_winDecor->setWhatsThis(
- 		tr("Set or remove window decorations for roster and chats."
- 		" For chats there are special header with close, hide and maximize buttons"));
-@@ -104,7 +101,6 @@ void OptionsTabApplication::applyOptions
+ 	d->ck_useleft->setWhatsThis(
+ 		tr("Normally, right-clicking with the mouse on a contact will activate the context-menu."
+ 		"  Check this option if you'd rather use a left-click."));
+@@ -100,7 +97,6 @@ void OptionsTabApplication::applyOptions
  
- 	OptApplicationUI *d = (OptApplicationUI *)w;
- 
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.always-on-top", d->ck_alwaysOnTop->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.automatically-resize-roster", d->ck_autoRosterSize->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.remember-window-sizes",d->ck_keepSizes->isChecked());
- 	PsiOptions::instance()->setOption("options.ui.contactlist.quit-on-close", d->ck_quitOnClose->isChecked());
- 	PsiOptions::instance()->setOption("options.ui.decorate-windows", d->ck_winDecor->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.use-left-click", d->ck_useleft->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.show-menubar", d->ck_showMenubar->isChecked());
  
-@@ -172,7 +168,6 @@ void OptionsTabApplication::restoreOptio
+@@ -130,7 +126,6 @@ void OptionsTabApplication::restoreOptio
  
- 	OptApplicationUI *d = (OptApplicationUI *)w;
- 
+ 	d->ck_alwaysOnTop->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.always-on-top").toBool() );
+ 	d->ck_autoRosterSize->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.automatically-resize-roster").toBool() );
 -	d->ck_keepSizes->setChecked( PsiOptions::instance()->getOption("options.ui.remember-window-sizes").toBool() );
+ 	d->ck_showMenubar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool() );
+ 	d->ck_useleft->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.use-left-click").toBool() );
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
- 	d->ck_quitOnClose->setChecked(PsiOptions::instance()->getOption("options.ui.contactlist.quit-on-close").toBool());
- 	d->ck_winDecor->setChecked(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
 --- psi.orig/src/options/opt_application.ui
 +++ psi/src/options/opt_application.ui
-@@ -21,13 +21,6 @@
+@@ -28,13 +28,6 @@
      </widget>
     </item>
     <item>
@@ -289,12 +318,12 @@
 -    </widget>
 -   </item>
 -   <item>
-     <widget class="QCheckBox" name="ck_docklet" >
-      <property name="text" >
-       <string>Enable docklet</string>
+     <widget class="QCheckBox" name="ck_useleft" >
+      <property name="enabled" >
+       <bool>true</bool>
 --- psi.orig/src/psi_profiles.cpp
 +++ psi/src/psi_profiles.cpp
-@@ -878,7 +878,6 @@ bool OptionsMigration::fromFile(const QS
+@@ -814,7 +814,6 @@ bool OptionsMigration::fromFile(const QS
  				}
  				PsiOptions::instance()->setOption("options.ui.chat.delete-contents-after", delafter);
  				migrateBoolEntry(tag, "alwaysOnTop", "options.ui.contactlist.always-on-top");
@@ -321,7 +350,7 @@
  		: AdvancedWidget<QWidget>(0, delegate ? delegate->initWindowFlags() : (Qt::WindowFlags)0)
  		, delegate_(delegate)
  		, tabWidget_(0)
-@@ -204,11 +205,9 @@ TabDlg::TabDlg(TabManager* tabManager, Q
+@@ -194,11 +195,7 @@ TabDlg::TabDlg(TabManager* tabManager, Q
  		addAction(action);
  	}
  
@@ -330,15 +359,13 @@
 -	} else {
 -		resize(ChatDlg::defaultSize()); //TODO: no!
 -	}
-+	if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
-+		setGeometryOptionPath(geometryOption);
-+
- 	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
++	setGeometryOptionPath(geometryOption);
  }
  
-@@ -415,9 +414,9 @@ void TabDlg::addTab(TabbableWidget* tab)
+ TabDlg::~TabDlg()
+@@ -392,9 +389,9 @@ void TabDlg::addTab(TabbableWidget* tab)
+ 	connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
  	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
- 	connect(tab, SIGNAL(vSplitterMoved(int,int)), SLOT(updateVSplitters(int,int)));
  
 -	this->showWithoutActivation();
  	updateTab(tab);
@@ -346,10 +373,10 @@
 +	QTimer::singleShot(0, this, SLOT(showWithoutActivation()));
  }
  
- void TabDlg::hideCurrentTab()
+ void TabDlg::detachCurrentTab()
 --- psi.orig/src/tabs/tabdlg.h
 +++ psi/src/tabs/tabdlg.h
-@@ -69,7 +69,7 @@ class TabDlg : public AdvancedWidget<QWi
+@@ -68,7 +68,7 @@ class TabDlg : public AdvancedWidget<QWi
  {
  	Q_OBJECT
  public:
@@ -478,27 +505,18 @@
  			saveGeometryTimer_->start();
  		}
  
-@@ -454,6 +459,9 @@ void GAdvancedWidget::setGeometryOptionP
- {
- 	Q_ASSERT(d->geometryOptionPath_.isEmpty());
- 	Q_ASSERT(!optionPath.isEmpty());
-+	if(optionPath.isEmpty()) {
-+		return;
-+	}
- 	d->geometryOptionPath_ = optionPath;
- 	d->restoreGeometry();
- 	d->parentWidget_->installEventFilter(d);
 --- psi.orig/src/whiteboarding/wbdlg.cpp
 +++ psi/src/whiteboarding/wbdlg.cpp
-@@ -34,6 +34,7 @@
+@@ -34,6 +34,8 @@
  #include "stretchwidget.h"
  #include "iconset.h"
  
 +static const QString geometryOption = "options.ui.chat.wb-size";
++
  //----------------------------------------------------------------------------
  // WbDlg
  //----------------------------------------------------------------------------
-@@ -208,7 +209,7 @@ WbDlg::WbDlg(SxeSession* session, PsiAcc
+@@ -208,7 +210,7 @@ WbDlg::WbDlg(SxeSession* session, PsiAcc
  	
  	setWindowOpacity(double(qMax(MINIMUM_OPACITY, PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt())) / 100);
  
@@ -507,7 +525,7 @@
  }
  
  WbDlg::~WbDlg() {
-@@ -283,12 +284,6 @@ void WbDlg::closeEvent(QCloseEvent *e) {
+@@ -283,12 +285,6 @@ void WbDlg::closeEvent(QCloseEvent *e) {
  	}
  }
  

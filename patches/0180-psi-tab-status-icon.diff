@@ -1,6 +1,6 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -336,6 +336,7 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -335,6 +335,7 @@
  				<recent-jids type="QStringList" />
  			</service-discovery>
  			<tabs>
@@ -8,22 +8,26 @@
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">false</use-tabs>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
-@@ -195,12 +195,6 @@ void ChatDlg::initActions()
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -189,16 +189,6 @@ void ChatDlg::initActions()
  	connect(act_scrolldown_, SIGNAL(triggered()), SLOT(scrollDown()));
  }
  
--void ChatDlg::ensureTabbedCorrectly() {
+-void ChatDlg::ensureTabbedCorrectly()
+-{
 -	TabbableWidget::ensureTabbedCorrectly();
 -	setShortcuts();
+-	if(!isTabbed() && geometryOptionPath().isEmpty()) {
+-		setGeometryOptionPath(geometryOption);
+-	}
 -}
 -
 -
  void ChatDlg::setShortcuts()
  {
  	act_send_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.send"));
-@@ -448,6 +442,15 @@ UserStatus userStatusFor(const Jid& jid,
+@@ -434,6 +424,18 @@ UserStatus userStatusFor(const Jid& jid,
  	return u;
  }
  
@@ -34,14 +38,17 @@
 +	QList<UserListItem*> ul = account()->findRelevant(jid());
 +	UserStatus userStatus = userStatusFor(jid(), ul, false);
 +	setTabIcon(PsiIconset::instance()->statusPtr(jid(), userStatus.statusType)->icon());
++	if(!isTabbed() && geometryOptionPath().isEmpty()) {
++		setGeometryOptionPath(geometryOption);
++	}
 +}
 +
  void ChatDlg::updateContact(const Jid &j, bool fromPresence)
  {
  	// if groupchat, only update if the resource matches
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
-@@ -763,6 +763,13 @@ void GCMainDlg::ensureTabbedCorrectly() 
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -763,6 +763,13 @@ void GCMainDlg::ensureTabbedCorrectly()
  	QList<int> tmp = ui_.hsplitter->sizes();
  	ui_.hsplitter->setSizes(QList<int>() << 0);
  	ui_.hsplitter->setSizes(tmp);
@@ -52,10 +59,10 @@
 +	else {
 +		setStatusTabIcon((d->state == Private::Connected ? STATUS_ONLINE : STATUS_OFFLINE));
 +	}
- }
- 
- void GCMainDlg::setShortcuts()
-@@ -1058,6 +1065,7 @@ void GCMainDlg::goDisc()
+ 	if(!isTabbed() && geometryOptionPath().isEmpty()) {
+ 		setGeometryOptionPath(geometryOption);
+ 	}
+@@ -1057,6 +1064,7 @@ void GCMainDlg::goDisc()
  	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
  		d->state = Private::Idle;
  		ui_.pb_topic->setEnabled(false);
@@ -63,7 +70,7 @@
  		appendSysMsg(tr("Disconnected."), true);
  		ui_.mle->chatEdit()->setEnabled(false);
  	}
-@@ -1145,6 +1153,7 @@ PsiAccount* GCMainDlg::account() const
+@@ -1144,6 +1152,7 @@ PsiAccount* GCMainDlg::account() const
  void GCMainDlg::error(int, const QString &str)
  {
  	ui_.pb_topic->setEnabled(false);
@@ -71,7 +78,7 @@
  
  	if(d->state == Private::Connecting)
  		appendSysMsg(tr("Unable to join groupchat.	Reason: %1").arg(str), true);
-@@ -1198,6 +1207,8 @@ void GCMainDlg::presence(const QString &
+@@ -1197,6 +1206,8 @@ void GCMainDlg::presence(const QString &
  	}
  
  	if (nick == d->self) {
@@ -80,7 +87,7 @@
  		// Update configuration dialog
  		if (d->configDlg) {
  			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
-@@ -1475,6 +1486,7 @@ void GCMainDlg::joined()
+@@ -1474,6 +1485,7 @@ void GCMainDlg::joined()
  		ui_.lv_users->clear();
  		d->state = Private::Connected;
  		ui_.pb_topic->setEnabled(true);
@@ -88,7 +95,7 @@
  		ui_.mle->chatEdit()->setEnabled(true);
  		setConnecting();
  		appendSysMsg(tr("Connected."), true);
-@@ -1780,6 +1792,11 @@ int GCMainDlg::unreadMessageCount() cons
+@@ -1779,6 +1791,11 @@ int GCMainDlg::unreadMessageCount() cons
  	return d->pending;
  }
  
@@ -100,18 +107,18 @@
  //----------------------------------------------------------------------------
  // GCFindDlg
  //----------------------------------------------------------------------------
---- git.orig/src/groupchatdlg.h
-+++ git/src/groupchatdlg.h
-@@ -93,6 +93,7 @@ protected:
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -92,6 +92,7 @@ protected:
+ 	void dropEvent(QDropEvent *);
  	void closeEvent(QCloseEvent *);
- 	void resizeEvent(QResizeEvent*);
  	void mucInfoDialog(const QString& title, const QString& message, const Jid& actor, const QString& reason);
 +	void setStatusTabIcon(int status);
  
  signals:
  	void aSend(const Message &);
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
 @@ -179,6 +179,7 @@ void PsiChatDlg::initUi()
  
  	PsiToolTip::install(ui_.lb_status);
@@ -132,8 +139,8 @@
  	}
  
  	if (u) {
---- git.orig/src/tabs/tabbablewidget.cpp
-+++ git/src/tabs/tabbablewidget.cpp
+--- psi.orig/src/tabs/tabbablewidget.cpp
++++ psi/src/tabs/tabbablewidget.cpp
 @@ -209,3 +209,20 @@ void TabbableWidget::changeEvent(QEvent*
  		}
  	}
@@ -155,8 +162,8 @@
 +{
 +	return icon_;
 +}
---- git.orig/src/tabs/tabbablewidget.h
-+++ git/src/tabs/tabbablewidget.h
+--- psi.orig/src/tabs/tabbablewidget.h
++++ psi/src/tabs/tabbablewidget.h
 @@ -21,6 +21,7 @@
  #ifndef TABBABLE_H
  #define TABBABLE_H
@@ -182,9 +189,9 @@
  };
  
  #endif
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -372,7 +372,7 @@ void TabDlg::addTab(TabbableWidget* tab)
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -384,7 +384,7 @@ void TabDlg::addTab(TabbableWidget* tab)
  {
  	setUpdatesEnabled(false);
  	tabs_.append(tab);
@@ -193,7 +200,7 @@
  
  	connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
  	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
-@@ -562,12 +562,15 @@ void TabDlg::updateTab(TabbableWidget* c
+@@ -574,12 +574,15 @@ void TabDlg::updateTab(TabbableWidget* c
  
  	if (chat->state() == TabbableWidget::StateComposing) {
  		tabWidget_->setTabTextColor(chat, Qt::darkGreen);
@@ -209,7 +216,7 @@
  	}
  	updateCaption();
  }
-@@ -775,3 +778,11 @@ TabbableWidget* TabDlg::getCurrentTab() 
+@@ -798,3 +801,11 @@ TabbableWidget* TabDlg::getCurrentTab() 
  {
  	return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
  }
@@ -221,8 +228,8 @@
 +{
 +	tabWidget_->setTabIcon(widget, icon);
 +}
---- git.orig/src/tabs/tabdlg.h
-+++ git/src/tabs/tabdlg.h
+--- psi.orig/src/tabs/tabdlg.h
++++ psi/src/tabs/tabdlg.h
 @@ -85,6 +85,7 @@ public:
  	void setTabBarShownForSingles(bool enabled); // default enabled
  	void setSimplifiedCaptionEnabled(bool enabled); // default disabled
@@ -231,8 +238,8 @@
  
  protected:
  	void setShortcuts();
---- git.orig/src/widgets/psitabwidget.cpp
-+++ git/src/widgets/psitabwidget.cpp
+--- psi.orig/src/widgets/psitabwidget.cpp
++++ psi/src/widgets/psitabwidget.cpp
 @@ -21,6 +21,7 @@
  #include "psitabwidget.h"
  #include "psitabbar.h"
@@ -281,8 +288,8 @@
  void PsiTabWidget::setCurrentPage(int index) {
  	if (index >= 0 && index < count()) {
  		showPage(widgets_[index]);
---- git.orig/src/widgets/psitabwidget.h
-+++ git/src/widgets/psitabwidget.h
+--- psi.orig/src/widgets/psitabwidget.h
++++ psi/src/widgets/psitabwidget.h
 @@ -48,7 +48,7 @@ public:
  	QWidget *currentPage();
  	int currentPageIndex();
