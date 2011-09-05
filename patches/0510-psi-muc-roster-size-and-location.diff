@@ -96,6 +96,40 @@
  	UserListItem* u = account()->find(jid().bare());
  	if(u) {
  		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
+@@ -1978,6 +2014,33 @@ void GCMainDlg::sendTemp(const QString &
+ 	}
+ }
+ 
++ 
++
++void GCMainDlg::resizeEvent(QResizeEvent *e)
++{
++	TabbableWidget::resizeEvent(e);
++
++	if(!isVisible())
++		return;
++
++	QList<int> sizes = ui_.hsplitter->sizes();
++	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
++	int logWidth = !leftRoster ? sizes.first() : sizes.last();
++	int rosterWidth = leftRoster ? sizes.first() : sizes.last();
++	int dw = rosterWidth - d->rosterSize;
++	sizes.clear();
++	sizes.append(logWidth + dw);
++	if(leftRoster) {
++		sizes.prepend(d->rosterSize);
++	}
++	else {
++		sizes.append(d->rosterSize);
++	}
++
++	ui_.hsplitter->setSizes(sizes);
++	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
++}
++
+ //----------------------------------------------------------------------------
+ // GCFindDlg
+ //----------------------------------------------------------------------------
 --- psi.orig/src/groupchatdlg.h
 +++ psi/src/groupchatdlg.h
 @@ -88,6 +88,7 @@ protected:
