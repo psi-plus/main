@@ -321,6 +321,17 @@
      <widget class="QCheckBox" name="ck_useleft" >
       <property name="enabled" >
        <bool>true</bool>
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -5156,7 +5156,7 @@ void PsiAccount::openChat(const Jid& j, 
+ 		chat->bringToFront(false);
+ 		TabDlg* dlg = chat->getManagingTabDlg();
+ 		if (dlg) {
+-			QTimer::singleShot(1000, dlg, SLOT(showWithoutActivation()));
++			QTimer::singleShot(1000, dlg, SLOT(showTabWithoutActivation()));
+ 		}
+ 	}
+ }
 --- psi.orig/src/psi_profiles.cpp
 +++ psi/src/psi_profiles.cpp
 @@ -814,7 +814,6 @@ bool OptionsMigration::fromFile(const QS
@@ -363,14 +374,19 @@
  }
  
  TabDlg::~TabDlg()
-@@ -392,9 +389,9 @@ void TabDlg::addTab(TabbableWidget* tab)
+@@ -392,9 +389,14 @@ void TabDlg::addTab(TabbableWidget* tab)
  	connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
  	connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
  
 -	this->showWithoutActivation();
  	updateTab(tab);
  	setUpdatesEnabled(true);
-+	QTimer::singleShot(0, this, SLOT(showWithoutActivation()));
++	QTimer::singleShot(0, this, SLOT(showTabWithoutActivation()));
++}
++
++void TabDlg::showTabWithoutActivation()
++{
++	showWithoutActivation();
  }
  
  void TabDlg::detachCurrentTab()
@@ -385,6 +401,14 @@
  	~TabDlg();
  	bool managesTab(const TabbableWidget*) const;
  	bool tabOnTop(const TabbableWidget*) const;
+@@ -128,6 +128,7 @@ private slots:
+ 	void checkHasChats();
+ 	void updateTab();
+ 	void updateTab(TabbableWidget*);
++	void showTabWithoutActivation();
+ 	void nextTab();
+ 	void previousTab();
+ 	void tab_aboutToShowMenu(QMenu *menu);
 --- psi.orig/src/tabs/tabmanager.cpp
 +++ psi/src/tabs/tabmanager.cpp
 @@ -64,13 +64,6 @@ bool TabManager::shouldBeTabbed(QWidget 
