@@ -1,6 +1,6 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -345,6 +345,54 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -344,6 +344,52 @@
  			</tabs>
  		</ui>
  		<shortcuts comment="Shortcuts">
@@ -39,8 +39,6 @@
 +				<help_readme type="QKeySequence" comment="README"></help_readme>
 +				<help_tip type="QKeySequence" comment="Tips"></help_tip>
 +				<help_online_forum type="QKeySequence" comment="Psi Forum (Online)"></help_online_forum>
-+				<separator type="QKeySequence"/>
-+				<spacer type="QKeySequence"/>
 +				<help_online_help type="QKeySequence" comment="Open Help"></help_online_help>
 +				<help_online_wiki type="QKeySequence" comment="Open Wiki"></help_online_wiki>
 +				<help_online_home type="QKeySequence" comment="Open Home Page"></help_online_home>
@@ -55,8 +53,8 @@
  			<chat comment="Shortcuts in the chat dialog">
  				<next-tab type="QVariantList" comment="Switch to the next tab">
  					<item type="QKeySequence">Ctrl+PgDown</item>
---- git.orig/src/psiactionlist.cpp
-+++ git/src/psiactionlist.cpp
+--- psi.orig/src/psiactionlist.cpp
++++ psi/src/psiactionlist.cpp
 @@ -19,15 +19,20 @@
   */
  
@@ -86,25 +84,36 @@
  
  	void createCommon();
  	void createMainWin();
-@@ -96,7 +102,11 @@ ActionList* PsiActionList::Private::crea
+@@ -90,13 +96,21 @@ PsiActionList::Private::~Private()
+ 
+ ActionList* PsiActionList::Private::createActionList( QString name, int id, ActionNames *actionlist )
+ {
++	static const QStringList skipList = QStringList() << "separator" << "spacer";
++
+ 	ActionList *actions = new ActionList( name, id, false );
+ 
+ 	QString aName;
  	for ( int i = 0; !(aName = QString(actionlist[i].name)).isEmpty(); i++ ) {
  		IconAction *action = actionlist[i].action;
  		if (action)
 +		{
  			actions->addAction( aName, action );
-+			action->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + aName));
-+			actionmap[aName] = action;
++			if(!skipList.contains(aName)) {
++				action->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + aName));
++				actionmap[aName] = action;
++			}
 +		}
  	}
  
  	list->addList( actions );
-@@ -411,6 +421,10 @@ void PsiActionList::Private::optionsChan
+@@ -411,6 +425,11 @@ void PsiActionList::Private::optionsChan
  	statusActionList->action("status_chat")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.chat").toBool());
  	statusActionList->action("status_xa")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool());
  	statusActionList->action("status_invisible")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.invisible").toBool());
++
 +	for(map<QString,IconAction*>::iterator i=actionmap.begin(); i!=actionmap.end(); i++)
 +	{
-+	    i->second->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + i->first));
++		 i->second->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + i->first));
 +	}
  }
  
