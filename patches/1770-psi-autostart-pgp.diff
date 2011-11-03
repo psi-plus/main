@@ -1,0 +1,32 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -62,6 +62,7 @@
+ 		</muc> 
+ 		<pgp comment="PGP encryption options">
+ 			<enable comment="Enable PGP globally" type="bool">true</enable>
++			<auto-start comment="Automatically enable PGP encryption" type="bool">false</auto-start>
+ 		</pgp>
+ 		<ui comment="User interface options">
+ 			<account comment="Account options">
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -774,6 +774,19 @@ void PsiChatDlg::updatePGP()
+ {
+ 	if (account()->hasPGP()) {
+ 		act_pgp_->setEnabled(true);
++		const QString res = jid().resource();
++		if(PsiOptions::instance()->getOption("options.pgp.auto-start").toBool() && !res.isEmpty()) {
++			UserListItem *item = account()->findFirstRelevant(jid());
++			if(item) {
++				UserResourceList::ConstIterator it = item->userResourceList().find(res);
++				if(it != item->userResourceList().end()) {
++					UserResource ur = *it;
++					if(ur.pgpVerifyStatus() == QCA::SecureMessageSignature::Valid) {
++						setPGPEnabled(true);
++					}
++				}
++			}
++		}
+ 	}
+ 	else {
+ 		act_pgp_->setChecked(false);
