@@ -10,21 +10,14 @@
  			<account comment="Account options">
 --- psi.orig/src/psichatdlg.cpp
 +++ psi/src/psichatdlg.cpp
-@@ -774,6 +774,19 @@ void PsiChatDlg::updatePGP()
+@@ -770,6 +770,12 @@ void PsiChatDlg::updatePGP()
  {
  	if (account()->hasPGP()) {
  		act_pgp_->setEnabled(true);
-+		const QString res = jid().resource();
-+		if(PsiOptions::instance()->getOption("options.pgp.auto-start").toBool() && !res.isEmpty()) {
++		if(PsiOptions::instance()->getOption("options.pgp.auto-start").toBool()) {
 +			UserListItem *item = account()->findFirstRelevant(jid());
-+			if(item) {
-+				UserResourceList::ConstIterator it = item->userResourceList().find(res);
-+				if(it != item->userResourceList().end()) {
-+					UserResource ur = *it;
-+					if(ur.pgpVerifyStatus() == QCA::SecureMessageSignature::Valid) {
-+						setPGPEnabled(true);
-+					}
-+				}
++			if(item && !item->publicKeyID().isEmpty()) {
++				setPGPEnabled(true);
 +			}
 +		}
  	}
