@@ -1,0 +1,963 @@
+--- psi.orig/src/eventdb.cpp
++++ psi/src/eventdb.cpp
+@@ -28,6 +28,9 @@
+ #include <QTimer>
+ #include <QTextStream>
+ #include <QDateTime>
++#include <QSqlError>
++#include <QSqlQuery>
++#include <QSqlDriver>
+ 
+ #include "common.h"
+ #include "applicationinfo.h"
+@@ -72,6 +75,15 @@ const QString & EDBItem::prevId() const
+ 	return v_prevId;
+ }
+ 
++void EDBItem::setNextId(const QString &id)
++{
++	v_nextId = id;
++}
++
++void EDBItem::setPrevId(const QString &id)
++{
++	v_prevId = id;
++}
+ 
+ //----------------------------------------------------------------------------
+ // EDBHandle
+@@ -436,6 +448,7 @@ int EDBFlatFile::append(const Jid &j, Ps
+ 	d->rlist.append(r);
+ 
+ 	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++
+ 	return r->id;
+ }
+ 
+@@ -968,3 +981,592 @@ QString EDBFlatFile::File::eventToLine(P
+ 	
+ 	return "";
+ }
++
++//----------------------------------------------------------------------------
++// EDBSqLite
++//----------------------------------------------------------------------------
++
++struct item_query_req
++{
++	Jid j;
++	int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
++	int len;
++	int dir;
++	int id;
++	QString eventId;
++	QString findStr;
++	PsiEvent *event;
++
++	QDateTime first, last;
++	enum Type {
++		Type_getLatest = 0,
++		Type_getOldest,
++		Type_get,
++		Type_append,
++		Type_find,
++		Type_getByDate,
++		Type_erase
++	};
++};
++
++class EDBSqLite::Private
++{
++public:
++	Private() {}
++	QList<item_query_req*> rlist;
++	EDBFlatFile *mirror_;
++};
++
++EDBSqLite::EDBSqLite() : EDB()
++{
++	d = new Private;
++
++	d->mirror_ = NULL;
++
++	QString path = ApplicationInfo::historyDir() + "/history.db";
++	//if (QFile::exists(path)) {
++		QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
++		db.setDatabaseName(path);
++		if (!db.open()) {
++			qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toAscii());
++			return;
++		}
++		QSqlQuery query(db);
++		query.exec("SELECT count(*) FROM `sqlite_master`;");
++		query.first();
++		if (query.value(0).toInt() == 0) {
++			// no tables found.
++			query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
++			query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER);");
++			query.exec("CREATE TABLE `messages` (`event_id` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
++			query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
++			query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
++			query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
++			query.exec("CREATE INDEX `date` ON `events` (`date`);");
++			query.exec("CREATE INDEX `event_id` ON `messages` (`event_id`);");
++			query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
++		}
++	//}
++}
++
++EDBSqLite::~EDBSqLite()
++{
++	{
++		QSqlDatabase db = QSqlDatabase::database("history", false);
++		if (db.isOpen())
++			db.close();
++	}
++	QSqlDatabase::removeDatabase("history");
++
++	if (d->mirror_ != NULL)
++		delete d->mirror_;
++
++	delete d;
++}
++
++int EDBSqLite::getLatest(const XMPP::Jid & jid, int len)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_getLatest;
++	r->len = len < 1 ? 1 : len;
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++int EDBSqLite::getOldest(const XMPP::Jid &jid, int len)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_getOldest;
++	r->len = len < 1 ? 1 : len;
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++int EDBSqLite::get(const XMPP::Jid &jid, const QString &id, int direction, int len)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_get;
++	r->len = len < 1 ? 1 : len;
++	r->dir = direction;
++	r->eventId = id;
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++int EDBSqLite::getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_getByDate;
++	r->len = 1;
++	r->id = genUniqueId();
++	r->first = first;
++	r->last = last;
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++int EDBSqLite::find(const QString &str, const XMPP::Jid &jid, const QString &id, int direction)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_find;
++	r->len = 1;
++	r->dir = direction;
++	r->findStr = str;
++	r->eventId = id;
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++int EDBSqLite::append(const XMPP::Jid &jid, PsiEvent *e)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_file_req::Type_append;
++	r->event = e->copy();
++	if ( !r->event ) {
++		qWarning("EDBSqLite::append(): Attempted to append incompatible type.");
++		delete r;
++		return 0;
++	}
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++
++	if (d->mirror_ != NULL)
++		d->mirror_->append(jid, e);
++
++	return r->id;
++}
++
++int EDBSqLite::erase(const XMPP::Jid &jid)
++{
++	item_query_req *r = new item_query_req;
++	r->j = jid;
++	r->type = item_query_req::Type_erase;
++	r->id = genUniqueId();
++	d->rlist.append(r);
++
++	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
++	return r->id;
++}
++
++void EDBSqLite::setMirror(EDBFlatFile *mirr)
++{
++	if (mirr != d->mirror_) {
++		if (d->mirror_ != NULL)
++			delete d->mirror_;
++		d->mirror_ = mirr;
++	}
++}
++
++EDBFlatFile *EDBSqLite::mirror() const
++{
++	return d->mirror_;
++}
++
++void EDBSqLite::performRequests()
++{
++	if (d->rlist.isEmpty())
++		return;
++	item_query_req *r = d->rlist.takeFirst();
++	const int type = r->type;
++	if (type == item_query_req::Type_append) {
++		bool b = appendEvent(r->j, r->event);
++		writeFinished(r->id, b);
++		delete r->event;
++	}
++	else if (type >= item_query_req::Type_getLatest && type <= item_query_req::Type_get) {
++		QSqlQuery query(QSqlDatabase::database("history"));
++		query.setForwardOnly(true);
++		int direction;
++		int len = r->len + 1;
++		QString queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`";
++		queryStr.append(" FROM `events` LEFT JOIN `messages` ON `events`.`id` = `messages`.`event_id`, `jids`");
++		queryStr.append(" WHERE `jid` = ? AND `jids`.`id` = `jid_id`");
++		if (type == item_query_req::Type_getLatest) {
++			direction = Backward;
++		} else {
++			direction = Forward;
++			if (type == item_query_req::Type_get) {
++				direction = r->dir;
++				queryStr.append(QString(" AND `event_id` %1 ?").arg((direction == Forward) ? ">=" : "<="));
++			}
++		}
++		queryStr.append(QString(" ORDER BY `events`.`id` %1").arg((direction == Forward) ? "ASC" : "DESC"));
++		queryStr.append(" LIMIT ?;");
++		query.prepare(queryStr);
++		int parNum = 0;
++		QString jidStr = JIDUtil::toString(r->j, false);
++		query.bindValue(parNum++, jidStr);
++		if (type == item_query_req::Type_get)
++			query.bindValue(parNum++, r->eventId);
++		query.bindValue(parNum, len);
++		EDBResult result;
++		if (query.exec()) {
++			EDBItem *ei = NULL;
++			int i = 0;
++			while (query.next()) {
++				++i;
++				QString id = query.value(0).toString();
++				if (i == len) {
++					if (ei != NULL) {
++						if (direction == Forward)
++							ei->setNextId(id);
++						else
++							ei->setPrevId(id);
++					}
++					break;
++
++				}
++				PsiEvent *e = getEvent(query);
++				if (e) {
++					QString prevId, nextId;
++					if (ei != NULL) {
++						if (direction == Forward) {
++							ei->setNextId(id);
++							prevId = ei->id();
++						} else {
++							ei->setPrevId(id);
++							nextId = ei->id();
++						}
++					}
++					ei = new EDBItem(e, id, prevId, nextId);
++					result.append(EDBItemPtr(ei));
++				}
++			}
++			if (type == item_query_req::Type_get && !result.isEmpty()) {
++				QString queryStr = "SELECT `events`.`id` FROM `events`, `jids`";
++				queryStr.append(" WHERE `jid` = ? AND `jids`.`id` = `jid_id`");
++				queryStr.append(QString(" AND `events`.`id` %1 ?").arg((direction == Forward) ? "<" : ">"));
++				queryStr.append(QString(" ORDER BY `events`.`id` %1").arg((direction == Forward) ? "DESC" : "ASC"));
++				queryStr.append(" LIMIT 1;");
++				query.prepare(queryStr);
++				query.bindValue(0, jidStr);
++				query.bindValue(1, r->eventId);
++				if (query.exec() && query.next()) {
++					if (direction == Forward)
++						result.first()->setPrevId(query.value(0).toString());
++					else
++						result.first()->setNextId(query.value(0).toString());
++				}
++			}
++		}
++		resultReady(r->id, result);
++	} else if(type == item_file_req::Type_getByDate ) {
++		QSqlQuery query(QSqlDatabase::database("history"));
++		query.setForwardOnly(true);
++		QString queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`";
++		queryStr.append(" FROM `events` LEFT JOIN `messages` ON `events`.`id` = `messages`.`event_id`, `jids`");
++		queryStr.append(" WHERE `jid` = ?  AND `jids`.`id` = `jid_id` AND `date` >= ? AND `date` <= ? ORDER BY `date` ASC;");
++		query.prepare(queryStr);
++		QString jidStr = JIDUtil::toString(r->j, false);
++		query.bindValue(0, jidStr);
++		query.bindValue(1, r->first);
++		query.bindValue(2, r->last);
++		EDBResult result;
++		if (query.exec()) {
++			EDBItem *ei = NULL;
++			while (query.next()) {
++				QString id = query.value(0).toString();
++				PsiEvent *e = getEvent(query);
++				if (e) {
++					QString prevId;
++					if (ei != NULL) {
++						prevId = ei->id();
++						ei->setNextId(id);
++					}
++					ei = new EDBItem(e, id, prevId, QString());
++					EDBItemPtr eip = EDBItemPtr(ei);
++					result.append(eip);
++				}
++			}
++			if (!result.isEmpty()) {
++				queryStr = "SELECT `events`.`id` FROM `events`, `jids`";
++				queryStr.append(" WHERE `jid` = ? AND `jids`.`id` = `jid_id`");
++				query.prepare(queryStr + " AND `date` < ? ORDER BY `date` DESC LIMIT 1;");
++				query.bindValue(0, jidStr);
++				query.bindValue(1, r->first);
++				if (query.exec()) {
++					if (query.next()) {
++						result.first()->setPrevId(query.value(0).toString());
++					}
++				}
++				query.prepare(queryStr + " AND `date` > ? ORDER BY `date` ASC LIMIT 1;");
++				query.bindValue(0, jidStr);
++				query.bindValue(1, r->last);
++				if (query.exec() && query.next()) {
++					result.last()->setNextId(query.value(0).toString());
++				}
++			}
++		}
++		resultReady(r->id, result);
++	} else if(type == item_file_req::Type_find) {
++		QSqlQuery query(QSqlDatabase::database("history"));
++		query.setForwardOnly(true);
++		QString queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`";
++		queryStr.append(" FROM `events` LEFT JOIN `messages` ON `events`.`id` = `messages`.`event_id`, `jids`");
++		queryStr.append(" WHERE `jid` = ?  AND `jids`.`id` = `jid_id` AND `m_text` IS NOT NULL ORDER BY `date`;");
++		query.prepare(queryStr);
++		query.bindValue(0, JIDUtil::toString(r->j, false));
++		EDBResult result;
++		if (query.exec()) {
++			EDBItem *ei = NULL;
++			QString str = r->findStr.toLower();
++			while (query.next()) {
++				QString id = query.value(0).toString();
++				if (!query.value(7).toString().toLower().contains(str, Qt::CaseSensitive))
++					continue;
++				PsiEvent *e = getEvent(query);
++				if (e) {
++					QString prevId;
++					if (ei != NULL) {
++						prevId = ei->id();
++						ei->setNextId(id);
++					}
++					ei = new EDBItem(e, id, prevId, QString());
++					EDBItemPtr eip = EDBItemPtr(ei);
++					result.append(eip);
++				}
++			}
++		}
++		resultReady(r->id, result);
++
++	} else if(type == item_file_req::Type_erase) {
++		bool res = false;
++		QSqlQuery query(QSqlDatabase::database("history"));
++		query.prepare("SELECT `id` FROM `jids` WHERE `jid` = ?;");
++		query.bindValue(0, JIDUtil::toString(r->j, false));
++		if (query.exec() && query.first()) {
++			const int id = query.value(0).toInt();
++			QString subQueryStr = "SELECT `id` FROM `events` WHERE `jid_id` = ?";
++			QString queryStr = QString("DELETE FROM `%1` WHERE `event_id` IN (%2);");
++			query.prepare(queryStr.arg("urls").arg(subQueryStr));
++			query.bindValue(0, id);
++			if (query.exec()) {
++				query.prepare(queryStr.arg("messages").arg(subQueryStr));
++				query.bindValue(0, id);
++				if (query.exec()) {
++					query.prepare("DELETE FROM `events` WHERE `jid_id` = ?;");
++					query.bindValue(0, id);
++					if (query.exec()) {
++						res = true;
++					}
++				}
++			}
++		}
++		writeFinished(r->id, res);
++	}
++	delete r;
++}
++
++bool EDBSqLite::appendEvent(const XMPP::Jid &jid, PsiEvent *e)
++{
++	QSqlDatabase db = QSqlDatabase::database("history");
++	const qint64 jidId = ensureJidRowId(jid, db);
++	if (jidId == 0)
++		return false;
++	QDateTime dTime;
++	int nType = 0;
++	int nFlags = 0;
++	if (e->type() == PsiEvent::Message) {
++		MessageEvent *me = (MessageEvent *)e;
++		const Message &m = me->message();
++		dTime = m.timeStamp();
++		if (!m.subject().isEmpty() || !m.body().isEmpty())
++			nFlags |= 1;
++		if (!m.urlList().isEmpty())
++			nFlags |= 2;
++		if (m.type() == "chat")
++			nType = 1;
++		else if(m.type() == "error")
++			nType = 4;
++		else if(m.type() == "headline")
++			nType = 5;
++	} else if (e->type() == PsiEvent::Auth) {
++		AuthEvent *ae = (AuthEvent *)e;
++		dTime = ae->timeStamp();
++		QString subType = ae->authType();
++		if(subType == "subscribe")
++			nType = 3;
++		else if(subType == "subscribed")
++			nType = 6;
++		else if(subType == "unsubscribe")
++			nType = 7;
++		else if(subType == "unsubscribed")
++			nType = 8;
++	} else {
++		return false;
++	}
++	int nDirection = e->originLocal() ? 1 : 2;
++	QSqlQuery query(db);
++	query.prepare("INSERT INTO `events` (`jid_id`, `date`, `type`, `direction`, `flags`) VALUES (?, ?, ?, ?, ?);");
++	query.bindValue(0, jidId);
++	query.bindValue(1, dTime);
++	query.bindValue(2, nType);
++	query.bindValue(3, nDirection);
++	query.bindValue(4, nFlags);
++	if (!query.exec())
++		return false;
++	if (nFlags != 0) {
++		qint64 eventId = 0;
++		// Getting last record id
++		if (db.driver()->hasFeature(QSqlDriver::LastInsertId)) {
++			eventId = query.lastInsertId().toLongLong();
++		} else {
++			query.prepare("SELECT `id` FROM `events` WHERE `jid_id` = ? AND `date` = ? AND `type` = ? AND `direction` = ? AND `flags` = ?;");
++			query.bindValue(0, jidId);
++			query.bindValue(1, dTime);
++			query.bindValue(2, nType);
++			query.bindValue(3, nDirection);
++			query.bindValue(4, nFlags);
++			if (!query.exec() || !query.last())
++				return false;
++			eventId = query.value(0).toLongLong();
++		}
++		MessageEvent *me = (MessageEvent *)e;
++		const Message &m = me->message();
++		if (nFlags & 1) {
++			// insert into messages table
++			query.prepare("INSERT INTO `messages` (`event_id`, `subject`, `m_text`, `lang`) VALUES (?, ?, ?, ?);");
++			query.addBindValue(eventId);
++			QString lang = m.lang();
++			query.addBindValue(m.subject(lang));
++			query.addBindValue(m.body(lang));
++			query.addBindValue(lang);
++			if (!query.exec())
++				return false;
++		}
++		if (nFlags & 2) {
++			// insert into urls table
++			const UrlList &urls = m.urlList();
++			foreach (Url url, urls) {
++				query.prepare("INSERT INTO `urls` (`event_id`, `url`, `desc`) VALUES (?, ?, ?);");
++				query.addBindValue(eventId);
++				query.addBindValue(url.url());
++				query.addBindValue(url.desc());
++				if (!query.exec())
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
++PsiEvent *EDBSqLite::getEvent(QSqlQuery &q)
++{
++	// `events`.`id`       - 0
++	// `jid`               - 1
++	// `data`              - 2
++	// `type`              - 3
++	// `direction`         - 4
++	// `flags`             - 5
++	// `subject`           - 6
++	// `m_text`            - 7
++	// `lang`              - 8
++	int type = q.value(3).toInt();
++	if(type == 0 || type == 1 || type == 4 || type == 5) {
++		Message m;
++		m.setTimeStamp(q.value(2).toDateTime());
++		if(type == 1)
++			m.setType("chat");
++		else if(type == 4)
++			m.setType("error");
++		else if(type == 5)
++			m.setType("headline");
++		else
++			m.setType("");
++		m.setFrom(Jid(q.value(1).toString()));
++		QVariant text = q.value(7);
++		if (!text.isNull()) {
++			m.setBody(text.toString());
++			m.setLang(q.value(8).toString());
++			m.setSubject(q.value(6).toString());
++		}
++		m.setSpooled(true);
++		if (q.value(5).toInt() & 2) {
++			QSqlQuery urlQuery(q);
++			urlQuery.setForwardOnly(true);
++			urlQuery.prepare("SELECT `url`, `desc` FROM `urls` WHERE `event_id` = ?;");
++			urlQuery.bindValue(0, q.value(0));
++			if (urlQuery.exec()) {
++				while (urlQuery.next()) {
++					m.urlAdd(Url(urlQuery.value(0).toString(), urlQuery.value(1).toString()));
++				}
++			}
++		}
++		MessageEvent *me = new MessageEvent(m, 0);
++		me->setOriginLocal((q.value(4).toInt() == 1));
++		return me;
++	}
++	if(type == 2 || type == 3 || type == 6 || type == 7 || type == 8) {
++		QString subType = "subscribe";
++		// if(type == 2) { // Not used (stupid "system message" from Psi <= 0.8.6)
++		if(type == 3)
++			subType = "subscribe";
++		else if(type == 6)
++			subType = "subscribed";
++		else if(type == 7)
++			subType = "unsubscribe";
++		else if(type == 8)
++			subType = "unsubscribed";
++
++		AuthEvent *ae = new AuthEvent(Jid(q.value(1).toString()), subType, 0);
++		ae->setTimeStamp(q.value(2).toDateTime());
++		return ae;
++	}
++	return NULL;
++}
++
++qint64 EDBSqLite::ensureJidRowId(const XMPP::Jid &jid, QSqlDatabase &db)
++{
++	QString sJid = jid.bare();
++	if (sJid.isEmpty())
++		return 0;
++	QSqlQuery query(db);
++	qint64 id;
++	for (int i = 1; i <= 2; ++i) {
++		query.prepare("SELECT `id` FROM `jids` WHERE `jid` = ?;");
++		query.bindValue(0, sJid);
++		if (!query.exec()) {
++			break;
++		}
++		if (query.first()) {
++			id = query.value(0).toLongLong();
++		} else {
++			if (i == 2)
++				break;
++			query.prepare("INSERT INTO `jids` (`type`, `jid`) VALUES (?, ?);");
++			query.bindValue(0, 1); // contact jid
++			query.bindValue(1, sJid);
++			if (!query.exec()) {
++				break;
++			}
++			if (!db.driver()->hasFeature(QSqlDriver::LastInsertId))
++				continue;
++			id = query.lastInsertId().toLongLong();
++		}
++		return id;
++	}
++	return 0;
++}
++
+--- psi.orig/src/eventdb.h
++++ psi/src/eventdb.h
+@@ -26,6 +26,7 @@
+ #include <QFile>
+ #include <QSharedPointer>
+ #include <QDateTime>
++#include <QSqlDatabase>
+ 
+ #include "xmpp_jid.h"
+ 
+@@ -34,13 +35,15 @@ class PsiEvent;
+ class EDBItem
+ {
+ public:
+-	EDBItem(PsiEvent *, const QString &id, const QString &nextId, const QString &prevId);
++	EDBItem(PsiEvent *, const QString &id, const QString &prevId, const QString &nextId);
+ 	~EDBItem();
+ 
+ 	PsiEvent *event() const;
+ 	const QString & id() const;
+ 	const QString & nextId() const;
+ 	const QString & prevId() const;
++	void setNextId(const QString &id);
++	void setPrevId(const QString &id);
+ 
+ private:
+ 	QString v_id, v_prevId, v_nextId;
+@@ -189,4 +192,34 @@ private:
+ 	void ensureIndex();
+ };
+ 
++class EDBSqLite : public EDB
++{
++	Q_OBJECT
++public:
++	EDBSqLite();
++	~EDBSqLite();
++
++	int getLatest(const XMPP::Jid &, int len);
++	int getOldest(const XMPP::Jid &, int len);
++	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
++	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
++	int find(const QString &str, const XMPP::Jid &jid, const QString &id, int direction);
++	int append(const XMPP::Jid &jid, PsiEvent *e);
++	int erase(const XMPP::Jid &jid);
++	void setMirror(EDBFlatFile *mirr);
++	EDBFlatFile *mirror() const;
++
++private:
++	class Private;
++	Private *d;
++
++private:
++	bool appendEvent(const XMPP::Jid &, PsiEvent *);
++	PsiEvent *getEvent(QSqlQuery &q);
++	qint64 ensureJidRowId(const XMPP::Jid &, QSqlDatabase &);
++
++private slots:
++	void performRequests();
++};
++
+ #endif
+--- psi.orig/src/historydlg.cpp
++++ psi/src/historydlg.cpp
+@@ -36,6 +36,7 @@
+ #include "fileutil.h"
+ #include "userlist.h"
+ #include "common.h"
++#include "historyimp.h"
+ 
+ static const QString geometryOption = "options.ui.history.size";
+ 
+@@ -400,6 +401,8 @@ void HistoryDlg::doMenu()
+ 	m->addAction(IconsetFactory::icon("psi/chat").icon(), tr("&Open chat"), this, SLOT(openChat()));
+ 	m->addAction(IconsetFactory::icon("psi/save").icon(), tr("&Export history"), this, SLOT(exportHistory()));
+ 	m->addAction(IconsetFactory::icon("psi/clearChat").icon(), tr("&Delete history"), this, SLOT(removeHistory()));
++	m->addSeparator();
++	m->addAction(tr("&Import all history"), this, SLOT(importHistory()));
+ 	m->exec(QCursor::pos());
+ }
+ 
+@@ -626,3 +629,20 @@ EDBHandle* HistoryDlg::getEDBHandle()
+ 	connect(h, SIGNAL(finished()), SLOT(edb_finished()));
+ 	return h;
+ }
++
++void HistoryDlg::importHistory()
++{
++	startRequest();
++	HistoryImp *imp = new HistoryImp(d->psi);
++	connect(imp, SIGNAL(finished(int)), this, SLOT(importFinished(int)));
++}
++
++void HistoryDlg::importFinished(int result)
++{
++	stopRequest();
++	if (result == 0)
++		QMessageBox::information(this, tr("Import"), tr("Imports is finished."));
++	else if (result == 2)
++		QMessageBox::critical(this, tr("Import"), tr("Import error."));
++	sender()->deleteLater();
++}
+--- psi.orig/src/historydlg.h
++++ psi/src/historydlg.h
+@@ -69,6 +69,8 @@ private slots:
+ 	void openChat();
+ 	void doMenu();
+ 	void removedContact(PsiContact*);
++	void importHistory();
++	void importFinished(int);
+ 
+ protected:
+ 	bool eventFilter(QObject *, QEvent *);
+--- psi.orig/src/historyimp.cpp
++++ psi/src/historyimp.cpp
+@@ -0,0 +1,119 @@
++/*
++ * historyimp.cpp
++ * Copyright (C) 20011   Aleksey Andreev
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include <QDir>
++#include <QTimer>
++#include <QMessageBox>
++
++#include "historyimp.h"
++#include "applicationinfo.h"
++
++HistoryImp::HistoryImp(PsiCon *psi) : QObject(),
++	prompt(true),
++	hRead(NULL),
++	hWrite(NULL)
++{
++	QString impDirStr = ApplicationInfo::historyDir() + "/";
++	QDir impDir(impDirStr);
++	QFileInfoList fl = impDir.entryInfoList(QStringList("*.history"), QDir::Files);
++	impSize = 0;
++	foreach (const QFileInfo &fi, fl) {
++		XMPP::Jid jid(JIDUtil::decode(fi.completeBaseName()));
++		if (jid.isValid()) {
++			importList.append(QPair<XMPP::Jid, QString>(jid, QString()));
++			impSize += fi.size();
++		}
++	}
++	if (importList.isEmpty()) {
++		emit finished(0);
++		return;
++	}
++	desEdb = psi->edb();
++	((EDBSqLite *)desEdb)->setMirror(NULL);
++
++	souEdb = new EDBFlatFile;
++
++	QTimer::singleShot(0, this, SLOT(readFromFiles()));
++}
++
++HistoryImp::~HistoryImp()
++{
++	((EDBSqLite *)desEdb)->setMirror((EDBFlatFile *)souEdb);
++	if (hRead != NULL)
++		delete hRead;
++	if (hWrite != NULL)
++		delete hWrite;
++}
++
++void HistoryImp::readFromFiles()
++{
++	if (prompt) {
++		prompt = false;
++		QString text = tr("Found %1 files. Common size is %2 bytes.\nContinue?").arg(importList.size()).arg(impSize);
++		if (QMessageBox::question(NULL, tr("Import history"), text, QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes) {
++			emit finished(1);
++			return;
++		}
++	}
++	if (importList.isEmpty()) {
++		emit finished(0);
++		return;
++	}
++	if (hWrite != NULL && !hWrite->writeSuccess()) {
++		emit finished(2); // Write error
++		return;
++	}
++	if (hRead == NULL) {
++		hRead = new EDBHandle(souEdb);
++		connect(hRead, SIGNAL(finished()), this, SLOT(writeToSqlite()));
++	}
++	QPair<XMPP::Jid, QString> &rec = importList.first();
++	QString nextId = rec.second;
++	if (nextId.isEmpty()) {
++		qWarning(QString("Importing %1").arg(JIDUtil::toString(rec.first, true)).toAscii());
++		hRead->getOldest(rec.first, 1);
++	} else {
++		hRead->get(rec.first, nextId, EDB::Forward, 1);
++	}
++}
++
++void HistoryImp::writeToSqlite()
++{
++	const EDBResult r = hRead->result();
++	if (hRead->lastRequestType() != EDBHandle::Read || r.size() > 1) {
++		emit finished(2);
++		return;
++	}
++	if (r.isEmpty()) {
++		importList.removeFirst();
++		QTimer::singleShot(0, this, SLOT(readFromFiles()));
++		return;
++	}
++	if (hWrite == NULL) {
++		hWrite = new EDBHandle(desEdb);
++		connect(hWrite, SIGNAL(finished()), this, SLOT(readFromFiles()));
++	}
++	EDBItemPtr it = r.first();
++	hWrite->append(importList.first().first, it->event());
++	if (!it->nextId().isEmpty())
++		importList.first().second = it->nextId();
++	else
++		importList.removeFirst();
++}
+--- psi.orig/src/historyimp.h
++++ psi/src/historyimp.h
+@@ -0,0 +1,58 @@
++/*
++ * historyimp.h
++ * Copyright (C) 20011   Aleksey Andreev
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef HISTORYIMP_H
++#define HISTORYIMP_H
++
++#include <QObject>
++#include <QPair>
++
++#include "xmpp/jid/jid.h"
++#include "jidutil.h"
++#include "psicon.h"
++#include "eventdb.h"
++
++class HistoryImp : public QObject
++{
++	Q_OBJECT
++
++public:
++	HistoryImp(PsiCon *psi);
++	~HistoryImp();
++
++private:
++	bool prompt;
++	qint64 impSize;
++	QList< QPair<XMPP::Jid, QString> > importList;
++	EDB *souEdb;
++	EDB *desEdb;
++	EDBHandle *hRead;
++	EDBHandle *hWrite;
++
++private slots:
++	void readFromFiles();
++	void writeToSqlite();
++
++signals:
++	void finished(int);
++
++};
++
++#endif
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -324,7 +324,10 @@ PsiCon::PsiCon()
+ 	d->ftwin = 0;
+ #endif
+ 
+-	d->edb = new EDBFlatFile;
++	//d->edb = new EDBFlatFile;
++	EDBSqLite *esl = new EDBSqLite;
++	esl->setMirror(new EDBFlatFile);
++	d->edb = esl;
+ 
+ 	d->s5bServer = 0;
+ 	d->tuneManager = 0;
+--- psi.orig/src/src.pri
++++ psi/src/src.pri
+@@ -1,4 +1,4 @@
+-QT += xml network
++QT += xml network sql
+ 
+ # modules
+ include($$PWD/protocol/protocol.pri)
+@@ -155,6 +155,7 @@ HEADERS += \
+ 	$$PWD/translationmanager.h \
+ 	$$PWD/eventdb.h \
+ 	$$PWD/historydlg.h \
++	$$PWD/historyimp.h \
+ 	$$PWD/tipdlg.h \
+ 	$$PWD/searchdlg.h \
+ 	$$PWD/registrationdlg.h \
+@@ -303,6 +304,7 @@ SOURCES += \
+ 	$$PWD/translationmanager.cpp \
+ 	$$PWD/eventdb.cpp \
+ 	$$PWD/historydlg.cpp \
++	$$PWD/historyimp.cpp \
+ 	$$PWD/searchdlg.cpp \
+ 	$$PWD/registrationdlg.cpp \
+ 	$$PWD/psitoolbar.cpp \
