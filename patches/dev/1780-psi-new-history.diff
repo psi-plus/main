@@ -34,7 +34,7 @@
  	return r->id;
  }
  
-@@ -968,3 +981,592 @@ QString EDBFlatFile::File::eventToLine(P
+@@ -968,3 +981,676 @@ QString EDBFlatFile::File::eventToLine(P
  	
  	return "";
  }
@@ -72,14 +72,20 @@
 +	Private() {}
 +	QList<item_query_req*> rlist;
 +	EDBFlatFile *mirror_;
++	QHash<QString, qint64>jidsHash;
++	unsigned int transactionsCounter;
++	QTimer *commitTimer;
 +};
 +
 +EDBSqLite::EDBSqLite() : EDB()
 +{
 +	d = new Private;
++	d->transactionsCounter = 0;
++	d->commitTimer = NULL;
 +
 +	d->mirror_ = NULL;
 +
++	status = NotActive;
 +	QString path = ApplicationInfo::historyDir() + "/history.db";
 +	//if (QFile::exists(path)) {
 +		QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
@@ -88,26 +94,29 @@
 +			qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toAscii());
 +			return;
 +		}
-+		QSqlQuery query(db);
-+		query.exec("SELECT count(*) FROM `sqlite_master`;");
-+		query.first();
-+		if (query.value(0).toInt() == 0) {
++		if (db.tables(QSql::Tables).size() == 0) {
 +			// no tables found.
-+			query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
-+			query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER);");
-+			query.exec("CREATE TABLE `messages` (`event_id` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
-+			query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
-+			query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
-+			query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
-+			query.exec("CREATE INDEX `date` ON `events` (`date`);");
-+			query.exec("CREATE INDEX `event_id` ON `messages` (`event_id`);");
-+			query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
++			if (db.transaction()) {
++				QSqlQuery query(db);
++				query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
++				query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER);");
++				query.exec("CREATE TABLE `messages` (`event_id` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
++				query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
++				query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
++				query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
++				query.exec("CREATE INDEX `date` ON `events` (`date`);");
++				query.exec("CREATE INDEX `event_id` ON `messages` (`event_id`);");
++				query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
++				if (db.commit())
++					status = Commited;
++			}
 +		}
 +	//}
 +}
 +
 +EDBSqLite::~EDBSqLite()
 +{
++	commit();
 +	{
 +		QSqlDatabase db = QSqlDatabase::database("history", false);
 +		if (db.isOpen())
@@ -253,6 +262,7 @@
 +		delete r->event;
 +	}
 +	else if (type >= item_query_req::Type_getLatest && type <= item_query_req::Type_get) {
++		commit();
 +		QSqlQuery query(QSqlDatabase::database("history"));
 +		query.setForwardOnly(true);
 +		int direction;
@@ -273,7 +283,7 @@
 +		queryStr.append(" LIMIT ?;");
 +		query.prepare(queryStr);
 +		int parNum = 0;
-+		QString jidStr = JIDUtil::toString(r->j, false);
++		QString jidStr = r->j.bare();
 +		query.bindValue(parNum++, jidStr);
 +		if (type == item_query_req::Type_get)
 +			query.bindValue(parNum++, r->eventId);
@@ -330,13 +340,14 @@
 +		}
 +		resultReady(r->id, result);
 +	} else if(type == item_file_req::Type_getByDate ) {
++		commit();
 +		QSqlQuery query(QSqlDatabase::database("history"));
 +		query.setForwardOnly(true);
 +		QString queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`";
 +		queryStr.append(" FROM `events` LEFT JOIN `messages` ON `events`.`id` = `messages`.`event_id`, `jids`");
 +		queryStr.append(" WHERE `jid` = ?  AND `jids`.`id` = `jid_id` AND `date` >= ? AND `date` <= ? ORDER BY `date` ASC;");
 +		query.prepare(queryStr);
-+		QString jidStr = JIDUtil::toString(r->j, false);
++		QString jidStr = r->j.bare();
 +		query.bindValue(0, jidStr);
 +		query.bindValue(1, r->first);
 +		query.bindValue(2, r->last);
@@ -378,13 +389,14 @@
 +		}
 +		resultReady(r->id, result);
 +	} else if(type == item_file_req::Type_find) {
++		commit();
 +		QSqlQuery query(QSqlDatabase::database("history"));
 +		query.setForwardOnly(true);
 +		QString queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`";
 +		queryStr.append(" FROM `events` LEFT JOIN `messages` ON `events`.`id` = `messages`.`event_id`, `jids`");
 +		queryStr.append(" WHERE `jid` = ?  AND `jids`.`id` = `jid_id` AND `m_text` IS NOT NULL ORDER BY `date`;");
 +		query.prepare(queryStr);
-+		query.bindValue(0, JIDUtil::toString(r->j, false));
++		query.bindValue(0, r->j.bare());
 +		EDBResult result;
 +		if (query.exec()) {
 +			EDBItem *ei = NULL;
@@ -409,29 +421,7 @@
 +		resultReady(r->id, result);
 +
 +	} else if(type == item_file_req::Type_erase) {
-+		bool res = false;
-+		QSqlQuery query(QSqlDatabase::database("history"));
-+		query.prepare("SELECT `id` FROM `jids` WHERE `jid` = ?;");
-+		query.bindValue(0, JIDUtil::toString(r->j, false));
-+		if (query.exec() && query.first()) {
-+			const int id = query.value(0).toInt();
-+			QString subQueryStr = "SELECT `id` FROM `events` WHERE `jid_id` = ?";
-+			QString queryStr = QString("DELETE FROM `%1` WHERE `event_id` IN (%2);");
-+			query.prepare(queryStr.arg("urls").arg(subQueryStr));
-+			query.bindValue(0, id);
-+			if (query.exec()) {
-+				query.prepare(queryStr.arg("messages").arg(subQueryStr));
-+				query.bindValue(0, id);
-+				if (query.exec()) {
-+					query.prepare("DELETE FROM `events` WHERE `jid_id` = ?;");
-+					query.bindValue(0, id);
-+					if (query.exec()) {
-+						res = true;
-+					}
-+				}
-+			}
-+		}
-+		writeFinished(r->id, res);
++		writeFinished(r->id, eraseHistory(r->j));
 +	}
 +	delete r;
 +}
@@ -439,7 +429,7 @@
 +bool EDBSqLite::appendEvent(const XMPP::Jid &jid, PsiEvent *e)
 +{
 +	QSqlDatabase db = QSqlDatabase::database("history");
-+	const qint64 jidId = ensureJidRowId(jid, db);
++	const qint64 jidId = ensureJidRowId(jid);
 +	if (jidId == 0)
 +		return false;
 +	QDateTime dTime;
@@ -475,6 +465,8 @@
 +		return false;
 +	}
 +	int nDirection = e->originLocal() ? 1 : 2;
++	if (!transaction(false))
++		return false;
 +	QSqlQuery query(db);
 +	query.prepare("INSERT INTO `events` (`jid_id`, `date`, `type`, `direction`, `flags`) VALUES (?, ?, ?, ?, ?);");
 +	query.bindValue(0, jidId);
@@ -594,13 +586,18 @@
 +	return NULL;
 +}
 +
-+qint64 EDBSqLite::ensureJidRowId(const XMPP::Jid &jid, QSqlDatabase &db)
++qint64 EDBSqLite::ensureJidRowId(const XMPP::Jid &jid)
 +{
 +	QString sJid = jid.bare();
 +	if (sJid.isEmpty())
 +		return 0;
++	qint64 id = d->jidsHash.value(sJid, 0);
++	if (id != 0)
++		return id;
++
++	QSqlDatabase db = QSqlDatabase::database("history");
++	commit();
 +	QSqlQuery query(db);
-+	qint64 id;
 +	for (int i = 1; i <= 2; ++i) {
 +		query.prepare("SELECT `id` FROM `jids` WHERE `jid` = ?;");
 +		query.bindValue(0, sJid);
@@ -622,9 +619,96 @@
 +				continue;
 +			id = query.lastInsertId().toLongLong();
 +		}
++		d->jidsHash[sJid] = id;
 +		return id;
 +	}
 +	return 0;
++}
++
++bool EDBSqLite::eraseHistory(const XMPP::Jid &jid)
++{
++	bool res = false;
++	if (!transaction(true))
++		return false;
++	QSqlQuery query(QSqlDatabase::database("history"));
++	query.prepare("SELECT `id` FROM `jids` WHERE `jid` = ?;");
++	query.bindValue(0, jid.bare());
++	if (query.exec() && query.first()) {
++		const int id = query.value(0).toInt();
++		QString subQueryStr = "SELECT `id` FROM `events` WHERE `jid_id` = ?";
++		QString queryStr = QString("DELETE FROM `%1` WHERE `event_id` IN (%2);");
++		query.prepare(queryStr.arg("urls").arg(subQueryStr));
++		query.bindValue(0, id);
++		if (query.exec()) {
++			query.prepare(queryStr.arg("messages").arg(subQueryStr));
++			query.bindValue(0, id);
++			if (query.exec()) {
++				query.prepare("DELETE FROM `events` WHERE `jid_id` = ?;");
++				query.bindValue(0, id);
++				if (query.exec()) {
++					res = true;
++				}
++			}
++		}
++	}
++	if (res)
++		res = commit();
++	else
++		rollback();
++	return res;
++}
++
++bool EDBSqLite::transaction(bool now)
++{
++	if (status == NotActive)
++		return false;
++	if (now || d->transactionsCounter >= 10000) {
++		if (!commit())
++			return false;
++	}
++
++	if (status == Commited) {
++		if (!QSqlDatabase::database("history").transaction())
++			return false;
++		status = NotCommited;
++	}
++	++d->transactionsCounter;
++
++	if (d->commitTimer == NULL) {
++		d->commitTimer = new QTimer(this);
++		connect(d->commitTimer, SIGNAL(timeout()), this, SLOT(commit()));
++		d->commitTimer->setSingleShot(true);
++		d->commitTimer->setInterval(5*1000);
++	}
++	d->commitTimer->start();
++
++	return true;
++}
++
++bool EDBSqLite::commit()
++{
++	if (status != NotActive) {
++		if (status == Commited || QSqlDatabase::database("history").commit()) {
++			d->transactionsCounter = 0;
++			status = Commited;
++			if (d->commitTimer != NULL && d->commitTimer->isActive())
++				d->commitTimer->stop();
++			return true;
++		}
++	}
++	return false;
++}
++
++bool EDBSqLite::rollback()
++{
++	if (status == NotCommited && QSqlDatabase::database("history").rollback()) {
++		d->transactionsCounter = 0;
++		status = Commited;
++		if (d->commitTimer != NULL && d->commitTimer->isActive())
++			d->commitTimer->stop();
++		return true;
++	}
++	return false;
 +}
 +
 --- psi.orig/src/eventdb.h
@@ -654,7 +738,7 @@
  
  private:
  	QString v_id, v_prevId, v_nextId;
-@@ -189,4 +192,34 @@ private:
+@@ -189,4 +192,41 @@ private:
  	void ensureIndex();
  };
  
@@ -676,16 +760,23 @@
 +	EDBFlatFile *mirror() const;
 +
 +private:
++	enum {NotActive, NotCommited, Commited};
++	int  status;
 +	class Private;
 +	Private *d;
 +
 +private:
 +	bool appendEvent(const XMPP::Jid &, PsiEvent *);
 +	PsiEvent *getEvent(QSqlQuery &q);
-+	qint64 ensureJidRowId(const XMPP::Jid &, QSqlDatabase &);
++	qint64 ensureJidRowId(const XMPP::Jid &);
++	bool eraseHistory(const XMPP::Jid &);
++	bool transaction(bool now);
++	bool rollback();
 +
 +private slots:
 +	void performRequests();
++	bool commit();
++
 +};
 +
  #endif
