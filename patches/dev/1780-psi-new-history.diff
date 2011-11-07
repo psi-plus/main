@@ -34,7 +34,7 @@
  	return r->id;
  }
  
-@@ -968,3 +981,676 @@ QString EDBFlatFile::File::eventToLine(P
+@@ -968,3 +981,677 @@ QString EDBFlatFile::File::eventToLine(P
  	
  	return "";
  }
@@ -87,31 +87,32 @@
 +
 +	status = NotActive;
 +	QString path = ApplicationInfo::historyDir() + "/history.db";
-+	//if (QFile::exists(path)) {
-+		QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
-+		db.setDatabaseName(path);
-+		if (!db.open()) {
-+			qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toAscii());
-+			return;
-+		}
-+		if (db.tables(QSql::Tables).size() == 0) {
-+			// no tables found.
-+			if (db.transaction()) {
-+				QSqlQuery query(db);
-+				query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
-+				query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER);");
-+				query.exec("CREATE TABLE `messages` (`event_id` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
-+				query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
-+				query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
-+				query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
-+				query.exec("CREATE INDEX `date` ON `events` (`date`);");
-+				query.exec("CREATE INDEX `event_id` ON `messages` (`event_id`);");
-+				query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
-+				if (db.commit())
-+					status = Commited;
++	QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
++	db.setDatabaseName(path);
++	if (!db.open()) {
++		qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toAscii());
++		return;
++	}
++	if (db.tables(QSql::Tables).size() == 0) {
++		// no tables found.
++		if (db.transaction()) {
++			QSqlQuery query(db);
++			query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
++			query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER);");
++			query.exec("CREATE TABLE `messages` (`event_id` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
++			query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
++			query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
++			query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
++			query.exec("CREATE INDEX `date` ON `events` (`date`);");
++			query.exec("CREATE INDEX `event_id` ON `messages` (`event_id`);");
++			query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
++			if (db.commit()) {
++				status = Commited;
 +			}
 +		}
-+	//}
++	} else {
++		status = Commited;
++	}
 +}
 +
 +EDBSqLite::~EDBSqLite()
