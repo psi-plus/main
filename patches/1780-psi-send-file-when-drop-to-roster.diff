@@ -1,0 +1,110 @@
+--- psi.orig/src/psicontactlistview.cpp
++++ psi/src/psicontactlistview.cpp
+@@ -25,12 +25,17 @@
+ #include <QApplication>
+ #include <QDesktopWidget>
+ #include <QTimer>
++#include <QFile>
+ 
+ #include "psicontactlistviewdelegate.h"
+ #include "psitooltip.h"
+ #include "psioptions.h"
+ #include "contactlistmodel.h"
+ #include "contactlistproxymodel.h"
++#include "contactlistgroup.h"
++#include "contactlistitemproxy.h"
++#include "psicontact.h"
++#include "psiaccount.h"
+ 
+ static const int recalculateTimerTimeout = 2000;
+ 
+@@ -172,6 +177,70 @@ void PsiContactListView::showToolTip(con
+ 	PsiToolTip::showText(globalPos, text, this);
+ }
+ 
++bool PsiContactListView::acceptableDragOperation(QDropEvent *e)
++{
++	ContactListItemProxy* ip = itemProxy(indexAt(e->pos()));
++	if(ip) {
++		PsiContact *pc = dynamic_cast<PsiContact*>(ip->item());
++		if(pc) {
++			QList<QUrl> urls = e->mimeData()->urls();
++			if(urls.count() == 1) {
++				QFile f(urls.first().path());
++				if(f.exists()) {
++					return true;
++				}
++			}
++		}
++	}
++
++	return false;
++}
++
++void PsiContactListView::dragEnterEvent(QDragEnterEvent *e)
++{
++	if(acceptableDragOperation(e)) {
++		setCurrentIndex(indexAt(e->pos()));
++		e->acceptProposedAction();
++		return;
++	}
++
++	ContactListDragView::dragEnterEvent(e);
++}
++
++void PsiContactListView::dragMoveEvent(QDragMoveEvent *e)
++{
++	if(acceptableDragOperation(e)) {
++		setCurrentIndex(indexAt(e->pos()));
++		e->acceptProposedAction();
++		return;
++	}
++
++	ContactListDragView::dragMoveEvent(e);
++}
++
++void PsiContactListView::dropEvent(QDropEvent *e)
++{
++	ContactListItemProxy* ip = itemProxy(indexAt(e->pos()));
++	if(ip) {
++		PsiContact *pc = dynamic_cast<PsiContact*>(ip->item());
++		if(pc) {
++			QList<QUrl> urls = e->mimeData()->urls();
++			if(urls.count() == 1) {
++				const QString path = urls.first().path();
++				QFile f(path);
++				if(f.exists()) {
++					e->acceptProposedAction();
++					pc->account()->sendFiles(pc->jid(), QStringList(path), true);
++					return;
++				}
++
++			}
++		}
++	}
++
++	ContactListDragView::dropEvent(e);
++}
++
+ void PsiContactListView::setModel(QAbstractItemModel* model)
+ {
+ 	ContactListDragView::setModel(model);
+--- psi.orig/src/psicontactlistview.h
++++ psi/src/psicontactlistview.h
+@@ -49,9 +49,16 @@ protected:
+ 	virtual void showToolTip(const QModelIndex& index, const QPoint& globalPos) const;
+ 	virtual void doItemsLayoutStart();
+ 
++	virtual void dragEnterEvent(QDragEnterEvent *e);
++	virtual void dropEvent(QDropEvent *e);
++	virtual void dragMoveEvent(QDragMoveEvent *e);
++
+ 	PsiContactListViewDelegate* itemDelegate() const;
+ 
+ private:
++	bool acceptableDragOperation(QDropEvent *e);
++
++private:
+ 	class Private;
+ 	Private* d;
+ };
