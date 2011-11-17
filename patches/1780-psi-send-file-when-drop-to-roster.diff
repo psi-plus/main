@@ -4,7 +4,7 @@
  #include <QApplication>
  #include <QDesktopWidget>
  #include <QTimer>
-+#include <QFile>
++#include <QFileInfo>
  
  #include "psicontactlistviewdelegate.h"
  #include "psitooltip.h"
@@ -18,7 +18,7 @@
  
  static const int recalculateTimerTimeout = 2000;
  
-@@ -172,6 +177,70 @@ void PsiContactListView::showToolTip(con
+@@ -172,6 +177,74 @@ void PsiContactListView::showToolTip(con
  	PsiToolTip::showText(globalPos, text, this);
  }
  
@@ -28,10 +28,9 @@
 +	if(ip) {
 +		PsiContact *pc = dynamic_cast<PsiContact*>(ip->item());
 +		if(pc) {
-+			QList<QUrl> urls = e->mimeData()->urls();
-+			if(urls.count() == 1) {
-+				QFile f(urls.first().path());
-+				if(f.exists()) {
++			foreach(const QUrl& url, e->mimeData()->urls()) {
++				const QFileInfo fi(url.toLocalFile());
++				if (!fi.isDir() && fi.exists()) {
 +					return true;
 +				}
 +			}
@@ -69,16 +68,21 @@
 +	if(ip) {
 +		PsiContact *pc = dynamic_cast<PsiContact*>(ip->item());
 +		if(pc) {
-+			QList<QUrl> urls = e->mimeData()->urls();
-+			if(urls.count() == 1) {
-+				const QString path = urls.first().path();
-+				QFile f(path);
-+				if(f.exists()) {
-+					e->acceptProposedAction();
-+					pc->account()->sendFiles(pc->jid(), QStringList(path), true);
-+					return;
++			QStringList files;
++			foreach(const QUrl& url, e->mimeData()->urls()) {
++				const QFileInfo fi(url.toLocalFile());
++				if (!fi.isDir() && fi.exists()) {
++					const QString fileName = QFileInfo(fi.isSymLink() ?
++									    fi.symLinkTarget() : fi.absoluteFilePath()
++									    ).canonicalFilePath();
++					files.append(fileName);
 +				}
++			}
 +
++			if(!files.isEmpty()) {
++				e->acceptProposedAction();
++				pc->account()->sendFiles(pc->jid(), files, true);
++				return;
 +			}
 +		}
 +	}
