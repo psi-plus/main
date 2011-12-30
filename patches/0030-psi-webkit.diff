@@ -14,11 +14,19 @@
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
  			</message>
  			<chat comment="Chat dialog options">
-+				<theme comment="The theme used for messages rendering" type="QString">psi/classic</theme>
++				<theme comment="The theme used for chat messages rendering" type="QString">psi/classic</theme>
  				<central-toolbar comment="Have a central toolbar" type="bool">false</central-toolbar>
  				<size comment="Remembered window size" type="QSize">
  				</size><!-- will be invalid when converted to QSize so we can detect first load -->
-@@ -260,6 +264,7 @@
+@@ -191,6 +195,7 @@
+ 				</view>
+ 			</menu>
+ 			<muc comment="Multi-User Chat options">
++				<theme comment="The theme used for groupchat messages rendering" type="QString">psi/classic</theme>
+ 				<highlight-words type="QStringList" />
+ 				<size comment="Remembered window size" type="QSize">
+ 					<width>580</width>
+@@ -260,6 +265,7 @@
  						<received type="QColor" comment="Color used to indicate received messages.">#0000ff</received>
  						<sent type="QColor" comment="Color used to indicate sent messages.">#ff0000</sent>
  						<informational type="QColor" comment="Color used to indicate informational (status change, spooled) messages.">#008000</informational>
@@ -81,7 +89,7 @@
 +};
 --- psi.orig/src/bytearrayreply.cpp
 +++ psi/src/bytearrayreply.cpp
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,89 @@
 +/*
 + * bytearrayreply.cpp - Base class for QNetworReply'es returning QByteArray
 + * Copyright (C) 2010 senu, Rion
@@ -116,14 +124,21 @@
 +	setRequest(request);
 +	setOpenMode(QIODevice::ReadOnly);
 +
-+	if (mimeType.isEmpty()) {
-+		setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
++	if (ba.isNull()) {
++		setError(QNetworkReply::ContentNotFoundError, "Not found");
++		QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
++		QTimer::singleShot(0, this, SLOT(signalError()));
++		QTimer::singleShot(0, this, SIGNAL(finished()));
 +	} else {
-+		setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
++		if (mimeType.isEmpty()) {
++			setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
++		} else {
++			setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
++		}
++		setHeader(QNetworkRequest::ContentLengthHeader, QByteArray::number(origLen));
++		QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
++		QTimer::singleShot(0, this, SIGNAL(readyRead()));
 +	}
-+	setHeader(QNetworkRequest::ContentLengthHeader, QByteArray::number(origLen));
-+	QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
-+	QTimer::singleShot(0, this, SIGNAL(readyRead()));
 +}
 +
 +ByteArrayReply::~ByteArrayReply() {
@@ -131,7 +146,7 @@
 +}
 +
 +void ByteArrayReply::abort() {
-+	qDebug("ByteArrayReply abort O_o");
++	// its ok for abort here. webkit calls it in any case on finish
 +}
 +
 +qint64 ByteArrayReply::bytesAvailable() const
@@ -159,9 +174,14 @@
 +	Q_ASSERT(0); //should never happened
 +	return true;
 +}
++
++void ByteArrayReply::signalError()
++{
++	emit error(error());
++}
 --- psi.orig/src/bytearrayreply.h
 +++ psi/src/bytearrayreply.h
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,56 @@
 +/*
 + * bytearrayreply.h - Base class for QNetworReply'es returning QByteArray
 + * Copyright (C) 2010 senu, Rion
@@ -209,6 +229,9 @@
 +	qint64 bytesAvailable() const;
 +	bool open(OpenMode mode);
 +
++private slots:
++	void signalError();
++
 +private:
 +	int origLen;
 +	QByteArray data;
@@ -217,15 +240,16 @@
 +#endif
 --- psi.orig/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp
-@@ -73,6 +73,7 @@
+@@ -73,6 +73,8 @@
  #include "psicontactlist.h"
  #include "accountlabel.h"
  #include "psirichtext.h"
 +#include "messageview.h"
++#include "chatview.h"
  
  #ifdef Q_WS_WIN
  #include <windows.h>
-@@ -117,12 +118,16 @@ void ChatDlg::init()
+@@ -117,12 +119,16 @@ void ChatDlg::init()
  	initActions();
  	setShortcuts();
  
@@ -246,7 +270,7 @@
  
  	// SyntaxHighlighters modify the QTextEdit in a QTimer::singleShot(0, ...) call
  	// so we need to install our hooks after it fired for the first time
-@@ -200,12 +205,12 @@ void ChatDlg::setShortcuts()
+@@ -200,12 +206,12 @@ void ChatDlg::setShortcuts()
  
  void ChatDlg::scrollUp()
  {
@@ -261,7 +285,7 @@
  }
  
  void ChatDlg::closeEvent(QCloseEvent *e)
-@@ -303,12 +308,13 @@ void ChatDlg::logSelectionChanged()
+@@ -303,12 +309,13 @@ void ChatDlg::logSelectionChanged()
  {
  #ifdef Q_WS_MAC
  	// A hack to only give the message log focus when text is selected
@@ -281,7 +305,27 @@
  #endif
  }
  
-@@ -670,6 +676,8 @@ void ChatDlg::doSend()
+@@ -450,18 +457,7 @@ void ChatDlg::updateContact(const Jid &j
+ 			updatePGP();
+ 
+ 			if (fromPresence && statusChanged) {
+-				QString msg = tr("%1 is %2").arg(Qt::escape(dispNick_)).arg(status2txt(status_));
+-				if (!statusString_.isEmpty()) {
+-					QString ss = TextUtil::linkify(TextUtil::plain2rich(statusString_));
+-					if (PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool()) {
+-						ss = TextUtil::emoticonify(ss);
+-					}
+-					if (PsiOptions::instance()->getOption("options.ui.chat.legacy-formatting").toBool()) {
+-						ss = TextUtil::legacyFormat(ss);
+-					}
+-					msg += QString(" [%1]").arg(ss);
+-				}
+-				appendSysMsg(msg);
++				chatView()->dispatchMessage(MessageView::statusMessage(dispNick_, status_, statusString_));
+ 			}
+ 		}
+ 
+@@ -670,6 +666,8 @@ void ChatDlg::doSend()
  	if (isEncryptionEnabled()) {
  		m.setWasEncrypted(true);
  	}
@@ -290,7 +334,16 @@
  	m_ = m;
  
  	// Request events
-@@ -792,17 +800,14 @@ void ChatDlg::appendMessage(const Messag
+@@ -777,7 +775,7 @@ QString ChatDlg::whoNick(bool local) con
+ 		result = dispNick_;
+ 	}
+ 
+-	return Qt::escape(result);
++	return result;
+ }
+ 
+ void ChatDlg::appendMessage(const Message &m, bool local)
+@@ -792,17 +790,14 @@ void ChatDlg::appendMessage(const Messag
  	encEnabled = lastWasEncrypted_;
  
  	if (encChanged) {
@@ -316,7 +369,7 @@
  				// enable warning
  				warnSend_ = true;
  				QTimer::singleShot(3000, this, SLOT(setWarnSendFalse()));
-@@ -810,21 +815,31 @@ void ChatDlg::appendMessage(const Messag
+@@ -810,21 +805,31 @@ void ChatDlg::appendMessage(const Messag
  		}
  	}
  
@@ -362,7 +415,7 @@
  	}
  
  	// if we're not active, notify the user by changing the title
-@@ -855,16 +870,6 @@ void ChatDlg::appendMessage(const Messag
+@@ -855,16 +860,6 @@ void ChatDlg::appendMessage(const Messag
  	}
  }
  
@@ -379,7 +432,7 @@
  void ChatDlg::updateIsComposing(bool b)
  {
  	setChatState(b ? XMPP::StateComposing : XMPP::StatePaused);
-@@ -1029,67 +1034,8 @@ void ChatDlg::nicksChanged()
+@@ -1029,67 +1024,8 @@ void ChatDlg::nicksChanged()
  	// this function is intended to be reimplemented in subclasses
  }
  
@@ -638,7 +691,7 @@
 +#endif
 --- psi.orig/src/chatview_te.cpp
 +++ psi/src/chatview_te.cpp
-@@ -0,0 +1,387 @@
+@@ -0,0 +1,390 @@
 +/*
 + * chatview_te.cpp - subclass of PsiTextView to handle various hotkeys
 + * Copyright (C) 2001-2010  Justin Karneges, Michail Pishchagin, Rion
@@ -668,12 +721,15 @@
 +#include "textutil.h"
 +#include "psirichtext.h"
 +#include "chatviewshare.h"
++#include "common.h"
 +
 +#include <QWidget>
 +#include <QTextOption>
 +#include <QScrollBar>
 +#include <QTimer>
 +#include <QKeyEvent>
++
++static const char *infomrationalColorOpt = "options.ui.look.colors.messages.informational";
 +
 +//----------------------------------------------------------------------------
 +// ChatView
@@ -800,7 +856,7 @@
 +QString ChatView::colorString(bool local, bool spooled) const
 +{
 +	if (spooled) {
-+		return ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++		return ColorOpt::instance()->color(infomrationalColorOpt).name();
 +	}
 +
 +	if (local) {
@@ -813,7 +869,7 @@
 +void ChatView::updateLastMsgTime(const QDateTime &t)
 +{
 +	if (share_.updateLastMsgTime(t)) {
-+		QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(t.date().toString(Qt::ISODate)));
 +	}
 +}
@@ -837,7 +893,7 @@
 +void ChatView::dispatchMessage(const MessageView &mv)
 +{
 +	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject) && share_.updateLastMsgTime(mv.dateTime())) {
-+		QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
 +	}
 +	switch (mv.type()) {
@@ -858,7 +914,7 @@
 +		case MessageView::Urls:
 +			renderUrls(mv);
 +			break;
-+		default:
++		default: // System/Status
 +			renderSysMessage(mv);
 +	}
 +}
@@ -875,7 +931,7 @@
 +	}
 +
 +	if(mv.isSpooled()) {
-+		nickcolor = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +	} else {
 +		nickcolor = share_.getMucNickColor(mv.nick(), mv.isLocal());
 +	}
@@ -902,13 +958,13 @@
 +	QString timestr = formatTimeStamp(mv.dateTime());
 +	QString color = colorString(mv.isLocal(), mv.isSpooled());
 +	if (mv.isEmote()) {
-+		appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(mv.nick()) + mv.formattedText() + "</span>");
++		appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + mv.formattedText() + "</span>");
 +	} else {
 +		if (PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
-+			appendText(QString("<p style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(mv.nick()) + "</p>" + mv.formattedText());
++			appendText(QString("<p style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(Qt::escape(mv.nick())) + "</p>" + mv.formattedText());
 +		}
 +		else {
-+			appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + mv.nick() + QString("&gt;</span> ") + mv.formattedText());
++			appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + Qt::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
 +		}
 +	}
 +
@@ -921,7 +977,7 @@
 +{
 +	QString timestr = formatTimeStamp(mv.dateTime());
 +	QString ut = mv.formattedUserText();
-+	QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++	QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
 +	appendText(QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
 +						(ut.isEmpty()?"":":") + "</font>" +
@@ -937,7 +993,7 @@
 +{
 +	QString timestr = formatTimeStamp(mv.dateTime());
 +	QString ut = mv.formattedUserText();
-+	QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
++	QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
 +	appendText(QString("<font color=\"%1\">[%2] *** ").arg(color, timestr) + mv.formattedText() +
 +						(ut.isEmpty()?"":":<br>") + "</font>" +
@@ -1121,7 +1177,7 @@
 +#endif
 --- psi.orig/src/chatviewtheme.cpp
 +++ psi/src/chatviewtheme.cpp
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,250 @@
 +/*
 + * chatviewtheme.cpp - theme for webkit based chatview
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -1180,7 +1236,9 @@
 +public slots:
 +	void setMetaData(const QVariantMap &map)
 +	{
-+		theme->md->name = map["name"].toString();
++		if (map["name"].isValid()) {
++			theme->setName(map["name"].toString());
++		}
 +	}
 +
 +	QString psiOption(const QString &option) const
@@ -1195,14 +1253,19 @@
 +
 +	QString getFileContents(const QString &name) const
 +	{
-+		return QString(Theme::loadData(name, theme->md->filename));
++		return QString(Theme::loadData(name, theme->fileName()));
 +	}
 +
 +	QString getFileContentsFromAdapterDir(const QString &name) const
 +	{
 +		QFile file(theme->d->adapterPath + "/" + name);
 +		if (file.open(QIODevice::ReadOnly)) {
-+			return file.readAll();
++			QByteArray result = file.readAll();
++			file.close();
++			return QString::fromUtf8(result.constData(), result.size());
++		} else {
++			qDebug("Failed to open file %s: %s", qPrintable(file.fileName()),
++				   qPrintable(file.errorString()));
 +		}
 +		return QString();
 +	}
@@ -1241,7 +1304,7 @@
 +
 +	void setDefaultAvatar(const QString &filename, const QString &host = QString())
 +	{
-+		QByteArray ba = Theme::loadData(filename, theme->md->filename);
++		QByteArray ba = Theme::loadData(filename, theme->fileName());
 +		if (!ba.isEmpty()) {
 +			((PsiWKAvatarHandler *)NetworkAccessManager::instance()
 +				->schemeHandler("avatar").data())->setDefaultAvatar(ba, host);
@@ -1265,13 +1328,24 @@
 +		return theme->d->jsNamespace;
 +	}
 +
++	const QString themeId() const
++	{
++		return theme->id();
++	}
++
++	QString status2text(int status) const
++	{
++		return ::status2txt(status);
++	}
++
 +};
 +
 +
 +//------------------------------------------------------------------------------
 +// ChatViewTheme
 +//------------------------------------------------------------------------------
-+ChatViewTheme::ChatViewTheme()
++ChatViewTheme::ChatViewTheme(const QString &id) :
++	Theme(id)
 +{
 +	d = new Private;
 +	d->jsNamespace = "chat";
@@ -1293,31 +1367,36 @@
 +		d->jso = new ChatViewThemeJS(this);
 +	if (d->wv.isNull()) {
 +		d->wv = new WebView(0);
-+		d->wv->setHtml("", QUrl("theme://theme"));
++		d->wv->setHtml("", baseUrl());
 +	}
 +	d->adapterPath = adapterPath;
-+	md->filename = file;
++	setFileName(file);
 +	d->scripts = helperScripts;
 +
 +	d->wv->page()->mainFrame()->addToJavaScriptWindowObject("chatServer", d->jso,
 +												QScriptEngine::QtOwnership);
 +	foreach (const QString &script, d->scripts) {
-+		d->wv->page()->mainFrame()->evaluateJavaScript(script);
++		QVariant result = d->wv->page()->mainFrame()->evaluateJavaScript(script);
++		if (result != "ok") {
++			qDebug("failed to eval helper script: %s...", qPrintable(script.mid(0, 50)));
++			return false;
++		}
 +	}
-+	QString resStr = d->wv->page()->mainFrame()->evaluateJavaScript("try { chat.adapter.loadTheme() } catch(e) { e.toString(); }").toString();
-+	//qDebug()<<"script returned: "<< qPrintable(resStr);
++	QString resStr = d->wv->page()->mainFrame()->evaluateJavaScript(
++				"try { window[chatServer.jsNamespace()].adapter.loadTheme() } "
++				"catch(e) { window[chatServer.jsNamespace()].util.props(e); }").toString();
 +
-+	bool res = (resStr == "ok");
-+	if (!res) {
-+		qWarning("javascript part of the theme loader "
-+				 "didn't return expected result: %s", qPrintable(resStr));
++	if (resStr == "ok") {
++		return true;
 +	}
-+	return res;
++	qWarning("javascript part of the theme loader "
++			 "didn't return expected result: %s", qPrintable(resStr));
++	return false;
 +}
 +
 +QByteArray ChatViewTheme::screenshot()
 +{
-+	return Theme::loadData("screenshot.png", md->filename);
++	return Theme::loadData("screenshot.png", fileName());
 +}
 +
 +QObject * ChatViewTheme::jsHelper()
@@ -1337,7 +1416,7 @@
 +			d->wv->page()->mainFrame()->addToJavaScriptWindowObject("chatSession", session);
 +		}
 +		return d->wv->page()->mainFrame()->evaluateJavaScript(
-+				"try { "+d->jsNamespace+".adapter.getHtml(); } catch(e) { e.toString(); }").toString();
++					"try { "+d->jsNamespace+".adapter.getHtml(); } catch(e) { e.toString() + ' line:' +e.line; }").toString();
 +	}
 +	return d->html;
 +}
@@ -1351,7 +1430,7 @@
 +#include "chatviewtheme.moc"
 --- psi.orig/src/chatviewtheme.h
 +++ psi/src/chatviewtheme.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +/*
 + * chatviewtheme.h - theme for webkit based chatview
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -1386,16 +1465,19 @@
 +{
 +	friend class ChatViewThemeJS;
 +public:
-+	ChatViewTheme();
++	ChatViewTheme(const QString &id);
 +	~ChatViewTheme();
++
++	QByteArray screenshot();
++
 +	bool load( const QString &file, const QStringList &helperScripts,
 +			   const QString &adapterPath );
-+	QByteArray screenshot();
 +
 +	QObject * jsHelper();
 +	QStringList scripts();
 +	QString html(QObject *session = 0);
 +	QString jsNamespace();
++	inline QUrl baseUrl() const { return QUrl("theme://messages/" + id()); }
 +
 +private:
 +	class Private;
@@ -1403,9 +1485,288 @@
 +};
 +
 +#endif
+--- psi.orig/src/chatviewthemeprovider.cpp
++++ psi/src/chatviewthemeprovider.cpp
+@@ -0,0 +1,200 @@
++/*
++ * chatviewthemeprovider.h - adapter for set of chatview themes
++ * Copyright (C) 2010 Rion (Sergey Ilinyh)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++
++#include "chatviewthemeprovider.h"
++
++#include <QFile>
++#include <QFileInfo>
++#include <QDir>
++
++#include "chatviewtheme.h"
++#include "psioptions.h"
++#include "theme.h"
++#include "applicationinfo.h"
++#include "psiwkavatarhandler.h"
++#include "psithememanager.h"
++
++static bool singleInited = false;
++static QMap<QString, QString> chatViewScripts;
++static QMap<QString, QString> chatViewAdapterDirs;
++
++class ChatViewThemeProvider;
++
++class ChatViewThemeUrlHandler : public NAMSchemeHandler
++{
++public:
++	QByteArray data(const QUrl &url) const
++	{
++		qDebug("loading theme file: %s", qPrintable(url.toString()));
++		QString themeId = url.path().section('/', 1, 2);
++		Theme *theme;
++		if (!(theme = PsiThemeManager::instance()->provider("chatview")->current())
++				|| theme->id() != themeId) // slightly stupid detector of current provider
++		{
++			theme = PsiThemeManager::instance()->provider("groupchatview")->current();
++			if (theme->id() != themeId) {
++				theme = NULL;
++			}
++		}
++		if (theme) {
++			QByteArray td = Theme::loadData(url.path().mid(themeId.size() + 1),
++											theme->fileName());
++			if (td.isNull()) {
++				qDebug("content of %s is not found in the theme",
++					   qPrintable(url.toString()));
++			}
++			return td;
++		}
++		qDebug("theme with id %s is not loaded. failed to load url %s",
++			   qPrintable(themeId), qPrintable(url.toString()));
++		return QByteArray();
++	}
++
++};
++
++static void singleInit(PsiCon *pc)
++{
++	if (!singleInited) {
++		NetworkAccessManager::instance()->setSchemeHandler(
++				"avatar", new PsiWKAvatarHandler(pc));
++		NetworkAccessManager::instance()->setSchemeHandler(
++				"theme", new ChatViewThemeUrlHandler());
++		singleInited = true;
++	}
++}
++
++
++
++//--------------------------------------
++// ChatViewThemeProvider
++//--------------------------------------
++ChatViewThemeProvider::ChatViewThemeProvider(QObject *parent_)
++	: PsiThemeProvider(parent_)
++	, curTheme(0)
++{
++	singleInit((PsiCon*)parent());
++}
++
++const QStringList ChatViewThemeProvider::themeIds() const
++{
++	QStringList dirs;
++	dirs << ":";
++	dirs << ".";
++	dirs << ApplicationInfo::homeDir();
++	dirs << ApplicationInfo::resourcesDir();
++
++	QSet<QString> ret;
++	foreach (QString dir, dirs) {
++		foreach (QFileInfo tDirInfo, QDir(dir+"/themes/chatview/")
++			.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot)) {
++			QString typeName = tDirInfo.fileName();
++			foreach (QFileInfo themeInfo,
++					QDir(tDirInfo.absoluteFilePath())
++						.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot) +
++					QDir(tDirInfo.absoluteFilePath())
++						.entryInfoList(QStringList("*.theme"), QDir::Files)) {
++				ret<<(QString("%1/%2").arg(typeName).arg(themeInfo.fileName()));
++				//qDebug("found theme: %s", qPrintable(QString("%1/%2").arg(typeName).arg(themeInfo.fileName())));
++			}
++		}
++	}
++
++	return ret.values();
++}
++
++Theme * ChatViewThemeProvider::load(const QString &themeId)
++{
++	QString up;
++	if (chatViewScripts.value("util").isEmpty()) {
++		if (!(up = themePath("chatview/util.js")).isEmpty()) {
++			QFile file(up);
++			if (file.open(QIODevice::ReadOnly)) {
++				chatViewScripts["util"] = file.readAll();
++			}
++		}
++	}
++	if (!chatViewScripts.value("util").isEmpty()) {
++		int pos;
++		if ((pos = themeId.indexOf('/')) > 0) {
++			QString tp = themePath("chatview/" + themeId);
++			QString typeName = themeId.mid(0, pos);
++			if (!tp.isEmpty()) { // theme exists
++				QString ap, ad;
++				if (chatViewScripts.value(typeName).isEmpty() &&
++					!(ap = themePath("chatview/" + typeName + "/adapter.js")).isEmpty()) {
++					QFile afile(ap);
++					if (afile.open(QIODevice::ReadOnly)) {
++						chatViewScripts[typeName] = afile.readAll();
++						ad = QFileInfo(afile).dir().absolutePath();
++						chatViewAdapterDirs.insert(typeName, ad);
++					}
++				} else {
++					ad = chatViewAdapterDirs.value(typeName);
++				}
++				if (!ad.isEmpty() && !chatViewScripts.value(typeName).isEmpty()) {
++					ChatViewTheme *theme = new ChatViewTheme(themeId);
++					if (theme->load(tp, QStringList()<<chatViewScripts["util"]
++									<<chatViewScripts[typeName], ad)) {
++						return theme;
++					}
++				}
++			}
++		}
++	}
++	return 0;
++}
++
++bool ChatViewThemeProvider::loadCurrent()
++{
++	QString loadedId = curTheme? curTheme->id() : "";
++	QString themeName = PsiOptions::instance()->getOption(optionString()).toString();
++	if (!loadedId.isEmpty() && loadedId == themeName) {
++		return true; // already loaded. nothing todo
++	}
++	ChatViewTheme *theme = 0;
++	if (!(theme = (ChatViewTheme *)load(themeName))) {
++		if (themeName != "psi/classic") {
++			qDebug("fallback to classic chatview theme");
++			if ( (theme = (ChatViewTheme *)load("psi/classic")) ) {
++				PsiOptions::instance()->setOption(optionString(), "psi/classic");
++			}
++		}
++	}
++	if (theme) {
++		if (curTheme) {
++			delete curTheme;
++		}
++		curTheme = theme;
++		if (theme->id() != loadedId) {
++			emit themeChanged();
++		}
++		return true;
++	}
++	return false;
++}
++
++void ChatViewThemeProvider::setCurrentTheme(const QString &id)
++{
++	PsiOptions::instance()->setOption(optionString(), id);
++	if (!curTheme || curTheme->id() != id) {
++		loadCurrent();
++	}
++}
+--- psi.orig/src/chatviewthemeprovider.h
++++ psi/src/chatviewthemeprovider.h
+@@ -0,0 +1,73 @@
++/*
++ * chatviewthemeprovider.h - adapter for set of chatview themes
++ * Copyright (C) 2010 Rion (Sergey Ilinyh)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++
++#ifndef CHATVIEWTHEMEPROVIDER_H
++#define CHATVIEWTHEMEPROVIDER_H
++
++#include "psithemeprovider.h"
++
++class ChatViewTheme;
++
++class ChatViewThemeProvider : public PsiThemeProvider
++{
++	Q_OBJECT
++
++public:
++	ChatViewThemeProvider(QObject *);
++
++	const char* type() const { return "chatview"; }
++	const QStringList themeIds() const;
++	Theme* load(const QString &themeId);
++	bool loadCurrent();
++	Theme *current() const { return (Theme*)curTheme; }
++	void setCurrentTheme(const QString &);
++	virtual int screenshotWidth() const { return 512; } // hack
++
++	QString optionsName() const { return tr("Chat Message Style"); }
++	QString optionsDescription() const { return tr("Configure your chat theme here"); }
++
++protected:
++	virtual const char* optionString() const { return "options.ui.chat.theme"; }
++
++signals:
++	void themeChanged();
++
++private:
++	ChatViewTheme *curTheme;
++};
++
++class GroupChatViewThemeProvider : public ChatViewThemeProvider
++{
++	Q_OBJECT
++
++public:
++	GroupChatViewThemeProvider(QObject *parent) :
++		ChatViewThemeProvider(parent) {}
++
++	const char* type() const { return "groupchatview"; }
++	QString optionsName() const { return tr("Groupchat Message Style"); }
++	QString optionsDescription() const { return tr("Configure your groupchat theme here"); }
++
++protected:
++	const char* optionString() const { return "options.ui.muc.theme"; }
++};
++
++#endif // CHATVIEWTHEMEPROVIDER_H
 --- psi.orig/src/chatview_webkit.cpp
 +++ psi/src/chatview_webkit.cpp
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,310 @@
 +/*
 + * chatview_webkit.cpp - Webkit based chatview
 + * Copyright (C) 2010  Rion
@@ -1538,7 +1899,7 @@
 +	connect(jsObject, SIGNAL(inited()), SLOT(sessionInited()));
 +	connect(webView->page()->mainFrame(),
 +			SIGNAL(javaScriptWindowObjectCleared()), SLOT(embedJsObject()));
-+	connect(PsiThemeManager::instance()->provider("chatview"),
++	connect(PsiThemeManager::instance()->provider(isMuc_?"groupchatview":"chatview"),
 +			SIGNAL(themeChanged()),
 +			SLOT(init()));
 +}
@@ -1549,15 +1910,18 @@
 +
 +ChatViewTheme* ChatView::currentTheme()
 +{
-+	return (ChatViewTheme *)PsiThemeManager::instance()->provider("chatview")->
-+			current();
++	return (ChatViewTheme *)PsiThemeManager::instance()->
++			provider(isMuc_?"groupchatview":"chatview")->current();
 +}
 +
 +// something after we know isMuc and dialog is set
 +void ChatView::init()
 +{
++	ChatViewTheme *theme = currentTheme();
++	QString html = theme->html(jsObject);
++	qDebug() << "Set html:" << html;
 +	webView->page()->mainFrame()->setHtml(
-+		currentTheme()->html(jsObject), QUrl("theme://theme")
++		html, theme->baseUrl()
 +	);
 +}
 +
@@ -2157,7 +2521,7 @@
  			}
  		}
  		else {
-@@ -1280,7 +1215,7 @@ void GCMainDlg::presence(const QString &
+@@ -1280,23 +1215,18 @@ void GCMainDlg::presence(const QString &
  				}
  
  				if (!message.isEmpty()) {
@@ -2166,16 +2530,24 @@
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
-@@ -1296,7 +1231,7 @@ void GCMainDlg::presence(const QString &
- 					if (!s.status().isEmpty()) {
- 						message+=QString(" (%1)").arg(s.status());
+ 				if (s.status() != contact->s.status() || s.show() != contact->s.show())	{
+-					QString message;
+ 					QString st;
+ 					if (s.show().isEmpty()) {
+ 						st=tr("online");
+ 					} else {
+ 						st=s.show();
  					}
+-					message = tr("%1 is now %2").arg(nick).arg(st);
+-					if (!s.status().isEmpty()) {
+-						message+=QString(" (%1)").arg(s.status());
+-					}
 -					appendSysMsg(message, false, QDateTime::currentDateTime());
-+					appendSysMsg(message);
++					ui_.log->dispatchMessage(MessageView::statusMessage(nick, (int)s.type(), s.status()));
  				}
  			}
  		}
-@@ -1325,7 +1260,7 @@ void GCMainDlg::presence(const QString &
+@@ -1325,7 +1255,7 @@ void GCMainDlg::presence(const QString &
  			else {
  				QMessageBox::information(this,tr("Room Destroyed"), message);
  			}
@@ -2184,7 +2556,7 @@
  			goForcedLeave();
  		}
  
-@@ -1385,7 +1320,7 @@ void GCMainDlg::presence(const QString &
+@@ -1385,7 +1315,7 @@ void GCMainDlg::presence(const QString &
  					message += QString(" (%1)").arg(s.status());
  				}
  			}
@@ -2193,7 +2565,7 @@
  		}
  		ui_.lv_users->removeEntry(nick);
  	}
-@@ -1416,18 +1351,33 @@ void GCMainDlg::message(const Message &_
+@@ -1416,18 +1346,33 @@ void GCMainDlg::message(const Message &_
  		d->nonAnonymous = false;
  	}
  
@@ -2236,7 +2608,7 @@
  	}
  
  	if(m.body().isEmpty())
-@@ -1460,7 +1410,7 @@ void GCMainDlg::message(const Message &_
+@@ -1460,7 +1405,7 @@ void GCMainDlg::message(const Message &_
  	}
  
  	if(from.isEmpty())
@@ -2245,7 +2617,7 @@
  	else
  		appendMessage(m, alert);
  }
-@@ -1487,144 +1437,57 @@ const QString& GCMainDlg::nick() const
+@@ -1487,144 +1432,57 @@ const QString& GCMainDlg::nick() const
  	return d->self;
  }
  
@@ -2260,11 +2632,11 @@
 +	MessageView mv = MessageView::fromPlainText(str, MessageView::System);
 +	if (!PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool()) {
 +		alert = false;
- 	}
++	}
 +	mv.setAlert(alert);
 +	if(!ts.isNull()) {
 +		mv.setDateTime(ts);
-+	}
+ 	}
 +	appendSysMsg(mv);
  }
  
@@ -2477,7 +2849,7 @@
     <class>ChatEditProxy</class>
 --- psi.orig/src/jsutil.cpp
 +++ psi/src/jsutil.cpp
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,81 @@
 +/*
 + * jsutil.cpp
 + * Copyright (C) 2009  Rion
@@ -2505,10 +2877,11 @@
 +QString JSUtil::map2json(const QVariantMap &map)
 +{
 +	QStringList ret;
-+	QString strVal;
-+	foreach (QString key, map.keys()) {
-+		escapeString(key);
-+		ret.append(QString("\"%1\":").arg(key) + variant2js(map.value(key)));
++	QMapIterator<QString, QVariant> i(map);
++	while (i.hasNext()) {
++		i.next();
++		ret.append(QString("\"%1\":").arg(escapeStringCopy(i.key())) +
++				   variant2js(i.value()));
 +	}
 +	return QString("{%1}").arg(ret.join(","));
 +}
@@ -2558,16 +2931,9 @@
 +	str.replace("\n", "\\\n");
 +	str.replace(QChar(8232), "\\\n"); //ctrl+enter
 +}
-+
-+
-+QString JSUtil::escapeStringCopy(QString str)
-+{
-+	escapeString(str);
-+	return str;
-+}
 --- psi.orig/src/jsutil.h
 +++ psi/src/jsutil.h
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,46 @@
 +/*
 + * jsutil.h
 + * Copyright (C) 2009  Rion
@@ -2605,14 +2971,18 @@
 +	static void escapeString(QString &str);
 +
 +	/** Escapes " and \n  (for JS evaluation) [overload] */
-+	static QString escapeStringCopy(QString str);
++	static inline QString escapeStringCopy(QString str)
++	{
++		escapeString(str);
++		return str;
++	}
 +};
 +
 +
 +#endif
 --- psi.orig/src/messageview.cpp
 +++ psi/src/messageview.cpp
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,183 @@
 +/*
 + * messageview.cpp - message data for chatview
 + * Copyright (C) 2010 Rion
@@ -2636,18 +3006,20 @@
 +#include "messageview.h"
 +#include "textutil.h"
 +#include "psioptions.h"
++#include "common.h"
 +
 +#include <QTextDocument>
 +
 +static const QString me_cmd = "/me ";
 +
 +MessageView::MessageView(Type t)
-+	: type_(t)
-+	, emote_(false)
-+	, alert_(false)
-+	, local_(false)
-+	, spooled_(false)
-+	, dateTime_(QDateTime::currentDateTime())
++	: _type(t)
++	, _emote(false)
++	, _alert(false)
++	, _local(false)
++	, _spooled(false)
++	, _status(0)
++	, _dateTime(QDateTime::currentDateTime())
 +{
 +
 +}
@@ -2669,16 +3041,28 @@
 +MessageView MessageView::urlsMessage(const QMap<QString, QString> &urls)
 +{
 +	MessageView mv(Urls);
-+	mv.type_ = Urls;
-+	mv.urls_ = urls;
++	mv._type = Urls;
++	mv._urls = urls;
 +	return mv;
 +}
 +
 +MessageView MessageView::subjectMessage(const QString &subject, const QString &prefix)
 +{
 +	MessageView mv(Subject);
-+	mv.text_ = Qt::escape(prefix);
-+	mv.usertext_ = subject;
++	mv._text = Qt::escape(prefix);
++	mv._userText = subject;
++	return mv;
++}
++
++MessageView MessageView::statusMessage(const QString &nick, int status,
++									   const QString &statusText)
++{
++	MessageView mv = MessageView::fromPlainText(QObject::tr("%1 is now %2")
++												.arg(nick, status2txt(status)),
++												Status);
++	mv.setNick(nick);
++	mv.setStatus(status);
++	mv.setUserText(statusText);
 +	return mv;
 +}
 +
@@ -2687,34 +3071,29 @@
 +void MessageView::setPlainText(const QString &text)
 +{
 +	if (!text.isEmpty()) {
-+		if (type_ == Message) {
-+			emote_ = text.startsWith(me_cmd);
++		if (_type == Message) {
++			_emote = text.startsWith(me_cmd);
 +		}
-+		text_ = TextUtil::plain2rich(text);
-+		if (type_ == Message) {
-+			text_ = TextUtil::linkify(text_);
++		_text = TextUtil::plain2rich(text);
++		if (_type == Message) {
++			_text = TextUtil::linkify(_text);
 +		}
 +	}
 +}
 +
 +void MessageView::setHtml(const QString &text)
 +{
-+	if (type_ == Message) {
-+		emote_ = text.trimmed().startsWith(me_cmd);
++	if (_type == Message) {
++		_emote = text.trimmed().startsWith(me_cmd);
 +	}
-+	text_ = text;
-+}
-+
-+QString MessageView::text() const
-+{
-+	return text_;
++	_text = text;
 +}
 +
 +QString MessageView::formattedText() const
 +{
-+	QString txt = text_;
++	QString txt = _text;
 +
-+	if (emote_ && type_ == Message) {
++	if (_emote && _type == Message) {
 +		int cmd = txt.indexOf(me_cmd);
 +		txt = txt.remove(cmd, me_cmd.length());
 +	}
@@ -2728,8 +3107,8 @@
 +
 +QString MessageView::formattedUserText() const
 +{
-+	if (!usertext_.isEmpty()) {
-+		QString text = TextUtil::plain2rich(usertext_);
++	if (!_userText.isEmpty()) {
++		QString text = TextUtil::plain2rich(_userText);
 +		text = TextUtil::linkify(text);
 +		if (PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool())
 +			text = TextUtil::emoticonify(text);
@@ -2740,124 +3119,47 @@
 +	return "";
 +}
 +
-+void MessageView::setAlert(bool alert)
-+{
-+	alert_ = alert;
-+}
-+
-+bool MessageView::isAlert() const
-+{
-+	return alert_;
-+}
-+
-+void MessageView::setLocal(bool local)
-+{
-+	local_ = local;
-+}
-+
-+bool MessageView::isLocal() const
-+{
-+	return local_;
-+}
-+
-+void MessageView::setEmote(bool emote)
-+{
-+	emote_ = emote;
-+}
-+
-+bool MessageView::isEmote() const
-+{
-+	return emote_;
-+}
-+
-+void MessageView::setSpooled(bool spooled)
-+{
-+	spooled_ = spooled;
-+}
-+
-+bool MessageView::isSpooled() const
-+{
-+	return spooled_;
-+}
-+
-+void MessageView::setNick(const QString &nick)
-+{
-+	nick_ = nick;
-+}
-+
-+QString MessageView::nick() const
-+{
-+	return nick_;
-+}
-+
-+void MessageView::setMessageId(const QString &id)
-+{
-+	messageId_ = id;
-+}
-+
-+QString MessageView::messageId() const
-+{
-+	return messageId_;
-+}
-+
-+void MessageView::setUserId(const QString &id)
-+{
-+	userId_ = id;
-+}
-+
-+QString MessageView::userId() const
-+{
-+	return userId_;
-+}
-+
-+MessageView::Type MessageView::type() const
-+{
-+	return type_;
-+}
-+
-+void MessageView::setDateTime(const QDateTime &dt)
-+{
-+	dateTime_ = dt;
-+}
-+
-+QDateTime MessageView::dateTime() const
-+{
-+	return dateTime_;
-+}
-+
 +QVariantMap MessageView::toVariantMap(bool isMuc, bool formatted) const
 +{
++	static QHash<Type, QString> types;
++	if (types.isEmpty()) {
++		types.insert(Message,	"message");
++		types.insert(System,	"system");
++		types.insert(Status,	"status");
++		types.insert(Subject,	"subject");
++		types.insert(Urls,		"urls");
++	}
 +	QVariantMap m;
-+	m["time"] = dateTime_;
-+	switch (type_) {
++	m["time"] = _dateTime;
++	m["type"] = types.value(_type);
++	switch (_type) {
 +		case Message:
-+			m["type"] = "message";
-+			m["message"] = formatted?formattedText():text_;
-+			m["emote"] = emote_;
-+			m["local"] = local_;
-+			m["sender"] = nick_;
-+			m["userid"] = userId_;
-+			m["spooled"] = spooled_;
-+			m["id"] = messageId_;
++			m["message"] = formatted?formattedText():_text;
++			m["emote"] = _emote;
++			m["local"] = _local;
++			m["sender"] = _nick;
++			m["userid"] = _userId;
++			m["spooled"] = _spooled;
++			m["id"] = _messageId;
 +			if (isMuc) { // maybe w/o conditions ?
-+				m["alert"] = alert_;
++				m["alert"] = _alert;
 +			}
 +			break;
-+		case System:
-+			m["type"] = "system";
-+			m["message"] = formatted?formattedText():text_;
-+			m["usertext"] = formatted?formattedUserText():usertext_;
++		case Status:
++			m["sender"] = _nick;
++			m["status"] = _status;
++			m["message"] = _text;
++			m["usertext"] = formatted?formattedUserText():_userText;
 +			break;
++		case System:
 +		case Subject:
-+			m["type"] = "subject";
-+			m["message"] = formatted?formattedText():text_;
-+			m["usertext"] = formatted?formattedUserText():usertext_;
++			m["message"] = formatted?formattedText():_text;
++			m["usertext"] = formatted?formattedUserText():_userText;
 +			break;
 +		case Urls:
-+			m["type"] = "urls";
 +			QVariantMap vmUrls;
-+			foreach (const QString &u, urls_.keys()) {
-+				vmUrls[u] = urls_.value(u);
++			foreach (const QString &u, _urls.keys()) {
++				vmUrls[u] = _urls.value(u);
 +			}
 +			m["urls"] = vmUrls;
 +			break;
@@ -2866,7 +3168,7 @@
 +}
 --- psi.orig/src/messageview.h
 +++ psi/src/messageview.h
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,106 @@
 +/*
 + * messageview.h - message data for chatview
 + * Copyright (C) 2010 Rion
@@ -2899,8 +3201,16 @@
 +	enum Type {
 +		Message,
 +		System,
++		Status,
 +		Subject,
 +		Urls
++	};
++
++	enum SystemMessageType {
++		MUCJoin,
++		MUCPart,
++		FileTransferRequest,
++		FileTransferFinished
 +	};
 +
 +	MessageView(Type);
@@ -2908,48 +3218,60 @@
 +	static MessageView fromPlainText(const QString &, Type);
 +	static MessageView fromHtml(const QString &, Type);
 +	static MessageView urlsMessage(const QMap<QString, QString> &);
-+	static MessageView subjectMessage(const QString &subject, const QString &prefix = QString());
++	static MessageView subjectMessage(const QString &subject,
++									  const QString &prefix = QString());
 +
-+	Type type() const;
-+	QString text() const;
++	// accepts plain/text nick, plain/text status and rich/text statusText
++	static MessageView statusMessage(const QString &nick, int status,
++									 const QString &statusText = QString());
++
++	inline Type type() const { return _type; }
++	inline const QString &text() const { return _text; }
++	inline void setText(const QString &text) { _text = text; }
++	inline const QString &userText() const { return _userText; }
++	inline void setUserText(const QString &text) { _userText = text; }
++
 +	void setPlainText(const QString &);
 +	void setHtml(const QString &);
 +	QString formattedText() const;
 +	QString formattedUserText() const;
 +
-+	void setAlert(bool);
-+	bool isAlert() const;
-+	void setLocal(bool);
-+	bool isLocal() const;
-+	void setEmote(bool);
-+	bool isEmote() const;
-+	void setSpooled(bool);
-+	bool isSpooled() const;
-+	void setNick(const QString &);
-+	QString nick() const;
-+	void setMessageId(const QString &);
-+	QString messageId() const;
-+	void setUserId(const QString &);
-+	QString userId() const;
-+	void setDateTime(const QDateTime &dt);
-+	QDateTime dateTime() const;
-+	QMap<QString, QString> urls() const { return urls_; }
++	inline void setAlert(bool state) { _alert = state; }
++	inline bool isAlert() const { return _alert; }
++	inline void setLocal(bool state) { _local = state; }
++	inline bool isLocal() const { return _local; }
++	inline void setEmote(bool state) { _emote = state; }
++	inline bool isEmote() const { return _emote; }
++	inline void setSpooled(bool state) { _spooled = state; }
++	inline bool isSpooled() const { return _spooled; }
++	inline void setStatus(int s) { _status = s; }
++	inline int status() const { return _status; }
++	inline void setNick(const QString &nick) { _nick = nick; }
++	inline const QString &nick() const { return _nick; }
++	inline void setMessageId(const QString &id) { _messageId = id; }
++	inline const QString &messageId() const { return _messageId; }
++	inline void setUserId(const QString &id) { _userId = id; }
++	inline const QString &userId() const { return _userId; }
++	inline void setDateTime(const QDateTime &dt) { _dateTime = dt; }
++	inline const QDateTime &dateTime() const { return _dateTime; }
++	inline QMap<QString, QString> urls() const { return _urls; }
 +
 +	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
 +
 +private:
-+	Type type_;
-+	bool emote_;
-+	bool alert_;
-+	bool local_;
-+	bool spooled_;
-+	QString messageId_;
-+	QString userId_;
-+	QString nick_;
-+	QString text_;
-+	QString usertext_;
-+	QDateTime dateTime_;
-+	QMap<QString, QString> urls_;
++	Type _type;
++	bool _emote;
++	bool _alert;
++	bool _local;
++	bool _spooled;
++	int _status;
++	QString _messageId;
++	QString _userId;
++	QString _nick; // rich / as is
++	QString _text; // always rich (plain text converted to rich)
++	QString _userText; // rich
++	QDateTime _dateTime;
++	QMap<QString, QString> _urls;
 +};
 +
 +#endif
@@ -3151,7 +3473,7 @@
  {
 --- psi.orig/src/networkaccessmanager.cpp
 +++ psi/src/networkaccessmanager.cpp
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,117 @@
 +/*
 + * networkaccessmanager.cpp - Network Manager for WebView able to process
 + * custom url schemas
@@ -3191,7 +3513,7 @@
 +
 +QNetworkReply * NetworkAccessManager::createRequest(Operation op, const QNetworkRequest & req, QIODevice * outgoingData = 0) {
 +    //download local file
-+	qDebug("url: %s", qPrintable(req.url().toString()));
++	//qDebug("url: %s", qPrintable(req.url().toString()));
 +	if (req.url().scheme() == "file" || req.url().scheme() == "data") {
 +		return QNetworkAccessManager::createRequest(op, req, outgoingData);
 +    }
@@ -3251,6 +3573,7 @@
 +void NetworkAccessManager::setSchemeHandler(const QString &scheme, NAMSchemeHandler *handler)
 +{
 +	if (schemeHandlers_.contains(scheme)) {
++		qDebug("%s is already registered. replacing..", qPrintable(scheme));
 +		schemeHandlers_.remove(scheme);
 +	}
 +	schemeHandlers_.insert(scheme, QSharedPointer<NAMSchemeHandler>(handler));
@@ -3616,7 +3939,7 @@
  	$$PWD/opt_advanced.ui \
 --- psi.orig/src/options/opt_theme.cpp
 +++ psi/src/options/opt_theme.cpp
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,90 @@
 +#include "opt_theme.h"
 +
 +#include "ui_opt_theme.h"
@@ -3682,7 +4005,9 @@
 +	if (sw) {
 +		d->themeView->setFixedWidth(sw);
 +	}
-+	connect(d->themeView->selectionModel(), SIGNAL(currentChanged(QModelIndex, QModelIndex)), SIGNAL(dataChanged()));
++	connect(d->themeView->selectionModel(),
++			SIGNAL(currentChanged(QModelIndex, QModelIndex)),
++			SIGNAL(dataChanged()));
 +
 +	return w;
 +}
@@ -3693,8 +4018,7 @@
 +		return;
 +
 +	OptAppearanceThemeUI *d = (OptAppearanceThemeUI *)w;
-+	//qDebug("save theme: %s", qPrintable(d->themeView->currentIndex().data(PsiThemeModel::IdRole).toString()));
-+	PsiOptions::instance()->setOption("options.ui.chat.theme", d->themeView->currentIndex().data(PsiThemeModel::IdRole));
++	provider->setCurrentTheme(d->themeView->currentIndex().data(PsiThemeModel::IdRole).toString());
 +}
 +
 +void OptionsTabAppearanceTheme::restoreOptions()
@@ -4010,265 +4334,6 @@
  	class ChatDlgMCmdProvider;
  };
  
---- psi.orig/src/psichatviewthemeprovider.cpp
-+++ psi/src/psichatviewthemeprovider.cpp
-@@ -0,0 +1,193 @@
-+/*
-+ * psichatviewthemeprovider.h - adapter for set of chatview themes
-+ * Copyright (C) 2010 Rion (Sergey Ilinyh)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+
-+#include "psichatviewthemeprovider.h"
-+
-+#include <QFile>
-+#include <QFileInfo>
-+#include <QDir>
-+
-+#include "chatviewtheme.h"
-+#include "psioptions.h"
-+#include "theme.h"
-+#include "applicationinfo.h"
-+#include "psiwkavatarhandler.h"
-+
-+class PsiChatViewThemeProvider;
-+class PsiChatViewThemeUrlHandler : public NAMSchemeHandler
-+{
-+private:
-+	PsiChatViewThemeProvider *provider;
-+public:
-+	PsiChatViewThemeUrlHandler(PsiChatViewThemeProvider *provider_)
-+		: provider(provider_)
-+	{
-+	}
-+	QByteArray data(const QUrl &url) const
-+	{
-+		qDebug("loading theme file: %s", qPrintable(url.toString()));
-+		Theme *theme = provider->current();
-+		if (theme) {
-+			QByteArray td = Theme::loadData(url.path(), theme->fileName());
-+			qDebug("content of %d bytes", td.size());
-+			return td;
-+		}
-+		return QByteArray();
-+	}
-+
-+};
-+
-+PsiChatViewThemeProvider::PsiChatViewThemeProvider(QObject *parent_)
-+	: PsiThemeProvider(parent_)
-+	, curTheme(0)
-+{
-+	NetworkAccessManager::instance()->setSchemeHandler(
-+			"avatar", new PsiWKAvatarHandler((PsiCon*)parent()) );
-+	NetworkAccessManager::instance()->setSchemeHandler(
-+			"theme", new PsiChatViewThemeUrlHandler(this));
-+	connect(PsiOptions::instance(),
-+			SIGNAL(optionChanged(const QString&)),
-+			SLOT(optionChanged(const QString&)));
-+}
-+
-+const QString PsiChatViewThemeProvider::type() const
-+{
-+	return "chatview";
-+}
-+
-+const QStringList PsiChatViewThemeProvider::themeIds() const
-+{
-+	QStringList dirs;
-+	dirs << ":";
-+	dirs << ".";
-+	dirs << ApplicationInfo::homeDir();
-+	dirs << ApplicationInfo::resourcesDir();
-+
-+	QSet<QString> ret;
-+	foreach (QString dir, dirs) {
-+		foreach (QFileInfo tDirInfo, QDir(dir+"/themes/chatview/")
-+			.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot)) {
-+			QString typeName = tDirInfo.fileName();
-+			foreach (QFileInfo themeInfo,
-+					QDir(tDirInfo.absoluteFilePath())
-+						.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot) +
-+					QDir(tDirInfo.absoluteFilePath())
-+						.entryInfoList(QStringList("*.theme"), QDir::Files)) {
-+				ret<<(QString("%1/%2").arg(typeName).arg(themeInfo.fileName()));
-+				//qDebug("found theme: %s", qPrintable(QString("%1/%2").arg(typeName).arg(themeInfo.fileName())));
-+			}
-+		}
-+	}
-+
-+	return ret.values();
-+}
-+
-+Theme * PsiChatViewThemeProvider::load(const QString &theme)
-+{
-+	QString up;
-+	if (chatViewScripts.value("util").isEmpty()) {
-+		if (!(up = themePath("chatview/util.js")).isEmpty()) {
-+			QFile file(up);
-+			if (file.open(QIODevice::ReadOnly)) {
-+				chatViewScripts["util"] = file.readAll();
-+			}
-+		}
-+	}
-+	if (!chatViewScripts.value("util").isEmpty()) {
-+		int pos;
-+		if ((pos = theme.indexOf('/')) > 0) {
-+			QString tp = themePath("chatview/" + theme);
-+			QString typeName = theme.mid(0, pos);
-+			if (!tp.isEmpty()) { // theme exists
-+				QString ap, ad;
-+				if (chatViewScripts.value(typeName).isEmpty() &&
-+					!(ap = themePath("chatview/" + typeName + "/adapter.js")).isEmpty()) {
-+					QFile afile(ap);
-+					if (afile.open(QIODevice::ReadOnly)) {
-+						chatViewScripts[typeName] = afile.readAll();
-+						ad = QFileInfo(afile).dir().path();
-+					}
-+				}
-+				if (!chatViewScripts.value(typeName).isEmpty()) {
-+					ChatViewTheme *theme = new ChatViewTheme();
-+					if (theme->load(tp, QStringList()<<chatViewScripts["util"]
-+									<<chatViewScripts[typeName], ad)) {
-+						return theme;
-+					}
-+				}
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+
-+bool PsiChatViewThemeProvider::loadCurrent()
-+{
-+	QString themeName = PsiOptions::instance()->getOption("options.ui.chat.theme").toString();
-+	ChatViewTheme *theme = 0;
-+	if (!(theme = (ChatViewTheme *)load(themeName))) {
-+		if (themeName != "psi/classic") {
-+			qDebug("fallback to classic chatview theme");
-+			if ( (theme = (ChatViewTheme *)load("psi/classic")) ) {
-+				PsiOptions::instance()->setOption("options.ui.chat.theme", "psi/classic");
-+			}
-+		}
-+	}
-+	if (theme) {
-+		if (curTheme) {
-+			delete curTheme;
-+		}
-+		curTheme = theme;
-+		emit themeChanged();
-+		return true;
-+	}
-+	return false;
-+}
-+
-+Theme *PsiChatViewThemeProvider::current() const
-+{
-+	return curTheme;
-+}
-+
-+const QString PsiChatViewThemeProvider::title(const QString &themeId, Theme *theme) const
-+{
-+	QString name = theme->name();
-+	return name.isEmpty()?themeId:name;
-+}
-+
-+QByteArray PsiChatViewThemeProvider::screenshot(const QString &themeId,
-+												Theme *theme) const
-+{
-+	Q_UNUSED(themeId)
-+	return ((ChatViewTheme *)theme)->screenshot();
-+}
-+
-+int PsiChatViewThemeProvider::screenshotWidth() const
-+{
-+	return 512;
-+}
-+
-+void PsiChatViewThemeProvider::optionChanged(const QString& option)
-+{
-+	if (option == "options.ui.chat.theme") {
-+		loadCurrent();
-+	}
-+}
---- psi.orig/src/psichatviewthemeprovider.h
-+++ psi/src/psichatviewthemeprovider.h
-@@ -0,0 +1,60 @@
-+/*
-+ * psichatviewthemeprovider.h - adapter for set of chatview themes
-+ * Copyright (C) 2010 Rion (Sergey Ilinyh)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+
-+#ifndef PSICHATVIEWTHEMEPROVIDER_H
-+#define PSICHATVIEWTHEMEPROVIDER_H
-+
-+#include <QPointer>
-+#include "psithemeprovider.h"
-+
-+class ChatViewTheme;
-+
-+class PsiChatViewThemeProvider : public PsiThemeProvider
-+{
-+	Q_OBJECT
-+
-+public:
-+	PsiChatViewThemeProvider(QObject *parent_);
-+
-+	const QString type() const;
-+	const QStringList themeIds() const;
-+	Theme* load(const QString &theme);
-+	bool loadCurrent();
-+	Theme *current() const;
-+	const QString title(const QString &themeId, Theme *theme = 0) const;
-+	QByteArray screenshot(const QString &themeId, Theme *theme) const;
-+	virtual int screenshotWidth() const;
-+
-+	QString optionsName() const { return "ChatView"; }
-+	QString optionsDescription() const { return "Configure your chatview theme here"; }
-+
-+signals:
-+	void themeChanged();
-+
-+private slots:
-+	void optionChanged(const QString& option);
-+
-+private:
-+	ChatViewTheme *curTheme;
-+	QMap<QString, QString> chatViewScripts;
-+};
-+
-+#endif
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -40,6 +40,7 @@
@@ -4279,18 +4344,20 @@
  #ifndef NEWCONTACTLIST
  # include "contactview.h"
  #endif
-@@ -80,6 +81,10 @@
+@@ -80,6 +81,12 @@
  #include "accountscombobox.h"
  #include "tabdlg.h"
  #include "chatdlg.h"
 +#ifdef WEBKIT
 +#include "avatars.h"
-+#include "psichatviewthemeprovider.h"
++#include "chatviewthemeprovider.h"
++#include "networkaccessmanager.h"
++#include "webview.h"
 +#endif
  #include "capsregistry.h"
  #include "urlobject.h"
  #include "anim.h"
-@@ -191,6 +196,7 @@ private:
+@@ -191,6 +198,7 @@ private:
  	}
  };
  
@@ -4298,13 +4365,16 @@
  //----------------------------------------------------------------------------
  // PsiCon::Private
  //----------------------------------------------------------------------------
-@@ -473,6 +479,16 @@ bool PsiCon::init()
+@@ -473,6 +481,19 @@ bool PsiCon::init()
  		//}
  	}
  
 +#ifdef WEBKIT
 +	PsiThemeManager::instance()->registerProvider(
-+			new PsiChatViewThemeProvider(this), true);
++			new ChatViewThemeProvider(this), true);
++	PsiThemeManager::instance()->registerProvider(
++			new GroupChatViewThemeProvider(this), true);
++	NetworkAccessManager::instance()->setSchemeHandler("icon", new IconHandler());
 +#endif
 +
 +	if( !PsiThemeManager::instance()->loadAll() ) {
@@ -4315,7 +4385,7 @@
  	if ( !d->actionList )
  		d->actionList = new PsiActionList( this );
  
-@@ -619,7 +635,6 @@ bool PsiCon::init()
+@@ -619,7 +640,6 @@ bool PsiCon::init()
  	}	
  	
  	checkAccountsEmpty();
@@ -4479,7 +4549,7 @@
 +#endif
 --- psi.orig/src/psithememodel.cpp
 +++ psi/src/psithememodel.cpp
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,153 @@
 +/*
 + * psithememodel.h - just a model for theme views
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -4503,6 +4573,7 @@
 +#include "psithememodel.h"
 +
 +#include <QtConcurrentMap>
++#include <QPixmap>
 +
 +#include "psithememanager.h"
 +
@@ -4521,8 +4592,8 @@
 +		ThemeItemInfo ti;
 +		if (t) { // if loaded
 +			ti.id = id;
-+			ti.title = provider->title(id, t);
-+			ti.screenshot = provider->screenshot(id, t);
++			ti.title = t->title();
++			ti.screenshot = t->screenshot();
 +			ti.isValid = true;
 +		} else {
 +			ti.isValid = false;
@@ -4704,7 +4775,7 @@
 +#endif
 --- psi.orig/src/psithemeprovider.cpp
 +++ psi/src/psithemeprovider.cpp
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,64 @@
 +/*
 + * psithemeprovider.cpp - kinda adapter for set of themes
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -4765,28 +4836,13 @@
 +	return false;
 +}
 +
-+// theme title for theme list
-+const QString PsiThemeProvider::title(const QString &themeId, Theme *theme) const
-+{
-+	Q_UNUSED(theme)
-+	return themeId;
-+}
-+
-+QByteArray PsiThemeProvider::screenshot(const QString &themeId,
-+												   Theme *theme) const
-+{
-+	Q_UNUSED(themeId)
-+	Q_UNUSED(theme)
-+	return QByteArray();
-+}
-+
 +int PsiThemeProvider::screenshotWidth() const
 +{
 +	return 0;
 +}
 --- psi.orig/src/psithemeprovider.h
 +++ psi/src/psithemeprovider.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,50 @@
 +/*
 + * psithemeprovider.h - kinda adapter for set of themes
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -4813,8 +4869,6 @@
 +#include <QFuture>
 +#include "theme.h"
 +
-+class Theme;
-+
 +class PsiThemeProvider : public QObject
 +{
 +	Q_OBJECT
@@ -4822,16 +4876,14 @@
 +public:
 +	PsiThemeProvider(QObject *parent);
 +
-+	virtual const QString type() const = 0;
++	virtual const char* type() const = 0;
 +	virtual Theme* load(const QString &) = 0;
 +	virtual const QStringList themeIds() const = 0;
 +	virtual bool loadCurrent() = 0;
 +	virtual Theme* current() const = 0;
++	virtual void setCurrentTheme(const QString &) = 0;
 +
 +	virtual bool threadedLoading() const;
-+	virtual const QString title(const QString &themeId, Theme *theme = 0) const;
-+	virtual QByteArray screenshot(const QString &themeId,
-+										Theme *theme = 0) const;
 +	virtual int screenshotWidth() const;
 +
 +	virtual QString optionsName() const = 0;
@@ -4895,7 +4947,7 @@
 +	}
 +
 +	f.setItalic(true);
-+	f.setPixelSize(textureh - 15);
++	f.setPixelSize(textureh - 8);
 +	painter->setFont(f);
 +	QFontMetrics fm(f);
 +	QString text = index.data(PsiThemeModel::TitleRole).toString();
@@ -5169,7 +5221,7 @@
 +			$$PWD/psiwkavatarhandler.h \
 +			$$PWD/jsutil.h \
 +			$$PWD/chatviewtheme.h \
-+			$$PWD/psichatviewthemeprovider.h
++			$$PWD/chatviewthemeprovider.h
 +	SOURCES += 	$$PWD/chatview_webkit.cpp \
 +			$$PWD/networkaccessmanager.cpp \
 +			$$PWD/bytearrayreply.cpp \
@@ -5177,7 +5229,7 @@
 +			$$PWD/psiwkavatarhandler.cpp \
 +			$$PWD/jsutil.cpp \
 +			$$PWD/chatviewtheme.cpp \
-+			$$PWD/psichatviewthemeprovider.cpp
++			$$PWD/chatviewthemeprovider.cpp
 +	DEFINES += WEBKIT
 +	QT += webkit
 +}
@@ -5310,7 +5362,7 @@
  };
 --- psi.orig/src/theme.cpp
 +++ psi/src/theme.cpp
-@@ -0,0 +1,172 @@
+@@ -0,0 +1,190 @@
 +/*
 + * theme.cpp - base class for any theme
 + * Copyright (C) 2010 Justin Karneges, Michail Pishchagin, Rion (Sergey Ilinyh)
@@ -5334,6 +5386,7 @@
 +#include "theme.h"
 +
 +#include <QFileInfo>
++#include <QStringList>
 +
 +#ifndef NO_Theme_ZIP
 +#define Theme_ZIP
@@ -5343,37 +5396,44 @@
 +#	include "zip/zip.h"
 +#endif
 +
-+void ThemeMetaData::init()
++class ThemeMetaData : public QSharedData
 +{
-+	name = QObject::tr("Unnamed");
-+	//version = "1.0";
-+	//description = "No description";
-+	//authors << "I. M. Anonymous";
-+	//creation = "1900-01-01";
-+	homeUrl = QString::null;
++public:
++	QString id, name, version, description, creation, homeUrl, filename;
++	QStringList authors;
++	QHash<QString, QString> info;
++
++public:
++	ThemeMetaData(const QString &id);
++	//QByteArray loadData(const QString &fileName, const QString &dir) const;
++};
++
++ThemeMetaData::ThemeMetaData(const QString &id) :
++	id(id),
++	name(QObject::tr("Unnamed"))
++{
++
 +}
 +
-+ThemeMetaData::ThemeMetaData()
++
++//--------------------------------------
++// Theme
++//--------------------------------------
++Theme::Theme(const QString &id) :
++	md(new ThemeMetaData(id))
 +{
-+	init();
++
 +}
 +
-+ThemeMetaData::ThemeMetaData(const ThemeMetaData &from)
-+	: QSharedData(from)
++Theme::Theme(const Theme &other) :
++	md(other.md)
 +{
-+	init();
-+	setInformation(from);
++
 +}
 +
-+void ThemeMetaData::setInformation(const ThemeMetaData &from) {
-+	name = from.name;
-+	version = from.version;
-+	description = from.description;
-+	creation = from.creation;
-+	homeUrl = from.homeUrl;
-+	filename = from.filename;
-+	authors = from.authors;
-+	info = from.info;
++Theme::~Theme()
++{
++
 +}
 +
 +QByteArray Theme::loadData(const QString &fileName, const QString &dir)
@@ -5383,6 +5443,7 @@
 +	QFileInfo fi(dir);
 +	if ( fi.isDir() ) {
 +		QFile file ( dir + '/' + fileName );
++		//qDebug("read data from %s", qPrintable(file.fileName()));
 +		if (!file.open(QIODevice::ReadOnly))
 +			return ba;
 +
@@ -5405,9 +5466,19 @@
 +	return ba;
 +}
 +
++const QString &Theme::id() const
++{
++	return md->id;
++}
++
 +const QString &Theme::name() const
 +{
 +	return md->name;
++}
++
++void Theme::setName(const QString &name)
++{
++	md->name = name;
 +}
 +
 +const QString &Theme::version() const
@@ -5458,15 +5529,6 @@
 +}
 +
 +/**
-+ * Sets the information (meta-data) of this Theme to the information from the given Theme.
-+ */
-+void Theme::setInformation(const Theme &from)
-+{
-+	md.detach();
-+	md->setInformation( *(from.md) );
-+}
-+
-+/**
 + * Returns additional Theme information.
 + * \sa setInfo()
 + */
@@ -5483,9 +5545,17 @@
 +{
 +	md->info = i;
 +}
++
++/**
++ * Title suitable to display in options dialog
++ */
++QString Theme::title() const
++{
++	return md->name.isEmpty()? md->id : md->name;
++}
 --- psi.orig/src/theme.h
 +++ psi/src/theme.h
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,65 @@
 +/*
 + * theme.h - base class for any theme
 + * Copyright (C) 2010 Justin Karneges, Michail Pishchagin, Rion (Sergey Ilinyh)
@@ -5506,42 +5576,33 @@
 + *
 + */
 +
++/*
++ MOST IMPORTANT RULE: the theme never depends on thing to which its applied,
++ so its one-way relation.
++*/
++
 +#ifndef PSITHEME_H
 +#define PSITHEME_H
 +
-+#include <QPixmap>
 +#include <QSharedData>
 +#include <QHash>
 +
-+class ThemeMetaData : public QSharedData
-+{
-+protected:
-+	void init();
-+
-+public:
-+	QString name, version, description, creation, homeUrl, filename;
-+	QStringList authors;
-+	QHash<QString, QString> info;
-+
-+public:
-+	ThemeMetaData();
-+	ThemeMetaData(const ThemeMetaData &from);
-+	void setInformation(const ThemeMetaData &from);
-+	//QByteArray loadData(const QString &fileName, const QString &dir) const;
-+};
++class ThemeMetaData;
 +
 +//-----------------------------------------------
 +// Theme
 +//-----------------------------------------------
 +class Theme {
 +public:
-+	Theme() {
-+		md = new ThemeMetaData;
-+	}
++	Theme(const QString &id);
++	Theme(const Theme &other);
++	virtual ~Theme();
 +
 +	static QByteArray loadData(const QString &fileName, const QString &dir);
 +
++	const QString &id() const;
 +	const QString &name() const;
++	void setName(const QString &name);
 +	const QString &version() const;
 +	const QString &description() const;
 +	const QStringList &authors() const;
@@ -5549,9 +5610,11 @@
 +	const QString &homeUrl() const;
 +	const QString &fileName() const;
 +	void setFileName(const QString &f);
-+	void setInformation(const Theme &from);
 +	const QHash<QString, QString> info() const;
 +	void setInfo(const QHash<QString, QString> &i);
++
++	virtual QString title() const;
++	virtual QByteArray screenshot() = 0; // this hack must be replaced with something widget based
 +protected:
 +	QSharedDataPointer<ThemeMetaData> md;
 +};
@@ -5667,7 +5730,7 @@
  #endif
 --- psi.orig/src/webview.cpp
 +++ psi/src/webview.cpp
-@@ -0,0 +1,207 @@
+@@ -0,0 +1,205 @@
 +/*
 + * webview.cpp - QWebView handling links and copying text
 + * Copyright (C) 2010 senu, Rion
@@ -5707,8 +5770,6 @@
 +
 +	page()->setNetworkAccessManager(NetworkAccessManager::instance());
 +    page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
-+
-+	NetworkAccessManager::instance()->setSchemeHandler("icon", new IconHandler());
 +
 +	connect(page(), SIGNAL(linkClicked(const QUrl&)), this, SLOT(linkClickedEvent(const QUrl&)));
 +	connect(page()->action(QWebPage::Copy), SIGNAL(triggered()), SLOT(textCopiedEvent()));
@@ -6022,13 +6083,13 @@
  			++row;
 --- psi.orig/themes/chatview/adium/adapter.js
 +++ psi/themes/chatview/adium/adapter.js
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,370 @@
 +try {
 +
 +window[chatServer.jsNamespace()].adapter = {
 +	loadTheme : function() {
 +		var chat = window[chatServer.jsNamespace()];
-+		//chatServer.console("load theme");
++		//chat.console("DEBUG: loading " + chatServer.themeId());
 +		var resources = ["Template.html", "FileTransferRequest.html",
 +		"Footer.html", "Header.html", "Status.html", "Topic.html", "Content.html",
 +		"Incoming/Content.html", "Incoming/NextContent.html",
@@ -6042,32 +6103,51 @@
 +				chatServer.toCache(resources[i], content);
 +			}
 +		}
++		//chat.console("DEBUG: 2");
 +		var ipDoc = chat.util.loadXML("Contents/Info.plist");
-+		if (ipDoc) {
-+			var xres = ipDoc.evaluate("/plist/dict/*", ipDoc, null, null, null);
-+			var e;
-+			var curKey = "";
-+			var ip = {};
-+			while (e = xres.iterateNext()) {
-+				switch(e.tagName) {
-+					case "key":
-+						curKey = e.textContent;
-+						break;
-+					case "string":
-+						ip[curKey] = e.textContent;
-+						break;
-+					case "integer":
-+						ip[curKey] = Number(e.textContent);
-+						break;
-+					case "false":
-+						ip[curKey] = false;
-+						break;
-+					case "true":
-+						ip[curKey] = true;
-+						break;
++		var xres = ipDoc.evaluate("/plist/dict/*", ipDoc, null, null, null);
++		var e;
++		var curKey = "";
++		var ip = {variants: {}};
++		var varKey = null;
++		var value;
++		while (e = xres.iterateNext()) {
++			//chat.console("DEBUG: " + e.textContent);
++			switch(e.tagName) {
++				case "key":
++					curKey = e.textContent.split(':');
++					varKey = null;
++					if (curKey.length == 2) {
++						varKey = curKey[1];
++					}
++					curKey = curKey[0];
++					continue;
++				case "string":
++					value = e.textContent;
++					break;
++				case "integer":
++					value = Number(e.textContent);
++					break;
++				case "false":
++					value = false;
++					break;
++				case "true":
++					value = true;
++					break;
++				default:
++					value = undefined;
++			}
++			//chat.console("DEBUG: 2.5");
++			if (varKey) {
++				if (!ip.variants[varKey]) {
++					ip.variants[varKey] = {};
 +				}
++				ip.variants[varKey][curKey] = value;
++			} else {
++				ip[curKey] = value;
 +			}
 +		}
++		//chat.console("DEBUG: 3");
 +		var baseHtml = chatServer.cache("Template.html");
 +		if (baseHtml) {
 +			chatServer.toCache("html", baseHtml);
@@ -6084,9 +6164,11 @@
 +			chatServer.toCache("html", chatServer.getFileContentsFromAdapterDir("Template.html"));
 +			ip.MessageViewVersion = 4;
 +		}
++		if (!String(chatServer.cache("html")).length) {
++			return "Failed to cache Template.html";
++		}
 +		chatServer.toCache("Info.plist", ip);
 +		chatServer.setMetaData({name: ip.CFBundleName});
-+		
 +		var jsRootName = "_adiumChat"+Math.round(1000*Math.random());
 +		window[jsRootName] = window[chatServer.jsNamespace()];
 +		chatServer.setJSNamespace(jsRootName);
@@ -6112,6 +6194,7 @@
 +	
 +	TemplateVar.prototype = {
 +		toString : function() {
++			//chat.console("DEBUG: TemplateVar.prototype.toString " + session);
 +			var d = cdata[this.name];
 +			if (this.name == "sender") { //may not be html
 +				d = chat.util.escapeHtml(d);
@@ -6146,6 +6229,7 @@
 +	}
 +	
 +	TemplateTimeVar.prototype.toString = function() {
++		//chat.console("DEBUG: TemplateTimeVar.prototype.toString");
 +		return cdata[this.name] instanceof Date?
 +			server.formatDate(cdata[this.name], this.format) : 
 +			(cdata[this.name] ? cdata[this.name] : "");
@@ -6168,13 +6252,16 @@
 +	}
 +	
 +	Template.prototype.toString = function(data) {
++		//chat.console("prepare Template.prototype.toString1");
 +		cdata = data || cdata;
 +		var html = this.parts.join("");
 +		proxyEl.innerHTML = html;
 +		chat.util.replaceIcons(proxyEl);
++		//chat.console("prepare Template.prototype.toString2");
 +		return proxyEl.innerHTML;
 +	}
 +	
++	// Template variable constructors
 +	var tvConstructors = {
 +		time : TemplateTimeVar,
 +		timeOpened : TemplateTimeVar
@@ -6186,30 +6273,43 @@
 +	
 +	return {
 +		getHtml : function() {
-+			session = window.chatSession;
++			session = window.chatSession; // global session because Template needs it
 +			
 +			//chat.console("prepare html");
 +			var html = server.cache("html");
++			//chat.console("cached Template.html: " + html);
 +			var ip = server.cache("Info.plist");
++			var variant = ip.DefaultVariant;
++			if (variant && ip.variants[variant]) {
++				chat.util.updateObject(ip, ip.variants[variant]);
++			}
++			////chat.console("prepare html2");
 +			var topHtml = (session.isMuc() && server.cache("Topic.html")) || server.cache("Header.html");
-+			topHtml = topHtml? new Template(topHtml).toString({
++			//chat.console("prepare html2.5");
++			topHtml = topHtml? (new Template(topHtml)).toString({
 +				chatName: chat.util.escapeHtml(session.chatName()),
 +				timeOpened: new Date()
 +			}) : "";
++			//chat.console("prepare html3");
 +			var footerHtml = new Template(server.cache("Footer.html") || "").toString({});
-+			footerHtml += "\n<script type='text/javascript'>window.addEventListener('load', "+server.jsNamespace()+".adapter.initSession, false);</script>";
++			footerHtml += "\n<script type='text/javascript'>window.addEventListener('load', "+
++				server.jsNamespace()+".adapter.initSession, false);</script>";
++			//chat.console("prepare html4");
++			//var baseUrl = "/" + server.themeId() + "/Contents/Resources//"; // double slash is hack to make relative css import path working
++			var baseUrl = window.location.href + "/Contents/Resources//";
 +			if (ip.MessageViewVersion < 3) {
 +				var replace = [
-+					"/Contents/Resources//", "main.css",
++					baseUrl, "main.css",
 +					topHtml, footerHtml
 +				];
 +			} else {
 +				var replace = [
-+					"/Contents/Resources//", "@import url( \"main.css\" );",
-+					ip.DefaultVariant? "Variants/" + ip.DefaultVariant + ".css" : "",
++					baseUrl, "@import url( \"main.css\" );",
++					ip.DefaultVariant? "Variants/" + ip.DefaultVariant + ".css" : "main.css",
 +					topHtml, footerHtml
 +				];
 +			}
++			//chat.console("prepare html5");
 +			html = html.replace(/%@/g, function(){return replace.shift() || ""});
 +			
 +			var styles = [];
@@ -6222,11 +6322,13 @@
 +			if (ip.DefaultFontSize) {
 +				styles.push("font-size:"+ip.DefaultFontSize+"pt");
 +			}
-+
-+			return html.replace("==bodyBackground==", styles.join(";"));
++			
++			html = html.replace("==bodyBackground==", styles.join(";"));
++			//chat.console("prepare html: " + html);
++			return html
 +		},
 +		initSession : function() {
-+			chat.console("init session");
++			//chat.console("init session");
 +			session = window.chatSession;
 +			chat.adapter.initSession = null;
 +			chat.adapter.loadTheme = null;
@@ -6239,7 +6341,7 @@
 +			chat.adapter.receiveObject = function(data) {
 +				cdata = data;
 +				try {
-+					chat.console(chat.util.props(data, true))
++					//chat.console(chat.util.props(data, true))
 +					var template;
 +					if (data.type == "message") {
 +						if (data.mtype != "message") {
@@ -6262,7 +6364,11 @@
 +								prevGrouppingData = data;
 +								data.senderStatusIcon="icon:status/online"; //FIXME temporary hack
 +								break;
++							case "status":
 +							case "system":
++								if (data["usertext"]) {
++									data["message"] += " (" + data["usertext"] + ")"
++								}
 +								template = templates.status;
 +								break;
 +							case "lastDate":
@@ -6345,8 +6451,9 @@
 +}())
 +
 +} catch(e) {
-+	chat.console("adapter load error!!! "+ e + "(Line:" + e.line + ")");
++	window[chatServer.jsNamespace()].console("adapter load error!!! "+ e + "(Line:" + e.line + ")");
 +}
++"ok"; // just an indicator for script loader
 --- psi.orig/themes/chatview/adium/Template.html
 +++ psi/themes/chatview/adium/Template.html
 @@ -0,0 +1,343 @@
@@ -6671,7 +6778,7 @@
 +		.actionMessageUserName { display:none; }
 +		.actionMessageBody:before { content:"*"; }
 +		.actionMessageBody:after { content:"*"; }
-+		* { word-wrap:break-word; }
++		* { word-wrap:break-word; text-rendering: optimizelegibility; }
 +		img.scaledToFitImage { height: auto; max-width: 100%%; }
 +	</style>
 +
@@ -6695,13 +6802,13 @@
 +</html>
 --- psi.orig/themes/chatview/psi/adapter.js
 +++ psi/themes/chatview/psi/adapter.js
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,260 @@
 +try {
 +	
 +window[chatServer.jsNamespace()].adapter = {
 +	loadTheme : function() {
-+		chatServer.setHtml(chatServer.getFileContents("index.html"));
-+		eval(chatServer.getFileContents("load.js"))
++        chatServer.setHtml(chatServer.getFileContents("index.html"));
++        eval(chatServer.getFileContents("load.js"));
 +		return "ok";
 +	},
 +	initSession : function() {
@@ -6788,7 +6895,10 @@
 +				}
 +				t.message = t.message || "%message%";
 +				t.sys = t.sys || "%message%";
-+				t.sysMessage = t.sysMessage || t.sys
++				t.sysMessage = t.sysMessage || t.sys;
++				t.sysMessageUT = t.sysMessageUT || t.sysMessage;
++				t.statusMessage = t.statusMessage || t.sysMessage;
++				t.statusMessageUT = t.statusMessageUT || t.statusMessage;
 +				t.sentMessage = t.sentMessage || t.message;
 +				t.receivedMessage = t.receivedMessage || t.message;
 +				t.spooledMessage = t.spooledMessage || t.message;
@@ -6812,6 +6922,24 @@
 +				return shared.cdata.nextOfGroup;
 +			}
 +		};
++        
++        // internationalization
++        function tr(text)
++        {
++            // TODO translate
++            return text;
++        }
++        
++        // accepts some templater object and object with 2 optional methods: "pre" and "post(text)"
++        function proxyTemplate(template, handlers)
++        {
++            return {"toString": function(){
++                if(handlers.pre) handlers.pre();
++                var result = template.toString();
++                if(handlers.post) result = handlers.post(result);
++                return result;
++            }}
++        }
 +		
 +		shared.TemplateVar.prototype = {
 +			toString : function() {
@@ -6827,7 +6955,7 @@
 +					} else { // last message date ?
 +						d = shared.server.formatDate(d, "yyyy-MM-dd");
 +					}
-+				} else if (this.name == "avatarurl") {
++				 } else if (this.name == "avatarurl") {
 +					return "avatar:" + encodeURIComponent(shared.accountId) +
 +						"/" + encodeURIComponent(shared.cdata.userid);
 +				} else if (this.name == "next") {
@@ -6868,6 +6996,9 @@
 +								data.nextOfGroup = false; //can't group w/o template
 +								template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
 +							}
++							break;
++                        case "status":
++                            template = data.usertext?shared.templates.statusMessageUT:shared.templates.statusMessage;
 +							break;
 +						case "system":
 +							template = data.usertext?shared.templates.sysMessageUT:shared.templates.sysMessage;
@@ -6929,8 +7060,9 @@
 +
 +
 +} catch(e) {
-+	chat.console("adapter load error!!! "+e)
++	window[chatServer.jsNamespace()].console("adapter load error!!! "+e)
 +}
++"ok"; // just an indicator for script loader
 --- psi.orig/themes/chatview/psi/classic/index.html
 +++ psi/themes/chatview/psi/classic/index.html
 @@ -0,0 +1,115 @@
@@ -7055,7 +7187,7 @@
 +chatServer.setMetaData({name: "Classic"});
 --- psi.orig/themes/chatview/util.js
 +++ psi/themes/chatview/util.js
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,193 @@
 +window[chatServer.jsNamespace()] = function() {
 +	var htmlSource = document.createElement("div"); //manages appendHtml
 +	var server = window.chatServer;
@@ -7166,16 +7298,18 @@
 +				}
 +			},
 +			
-+			loadXML : function(path) {
++			loadXML : function(path, allowEmpty) {
++				allowEmpty = allowEmpty || false;
 +				text = server.getFileContents(path);
-+				if (text) {
-+					try {
-+						return new DOMParser().parseFromString(text, "text/xml");
-+					} catch (e) {
-+						server.console("failed to parse xml from file " + path);
-+					}
++				if (!text && !allowEmpty) {
++					throw new Error("File " + path + " is empty. can't parse xml");
 +				}
-+				return false;
++				try {
++					return new DOMParser().parseFromString(text, "text/xml");
++				} catch (e) {
++					server.console("failed to parse xml from file " + path);
++					throw e;
++				}
 +			}
 +		},
 +		
@@ -7246,3 +7380,4 @@
 +	}
 +	return chat;
 +}();
++"ok"; // just an indicator for script loader
