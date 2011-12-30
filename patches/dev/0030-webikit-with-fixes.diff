@@ -81,7 +81,7 @@
 +};
 --- psi.orig/src/bytearrayreply.cpp
 +++ psi/src/bytearrayreply.cpp
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,84 @@
 +/*
 + * bytearrayreply.cpp - Base class for QNetworReply'es returning QByteArray
 + * Copyright (C) 2010 senu, Rion
@@ -116,14 +116,21 @@
 +	setRequest(request);
 +	setOpenMode(QIODevice::ReadOnly);
 +
-+	if (mimeType.isEmpty()) {
-+		setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
++	if (ba.isNull()) {
++		setError(QNetworkReply::ContentNotFoundError, "Not found");
++		QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
++		QTimer::singleShot(0, this, SIGNAL(error()));
++		QTimer::singleShot(0, this, SIGNAL(finished()));
 +	} else {
-+		setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
++		if (mimeType.isEmpty()) {
++			setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
++		} else {
++			setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
++		}
++		setHeader(QNetworkRequest::ContentLengthHeader, QByteArray::number(origLen));
++		QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
++		QTimer::singleShot(0, this, SIGNAL(readyRead()));
 +	}
-+	setHeader(QNetworkRequest::ContentLengthHeader, QByteArray::number(origLen));
-+	QTimer::singleShot(0, this, SIGNAL(metaDataChanged()));
-+	QTimer::singleShot(0, this, SIGNAL(readyRead()));
 +}
 +
 +ByteArrayReply::~ByteArrayReply() {
@@ -1154,7 +1161,7 @@
 +#endif
 --- psi.orig/src/chatviewtheme.cpp
 +++ psi/src/chatviewtheme.cpp
-@@ -0,0 +1,237 @@
+@@ -0,0 +1,240 @@
 +/*
 + * chatviewtheme.cpp - theme for webkit based chatview
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -1213,7 +1220,9 @@
 +public slots:
 +	void setMetaData(const QVariantMap &map)
 +	{
-+		theme->md->name = map["name"].toString();
++		if (map["name"].isValid()) {
++			theme->setName(map["name"].toString());
++		}
 +	}
 +
 +	QString psiOption(const QString &option) const
@@ -1228,7 +1237,7 @@
 +
 +	QString getFileContents(const QString &name) const
 +	{
-+		return QString(Theme::loadData(name, theme->md->filename));
++		return QString(Theme::loadData(name, theme->fileName()));
 +	}
 +
 +	QString getFileContentsFromAdapterDir(const QString &name) const
@@ -1274,7 +1283,7 @@
 +
 +	void setDefaultAvatar(const QString &filename, const QString &host = QString())
 +	{
-+		QByteArray ba = Theme::loadData(filename, theme->md->filename);
++		QByteArray ba = Theme::loadData(filename, theme->fileName());
 +		if (!ba.isEmpty()) {
 +			((PsiWKAvatarHandler *)NetworkAccessManager::instance()
 +				->schemeHandler("avatar").data())->setDefaultAvatar(ba, host);
@@ -1309,7 +1318,8 @@
 +//------------------------------------------------------------------------------
 +// ChatViewTheme
 +//------------------------------------------------------------------------------
-+ChatViewTheme::ChatViewTheme()
++ChatViewTheme::ChatViewTheme(const QString &id) :
++	Theme(id)
 +{
 +	d = new Private;
 +	d->jsNamespace = "chat";
@@ -1334,7 +1344,7 @@
 +		d->wv->setHtml("", QUrl("theme://theme"));
 +	}
 +	d->adapterPath = adapterPath;
-+	md->filename = file;
++	setFileName(file);
 +	d->scripts = helperScripts;
 +
 +	d->wv->page()->mainFrame()->addToJavaScriptWindowObject("chatServer", d->jso,
@@ -1360,7 +1370,7 @@
 +
 +QByteArray ChatViewTheme::screenshot()
 +{
-+	return Theme::loadData("screenshot.png", md->filename);
++	return Theme::loadData("screenshot.png", fileName());
 +}
 +
 +QObject * ChatViewTheme::jsHelper()
@@ -1394,7 +1404,7 @@
 +#include "chatviewtheme.moc"
 --- psi.orig/src/chatviewtheme.h
 +++ psi/src/chatviewtheme.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,53 @@
 +/*
 + * chatviewtheme.h - theme for webkit based chatview
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -1429,11 +1439,13 @@
 +{
 +	friend class ChatViewThemeJS;
 +public:
-+	ChatViewTheme();
++	ChatViewTheme(const QString &id);
 +	~ChatViewTheme();
++
++	QByteArray screenshot();
++
 +	bool load( const QString &file, const QStringList &helperScripts,
 +			   const QString &adapterPath );
-+	QByteArray screenshot();
 +
 +	QObject * jsHelper();
 +	QStringList scripts();
@@ -1446,6 +1458,272 @@
 +};
 +
 +#endif
+--- psi.orig/src/chatviewthemeprovider.cpp
++++ psi/src/chatviewthemeprovider.cpp
+@@ -0,0 +1,186 @@
++/*
++ * chatviewthemeprovider.h - adapter for set of chatview themes
++ * Copyright (C) 2010 Rion (Sergey Ilinyh)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++
++#include "chatviewthemeprovider.h"
++
++#include <QFile>
++#include <QFileInfo>
++#include <QDir>
++
++#include "chatviewtheme.h"
++#include "psioptions.h"
++#include "theme.h"
++#include "applicationinfo.h"
++#include "psiwkavatarhandler.h"
++
++
++static QMap<QString, QString> chatViewScripts;
++
++class ChatViewThemeProvider;
++
++class ChatViewThemeUrlHandler : public NAMSchemeHandler
++{
++private:
++	ChatViewThemeProvider *provider;
++public:
++	ChatViewThemeUrlHandler(ChatViewThemeProvider *provider_)
++		: provider(provider_)
++	{
++	}
++	QByteArray data(const QUrl &url) const
++	{
++		qDebug("loading theme file: %s", qPrintable(url.toString()));
++		Theme *theme = provider->current();
++		if (theme) {
++			QByteArray td = Theme::loadData(url.path(), theme->fileName());
++			if (td.isNull()) {
++				qDebug("content of %s is not found", qPrintable(url.toString()));
++			}
++			return td;
++		}
++		return QByteArray();
++	}
++
++};
++
++ChatViewThemeProvider::ChatViewThemeProvider(QObject *parent_)
++	: PsiThemeProvider(parent_)
++	, curTheme(0)
++{
++	NetworkAccessManager::instance()->setSchemeHandler(
++			"avatar", new PsiWKAvatarHandler((PsiCon*)parent()) );
++	NetworkAccessManager::instance()->setSchemeHandler(
++			"theme", new ChatViewThemeUrlHandler(this));
++	connect(PsiOptions::instance(),
++			SIGNAL(optionChanged(const QString&)),
++			SLOT(optionChanged(const QString&)));
++}
++
++const QString ChatViewThemeProvider::type() const
++{
++	return "chatview";
++}
++
++const QStringList ChatViewThemeProvider::themeIds() const
++{
++	QStringList dirs;
++	dirs << ":";
++	dirs << ".";
++	dirs << ApplicationInfo::homeDir();
++	dirs << ApplicationInfo::resourcesDir();
++
++	QSet<QString> ret;
++	foreach (QString dir, dirs) {
++		foreach (QFileInfo tDirInfo, QDir(dir+"/themes/chatview/")
++			.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot)) {
++			QString typeName = tDirInfo.fileName();
++			foreach (QFileInfo themeInfo,
++					QDir(tDirInfo.absoluteFilePath())
++						.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot) +
++					QDir(tDirInfo.absoluteFilePath())
++						.entryInfoList(QStringList("*.theme"), QDir::Files)) {
++				ret<<(QString("%1/%2").arg(typeName).arg(themeInfo.fileName()));
++				//qDebug("found theme: %s", qPrintable(QString("%1/%2").arg(typeName).arg(themeInfo.fileName())));
++			}
++		}
++	}
++
++	return ret.values();
++}
++
++Theme * ChatViewThemeProvider::load(const QString &themeId)
++{
++	QString up;
++	if (chatViewScripts.value("util").isEmpty()) {
++		if (!(up = themePath("chatview/util.js")).isEmpty()) {
++			QFile file(up);
++			if (file.open(QIODevice::ReadOnly)) {
++				chatViewScripts["util"] = file.readAll();
++			}
++		}
++	}
++	if (!chatViewScripts.value("util").isEmpty()) {
++		int pos;
++		if ((pos = themeId.indexOf('/')) > 0) {
++			QString tp = themePath("chatview/" + themeId);
++			QString typeName = themeId.mid(0, pos);
++			if (!tp.isEmpty()) { // theme exists
++				QString ap, ad;
++				if (chatViewScripts.value(typeName).isEmpty() &&
++					!(ap = themePath("chatview/" + typeName + "/adapter.js")).isEmpty()) {
++					QFile afile(ap);
++					if (afile.open(QIODevice::ReadOnly)) {
++						chatViewScripts[typeName] = afile.readAll();
++						ad = QFileInfo(afile).dir().path();
++					}
++				}
++				if (!chatViewScripts.value(typeName).isEmpty()) {
++					ChatViewTheme *theme = new ChatViewTheme(themeId);
++					if (theme->load(tp, QStringList()<<chatViewScripts["util"]
++									<<chatViewScripts[typeName], ad)) {
++						return theme;
++					}
++				}
++			}
++		}
++	}
++	return 0;
++}
++
++bool ChatViewThemeProvider::loadCurrent()
++{
++	QString themeName = PsiOptions::instance()->getOption(optionString()).toString();
++	ChatViewTheme *theme = 0;
++	if (!(theme = (ChatViewTheme *)load(themeName))) {
++		if (themeName != "psi/classic") {
++			qDebug("fallback to classic chatview theme");
++			if ( (theme = (ChatViewTheme *)load("psi/classic")) ) {
++				PsiOptions::instance()->setOption(optionString(), "psi/classic");
++			}
++		}
++	}
++	if (theme) {
++		if (curTheme) {
++			delete curTheme;
++		}
++		curTheme = theme;
++		emit themeChanged();
++		return true;
++	}
++	return false;
++}
++
++Theme *ChatViewThemeProvider::current() const
++{
++	return curTheme;
++}
++
++int ChatViewThemeProvider::screenshotWidth() const
++{
++	return 512;
++}
++
++void ChatViewThemeProvider::optionChanged(const QString& option)
++{
++	if (option == optionString()) {
++		loadCurrent();
++	}
++}
+--- psi.orig/src/chatviewthemeprovider.h
++++ psi/src/chatviewthemeprovider.h
+@@ -0,0 +1,74 @@
++/*
++ * chatviewthemeprovider.h - adapter for set of chatview themes
++ * Copyright (C) 2010 Rion (Sergey Ilinyh)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++
++#ifndef CHATVIEWTHEMEPROVIDER_H
++#define CHATVIEWTHEMEPROVIDER_H
++
++#include "psithemeprovider.h"
++
++class ChatViewTheme;
++
++class ChatViewThemeProvider : public PsiThemeProvider
++{
++	Q_OBJECT
++
++public:
++	ChatViewThemeProvider(QObject *);
++
++	const QString type() const;
++	const QStringList themeIds() const;
++	Theme* load(const QString &themeId);
++	bool loadCurrent();
++	Theme *current() const;
++	virtual int screenshotWidth() const;
++
++	QString optionsName() const { return tr("Chat Message Style"); }
++	QString optionsDescription() const { return tr("Configure your chat theme here"); }
++
++protected:
++	virtual const char* optionString() const { return "options.ui.chat.theme"; }
++
++signals:
++	void themeChanged();
++
++private slots:
++	void optionChanged(const QString& option);
++
++private:
++	ChatViewTheme *curTheme;
++};
++
++class GroupChatViewThemeProvider : public ChatViewThemeProvider
++{
++	Q_OBJECT
++
++public:
++	GroupChatViewThemeProvider(QObject *parent) :
++		ChatViewThemeProvider(parent) {}
++
++	QString optionsName() const { return tr("Groupchat Message Style"); }
++	QString optionsDescription() const { return tr("Configure your groupchat theme here"); }
++
++protected:
++	const char* optionString() const { return "options.ui.muc.theme"; }
++};
++
++#endif // CHATVIEWTHEMEPROVIDER_H
 --- psi.orig/src/chatview_webkit.cpp
 +++ psi/src/chatview_webkit.cpp
 @@ -0,0 +1,309 @@
@@ -4013,267 +4291,6 @@
  	class ChatDlgMCmdProvider;
  };
  
---- psi.orig/src/psichatviewthemeprovider.cpp
-+++ psi/src/psichatviewthemeprovider.cpp
-@@ -0,0 +1,195 @@
-+/*
-+ * psichatviewthemeprovider.h - adapter for set of chatview themes
-+ * Copyright (C) 2010 Rion (Sergey Ilinyh)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+
-+#include "psichatviewthemeprovider.h"
-+
-+#include <QFile>
-+#include <QFileInfo>
-+#include <QDir>
-+
-+#include "chatviewtheme.h"
-+#include "psioptions.h"
-+#include "theme.h"
-+#include "applicationinfo.h"
-+#include "psiwkavatarhandler.h"
-+
-+class PsiChatViewThemeProvider;
-+
-+// TODO NO CACHE
-+class PsiChatViewThemeUrlHandler : public NAMSchemeHandler
-+{
-+private:
-+	PsiChatViewThemeProvider *provider;
-+public:
-+	PsiChatViewThemeUrlHandler(PsiChatViewThemeProvider *provider_)
-+		: provider(provider_)
-+	{
-+	}
-+	QByteArray data(const QUrl &url) const
-+	{
-+		qDebug("loading theme file: %s", qPrintable(url.toString()));
-+		Theme *theme = provider->current();
-+		if (theme) {
-+			QByteArray td = Theme::loadData(url.path(), theme->fileName());
-+			qDebug("content of %d bytes", td.size());
-+			return td;
-+		}
-+		return QByteArray();
-+	}
-+
-+};
-+
-+PsiChatViewThemeProvider::PsiChatViewThemeProvider(QObject *parent_)
-+	: PsiThemeProvider(parent_)
-+	, curTheme(0)
-+{
-+	NetworkAccessManager::instance()->setSchemeHandler(
-+			"avatar", new PsiWKAvatarHandler((PsiCon*)parent()) );
-+	NetworkAccessManager::instance()->setSchemeHandler(
-+			"theme", new PsiChatViewThemeUrlHandler(this));
-+	connect(PsiOptions::instance(),
-+			SIGNAL(optionChanged(const QString&)),
-+			SLOT(optionChanged(const QString&)));
-+}
-+
-+const QString PsiChatViewThemeProvider::type() const
-+{
-+	return "chatview";
-+}
-+
-+const QStringList PsiChatViewThemeProvider::themeIds() const
-+{
-+	QStringList dirs;
-+	dirs << ":";
-+	dirs << ".";
-+	dirs << ApplicationInfo::homeDir();
-+	dirs << ApplicationInfo::resourcesDir();
-+
-+	QSet<QString> ret;
-+	foreach (QString dir, dirs) {
-+		foreach (QFileInfo tDirInfo, QDir(dir+"/themes/chatview/")
-+			.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot)) {
-+			QString typeName = tDirInfo.fileName();
-+			foreach (QFileInfo themeInfo,
-+					QDir(tDirInfo.absoluteFilePath())
-+						.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot) +
-+					QDir(tDirInfo.absoluteFilePath())
-+						.entryInfoList(QStringList("*.theme"), QDir::Files)) {
-+				ret<<(QString("%1/%2").arg(typeName).arg(themeInfo.fileName()));
-+				//qDebug("found theme: %s", qPrintable(QString("%1/%2").arg(typeName).arg(themeInfo.fileName())));
-+			}
-+		}
-+	}
-+
-+	return ret.values();
-+}
-+
-+Theme * PsiChatViewThemeProvider::load(const QString &theme)
-+{
-+	QString up;
-+	if (chatViewScripts.value("util").isEmpty()) {
-+		if (!(up = themePath("chatview/util.js")).isEmpty()) {
-+			QFile file(up);
-+			if (file.open(QIODevice::ReadOnly)) {
-+				chatViewScripts["util"] = file.readAll();
-+			}
-+		}
-+	}
-+	if (!chatViewScripts.value("util").isEmpty()) {
-+		int pos;
-+		if ((pos = theme.indexOf('/')) > 0) {
-+			QString tp = themePath("chatview/" + theme);
-+			QString typeName = theme.mid(0, pos);
-+			if (!tp.isEmpty()) { // theme exists
-+				QString ap, ad;
-+				if (chatViewScripts.value(typeName).isEmpty() &&
-+					!(ap = themePath("chatview/" + typeName + "/adapter.js")).isEmpty()) {
-+					QFile afile(ap);
-+					if (afile.open(QIODevice::ReadOnly)) {
-+						chatViewScripts[typeName] = afile.readAll();
-+						ad = QFileInfo(afile).dir().path();
-+					}
-+				}
-+				if (!chatViewScripts.value(typeName).isEmpty()) {
-+					ChatViewTheme *theme = new ChatViewTheme();
-+					if (theme->load(tp, QStringList()<<chatViewScripts["util"]
-+									<<chatViewScripts[typeName], ad)) {
-+						return theme;
-+					}
-+				}
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+
-+bool PsiChatViewThemeProvider::loadCurrent()
-+{
-+	QString themeName = PsiOptions::instance()->getOption("options.ui.chat.theme").toString();
-+	ChatViewTheme *theme = 0;
-+	if (!(theme = (ChatViewTheme *)load(themeName))) {
-+		if (themeName != "psi/classic") {
-+			qDebug("fallback to classic chatview theme");
-+			if ( (theme = (ChatViewTheme *)load("psi/classic")) ) {
-+				PsiOptions::instance()->setOption("options.ui.chat.theme", "psi/classic");
-+			}
-+		}
-+	}
-+	if (theme) {
-+		if (curTheme) {
-+			delete curTheme;
-+		}
-+		curTheme = theme;
-+		emit themeChanged();
-+		return true;
-+	}
-+	return false;
-+}
-+
-+Theme *PsiChatViewThemeProvider::current() const
-+{
-+	return curTheme;
-+}
-+
-+const QString PsiChatViewThemeProvider::title(const QString &themeId, Theme *theme) const
-+{
-+	QString name = theme->name();
-+	return name.isEmpty()?themeId:name;
-+}
-+
-+QByteArray PsiChatViewThemeProvider::screenshot(const QString &themeId,
-+												Theme *theme) const
-+{
-+	Q_UNUSED(themeId)
-+	return ((ChatViewTheme *)theme)->screenshot();
-+}
-+
-+int PsiChatViewThemeProvider::screenshotWidth() const
-+{
-+	return 512;
-+}
-+
-+void PsiChatViewThemeProvider::optionChanged(const QString& option)
-+{
-+	if (option == "options.ui.chat.theme") {
-+		loadCurrent();
-+	}
-+}
---- psi.orig/src/psichatviewthemeprovider.h
-+++ psi/src/psichatviewthemeprovider.h
-@@ -0,0 +1,60 @@
-+/*
-+ * psichatviewthemeprovider.h - adapter for set of chatview themes
-+ * Copyright (C) 2010 Rion (Sergey Ilinyh)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+
-+#ifndef PSICHATVIEWTHEMEPROVIDER_H
-+#define PSICHATVIEWTHEMEPROVIDER_H
-+
-+#include <QPointer>
-+#include "psithemeprovider.h"
-+
-+class ChatViewTheme;
-+
-+class PsiChatViewThemeProvider : public PsiThemeProvider
-+{
-+	Q_OBJECT
-+
-+public:
-+	PsiChatViewThemeProvider(QObject *parent_);
-+
-+	const QString type() const;
-+	const QStringList themeIds() const;
-+	Theme* load(const QString &theme);
-+	bool loadCurrent();
-+	Theme *current() const;
-+	const QString title(const QString &themeId, Theme *theme = 0) const;
-+	QByteArray screenshot(const QString &themeId, Theme *theme) const;
-+	virtual int screenshotWidth() const;
-+
-+	QString optionsName() const { return "ChatView"; }
-+	QString optionsDescription() const { return "Configure your chatview theme here"; }
-+
-+signals:
-+	void themeChanged();
-+
-+private slots:
-+	void optionChanged(const QString& option);
-+
-+private:
-+	ChatViewTheme *curTheme;
-+	QMap<QString, QString> chatViewScripts;
-+};
-+
-+#endif
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -40,6 +40,7 @@
@@ -4290,7 +4307,7 @@
  #include "chatdlg.h"
 +#ifdef WEBKIT
 +#include "avatars.h"
-+#include "psichatviewthemeprovider.h"
++#include "chatviewthemeprovider.h"
 +#endif
  #include "capsregistry.h"
  #include "urlobject.h"
@@ -4303,13 +4320,15 @@
  //----------------------------------------------------------------------------
  // PsiCon::Private
  //----------------------------------------------------------------------------
-@@ -473,6 +479,16 @@ bool PsiCon::init()
+@@ -473,6 +479,18 @@ bool PsiCon::init()
  		//}
  	}
  
 +#ifdef WEBKIT
 +	PsiThemeManager::instance()->registerProvider(
-+			new PsiChatViewThemeProvider(this), true);
++			new ChatViewThemeProvider(this), true);
++	PsiThemeManager::instance()->registerProvider(
++			new GroupChatViewThemeProvider(this), true);
 +#endif
 +
 +	if( !PsiThemeManager::instance()->loadAll() ) {
@@ -4320,7 +4339,7 @@
  	if ( !d->actionList )
  		d->actionList = new PsiActionList( this );
  
-@@ -619,7 +635,6 @@ bool PsiCon::init()
+@@ -619,7 +637,6 @@ bool PsiCon::init()
  	}	
  	
  	checkAccountsEmpty();
@@ -4526,8 +4545,8 @@
 +		ThemeItemInfo ti;
 +		if (t) { // if loaded
 +			ti.id = id;
-+			ti.title = provider->title(id, t);
-+			ti.screenshot = provider->screenshot(id, t);
++			ti.title = t->title();
++			ti.screenshot = t->screenshot();
 +			ti.isValid = true;
 +		} else {
 +			ti.isValid = false;
@@ -4709,7 +4728,7 @@
 +#endif
 --- psi.orig/src/psithemeprovider.cpp
 +++ psi/src/psithemeprovider.cpp
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,64 @@
 +/*
 + * psithemeprovider.cpp - kinda adapter for set of themes
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -4770,28 +4789,13 @@
 +	return false;
 +}
 +
-+// theme title for theme list
-+const QString PsiThemeProvider::title(const QString &themeId, Theme *theme) const
-+{
-+	Q_UNUSED(theme)
-+	return themeId;
-+}
-+
-+QByteArray PsiThemeProvider::screenshot(const QString &themeId,
-+												   Theme *theme) const
-+{
-+	Q_UNUSED(themeId)
-+	Q_UNUSED(theme)
-+	return QByteArray();
-+}
-+
 +int PsiThemeProvider::screenshotWidth() const
 +{
 +	return 0;
 +}
 --- psi.orig/src/psithemeprovider.h
 +++ psi/src/psithemeprovider.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,51 @@
 +/*
 + * psithemeprovider.h - kinda adapter for set of themes
 + * Copyright (C) 2010 Rion (Sergey Ilinyh)
@@ -4834,9 +4838,6 @@
 +	virtual Theme* current() const = 0;
 +
 +	virtual bool threadedLoading() const;
-+	virtual const QString title(const QString &themeId, Theme *theme = 0) const;
-+	virtual QByteArray screenshot(const QString &themeId,
-+										Theme *theme = 0) const;
 +	virtual int screenshotWidth() const;
 +
 +	virtual QString optionsName() const = 0;
@@ -5174,7 +5175,7 @@
 +			$$PWD/psiwkavatarhandler.h \
 +			$$PWD/jsutil.h \
 +			$$PWD/chatviewtheme.h \
-+			$$PWD/psichatviewthemeprovider.h
++			$$PWD/chatviewthemeprovider.h
 +	SOURCES += 	$$PWD/chatview_webkit.cpp \
 +			$$PWD/networkaccessmanager.cpp \
 +			$$PWD/bytearrayreply.cpp \
@@ -5182,7 +5183,7 @@
 +			$$PWD/psiwkavatarhandler.cpp \
 +			$$PWD/jsutil.cpp \
 +			$$PWD/chatviewtheme.cpp \
-+			$$PWD/psichatviewthemeprovider.cpp
++			$$PWD/chatviewthemeprovider.cpp
 +	DEFINES += WEBKIT
 +	QT += webkit
 +}
@@ -5315,7 +5316,7 @@
  };
 --- psi.orig/src/theme.cpp
 +++ psi/src/theme.cpp
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,189 @@
 +/*
 + * theme.cpp - base class for any theme
 + * Copyright (C) 2010 Justin Karneges, Michail Pishchagin, Rion (Sergey Ilinyh)
@@ -5348,37 +5349,44 @@
 +#	include "zip/zip.h"
 +#endif
 +
-+void ThemeMetaData::init()
++class ThemeMetaData : public QSharedData
 +{
-+	name = QObject::tr("Unnamed");
-+	//version = "1.0";
-+	//description = "No description";
-+	//authors << "I. M. Anonymous";
-+	//creation = "1900-01-01";
-+	homeUrl = QString::null;
++public:
++	QString id, name, version, description, creation, homeUrl, filename;
++	QStringList authors;
++	QHash<QString, QString> info;
++
++public:
++	ThemeMetaData(const QString &id);
++	//QByteArray loadData(const QString &fileName, const QString &dir) const;
++};
++
++ThemeMetaData::ThemeMetaData(const QString &id) :
++	id(id),
++	name(QObject::tr("Unnamed"))
++{
++
 +}
 +
-+ThemeMetaData::ThemeMetaData()
++
++//--------------------------------------
++// Theme
++//--------------------------------------
++Theme::Theme(const QString &id) :
++	md(new ThemeMetaData(id))
 +{
-+	init();
++
 +}
 +
-+ThemeMetaData::ThemeMetaData(const ThemeMetaData &from)
-+	: QSharedData(from)
++Theme::Theme(const Theme &other) :
++	md(other.md)
 +{
-+	init();
-+	setInformation(from);
++
 +}
 +
-+void ThemeMetaData::setInformation(const ThemeMetaData &from) {
-+	name = from.name;
-+	version = from.version;
-+	description = from.description;
-+	creation = from.creation;
-+	homeUrl = from.homeUrl;
-+	filename = from.filename;
-+	authors = from.authors;
-+	info = from.info;
++Theme::~Theme()
++{
++
 +}
 +
 +QByteArray Theme::loadData(const QString &fileName, const QString &dir)
@@ -5411,9 +5419,19 @@
 +	return ba;
 +}
 +
++const QString &Theme::id() const
++{
++	return md->id;
++}
++
 +const QString &Theme::name() const
 +{
 +	return md->name;
++}
++
++void Theme::setName(const QString &name)
++{
++	md->name = name;
 +}
 +
 +const QString &Theme::version() const
@@ -5464,15 +5482,6 @@
 +}
 +
 +/**
-+ * Sets the information (meta-data) of this Theme to the information from the given Theme.
-+ */
-+void Theme::setInformation(const Theme &from)
-+{
-+	md.detach();
-+	md->setInformation( *(from.md) );
-+}
-+
-+/**
 + * Returns additional Theme information.
 + * \sa setInfo()
 + */
@@ -5489,9 +5498,17 @@
 +{
 +	md->info = i;
 +}
++
++/**
++ * Title suitable to display in options dialog
++ */
++QString Theme::title() const
++{
++	return md->name.isEmpty()? md->id : md->name;
++}
 --- psi.orig/src/theme.h
 +++ psi/src/theme.h
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,61 @@
 +/*
 + * theme.h - base class for any theme
 + * Copyright (C) 2010 Justin Karneges, Michail Pishchagin, Rion (Sergey Ilinyh)
@@ -5519,35 +5536,22 @@
 +#include <QSharedData>
 +#include <QHash>
 +
-+class ThemeMetaData : public QSharedData
-+{
-+protected:
-+	void init();
-+
-+public:
-+	QString name, version, description, creation, homeUrl, filename;
-+	QStringList authors;
-+	QHash<QString, QString> info;
-+
-+public:
-+	ThemeMetaData();
-+	ThemeMetaData(const ThemeMetaData &from);
-+	void setInformation(const ThemeMetaData &from);
-+	//QByteArray loadData(const QString &fileName, const QString &dir) const;
-+};
++class ThemeMetaData;
 +
 +//-----------------------------------------------
 +// Theme
 +//-----------------------------------------------
 +class Theme {
 +public:
-+	Theme() {
-+		md = new ThemeMetaData;
-+	}
++	Theme(const QString &id);
++	Theme(const Theme &other);
++	virtual ~Theme();
 +
 +	static QByteArray loadData(const QString &fileName, const QString &dir);
 +
++	const QString &id() const;
 +	const QString &name() const;
++	void setName(const QString &name);
 +	const QString &version() const;
 +	const QString &description() const;
 +	const QStringList &authors() const;
@@ -5555,9 +5559,11 @@
 +	const QString &homeUrl() const;
 +	const QString &fileName() const;
 +	void setFileName(const QString &f);
-+	void setInformation(const Theme &from);
 +	const QHash<QString, QString> info() const;
 +	void setInfo(const QHash<QString, QString> &i);
++
++	virtual QString title() const;
++	virtual QByteArray screenshot() = 0;
 +protected:
 +	QSharedDataPointer<ThemeMetaData> md;
 +};
