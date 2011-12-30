@@ -1899,9 +1899,6 @@
 +	connect(jsObject, SIGNAL(inited()), SLOT(sessionInited()));
 +	connect(webView->page()->mainFrame(),
 +			SIGNAL(javaScriptWindowObjectCleared()), SLOT(embedJsObject()));
-+	connect(PsiThemeManager::instance()->provider(isMuc_?"groupchatview":"chatview"),
-+			SIGNAL(themeChanged()),
-+			SLOT(init()));
 +}
 +
 +ChatView::~ChatView()
@@ -1919,7 +1916,7 @@
 +{
 +	ChatViewTheme *theme = currentTheme();
 +	QString html = theme->html(jsObject);
-+	qDebug() << "Set html:" << html;
++	//qDebug() << "Set html:" << html;
 +	webView->page()->mainFrame()->setHtml(
 +		html, theme->baseUrl()
 +	);
@@ -1951,6 +1948,9 @@
 +	isMuc_ = isMuc;
 +	jid_ = jid;
 +	name_ = name;
++	connect(PsiThemeManager::instance()->provider(isMuc_?"groupchatview":"chatview"),
++			SIGNAL(themeChanged()),
++			SLOT(init()));
 +}
 +
 +bool ChatView::focusNextPrevChild(bool next)
@@ -3939,7 +3939,7 @@
  	$$PWD/opt_advanced.ui \
 --- psi.orig/src/options/opt_theme.cpp
 +++ psi/src/options/opt_theme.cpp
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,91 @@
 +#include "opt_theme.h"
 +
 +#include "ui_opt_theme.h"
@@ -4028,7 +4028,8 @@
 +
 +	OptAppearanceThemeUI *d = (OptAppearanceThemeUI *)w;
 +
-+	d->themeView->setCurrentIndex(themesModel->index( themesModel->themeRow(PsiOptions::instance()->getOption("options.ui.chat.theme").toString()) ));
++	Theme *theme = provider->current();
++	d->themeView->setCurrentIndex(themesModel->index( themesModel->themeRow(theme?theme->id():"") ));
 +}
 --- psi.orig/src/options/opt_theme.h
 +++ psi/src/options/opt_theme.h
