@@ -1088,10 +1088,10 @@ index 0000000..032cae0
 +#endif
 diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
 new file mode 100644
-index 0000000..5298b05
+index 0000000..8831b3e
 --- /dev/null
 +++ b/src/chatview_webkit.cpp
-@@ -0,0 +1,320 @@
+@@ -0,0 +1,339 @@
 +/*
 + * chatview_webkit.cpp - Webkit based chatview
 + * Copyright (C) 2010  Rion
@@ -1141,59 +1141,86 @@ index 0000000..5298b05
 +// ChatViewJSObject
 +// object which will be embed to javascript part of view
 +//----------------------------------------------------------------------------
-+ChatViewJSObject::ChatViewJSObject(QObject *view)
-+	: QObject(view)
++class ChatViewJSObject : public QObject
 +{
++	Q_OBJECT
 +
-+}
++	ChatView *_view;
 +
-+QString ChatViewJSObject::mucNickColor(QString nick, bool isSelf, QStringList validList) const
-+{
-+	return ((ChatView*)parent())->share_.getMucNickColor(nick, isSelf, validList);
-+}
++public:
++	ChatViewJSObject(ChatView *view) :
++		QObject(view),
++		_view(view)
++	{
 +
-+bool ChatViewJSObject::isMuc() const
-+{
-+	return ((ChatView*)parent())->isMuc_;
-+}
-+
-+QString ChatViewJSObject::chatName() const
-+{
-+	return ((ChatView*)parent())->name_;
-+}
-+
-+QString ChatViewJSObject::jid() const
-+{
-+	return ((ChatView*)parent())->jid_;
-+}
-+
-+QString ChatViewJSObject::account() const
-+{
-+	return ((ChatView*)parent())->account_->id();
-+}
-+
-+void ChatViewJSObject::signalInited()
-+{
-+	emit inited();
-+}
-+
-+QString ChatViewJSObject::getFont() const
-+{
-+	QFont f = ((ChatView*)parent())->font();
-+	QString weight = "normal";
-+	switch (f.weight()) {
-+		case QFont::Light: weight = "lighter"; break;
-+		case QFont::DemiBold: weight = "bold"; break;
-+		case QFont::Bold: weight = "bolder"; break;
-+		case QFont::Black: weight = "900"; break;
 +	}
-+	return QString("{fontFamily:'%1',fontSize:'%2pt',fontStyle:'%3',fontVariant:'%4',fontWeight:'%5'}")
-+					 .arg(f.family())
-+					 .arg(f.pointSize())
-+					 .arg(f.style()==QFont::StyleNormal?"normal":(f.style()==QFont::StyleItalic?"italic":"oblique"))
-+					 .arg(f.capitalization() == QFont::SmallCaps?"small-caps":"normal")
-+					 .arg(weight);
-+}
++
++public slots:
++	QString mucNickColor(QString nick, bool isSelf,
++						 QStringList validList = QStringList()) const
++	{
++		return _view->share_.getMucNickColor(nick, isSelf, validList);
++	}
++
++	bool isMuc() const
++	{
++		return _view->isMuc_;
++	}
++
++	QString chatName() const
++	{
++		return _view->name_;
++	}
++
++	QString jid() const
++	{
++		return _view->jid_;
++	}
++
++	QString account() const
++	{
++		return _view->account_->id();
++	}
++
++	void signalInited()
++	{
++		emit inited();
++	}
++
++	QString getFont() const
++	{
++		QFont f = ((ChatView*)parent())->font();
++		QString weight = "normal";
++		switch (f.weight()) {
++			case QFont::Light: weight = "lighter"; break;
++			case QFont::DemiBold: weight = "bold"; break;
++			case QFont::Bold: weight = "bolder"; break;
++			case QFont::Black: weight = "900"; break;
++		}
++		return QString("{fontFamily:'%1',fontSize:'%2pt',fontStyle:'%3',fontVariant:'%4',fontWeight:'%5'}")
++						 .arg(f.family())
++						 .arg(f.pointSize())
++						 .arg(f.style()==QFont::StyleNormal?"normal":(f.style()==QFont::StyleItalic?"italic":"oblique"))
++						 .arg(f.capitalization() == QFont::SmallCaps?"small-caps":"normal")
++						 .arg(weight);
++	}
++
++	void setTransparent()
++	{
++		QPalette palette = _view->webView->palette();
++		palette.setBrush(QPalette::Base, Qt::transparent);
++		_view->webView->page()->setPalette(palette);
++		_view->webView->setAttribute(Qt::WA_OpaquePaintEvent, false);
++
++		palette = _view->palette();
++		palette.setBrush(QPalette::Base, Qt::transparent);
++		_view->setPalette(palette);
++		_view->setAttribute(Qt::WA_TranslucentBackground, true);
++	}
++
++signals:
++	void inited();
++};
 +
 +
 +//----------------------------------------------------------------------------
@@ -1210,16 +1237,6 @@ index 0000000..5298b05
 +	webView = new WebView(this);
 +	webView->setFocusPolicy(Qt::NoFocus);
 +	webView->settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
-+
-+	QPalette palette = webView->palette();
-+	palette.setBrush(QPalette::Base, Qt::transparent);
-+	webView->page()->setPalette(palette);
-+	webView->setAttribute(Qt::WA_OpaquePaintEvent, false);
-+
-+	palette = this->palette();
-+	palette.setBrush(QPalette::Base, Qt::transparent);
-+	setPalette(palette);
-+	setAttribute(Qt::WA_TranslucentBackground, true);
 +
 +	QVBoxLayout *layout = new QVBoxLayout;
 +	layout->setContentsMargins(0,0,0,0);
@@ -1412,12 +1429,14 @@ index 0000000..5298b05
 +
 +	return found;
 +}
++
++#include "chatview_webkit.moc"
 diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
 new file mode 100644
-index 0000000..1fdefa5
+index 0000000..a231e5e
 --- /dev/null
 +++ b/src/chatview_webkit.h
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,100 @@
 +/*
 + * chatview_webkit.h - Webkit based chatview
 + * Copyright (C) 2010  Rion
@@ -1454,29 +1473,12 @@ index 0000000..1fdefa5
 +class PsiAccount;
 +class ChatViewTheme;
 +
-+class ChatViewJSObject : public QObject
-+{
-+	Q_OBJECT
-+public:
-+	ChatViewJSObject(QObject *view);
 +
-+public slots:
-+	QString mucNickColor(QString nick, bool isSelf, QStringList validList = QStringList()) const;
-+	bool isMuc() const;
-+	QString chatName() const;
-+	QString jid() const;
-+	QString account() const;
-+	void signalInited();
-+	QString getFont() const;
-+
-+signals:
-+	void inited();
-+};
++class ChatViewJSObject;
 +
 +class ChatView : public QFrame
 +{
 +	Q_OBJECT
-+	friend class ChatViewJSObject;
 +public:
 +	ChatView(QWidget* parent);
 +	~ChatView();
@@ -1519,6 +1521,7 @@ index 0000000..1fdefa5
 +	void sessionInited();
 +
 +private:
++	friend class ChatViewJSObject;
 +	ChatViewTheme* currentTheme();
 +
 +	WebView *webView;
@@ -6639,10 +6642,10 @@ index 0000000..79224b8
 +</html>
 diff --git a/themes/chatview/adium/adapter.js b/themes/chatview/adium/adapter.js
 new file mode 100644
-index 0000000..cb0b200
+index 0000000..6351c09
 --- /dev/null
 +++ b/themes/chatview/adium/adapter.js
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,374 @@
 +try {
 +
 +window[chatServer.jsNamespace()].adapter = {
@@ -6870,10 +6873,15 @@ index 0000000..cb0b200
 +			}
 +			//chat.console("prepare html5");
 +			html = html.replace(/%@/g, function(){return replace.shift() || ""});
++			if (ip.DefaultBackgroundIsTransparent) {
++				session.setTransparent();
++			} else {
++				if (ip.DefaultBackgroundColor)
++					html = html.replace(/<head>/i, '<head><style type="text/css" media="screen,print">' +
++						"body { background-color:#"+ip.DefaultBackgroundColor+" }</style>");
++			}
 +			
 +			var styles = [];
-+			var bgColor = ip.DefaultBackgroundColor?ip.DefaultBackgroundColor:"FFFFFF";
-+			styles.push("background-color:"+server.hex2rgba(bgColor, ip.DefaultBackgroundIsTransparent===true?0:1));
 +			if (ip.DefaultFontFamily) {
 +				styles.push("font-family:"+ip.DefaultFontFamily);
 +			}
