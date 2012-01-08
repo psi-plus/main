@@ -1,5 +1,9 @@
---- psi.orig/options/default.xml
-+++ psi/options/default.xml
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/options/default.xml b/options/default.xml
+index 04e653d..5786770 100644
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -110,6 +110,8 @@
  				<use-chat-says-style type="bool">false</use-chat-says-style>
  				<use-expanding-line-edit type="bool">true</use-expanding-line-edit>
@@ -18,8 +22,10 @@
  				<passive-popups>
  					<duration type="int">10000</duration>
  					<enabled type="bool">false</enabled>
---- psi.orig/src/chatdlg.cpp
-+++ psi/src/chatdlg.cpp
+diff --git a/src/chatdlg.cpp b/src/chatdlg.cpp
+index 8183d13..7542ae8 100644
+--- a/src/chatdlg.cpp
++++ b/src/chatdlg.cpp
 @@ -668,6 +668,20 @@ void ChatDlg::doSend()
  	}
  	QString id = account()->client()->genUniqueId();
@@ -41,7 +47,7 @@
  	m_ = m;
  
  	// Request events
-@@ -741,6 +755,9 @@ void ChatDlg::incomingMessage(const Mess
+@@ -741,6 +755,9 @@ void ChatDlg::incomingMessage(const Message &m)
  		if (m.chatState() != XMPP::StateNone) {
  			setContactChatState(m.chatState());
  		}
@@ -51,7 +57,7 @@
  	}
  	else {
  		// Normal message
-@@ -821,6 +838,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -821,6 +838,7 @@ void ChatDlg::appendMessage(const Message &m, bool local)
  	mv.setUserId(local?account()->jid().bare():jid().bare());
  	mv.setDateTime(m.timeStamp());
  	mv.setSpooled(m.spooled());
@@ -59,11 +65,13 @@
  	chatView()->dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
---- psi.orig/src/chatview_te.cpp
-+++ psi/src/chatview_te.cpp
-@@ -28,12 +28,14 @@
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+index 643574b..1bbf394 100644
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -27,12 +27,14 @@
+ #include "textutil.h"
  #include "psirichtext.h"
- #include "chatviewshare.h"
  #include "common.h"
 +#include "iconset.h"
  
@@ -76,7 +84,7 @@
  
  static const char *infomrationalColorOpt = "options.ui.look.colors.messages.informational";
  
-@@ -57,6 +59,26 @@ ChatView::ChatView(QWidget *parent)
+@@ -56,6 +58,26 @@ ChatView::ChatView(QWidget *parent)
  	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
  	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
  #endif
@@ -103,7 +111,7 @@
  }
  
  ChatView::~ChatView()
-@@ -87,6 +109,29 @@ void ChatView::setSessionData(bool isMuc
+@@ -86,6 +108,29 @@ void ChatView::setSessionData(bool isMuc, const QString &jid, const QString name
  	name_ = name;
  }
  
@@ -133,9 +141,9 @@
  bool ChatView::focusNextPrevChild(bool next)
  {
  	return QWidget::focusNextPrevChild(next);
-@@ -200,7 +245,8 @@ void ChatView::dispatchMessage(const Mes
- {
- 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject) && share_.updateLastMsgTime(mv.dateTime())) {
+@@ -201,7 +246,8 @@ void ChatView::dispatchMessage(const MessageView &mv)
+ 			&& updateLastMsgTime(mv.dateTime()))
+ 	{
  		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 -		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
 +		appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
@@ -143,7 +151,7 @@
  	}
  	switch (mv.type()) {
  		case MessageView::Message:
-@@ -230,6 +276,8 @@ void ChatView::renderMucMessage(const Me
+@@ -231,6 +277,8 @@ void ChatView::renderMucMessage(const MessageView &mv)
  	const QString timestr = formatTimeStamp(mv.dateTime());
  	QString alerttagso, alerttagsc, nickcolor;
  	QString textcolor = palette().color(QPalette::Active, QPalette::Text).name();
@@ -152,7 +160,7 @@
  	if(mv.isAlert()) {
  		textcolor = "#FF0000";
  		alerttagso = "<b>";
-@@ -243,14 +291,14 @@ void ChatView::renderMucMessage(const Me
+@@ -244,14 +292,14 @@ void ChatView::renderMucMessage(const MessageView &mv)
  	}
  
  	if(mv.isEmote()) {
@@ -170,7 +178,7 @@
  		}
  	}
  
-@@ -263,14 +311,20 @@ void ChatView::renderMessage(const Messa
+@@ -264,14 +312,20 @@ void ChatView::renderMessage(const MessageView &mv)
  {
  	QString timestr = formatTimeStamp(mv.dateTime());
  	QString color = colorString(mv.isLocal(), mv.isSpooled());
@@ -194,7 +202,7 @@
  		}
  	}
  
-@@ -285,14 +339,15 @@ void ChatView::renderSysMessage(const Me
+@@ -286,14 +340,15 @@ void ChatView::renderSysMessage(const MessageView &mv)
  	QString ut = mv.formattedUserText();
  	QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
  	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
@@ -212,7 +220,7 @@
  }
  
  void ChatView::renderMucSubject(const MessageView &mv)
-@@ -301,7 +356,8 @@ void ChatView::renderMucSubject(const Me
+@@ -302,7 +357,8 @@ void ChatView::renderMucSubject(const MessageView &mv)
  	QString ut = mv.formattedUserText();
  	QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
  	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
@@ -222,8 +230,10 @@
  						(ut.isEmpty()?"":":<br>") + "</font>" +
  						(ut.isEmpty()?"":QString(" <span style=\"color:%1;font-weight:bold\">%2</span>").arg(userTextColor, ut)));
  }
---- psi.orig/src/chatview_te.h
-+++ psi/src/chatview_te.h
+diff --git a/src/chatview_te.h b/src/chatview_te.h
+index 33c0d37..a1d84aa 100644
+--- a/src/chatview_te.h
++++ b/src/chatview_te.h
 @@ -39,8 +39,12 @@ public:
  	ChatView(QWidget* parent);
  	~ChatView();
@@ -237,10 +247,10 @@
  
  	void init();
  	void setDialog(QWidget* dialog);
-@@ -85,6 +89,13 @@ private:
+@@ -84,6 +88,13 @@ private:
+ 	QString name_;
  	int  oldTrackBarPosition;
  	QPointer<QWidget> dialog_;
- 	ChatViewShare share_;
 +	bool useMessageIcons_;
 +
 +	QPixmap logIconSend;
@@ -251,9 +261,11 @@
  };
  
  #endif
---- psi.orig/src/chatview_webkit.cpp
-+++ psi/src/chatview_webkit.cpp
-@@ -164,6 +164,14 @@ void ChatView::embedJsObject()
+diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
+index f7149b6..8f295dc 100644
+--- a/src/chatview_webkit.cpp
++++ b/src/chatview_webkit.cpp
+@@ -191,6 +191,14 @@ void ChatView::embedJsObject()
  	}
  }
  
@@ -268,9 +280,11 @@
  QSize ChatView::sizeHint() const
  {
  	return minimumSizeHint();
---- psi.orig/src/chatview_webkit.h
-+++ psi/src/chatview_webkit.h
-@@ -61,6 +61,8 @@ public:
+diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
+index 175a2b6..4fa7ab0 100644
+--- a/src/chatview_webkit.h
++++ b/src/chatview_webkit.h
+@@ -44,6 +44,8 @@ public:
  	ChatView(QWidget* parent);
  	~ChatView();
  
@@ -279,8 +293,10 @@
  	// reimplemented
  	QSize sizeHint() const;
  
---- psi.orig/src/messageview.cpp
-+++ psi/src/messageview.cpp
+diff --git a/src/messageview.cpp b/src/messageview.cpp
+index 084377a..f8f6aeb 100644
+--- a/src/messageview.cpp
++++ b/src/messageview.cpp
 @@ -33,6 +33,7 @@ MessageView::MessageView(Type t)
  	, _alert(false)
  	, _local(false)
@@ -289,7 +305,7 @@
  	, _status(0)
  	, _dateTime(QDateTime::currentDateTime())
  {
-@@ -158,6 +159,8 @@ QVariantMap MessageView::toVariantMap(bo
+@@ -158,6 +159,8 @@ QVariantMap MessageView::toVariantMap(bool isMuc, bool formatted) const
  			m["id"] = _messageId;
  			if (isMuc) { // maybe w/o conditions ?
  				m["alert"] = _alert;
@@ -298,8 +314,10 @@
  			}
  			break;
  		case Status:
---- psi.orig/src/messageview.h
-+++ psi/src/messageview.h
+diff --git a/src/messageview.h b/src/messageview.h
+index 119da7e..0add96f 100644
+--- a/src/messageview.h
++++ b/src/messageview.h
 @@ -75,6 +75,8 @@ public:
  	inline bool isSpooled() const { return _spooled; }
  	inline void setStatus(int s) { _status = s; }
@@ -317,8 +335,10 @@
  	int _status;
  	QString _messageId;
  	QString _userId;
---- psi.orig/src/options/opt_advanced.cpp
-+++ psi/src/options/opt_advanced.cpp
+diff --git a/src/options/opt_advanced.cpp b/src/options/opt_advanced.cpp
+index ddadd83..88a0acc 100644
+--- a/src/options/opt_advanced.cpp
++++ b/src/options/opt_advanced.cpp
 @@ -52,6 +52,10 @@ QWidget *OptionsTabAdvanced::widget()
  	d->ck_inactiveevents->setWhatsThis(
  		tr("Enables the sending of events when you end or suspend a "
@@ -339,7 +359,7 @@
  	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
  	if ( SpellChecker::instance()->available() )
  		PsiOptions::instance()->setOption("options.ui.spell-check.enabled",d->ck_spell->isChecked());
-@@ -132,6 +138,8 @@ void OptionsTabAdvanced::restoreOptions(
+@@ -132,6 +138,8 @@ void OptionsTabAdvanced::restoreOptions()
  
  	d->ck_messageevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool() );
  	d->ck_inactiveevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-inactivity-events").toBool() );
@@ -348,8 +368,10 @@
  	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
  	if ( !SpellChecker::instance()->available() )
  		d->ck_spell->setChecked(false);
---- psi.orig/src/options/opt_advanced.ui
-+++ psi/src/options/opt_advanced.ui
+diff --git a/src/options/opt_advanced.ui b/src/options/opt_advanced.ui
+index 4e5fb1a..1c7efb5 100644
+--- a/src/options/opt_advanced.ui
++++ b/src/options/opt_advanced.ui
 @@ -34,6 +34,20 @@
      </widget>
     </item>
@@ -371,9 +393,11 @@
      <widget class="QCheckBox" name="ck_rc" >
       <property name="text" >
        <string>Enable remote controlling from other locations</string>
---- psi.orig/src/psiaccount.cpp
-+++ psi/src/psiaccount.cpp
-@@ -1037,6 +1037,7 @@ PsiAccount::PsiAccount(const UserAccount
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index f0ea6f2..7a328c1 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -1034,6 +1034,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  #endif
  
  	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
@@ -381,7 +405,7 @@
  
  	//connect(d->client, SIGNAL(connected()), SLOT(client_connected()));
  	//connect(d->client, SIGNAL(handshaken()), SLOT(client_handshaken()));
-@@ -2548,7 +2549,7 @@ void PsiAccount::client_messageReceived(
+@@ -2545,7 +2546,7 @@ void PsiAccount::client_messageReceived(const Message &m)
  void PsiAccount::processIncomingMessage(const Message &_m)
  {
  	// skip empty messages, but not if the message contains a data form
@@ -390,7 +414,7 @@
  		return;
  
  	// skip headlines?
-@@ -2648,6 +2649,17 @@ void PsiAccount::processIncomingMessage(
+@@ -2645,6 +2646,17 @@ void PsiAccount::processIncomingMessage(const Message &_m)
  	//if(m.type() == "chat" && (!m.urlList().isEmpty() || !m.subject().isEmpty()))
  	//	m.setType("");
  
@@ -408,7 +432,7 @@
  	MessageEvent *me = new MessageEvent(m, this);
  	me->setOriginLocal(false);
  	handleEvent(me, IncomingStanza);
-@@ -4640,6 +4652,19 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4637,6 +4649,19 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  			delete e;
  			return;
  		}
@@ -428,7 +452,7 @@
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		if(m.type() == "chat") {
-@@ -5603,7 +5628,9 @@ void PsiAccount::pgp_encryptFinished()
+@@ -5600,7 +5625,9 @@ void PsiAccount::pgp_encryptFinished()
  		if (m.containsEvent(DisplayedEvent)) mwrap.addEvent(DisplayedEvent);
  		if (m.containsEvent(ComposingEvent)) mwrap.addEvent(ComposingEvent);
  		if (m.containsEvent(CancelEvent)) mwrap.addEvent(CancelEvent);
@@ -438,7 +462,7 @@
  		dj_sendMessage(mwrap);
  	}
  	emit encryptedMessageSent(x, pt->success(), pt->errorCode(), pt->diagnosticText());
-@@ -5719,6 +5746,9 @@ void PsiAccount::optionsUpdate()
+@@ -5716,6 +5743,9 @@ void PsiAccount::optionsUpdate()
  	// Chat states
  	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
  
@@ -448,7 +472,7 @@
  	// Remote Controlling
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
-@@ -5763,6 +5793,19 @@ void PsiAccount::setSendChatState(bool b
+@@ -5760,6 +5790,19 @@ void PsiAccount::setSendChatState(bool b)
  	}
  }
  
@@ -468,8 +492,10 @@
  
  void PsiAccount::invokeGCMessage(const Jid &j)
  {
---- psi.orig/src/psiaccount.h
-+++ psi/src/psiaccount.h
+diff --git a/src/psiaccount.h b/src/psiaccount.h
+index 1072a4c..aed6386 100644
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
 @@ -429,6 +429,7 @@ protected:
  
  	void publishTune(const Tune&);
@@ -478,8 +504,10 @@
  	void setRCEnabled(bool);
  	void sessionStarted();
  
---- psi.orig/themes/chatview/psi/classic/index.html
-+++ psi/themes/chatview/psi/classic/index.html
+diff --git a/themes/chatview/psi/classic/index.html b/themes/chatview/psi/classic/index.html
+index 93cb8ae..b74908e 100644
+--- a/themes/chatview/psi/classic/index.html
++++ b/themes/chatview/psi/classic/index.html
 @@ -11,6 +11,7 @@ body > div {
  	overflow:hidden;
  }
@@ -488,7 +516,7 @@
  .sent {}
  .received {}
  .infmsg {}
-@@ -33,6 +34,7 @@ window[chatServer.jsNamespace()].theme =
+@@ -34,6 +35,7 @@ window[chatServer.jsNamespace()].theme = function() {
  	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
  	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
  	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
@@ -496,7 +524,7 @@
  	
  	var applyPsiSettings = function() {
  		chat.util.updateObject(cssBody, eval("["+shared.session.getFont()+"][0]"));
-@@ -41,6 +43,17 @@ window[chatServer.jsNamespace()].theme =
+@@ -43,6 +45,17 @@ window[chatServer.jsNamespace()].theme = function() {
  		cssReceivedMsg.color = shared.colorOption("options.ui.look.colors.messages.received");
  		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
  		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
@@ -514,7 +542,7 @@
  	}
  	
  	var shared = chat.adapter.initSession();
-@@ -48,22 +61,22 @@ window[chatServer.jsNamespace()].theme =
+@@ -50,22 +63,22 @@ window[chatServer.jsNamespace()].theme = function() {
  		chatElement : document.body,
  		templates : {
  			message: shared.isMuc?
@@ -549,7 +577,7 @@
  			trackbar: '<hr class="trackbar" />'
  		},
  		dateFormat : "hh:mm:ss",
-@@ -71,6 +84,12 @@ window[chatServer.jsNamespace()].theme =
+@@ -73,6 +86,12 @@ window[chatServer.jsNamespace()].theme = function() {
  			if (shared.cdata.type == "settings") {
  				applyPsiSettings();
  				return false;
@@ -562,7 +590,7 @@
  			}
  			if (shared.cdata.mtype == "message") {
  				var template = shared.cdata.emote && shared.templates.messageNC ||
-@@ -94,7 +113,32 @@ window[chatServer.jsNamespace()].theme =
+@@ -96,7 +115,32 @@ window[chatServer.jsNamespace()].theme = function() {
  				(shared.cdata.local?"sent":"received");},
  			nickcolor : function() {
  				return shared.session.mucNickColor(shared.cdata.sender, shared.cdata.local);

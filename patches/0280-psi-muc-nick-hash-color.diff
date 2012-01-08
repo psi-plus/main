@@ -1,6 +1,10 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -218,7 +218,7 @@
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/options/default.xml b/options/default.xml
+index ccd6de7..770ed79 100644
+--- a/options/default.xml
++++ b/options/default.xml
+@@ -219,7 +219,7 @@
  					<width>580</width>
  					<height>420</height>
  				</size>
@@ -9,9 +13,11 @@
  			</muc>
  			<show-deprecated comment="Deprecated functionality or protocols">
  				<service-discovery comment="Service discovery dialog">
---- git.orig/src/chatview_te.cpp
-+++ git/src/chatview_te.cpp
-@@ -294,7 +294,7 @@ void ChatView::renderMucMessage(const Me
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+index d3fe0f7..7036242 100644
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -298,7 +298,7 @@ void ChatView::renderMucMessage(const MessageView &mv)
  		alerttagsc = "</b>";
  	}
  
@@ -19,24 +25,23 @@
 +	if(mv.isSpooled() && !PsiOptions::instance()->getOption("options.ui.muc.colored-history").toBool()) {
  		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
  	} else {
- 		nickcolor = share_.getMucNickColor(mv.nick(), mv.isLocal());
---- git.orig/src/chatviewshare.cpp
-+++ git/src/chatviewshare.cpp
-@@ -20,6 +20,8 @@
+ 		nickcolor = getMucNickColor(mv.nick(), mv.isLocal());
+diff --git a/src/chatviewcommon.cpp b/src/chatviewcommon.cpp
+index dcbd311..2179897 100644
+--- a/src/chatviewcommon.cpp
++++ b/src/chatviewcommon.cpp
+@@ -19,6 +19,8 @@
+  */
  
- #include "chatviewshare.h"
- #include "psioptions.h"
+ #include <QWidget>
 +#include <QColor>
 +#include <QRegExp>
  
- ChatViewShare::ChatViewShare(QObject *parent)
- 		: QObject(parent)
-@@ -35,32 +37,72 @@ bool ChatViewShare::updateLastMsgTime(QD
- 	return doInsert;
- }
+ #include "chatviewcommon.h"
+ #include "psioptions.h"
+@@ -42,30 +44,70 @@ bool ChatViewCommon::updateLastMsgTime(QDateTime t)
  
--QString ChatViewShare::getMucNickColor(QString nick, bool isSelf, QStringList validList)
-+QString ChatViewShare::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
+ QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
  {
 +	QString nickwoun = nick; // nick without underscores
 +	nickwoun.replace(QRegExp("^_*"), "");
@@ -47,15 +52,15 @@
 +	if(isSelf || nickwoun.isEmpty()) {
  		sender = -1;
  	} else {
--		if (!nicks.contains(nick)) {
-+		if (!nicks.contains(nickwoun)) {
+-		if (!_nicks.contains(nick)) {
++		if (!_nicks.contains(nickwoun)) {
  			//not found in map
--			nicks.insert(nick,nickNumber_);
-+			nicks.insert(nickwoun,nickNumber_);
- 			nickNumber_++;
+-			_nicks.insert(nick,_nickNumber);
++			_nicks.insert(nickwoun,_nickNumber);
+ 			_nickNumber++;
  		}
--		sender=nicks[nick];
-+		sender=nicks[nickwoun];
+-		sender=_nicks[nick];
++		sender=_nicks[nickwoun];
  	}
  
  	QStringList nickColors = validList.isEmpty()
@@ -117,19 +122,10 @@
 +		}
  	}
  }
---- git.orig/src/chatviewshare.h
-+++ git/src/chatviewshare.h
-@@ -41,7 +41,7 @@ private:
- 	QMap<QString,int> nicks;
- 
- public slots:
--	QString getMucNickColor(QString, bool, QStringList validList = QStringList());
-+	QString getMucNickColor(const QString&, bool, QStringList validList = QStringList());
- };
- 
- #endif
---- git.orig/src/options/opt_general_groupchat.ui
-+++ git/src/options/opt_general_groupchat.ui
+diff --git a/src/options/opt_general_groupchat.ui b/src/options/opt_general_groupchat.ui
+index cb539b4..1b87274 100644
+--- a/src/options/opt_general_groupchat.ui
++++ b/src/options/opt_general_groupchat.ui
 @@ -157,6 +157,13 @@
         </property>
        </widget>
@@ -177,8 +173,10 @@
 + </connections>
 + </ui>
 \ No newline at end of file
---- git.orig/src/options/opt_groupchat.cpp
-+++ git/src/options/opt_groupchat.cpp
+diff --git a/src/options/opt_groupchat.cpp b/src/options/opt_groupchat.cpp
+index 84b8339..afc5cfc 100644
+--- a/src/options/opt_groupchat.cpp
++++ b/src/options/opt_groupchat.cpp
 @@ -67,6 +67,7 @@ void OptionsTabGroupchat::applyOptions()
  	GeneralGroupchatUI *d = (GeneralGroupchatUI *)w;
  	PsiOptions::instance()->setOption("options.ui.muc.use-highlighting", d->ck_gcHighlights->isChecked());
@@ -187,7 +185,7 @@
  
  	QStringList highlight;
  	int i;
-@@ -96,6 +97,8 @@ void OptionsTabGroupchat::restoreOptions
+@@ -96,6 +97,8 @@ void OptionsTabGroupchat::restoreOptions()
  	d->ck_gcHighlights->setChecked( PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool() );
  	d->ck_gcNickColoring->setChecked( true );
  	d->ck_gcNickColoring->setChecked( PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() );

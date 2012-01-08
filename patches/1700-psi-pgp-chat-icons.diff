@@ -1,14 +1,18 @@
---- psi.orig/src/chatview_te.cpp
-+++ psi/src/chatview_te.cpp
-@@ -47,6 +47,7 @@ static const char *infomrationalColorOpt
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+index 50c5935..0564c8c 100644
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -46,6 +46,7 @@ static const char *infomrationalColorOpt = "options.ui.look.colors.messages.info
  ChatView::ChatView(QWidget *parent)
  	: PsiTextView(parent)
  	, isMuc_(false)
 +	, isEncryptionEnabled_(false)
  	, oldTrackBarPosition(0)
  	, dialog_(0)
- 	, share_(this)
-@@ -75,12 +76,18 @@ ChatView::ChatView(QWidget *parent)
+ {
+@@ -74,12 +75,18 @@ ChatView::ChatView(QWidget *parent)
  			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconDelivered = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
@@ -27,7 +31,7 @@
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
  		}
-@@ -110,6 +117,11 @@ void ChatView::setDialog(QWidget* dialog
+@@ -109,6 +116,11 @@ void ChatView::setDialog(QWidget* dialog)
  	dialog_ = dialog;
  }
  
@@ -39,7 +43,7 @@
  void ChatView::setSessionData(bool isMuc, const QString &jid, const QString name)
  {
  	isMuc_ = isMuc;
-@@ -150,15 +162,18 @@ void ChatView::addLogIconsResources()
+@@ -149,15 +161,18 @@ void ChatView::addLogIconsResources()
  {
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_send"), logIconSend);
@@ -59,7 +63,7 @@
  		setLineWrapColumnOrWidth(lineWrapColumnOrWidth());
  	}
  }
-@@ -363,11 +378,14 @@ void ChatView::renderMessage(const Messa
+@@ -364,11 +379,14 @@ void ChatView::renderMessage(const MessageView &mv)
  	QString timestr = formatTimeStamp(mv.dateTime());
  	QString color = colorString(mv.isLocal(), mv.isSpooled());
  	if (useMessageIcons_ && mv.isAwaitingReceipt()) {
@@ -77,8 +81,10 @@
  	if (mv.isEmote()) {
  		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + mv.formattedText() + "</span>");
  	} else {
---- psi.orig/src/chatview_te.h
-+++ psi/src/chatview_te.h
+diff --git a/src/chatview_te.h b/src/chatview_te.h
+index cf5d163..95074c2 100644
+--- a/src/chatview_te.h
++++ b/src/chatview_te.h
 @@ -64,6 +64,8 @@ public:
  	bool internalFind(QString str, bool startFromBeginning = false);
  	ChatView *textWidget();
@@ -96,7 +102,7 @@
  	QString jid_;
  	QString name_;
  	int  oldTrackBarPosition;
-@@ -104,6 +107,9 @@ private:
+@@ -103,6 +106,9 @@ private:
  	QPixmap logIconSend;
  	QPixmap logIconReceive;
  	QPixmap logIconDelivered;
@@ -106,17 +112,19 @@
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
  	QAction *actQuote_;
---- psi.orig/src/chatview_webkit.cpp
-+++ psi/src/chatview_webkit.cpp
-@@ -111,6 +111,7 @@ ChatView::ChatView(QWidget *parent)
+diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
+index 9b0758f..41e12c9 100644
+--- a/src/chatview_webkit.cpp
++++ b/src/chatview_webkit.cpp
+@@ -137,6 +137,7 @@ ChatView::ChatView(QWidget *parent)
+ 	, sessionReady_(false)
  	, dialog_(0)
- 	, share_(this)
  	, isMuc_(false)
 +	, isEncryptionEnabled_(false)
  {
  	jsObject = new ChatViewJSObject(this);
  	webView = new WebView(this);
-@@ -153,6 +154,11 @@ void ChatView::init()
+@@ -180,6 +181,11 @@ void ChatView::init()
  	);
  }
  
@@ -128,7 +136,7 @@
  void ChatView::embedJsObject()
  {
  	ChatViewTheme *theme = currentTheme();
-@@ -169,6 +175,7 @@ void ChatView::markReceived(QString id)
+@@ -196,6 +202,7 @@ void ChatView::markReceived(QString id)
  	QVariantMap m;
  	m["type"] = "receipt";
  	m["id"] = id;
@@ -136,7 +144,7 @@
  	sendJsObject(m);
  }
  
-@@ -285,6 +292,7 @@ void ChatView::dispatchMessage(const Mes
+@@ -314,6 +321,7 @@ void ChatView::dispatchMessage(const MessageView &mv)
  	QVariantMap vm = mv.toVariantMap(isMuc_, true);
  	vm["mtype"] = vm["type"];
  	vm["type"] = "message";
@@ -144,9 +152,11 @@
  	sendJsObject(vm);
  }
  
---- psi.orig/src/chatview_webkit.h
-+++ psi/src/chatview_webkit.h
-@@ -84,6 +84,8 @@ public:
+diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
+index 5e41fe2..cb0b8fa 100644
+--- a/src/chatview_webkit.h
++++ b/src/chatview_webkit.h
+@@ -67,6 +67,8 @@ public:
  	bool internalFind(QString str, bool startFromBeginning = false);
  	WebView * textWidget();
  
@@ -155,16 +165,18 @@
  protected:
  	// override the tab/esc behavior
  	bool focusNextPrevChild(bool next);
-@@ -115,6 +117,7 @@ private:
+@@ -98,6 +100,7 @@ private:
+ 	bool sessionReady_;
  	QPointer<QWidget> dialog_;
- 	ChatViewShare share_;
  	bool isMuc_;
 +	bool isEncryptionEnabled_;
  	QString jid_;
  	QString name_;
  	PsiAccount *account_;
---- psi.orig/src/psichatdlg.cpp
-+++ psi/src/psichatdlg.cpp
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+index b1d645d..ee9b985 100644
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -779,6 +779,8 @@ void PsiChatDlg::updatePGP()
  	ui_.tb_pgp->setVisible(account()->hasPGP() &&
  	                       !smallChat_ &&
@@ -182,9 +194,11 @@
  }
  
  void PsiChatDlg::toggleSmallChat()
---- psi.orig/themes/chatview/psi/classic/index.html
-+++ psi/themes/chatview/psi/classic/index.html
-@@ -91,7 +91,7 @@ window[chatServer.jsNamespace()].theme =
+diff --git a/themes/chatview/psi/classic/index.html b/themes/chatview/psi/classic/index.html
+index 330ac15..2795893 100644
+--- a/themes/chatview/psi/classic/index.html
++++ b/themes/chatview/psi/classic/index.html
+@@ -93,7 +93,7 @@ window[chatServer.jsNamespace()].theme = function() {
  				var img = document.getElementById("receipt"+shared.cdata.id);
  				if (img) {
  					var sizeUri = messageIconsSize?"?w="+messageIconsSize+"&h="+messageIconsSize:"";
@@ -193,7 +207,7 @@
  				}
  			}
  			if (shared.cdata.mtype == "message") {
-@@ -128,6 +128,9 @@ window[chatServer.jsNamespace()].theme =
+@@ -130,6 +130,9 @@ window[chatServer.jsNamespace()].theme = function() {
  							icon = shared.cdata.local?(shared.cdata.awaitingReceipt?
  								"psi/notification_chat_send":"psi/notification_chat_delivery_ok")
  								: "psi/notification_chat_receive";

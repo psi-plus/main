@@ -596,10 +596,10 @@ index 0000000..a50f61b
 +#endif
 diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
 new file mode 100644
-index 0000000..86593af
+index 0000000..643574b
 --- /dev/null
 +++ b/src/chatview_te.cpp
-@@ -0,0 +1,390 @@
+@@ -0,0 +1,391 @@
 +/*
 + * chatview_te.cpp - subclass of PsiTextView to handle various hotkeys
 + * Copyright (C) 2001-2010  Justin Karneges, Michail Pishchagin, Rion
@@ -628,7 +628,6 @@ index 0000000..86593af
 +#include "coloropt.h"
 +#include "textutil.h"
 +#include "psirichtext.h"
-+#include "chatviewshare.h"
 +#include "common.h"
 +
 +#include <QWidget>
@@ -647,13 +646,13 @@ index 0000000..86593af
 +	, isMuc_(false)
 +	, oldTrackBarPosition(0)
 +	, dialog_(0)
-+	, share_(this)
 +{
 +	setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 +
 +	setReadOnly(true);
 +	setUndoRedoEnabled(false);
 +	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
++	setLooks(this);
 +
 +#ifndef Q_WS_X11	// linux has this feature built-in
 +	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
@@ -776,7 +775,7 @@ index 0000000..86593af
 +
 +void ChatView::updateLastMsgTime(const QDateTime &t)
 +{
-+	if (share_.updateLastMsgTime(t)) {
++	if (updateLastMsgTime(t)) {
 +		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(t.date().toString(Qt::ISODate)));
 +	}
@@ -800,7 +799,9 @@ index 0000000..86593af
 +
 +void ChatView::dispatchMessage(const MessageView &mv)
 +{
-+	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject) && share_.updateLastMsgTime(mv.dateTime())) {
++	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
++			&& updateLastMsgTime(mv.dateTime()))
++	{
 +		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +		appendText(QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
 +	}
@@ -841,7 +842,7 @@ index 0000000..86593af
 +	if(mv.isSpooled()) {
 +		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
 +	} else {
-+		nickcolor = share_.getMucNickColor(mv.nick(), mv.isLocal());
++		nickcolor = getMucNickColor(mv.nick(), mv.isLocal());
 +	}
 +
 +	if(mv.isEmote()) {
@@ -992,10 +993,10 @@ index 0000000..86593af
 +}
 diff --git a/src/chatview_te.h b/src/chatview_te.h
 new file mode 100644
-index 0000000..032cae0
+index 0000000..33c0d37
 --- /dev/null
 +++ b/src/chatview_te.h
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,89 @@
 +/*
 + * chatview_te.h - subclass of PsiTextView to handle various hotkeys
 + * Copyright (C) 2001-2010  Justin Karneges, Michail Pishchagin, Rion
@@ -1024,13 +1025,13 @@ index 0000000..032cae0
 +#include <QPointer>
 +
 +#include "psitextview.h"
-+#include "chatviewshare.h"
++#include "chatviewcommon.h"
 +
 +class ChatEdit;
 +class ChatViewBase;
 +class MessageView;
 +
-+class ChatView : public PsiTextView
++class ChatView : public PsiTextView, public ChatViewCommon
 +{
 +	Q_OBJECT
 +public:
@@ -1082,16 +1083,15 @@ index 0000000..032cae0
 +	QString name_;
 +	int  oldTrackBarPosition;
 +	QPointer<QWidget> dialog_;
-+	ChatViewShare share_;
 +};
 +
 +#endif
 diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
 new file mode 100644
-index 0000000..8831b3e
+index 0000000..f7149b6
 --- /dev/null
 +++ b/src/chatview_webkit.cpp
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,341 @@
 +/*
 + * chatview_webkit.cpp - Webkit based chatview
 + * Copyright (C) 2010  Rion
@@ -1159,7 +1159,7 @@ index 0000000..8831b3e
 +	QString mucNickColor(QString nick, bool isSelf,
 +						 QStringList validList = QStringList()) const
 +	{
-+		return _view->share_.getMucNickColor(nick, isSelf, validList);
++		return _view->getMucNickColor(nick, isSelf, validList);
 +	}
 +
 +	bool isMuc() const
@@ -1230,7 +1230,6 @@ index 0000000..8831b3e
 +	: QFrame(parent)
 +	, sessionReady_(false)
 +	, dialog_(0)
-+	, share_(this)
 +	, isMuc_(false)
 +{
 +	jsObject = new ChatViewJSObject(this);
@@ -1243,6 +1242,7 @@ index 0000000..8831b3e
 +	layout->addWidget(webView);
 +	setLayout(layout);
 +	setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
++	setLooks(webView);
 +
 +#ifndef Q_WS_X11	// linux has this feature built-in
 +	connect( PsiOptions::instance(), SIGNAL(optionChanged(QString)), SLOT(psiOptionChanged(QString)) ); //needed only for save autocopy state atm
@@ -1379,7 +1379,9 @@ index 0000000..8831b3e
 +// input point of all messages
 +void ChatView::dispatchMessage(const MessageView &mv)
 +{
-+	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject) && share_.updateLastMsgTime(mv.dateTime())) {
++	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
++			&& updateLastMsgTime(mv.dateTime()))
++	{
 +		QVariantMap m;
 +		m["date"] = mv.dateTime();
 +		m["type"] = "message";
@@ -1433,10 +1435,10 @@ index 0000000..8831b3e
 +#include "chatview_webkit.moc"
 diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
 new file mode 100644
-index 0000000..a231e5e
+index 0000000..175a2b6
 --- /dev/null
 +++ b/src/chatview_webkit.h
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,99 @@
 +/*
 + * chatview_webkit.h - Webkit based chatview
 + * Copyright (C) 2010  Rion
@@ -1465,7 +1467,7 @@ index 0000000..a231e5e
 +#include <QFrame>
 +#include <QPointer>
 +#include "webview.h"
-+#include "chatviewshare.h"
++#include "chatviewcommon.h"
 +
 +class ChatEdit;
 +class ChatView;
@@ -1476,7 +1478,7 @@ index 0000000..a231e5e
 +
 +class ChatViewJSObject;
 +
-+class ChatView : public QFrame
++class ChatView : public QFrame, public ChatViewCommon
 +{
 +	Q_OBJECT
 +public:
@@ -1529,7 +1531,6 @@ index 0000000..a231e5e
 +	QStringList jsBuffer_;
 +	bool sessionReady_;
 +	QPointer<QWidget> dialog_;
-+	ChatViewShare share_;
 +	bool isMuc_;
 +	QString jid_;
 +	QString name_;
@@ -1537,14 +1538,14 @@ index 0000000..a231e5e
 +};
 +
 +#endif
-diff --git a/src/chatviewshare.cpp b/src/chatviewshare.cpp
+diff --git a/src/chatviewcommon.cpp b/src/chatviewcommon.cpp
 new file mode 100644
-index 0000000..0bf7a09
+index 0000000..dcbd311
 --- /dev/null
-+++ b/src/chatviewshare.cpp
-@@ -0,0 +1,66 @@
++++ b/src/chatviewcommon.cpp
+@@ -0,0 +1,71 @@
 +/*
-+ * chatviewshare.cpp - shared part of any chatview
++ * chatviewcommon.cpp - shared part of any chatview
 + * Copyright (C) 2010 Rion
 + *
 + * This program is free software; you can redistribute it and/or
@@ -1563,35 +1564,40 @@ index 0000000..0bf7a09
 + *
 + */
 +
-+#include "chatviewshare.h"
++#include <QWidget>
++
++#include "chatviewcommon.h"
 +#include "psioptions.h"
 +
-+ChatViewShare::ChatViewShare(QObject *parent)
-+		: QObject(parent)
-+		, nickNumber_(0)
++void ChatViewCommon::setLooks(QWidget *w)
 +{
-+
++	QPalette pal = w->palette(); // copy widget's palette to non const QPalette
++	pal.setColor(QPalette::Inactive, QPalette::HighlightedText,
++				 pal.color(QPalette::Active, QPalette::HighlightedText));
++	pal.setColor(QPalette::Inactive, QPalette::Highlight,
++				 pal.color(QPalette::Active, QPalette::Highlight));
++	w->setPalette(pal);        // set the widget's palette
 +}
 +
-+bool ChatViewShare::updateLastMsgTime(QDateTime t)
++bool ChatViewCommon::updateLastMsgTime(QDateTime t)
 +{
-+	bool doInsert = t.date() != lastMsgTime_.date();
-+	lastMsgTime_ = t;
++	bool doInsert = t.date() != _lastMsgTime.date();
++	_lastMsgTime = t;
 +	return doInsert;
 +}
 +
-+QString ChatViewShare::getMucNickColor(QString nick, bool isSelf, QStringList validList)
++QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
 +{
 +	int sender;
 +	if(isSelf || nick.isEmpty()) {
 +		sender = -1;
 +	} else {
-+		if (!nicks.contains(nick)) {
++		if (!_nicks.contains(nick)) {
 +			//not found in map
-+			nicks.insert(nick,nickNumber_);
-+			nickNumber_++;
++			_nicks.insert(nick,_nickNumber);
++			_nickNumber++;
 +		}
-+		sender=nicks[nick];
++		sender=_nicks[nick];
 +	}
 +
 +	QStringList nickColors = validList.isEmpty()
@@ -1609,14 +1615,14 @@ index 0000000..0bf7a09
 +		return nickColors[n];
 +	}
 +}
-diff --git a/src/chatviewshare.h b/src/chatviewshare.h
+diff --git a/src/chatviewcommon.h b/src/chatviewcommon.h
 new file mode 100644
-index 0000000..62dcd19
+index 0000000..b230c10
 --- /dev/null
-+++ b/src/chatviewshare.h
++++ b/src/chatviewcommon.h
 @@ -0,0 +1,47 @@
 +/*
-+ * chatviewshare.h - shared part of any chatview
++ * chatviewcommon.h - shared part of any chatview
 + * Copyright (C) 2010 Rion
 + *
 + * This program is free software; you can redistribute it and/or
@@ -1640,25 +1646,25 @@ index 0000000..62dcd19
 +
 +#include <QDateTime>
 +#include <QMap>
-+#include <QObject>
 +#include <QStringList>
 +
-+class ChatViewShare : public QObject
++class QWidget;
++
++class ChatViewCommon
 +{
-+	Q_OBJECT
 +public:
-+	ChatViewShare(QObject *parent);
++	ChatViewCommon() : _nickNumber(0) { }
++	void setLooks(QWidget *);
 +	bool updateLastMsgTime(QDateTime t);
++	QString getMucNickColor(const QString &, bool,
++							QStringList validList = QStringList());
 +
 +protected:
-+	QDateTime lastMsgTime_;
++	QDateTime _lastMsgTime;
 +
 +private:
-+	int nickNumber_;
-+	QMap<QString,int> nicks;
-+
-+public slots:
-+	QString getMucNickColor(QString, bool, QStringList validList = QStringList());
++	int _nickNumber;
++	QMap<QString,int> _nicks;
 +};
 +
 +#endif
@@ -5347,7 +5353,7 @@ index 0000000..79a0971
 +
 +#endif
 diff --git a/src/src.pri b/src/src.pri
-index 3dba787..667c115 100644
+index 3dba787..31ca930 100644
 --- a/src/src.pri
 +++ b/src/src.pri
 @@ -113,6 +113,11 @@ HEADERS += \
@@ -5366,7 +5372,7 @@ index 3dba787..667c115 100644
  	$$PWD/accountmodifydlg.h \
  	$$PWD/changepwdlg.h \
  	$$PWD/msgmle.h \
-+	$$PWD/chatviewshare.h \
++	$$PWD/chatviewcommon.h \
 +	$$PWD/chatview.h \
 +	$$PWD/messageview.h \
  	$$PWD/statusdlg.h \
@@ -5388,7 +5394,7 @@ index 3dba787..667c115 100644
  	$$PWD/accountmodifydlg.cpp \
  	$$PWD/changepwdlg.cpp \
  	$$PWD/msgmle.cpp \
-+	$$PWD/chatviewshare.cpp \
++	$$PWD/chatviewcommon.cpp \
 +	$$PWD/messageview.cpp \
  	$$PWD/statusdlg.cpp \
  	$$PWD/statuscombobox.cpp \
