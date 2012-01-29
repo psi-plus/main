@@ -502,7 +502,7 @@
  bool ChatEdit::checkSpellingGloballyEnabled()
  {
  	return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
-@@ -355,6 +366,42 @@ void ChatEdit::clearMessageHistory()
+@@ -355,6 +366,47 @@ void ChatEdit::clearMessageHistory()
  	typedMsgsIndex = 0;
  }
  
@@ -522,15 +522,20 @@
 +	QDomElement p = htmlElem.firstChildElement("p");
 +	QDomElement body = doc.createElementNS("http://www.w3.org/1999/xhtml", "body");
 +	bool foundSpan = false;
++	int paraCnt = 0;
 +	while(!p.isNull()) {
-+		p.removeAttribute("style");
++		p.setAttribute("style", "margin:0;padding:0;"); //p.removeAttribute("style");
 +		body.appendChild(p.cloneNode(true).toElement());
 +		if(!p.firstChildElement("span").isNull())
 +			foundSpan = true;
 +		p = p.nextSiblingElement("p");
++		++paraCnt;
 +	}
-+	if(foundSpan)
++	if(foundSpan) {
++		if (paraCnt == 1)
++			body.firstChildElement("p").setTagName("span");
 +		elem.setBody(body);
++	}
 +	return elem;
 +}
 +
