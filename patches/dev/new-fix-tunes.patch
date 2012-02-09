@@ -1,316 +1,7 @@
---- git.orig/src/options/options.pri
-+++ git/src/options/options.pri
-@@ -26,7 +26,8 @@ HEADERS += \
- 	$$PWD/opt_avcall.h \
- 	$$PWD/opt_toolbars.h \
- 	$$PWD/opt_advanced.h \
--	$$PWD/opt_shortcuts.h
-+	$$PWD/opt_shortcuts.h \
-+	$$PWD/opt_statuspep.h
- 
- HEADERS += $$PWD/opt_tree.h
- 
-@@ -46,7 +47,8 @@ SOURCES += \
- 	$$PWD/opt_avcall.cpp \
- 	$$PWD/opt_toolbars.cpp \
- 	$$PWD/opt_advanced.cpp \
--	$$PWD/opt_shortcuts.cpp
-+	$$PWD/opt_shortcuts.cpp \
-+	$$PWD/opt_statuspep.cpp
- 
- SOURCES += $$PWD/opt_tree.cpp
- 
-@@ -72,7 +74,8 @@ FORMS += \
- 	$$PWD/opt_iconset_system.ui \
- 	$$PWD/opt_iconset_roster.ui \
- 	$$PWD/opt_general_groupchat.ui \
--	$$PWD/opt_shortcuts.ui
-+	$$PWD/opt_shortcuts.ui \
-+	$$PWD/opt_statuspep.ui
- 
- psi_plugins {
- 	FORMS += $$PWD/opt_plugins.ui
---- git.orig/src/options/opt_status.cpp
-+++ git/src/options/opt_status.cpp
-@@ -1,6 +1,7 @@
- #include "opt_status.h"
- #include "opt_statusgeneral.h"
- #include "opt_statusauto.h"
-+#include "opt_statuspep.h"
- 
- OptionsTabStatus::OptionsTabStatus(QObject *parent)
- : MetaOptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
-@@ -10,4 +11,5 @@ OptionsTabStatus::OptionsTabStatus(QObje
- 	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), parent, SLOT(enableCommonWidgets(bool)));
- 	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), SLOT(enableOtherTabs(bool)));
- 	addTab(new OptionsTabStatusAuto(this));
-+	addTab(new OptionsTabStatusPep(this));
- }
---- git.orig/src/options/opt_statuspep.cpp
-+++ git/src/options/opt_statuspep.cpp
-@@ -0,0 +1,108 @@
-+#include "opt_statuspep.h"
-+#include "psioptions.h"
-+
-+#include <QListWidget>
-+#include <QCheckBox>
-+
-+#include "ui_opt_statuspep.h"
-+
-+static const char *tuneUrlFilterOptionPath = "options.extended-presence.tune.url-filter";
-+static const char *tuneControllerFilterOptionPath = "options.extended-presence.tune.controller-filter";
-+
-+class OptStatusPepUI : public QWidget, public Ui::OptStatusPep
-+{
-+public:
-+	OptStatusPepUI() : QWidget() { setupUi(this); }
-+};
-+
-+OptionsTabStatusPep::OptionsTabStatusPep(QObject *parent)
-+: OptionsTab(parent, "status_tunes", "", tr("PEP"), tr("Tunes no-video filter and controllers switcher"))
-+, w_(0)
-+, psi_(0)
-+, controllersChanged_(false)
-+{
-+}
-+
-+OptionsTabStatusPep::~OptionsTabStatusPep()
-+{
-+}
-+
-+QWidget *OptionsTabStatusPep::widget()
-+{
-+	if (w_) {
-+		return 0;
-+	}
-+
-+	w_ = new OptStatusPepUI();
-+	return w_;
-+}
-+
-+void OptionsTabStatusPep::applyOptions()
-+{
-+	if (!w_) {
-+		return;
-+	}
-+
-+	OptStatusPepUI *d = (OptStatusPepUI *)w_;
-+	PsiOptions* o = PsiOptions::instance();
-+	QStringList newTuneFilters = d->tuneExtensions->text().split(QRegExp("\\W+"));
-+	QString tuneExstensionsFilter;
-+	if (!newTuneFilters.isEmpty()) {
-+		newTuneFilters.removeDuplicates();
-+		qSort(newTuneFilters);
-+		tuneExstensionsFilter = newTuneFilters.join(" ").toLower();
-+		d->tuneExtensions->setText(tuneExstensionsFilter);
-+	}
-+	QString controllerFilter = blackList_.join(",");
-+	if (tuneExstensionsFilter != tuneFilters_) {
-+		o->setOption(tuneUrlFilterOptionPath, tuneExstensionsFilter);
-+	}
-+	if (controllersChanged_) {
-+		o->setOption(tuneControllerFilterOptionPath, controllerFilter);
-+	}
-+}
-+
-+void OptionsTabStatusPep::restoreOptions()
-+{
-+	if (!w_) {
-+		return;
-+	}
-+
-+	OptStatusPepUI *d = (OptStatusPepUI *)w_;
-+	PsiOptions* o = PsiOptions::instance();
-+	tuneFilters_ = o->getOption(tuneUrlFilterOptionPath).toString();
-+	d->tuneExtensions->setText(tuneFilters_);
-+	QStringList controllers = psi_->tuneManager()->controllerNames();
-+	blackList_ = o->getOption(tuneControllerFilterOptionPath).toString().split(QRegExp("[,]\\s*"), QString::SkipEmptyParts);
-+	foreach(const QString &name, controllers) {
-+		QCheckBox* cb = new QCheckBox(name);
-+		QString caption = name + " controller";
-+		cb->setText(caption);
-+		cb->setObjectName(name);
-+		int i = controllers.indexOf(name);
-+		d->gridLayout->addWidget(cb,i/3,i%3);
-+		cb->setChecked(!blackList_.contains(name));
-+		connect(cb, SIGNAL(toggled(bool)), SLOT(controllerSelected(bool)));
-+	}
-+}
-+
-+void OptionsTabStatusPep::controllerSelected(bool checked)
-+{
-+	QCheckBox *box = qobject_cast<QCheckBox*>(sender());
-+	QString name_ = box->objectName();
-+	if (!name_.isEmpty()) {
-+		if (!checked && !blackList_.contains(name_, Qt::CaseInsensitive)) {
-+			blackList_ << name_;
-+			controllersChanged_ = true;
-+		}
-+		else if (checked) {
-+			blackList_.removeAll(name_);
-+			controllersChanged_ = true;
-+		}
-+	}
-+}
-+
-+void OptionsTabStatusPep::setData(PsiCon *psi, QWidget *)
-+{
-+	psi_ = psi;
-+}
---- git.orig/src/options/opt_statuspep.h
-+++ git/src/options/opt_statuspep.h
-@@ -0,0 +1,36 @@
-+#ifndef OPT_STAUSPEP_H
-+#define OPT_STAUSPEP_H
-+
-+#include "optionstab.h"
-+#include "common.h"
-+#include "psicon.h"
-+
-+class QWidget;
-+
-+class OptionsTabStatusPep : public OptionsTab
-+{
-+	Q_OBJECT
-+
-+public:
-+
-+	OptionsTabStatusPep(QObject *parent);
-+	~OptionsTabStatusPep();
-+
-+	QWidget *widget();
-+	void applyOptions();
-+	void restoreOptions();
-+	void setData(PsiCon *psi, QWidget *);
-+
-+protected slots:
-+	void controllerSelected(bool);
-+
-+private:
-+	QWidget *w_;
-+	PsiCon *psi_;
-+	QStringList blackList_;
-+	QString tuneFilters_;
-+	bool controllersChanged_;
-+};
-+
-+
-+#endif // OPT_STAUSPEP_H
---- git.orig/src/options/opt_statuspep.ui
-+++ git/src/options/opt_statuspep.ui
-@@ -0,0 +1,108 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<ui version="4.0">
-+ <class>OptStatusPep</class>
-+ <widget class="QWidget" name="OptStatusPep">
-+  <property name="geometry">
-+   <rect>
-+    <x>0</x>
-+    <y>0</y>
-+    <width>588</width>
-+    <height>350</height>
-+   </rect>
-+  </property>
-+  <property name="sizePolicy">
-+   <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-+    <horstretch>0</horstretch>
-+    <verstretch>0</verstretch>
-+   </sizepolicy>
-+  </property>
-+  <property name="windowTitle">
-+   <string>Form</string>
-+  </property>
-+  <property name="autoFillBackground">
-+   <bool>false</bool>
-+  </property>
-+  <layout class="QVBoxLayout" name="verticalLayout">
-+   <item>
-+    <widget class="QGroupBox" name="groupBox">
-+     <property name="title">
-+      <string>Tunes</string>
-+     </property>
-+     <property name="alignment">
-+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-+     </property>
-+     <property name="flat">
-+      <bool>false</bool>
-+     </property>
-+     <layout class="QVBoxLayout" name="verticalLayout_4">
-+      <property name="spacing">
-+       <number>6</number>
-+      </property>
-+      <item>
-+       <widget class="QLabel" name="label">
-+        <property name="text">
-+         <string>Enter media file extensions to ignore them on tune sending</string>
-+        </property>
-+       </widget>
-+      </item>
-+      <item>
-+       <widget class="QLineEdit" name="tuneExtensions">
-+        <property name="toolTip">
-+         <string>Add extensions</string>
-+        </property>
-+        <property name="whatsThis">
-+         <string>Ignored media file extensions on psi tunes sending</string>
-+        </property>
-+       </widget>
-+      </item>
-+      <item>
-+       <widget class="QGroupBox" name="rightGroupBox">
-+        <property name="sizePolicy">
-+         <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
-+          <horstretch>0</horstretch>
-+          <verstretch>0</verstretch>
-+         </sizepolicy>
-+        </property>
-+        <property name="title">
-+         <string>Tune Controllers</string>
-+        </property>
-+        <property name="flat">
-+         <bool>false</bool>
-+        </property>
-+        <layout class="QVBoxLayout" name="verticalLayout_2">
-+         <property name="spacing">
-+          <number>0</number>
-+         </property>
-+         <property name="sizeConstraint">
-+          <enum>QLayout::SetDefaultConstraint</enum>
-+         </property>
-+         <property name="margin">
-+          <number>6</number>
-+         </property>
-+         <item>
-+          <layout class="QGridLayout" name="gridLayout"/>
-+         </item>
-+        </layout>
-+       </widget>
-+      </item>
-+     </layout>
-+    </widget>
-+   </item>
-+   <item>
-+    <spacer name="verticalSpacer">
-+     <property name="orientation">
-+      <enum>Qt::Vertical</enum>
-+     </property>
-+     <property name="sizeHint" stdset="0">
-+      <size>
-+       <width>20</width>
-+       <height>40</height>
-+      </size>
-+     </property>
-+    </spacer>
-+   </item>
-+  </layout>
-+ </widget>
-+ <resources/>
-+ <connections/>
-+</ui>
 --- git.orig/src/src.pri
 +++ git/src/src.pri
 @@ -29,7 +29,7 @@ pep {
- 	DEFINES += USE_PEP
+  DEFINES += USE_PEP
  	CONFIG += tc_psifile
  	mac { CONFIG += tc_itunes }
 -	windows { CONFIG += tc_winamp }
@@ -342,8 +33,8 @@
 + */
 +
 +#include "aimptunecontroller.h"
-+#include "plugins/aimp/third-party/AIMPSDKCommon.h"
-+#include "plugins/aimp/third-party/AIMPSDKRemote.h"
++#include "third-party/AIMPSDKCommon.h"
++#include "third-party/AIMPSDKRemote.h"
 +
 +/**
 + * \class AIMPTuneController
@@ -496,6 +187,147 @@
 +};
 +
 +#endif
+--- git.orig/src/tools/tunecontroller/itunestunecontroller.cpp
++++ git/src/tools/tunecontroller/itunestunecontroller.cpp
+@@ -0,0 +1,113 @@
++/*
++ * itunescontroller.cpp 
++ * Copyright (C) 2006  Remko Troncon
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#include <QtGlobal>
++#include <QString>
++#include <QTime>
++#include <QDebug>
++
++#include <CoreFoundation/CoreFoundation.h>
++
++#include "itunestunecontroller.h"
++
++/**
++ * \class ITunesController
++ * \brief A controller for the Mac OS X version of iTunes.
++ */
++
++static QString CFStringToQString(CFStringRef s)
++{
++	QString result;
++
++	if (s != NULL) {
++		CFIndex length = CFStringGetMaximumSizeForEncoding(CFStringGetLength(s), kCFStringEncodingUTF8) + 1;
++		char* buffer = new char[length];
++		if (CFStringGetCString(s, buffer, length, kCFStringEncodingUTF8)) {
++			result = QString::fromUtf8(buffer);
++		}
++		else {
++			qWarning("itunesplayer.cpp: CFString conversion failed.");
++		}
++		delete[] buffer;
++	} 
++    return result;
++}
++
++
++ITunesController::ITunesController()
++{
++	// TODO: Poll iTunes for current playing tune
++	CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
++	CFNotificationCenterAddObserver(center, this, ITunesController::iTunesCallback, CFSTR("com.apple.iTunes.playerInfo"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
++}
++
++ITunesController::~ITunesController()
++{
++	CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
++	CFNotificationCenterRemoveObserver(center, this, CFSTR("com.apple.iTunes.playerInfo"), NULL);
++}
++
++Tune ITunesController::currentTune() const
++{
++	return currentTune_;
++}
++
++void ITunesController::iTunesCallback(CFNotificationCenterRef,void* observer,CFStringRef,const void*, CFDictionaryRef info)
++{
++	Tune tune;
++	ITunesController* controller = (ITunesController*) observer;
++	
++	CFStringRef cf_state = (CFStringRef) CFDictionaryGetValue(info, CFSTR("Player State"));
++	if (CFStringCompare(cf_state,CFSTR("Paused"),0) == kCFCompareEqualTo) {
++		//qDebug() << "itunesplayer.cpp: Paused";
++		emit controller->stopped();
++	}
++	else if (CFStringCompare(cf_state,CFSTR("Stopped"),0) == kCFCompareEqualTo) {
++		//qDebug() << "itunesplayer.cpp: Stopped";
++		emit controller->stopped();
++	}
++	else if (CFStringCompare(cf_state,CFSTR("Playing"),0) == kCFCompareEqualTo) {
++		//qDebug() << "itunesplayer.cpp: Playing";
++		tune.setArtist(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Artist"))));
++		tune.setName(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Name"))));
++		tune.setAlbum(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Album"))));
++		
++		CFNumberRef cf_track = (CFNumberRef) CFDictionaryGetValue(info, CFSTR("Track Number"));
++		if (cf_track) {
++			int tracknr;
++			if (!CFNumberGetValue(cf_track,kCFNumberIntType,&tracknr)) {
++				qWarning("itunesplayer.cpp: Number value conversion failed.");
++			}
++			tune.setTrack(QString::number(tracknr));
++		}
++		
++		CFNumberRef cf_time = (CFNumberRef) CFDictionaryGetValue(info, CFSTR("Total Time"));
++		int time = 0;
++		if (cf_time && !CFNumberGetValue(cf_time,kCFNumberIntType,&time)) {
++			qWarning("itunesplayer.cpp: Number value conversion failed.");
++		}
++		tune.setTime((unsigned int) (time / 1000));
++		controller->currentTune_ = tune;
++		emit controller->playing(tune);
++	}
++	else {
++		qWarning("itunesplayer.cpp: Unknown state.");
++	}
++}
+--- git.orig/src/tools/tunecontroller/itunestunecontroller.h
++++ git/src/tools/tunecontroller/itunestunecontroller.h
+@@ -0,0 +1,22 @@
++#ifndef ITUNESTUNECONTROLLER_H
++#define ITUNESTUNECONTROLLER_H
++
++#include <QString>
++#include <CoreFoundation/CoreFoundation.h>
++
++#include "tunecontrollerinterface.h"
++
++class ITunesController : public TuneController
++{
++public:
++	ITunesController();
++	~ITunesController();
++
++	virtual Tune currentTune() const;
++
++private:
++	static void iTunesCallback(CFNotificationCenterRef,void*,CFStringRef,const void*, CFDictionaryRef info);
++	Tune currentTune_;
++};
++
++#endif
 --- git.orig/src/tools/tunecontroller/plugins/aimp/aimpplugin.cpp
 +++ git/src/tools/tunecontroller/plugins/aimp/aimpplugin.cpp
 @@ -0,0 +1,56 @@
@@ -608,7 +440,6 @@
 +#pragma pack(pop)
 +
 +#endif
-\ В конце файла нет новой строки
 --- git.orig/src/tools/tunecontroller/plugins/aimp/third-party/AIMPSDKRemote.h
 +++ git/src/tools/tunecontroller/plugins/aimp/third-party/AIMPSDKRemote.h
 @@ -0,0 +1,228 @@
@@ -840,7 +671,430 @@
 +const int AIMP_RA_NOTIFY_PROPERTY = AIMP_RA_NOTIFY_BASE + 3; 
 +
 +#endif
-\ В конце файла нет новой строки
+--- git.orig/src/tools/tunecontroller/plugins/itunes/itunescontroller.cpp
++++ git/src/tools/tunecontroller/plugins/itunes/itunescontroller.cpp
+@@ -1,113 +0,0 @@
+-/*
+- * itunescontroller.cpp 
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-
+-#include <QtGlobal>
+-#include <QString>
+-#include <QTime>
+-#include <QDebug>
+-
+-#include <CoreFoundation/CoreFoundation.h>
+-
+-#include "itunescontroller.h"
+-
+-/**
+- * \class ITunesController
+- * \brief A controller for the Mac OS X version of iTunes.
+- */
+-
+-static QString CFStringToQString(CFStringRef s)
+-{
+-	QString result;
+-
+-	if (s != NULL) {
+-		CFIndex length = CFStringGetMaximumSizeForEncoding(CFStringGetLength(s), kCFStringEncodingUTF8) + 1;
+-		char* buffer = new char[length];
+-		if (CFStringGetCString(s, buffer, length, kCFStringEncodingUTF8)) {
+-			result = QString::fromUtf8(buffer);
+-		}
+-		else {
+-			qWarning("itunesplayer.cpp: CFString conversion failed.");
+-		}
+-		delete[] buffer;
+-	} 
+-    return result;
+-}
+-
+-
+-ITunesController::ITunesController()
+-{
+-	// TODO: Poll iTunes for current playing tune
+-	CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
+-	CFNotificationCenterAddObserver(center, this, ITunesController::iTunesCallback, CFSTR("com.apple.iTunes.playerInfo"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+-}
+-
+-ITunesController::~ITunesController()
+-{
+-	CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
+-	CFNotificationCenterRemoveObserver(center, this, CFSTR("com.apple.iTunes.playerInfo"), NULL);
+-}
+-
+-Tune ITunesController::currentTune() const
+-{
+-	return currentTune_;
+-}
+-
+-void ITunesController::iTunesCallback(CFNotificationCenterRef,void* observer,CFStringRef,const void*, CFDictionaryRef info)
+-{
+-	Tune tune;
+-	ITunesController* controller = (ITunesController*) observer;
+-	
+-	CFStringRef cf_state = (CFStringRef) CFDictionaryGetValue(info, CFSTR("Player State"));
+-	if (CFStringCompare(cf_state,CFSTR("Paused"),0) == kCFCompareEqualTo) {
+-		//qDebug() << "itunesplayer.cpp: Paused";
+-		emit controller->stopped();
+-	}
+-	else if (CFStringCompare(cf_state,CFSTR("Stopped"),0) == kCFCompareEqualTo) {
+-		//qDebug() << "itunesplayer.cpp: Stopped";
+-		emit controller->stopped();
+-	}
+-	else if (CFStringCompare(cf_state,CFSTR("Playing"),0) == kCFCompareEqualTo) {
+-		//qDebug() << "itunesplayer.cpp: Playing";
+-		tune.setArtist(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Artist"))));
+-		tune.setName(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Name"))));
+-		tune.setAlbum(CFStringToQString((CFStringRef) CFDictionaryGetValue(info, CFSTR("Album"))));
+-		
+-		CFNumberRef cf_track = (CFNumberRef) CFDictionaryGetValue(info, CFSTR("Track Number"));
+-		if (cf_track) {
+-			int tracknr;
+-			if (!CFNumberGetValue(cf_track,kCFNumberIntType,&tracknr)) {
+-				qWarning("itunesplayer.cpp: Number value conversion failed.");
+-			}
+-			tune.setTrack(QString::number(tracknr));
+-		}
+-		
+-		CFNumberRef cf_time = (CFNumberRef) CFDictionaryGetValue(info, CFSTR("Total Time"));
+-		int time = 0;
+-		if (cf_time && !CFNumberGetValue(cf_time,kCFNumberIntType,&time)) {
+-			qWarning("itunesplayer.cpp: Number value conversion failed.");
+-		}
+-		tune.setTime((unsigned int) (time / 1000));
+-		controller->currentTune_ = tune;
+-		emit controller->playing(tune);
+-	}
+-	else {
+-		qWarning("itunesplayer.cpp: Unknown state.");
+-	}
+-}
+--- git.orig/src/tools/tunecontroller/plugins/itunes/itunescontroller.h
++++ git/src/tools/tunecontroller/plugins/itunes/itunescontroller.h
+@@ -1,22 +0,0 @@
+-#ifndef ITUNESCONTROLLER_H
+-#define ITUNESCONTROLLER_H
+-
+-#include <QString>
+-#include <CoreFoundation/CoreFoundation.h>
+-
+-#include "tunecontrollerinterface.h"
+-
+-class ITunesController : public TuneController
+-{
+-public:
+-	ITunesController();
+-	~ITunesController();
+-
+-	virtual Tune currentTune() const;
+-
+-private:
+-	static void iTunesCallback(CFNotificationCenterRef,void*,CFStringRef,const void*, CFDictionaryRef info);
+-	Tune currentTune_;
+-};
+-
+-#endif
+--- git.orig/src/tools/tunecontroller/plugins/itunes/itunesplugin.cpp
++++ git/src/tools/tunecontroller/plugins/itunes/itunesplugin.cpp
+@@ -26,7 +26,7 @@
+ #include <QObject>
+ #include <QString>
+ 
+-#include "itunescontroller.h"
++#include "itunestunecontroller.h"
+ #include "tunecontrollerplugin.h"
+ 
+ class ITunesPlugin : public QObject, public TuneControllerPlugin
+--- git.orig/src/tools/tunecontroller/plugins/winamp/winampcontroller.cpp
++++ git/src/tools/tunecontroller/plugins/winamp/winampcontroller.cpp
+@@ -1,196 +0,0 @@
+-/*
+- * winampcontroller.cpp 
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-
+-#include <windows.h>
+-#include <QTimer>
+-
+-#ifdef Q_CC_MSVC
+-#pragma warning(push)
+-#pragma warning(disable: 4100)
+-#endif
+-
+-// this file generates eight C4100 warnings, when compiled with MSVC2003
+-#include "third-party/wa_ipc.h"
+-
+-#ifdef Q_CC_MSVC
+-#pragma warning(pop)
+-#endif
+-
+-#include "winampcontroller.h"
+-
+-
+-/**
+- * \class WinAmpController
+- * \brief A controller for WinAmp.
+- */
+-
+-
+-/**
+- * \brief Constructs the controller.
+- */
+-WinAmpController::WinAmpController() : TuneController()
+-{
+-	connect(&timer_, SIGNAL(timeout()), SLOT(check()));
+-	norminterval_ = 3000;
+-	antiscrollinterval_ = 100;
+-	antiscrollcounter_ = 0;
+-	timer_.start(norminterval_);
+-}
+-
+-template <typename char_type> const size_t length (const char_type * begin)
+-{
+-	const char_type * end = begin;
+-	for (; *end; ++end);
+-	return end - begin;
+-}
+-
+-// Returns a title of a track currently being played by WinAmp with given HWND (passed in waWnd)
+-QPair<bool, QString> WinAmpController::getTrackTitle(HWND waWnd)
+-{
+-	TCHAR waTitle[2048];
+-	QString title;
+-
+-	// Get WinAmp window title. It always contains name of the track
+-	SendMessage (waWnd, WM_GETTEXT, static_cast<WPARAM> (sizeof (waTitle) / sizeof (waTitle[0])), reinterpret_cast<LPARAM> (waTitle));
+-	// Now, waTitle contains WinAmp window title
+-	title = QString ((const QChar *) waTitle, length<TCHAR> ((const TCHAR *) waTitle));
+-	if (title[0] == '*' || (title.length () && title[title.length() - 1] == '*')) {
+-		// request to be called again soon.
+-		return QPair<bool, QString>(false, QString());
+-	}
+-
+-	// Check whether there is a need to do the all stuff
+-	if (!title.length()) {
+-		return QPair<bool, QString>(true,title);
+-	}
+-
+-	QString winamp (" - Winamp ***");
+-	int winampLength = winamp.length();
+-
+-	// Is title scrolling on the taskbar enabled?
+-	title += title + title;
+-	int waLast = title.indexOf (winamp, -1);
+-	if (waLast != -1) {
+-		if (title.length()) {
+-			title.remove (waLast, title.length () - waLast);
+-		}
+-		int waFirst;
+-		while ((waFirst = title.indexOf (winamp)) != -1) {
+-			title.remove (0, waFirst + winampLength);
+-		}
+-	}
+-	else {
+-		title = QString ((const QChar *) waTitle, length<TCHAR> ((const TCHAR *) waTitle)); // Title is not scrolling
+-	}
+-
+-	// Remove leading and trailing spaces
+-	title  = title.trimmed();
+-
+-	// Remove trailing " - Winamp" from title
+-	if (title.length ()) {
+-		winamp = " - Winamp";
+-		winampLength = winamp.length ();
+-		int waFirst = title.indexOf (winamp);
+-		if (waFirst != -1)
+-		{
+-			title.remove (waFirst, waFirst + winampLength);
+-		}
+-	}
+-
+-	// Remove track number from title
+-	if (title.length ()) {
+-		QString dot(". ");
+-		int dotFirst = title.indexOf (dot);
+-		if (dotFirst != -1) {
+-			// All symbols before the dot are digits?
+-			bool allDigits = true;
+-			for (int pos = dotFirst; pos > 0; --pos) {
+-				allDigits = allDigits && title[pos].isNumber();
+-			}
+-			if (allDigits) {
+-				title.remove(0, dotFirst + dot.length ());
+-			}
+-		}
+-	}
+-
+-	// Remove leading and trailing spaces
+-	if (title.length ()) {
+-		while (title.length () && title[0] == ' ') {
+-			title.remove (0, 1);
+-		}
+-		while (title.length () && title[title.length () - 1] == ' ') {
+-			title.remove (title.length () - 1, 1);
+-		}
+-	}
+-
+-	return QPair<bool, QString>(true,title);
+-}
+-
+-
+-/**
+- * Polls for new song info.
+- */
+-void WinAmpController::check()
+-{
+-
+-	Tune tune;
+-#ifdef UNICODE
+-	HWND h = FindWindow(L"Winamp v1.x", NULL);
+-#else
+-	HWND h = FindWindow("Winamp v1.x", NULL);
+-#endif
+-
+-	if (h && SendMessage(h,WM_WA_IPC,0,IPC_ISPLAYING) == 1) {
+-		QPair<bool, QString> trackpair(getTrackTitle(h));
+-		if (!trackpair.first) {
+-			// getTrackTitle wants us to retry in a few ms...
+-			int interval = antiscrollinterval_;
+-			if (++antiscrollcounter_ > 10) {
+-				antiscrollcounter_ = 0;
+-				interval = norminterval_;
+-			}
+-			timer_.start(interval);
+-			return;
+-		}
+-		antiscrollcounter_ = 0;
+-		tune.setName(trackpair.second);
+-		tune.setURL(trackpair.second);
+-		tune.setTime(SendMessage(h,WM_WA_IPC,1,IPC_GETOUTPUTTIME));
+-	}
+-
+-
+-
+-	if (prev_tune_ != tune) {
+-		prev_tune_ = tune;
+-		if (tune.isNull()) {
+-			emit stopped();
+-		}
+-		else {
+-			emit playing(tune);
+-		}
+-	}
+-	timer_.start(norminterval_);
+-}
+-
+-
+-Tune WinAmpController::currentTune() const
+-{
+-	return prev_tune_;
+-}
+--- git.orig/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
++++ git/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
+@@ -1,49 +0,0 @@
+-/*
+- * winampcontroller.h
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-
+-#ifndef WINAMPCONTROLLER_H
+-#define WINAMPCONTROLLER_H
+-
+-#include "tunecontrollerinterface.h"
+-#include "pollingtunecontroller.h"
+-
+-#include <windows.h>
+-#include <QPair>
+-
+-class WinAmpController : public TuneController
+-{
+-	Q_OBJECT
+-public:
+-	WinAmpController();
+-	virtual Tune currentTune() const;
+-
+-protected:
+-	QPair<bool, QString> getTrackTitle(HWND waWnd);
+-protected slots:
+-	void check();
+-
+-private:
+-	Tune prev_tune_;
+-	QTimer timer_;
+-	int norminterval_, antiscrollinterval_;
+-	int antiscrollcounter_;
+-};
+-
+-#endif
+--- git.orig/src/tools/tunecontroller/plugins/winamp/winampplugin.h
++++ git/src/tools/tunecontroller/plugins/winamp/winampplugin.h
+@@ -29,7 +29,7 @@
+ #include <QObject>
+ #include <QString>
+ 
+-#include "winampcontroller.h"
++#include "winamptunecontroller.h"
+ #include "tunecontrollerplugin.h"
+ 
+ class WinAmpPlugin : public QObject, public TuneControllerPlugin
+--- git.orig/src/tools/tunecontroller/pollingtunecontroller.h
++++ git/src/tools/tunecontroller/pollingtunecontroller.h
+@@ -38,6 +38,7 @@ public:
+ 	inline bool isPolling() const { return _timer.isActive(); }
+ 	inline void startPoll() { _timer.start(DefaultInterval); }
+ 	inline void stopPoll() { _timer.stop(); }
++	inline void setInterval(const int &interval) { _timer.setInterval(interval); }
+ 
+ protected slots:
+ 	virtual void check();
 --- git.orig/src/tools/tunecontroller/tunecontrollermanager.cpp
 +++ git/src/tools/tunecontroller/tunecontrollermanager.cpp
 @@ -164,6 +164,10 @@ Q_IMPORT_PLUGIN(itunesplugin)
@@ -856,6 +1110,33 @@
  #endif
 --- git.orig/src/tools/tunecontroller/tunecontroller.pri
 +++ git/src/tools/tunecontroller/tunecontroller.pri
+@@ -25,10 +25,10 @@ tc_itunes {
+ 		INCLUDEPATH += $$ITUNES_PLUGIN_PATH
+ 
+ 		HEADERS += \
+-			$$ITUNES_PLUGIN_PATH/itunescontroller.h 
++			$$PWD/itunestunecontroller.h 
+ 			
+ 		SOURCES += \
+-			$$ITUNES_PLUGIN_PATH/itunescontroller.cpp \
++			$$PWD/itunestunecontroller.cpp \
+ 			$$ITUNES_PLUGIN_PATH/itunesplugin.cpp
+ 
+ 		QMAKE_LFLAGS += -framework CoreFoundation
+@@ -42,11 +42,11 @@ tc_winamp {
+ 	INCLUDEPATH += $$WINAMP_PLUGIN_PATH
+ 
+ 	HEADERS += \
+-		$$WINAMP_PLUGIN_PATH/winampcontroller.h \
++		$$PWD/winamptunecontroller.h \
+ 		$$WINAMP_PLUGIN_PATH/winampplugin.h 
+ 		
+ 	SOURCES += \
+-		$$WINAMP_PLUGIN_PATH/winampcontroller.cpp \
++		$$PWD/winamptunecontroller.cpp \
+ 		$$WINAMP_PLUGIN_PATH/winampplugin.cpp
+ 	
+ 	LIBS += -lUser32
 @@ -78,3 +78,17 @@ tc_mpris {
  		$$PWD/mpristunecontroller.cpp \
  		$$MPRIS_PLUGIN_PATH/mprisplugin.cpp
@@ -874,3 +1155,247 @@
 +		$$PWD/aimptunecontroller.cpp \
 +		$$AIMP_PLUGIN_PATH/aimpplugin.cpp
 +}
+--- git.orig/src/tools/tunecontroller/winamptunecontroller.cpp
++++ git/src/tools/tunecontroller/winamptunecontroller.cpp
+@@ -0,0 +1,191 @@
++/*
++ * winampcontroller.cpp 
++ * Copyright (C) 2006  Remko Troncon
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#include <windows.h>
++
++#ifdef Q_CC_MSVC
++#pragma warning(push)
++#pragma warning(disable: 4100)
++#endif
++
++// this file generates eight C4100 warnings, when compiled with MSVC2003
++#include "third-party/wa_ipc.h"
++
++#ifdef Q_CC_MSVC
++#pragma warning(pop)
++#endif
++
++#include "winamptunecontroller.h"
++
++
++/**
++ * \class WinAmpController
++ * \brief A controller for WinAmp.
++ */
++
++
++/**
++ * \brief Constructs the controller.
++ */
++WinAmpController::WinAmpController()
++: PollingTuneController(),
++  norminterval_(3000),
++  antiscrollinterval_(100),
++  antiscrollcounter_(0)
++{
++	startPoll();
++	setInterval(norminterval_);
++}
++
++template <typename char_type> const size_t length (const char_type * begin)
++{
++	const char_type * end = begin;
++	for (; *end; ++end);
++	return end - begin;
++}
++
++// Returns a title of a track currently being played by WinAmp with given HWND (passed in waWnd)
++QPair<bool, QString> WinAmpController::getTrackTitle(HWND waWnd)
++{
++	TCHAR waTitle[2048];
++	QString title;
++
++	// Get WinAmp window title. It always contains name of the track
++	SendMessage (waWnd, WM_GETTEXT, static_cast<WPARAM> (sizeof (waTitle) / sizeof (waTitle[0])), reinterpret_cast<LPARAM> (waTitle));
++	// Now, waTitle contains WinAmp window title
++	title = QString ((const QChar *) waTitle, length<TCHAR> ((const TCHAR *) waTitle));
++	if (title[0] == '*' || (title.length () && title[title.length() - 1] == '*')) {
++		// request to be called again soon.
++		return QPair<bool, QString>(false, QString());
++	}
++
++	// Check whether there is a need to do the all stuff
++	if (!title.length()) {
++		return QPair<bool, QString>(true,title);
++	}
++
++	QString winamp (" - Winamp ***");
++	int winampLength = winamp.length();
++
++	// Is title scrolling on the taskbar enabled?
++	title += title + title;
++	int waLast = title.indexOf (winamp, -1);
++	if (waLast != -1) {
++		if (title.length()) {
++			title.remove (waLast, title.length () - waLast);
++		}
++		int waFirst;
++		while ((waFirst = title.indexOf (winamp)) != -1) {
++			title.remove (0, waFirst + winampLength);
++		}
++	}
++	else {
++		title = QString ((const QChar *) waTitle, length<TCHAR> ((const TCHAR *) waTitle)); // Title is not scrolling
++	}
++
++	// Remove leading and trailing spaces
++	title  = title.trimmed();
++
++	// Remove trailing " - Winamp" from title
++	if (title.length ()) {
++		winamp = " - Winamp";
++		winampLength = winamp.length ();
++		int waFirst = title.indexOf (winamp);
++		if (waFirst != -1)
++		{
++			title.remove (waFirst, waFirst + winampLength);
++		}
++	}
++
++	// Remove track number from title
++	if (title.length ()) {
++		QString dot(". ");
++		int dotFirst = title.indexOf (dot);
++		if (dotFirst != -1) {
++			// All symbols before the dot are digits?
++			bool allDigits = true;
++			for (int pos = dotFirst; pos > 0; --pos) {
++				allDigits = allDigits && title[pos].isNumber();
++			}
++			if (allDigits) {
++				title.remove(0, dotFirst + dot.length ());
++			}
++		}
++	}
++
++	// Remove leading and trailing spaces
++	if (title.length ()) {
++		while (title.length () && title[0] == ' ') {
++			title.remove (0, 1);
++		}
++		while (title.length () && title[title.length () - 1] == ' ') {
++			title.remove (title.length () - 1, 1);
++		}
++	}
++
++	return QPair<bool, QString>(true,title);
++}
++
++
++/**
++ * Polls for new song info.
++ */
++void WinAmpController::check()
++{
++
++	Tune tune;
++#ifdef UNICODE
++	HWND h = FindWindow(L"Winamp v1.x", NULL);
++#else
++	HWND h = FindWindow("Winamp v1.x", NULL);
++#endif
++
++	if (h && SendMessage(h,WM_WA_IPC,0,IPC_ISPLAYING) == 1) {
++		QPair<bool, QString> trackpair(getTrackTitle(h));
++		if (!trackpair.first) {
++			// getTrackTitle wants us to retry in a few ms...
++			int interval = antiscrollinterval_;
++			if (++antiscrollcounter_ > 10) {
++				antiscrollcounter_ = 0;
++				interval = norminterval_;
++			}
++			setInterval(interval);
++			return;
++		}
++		antiscrollcounter_ = 0;
++		tune.setName(trackpair.second);
++		tune.setURL(trackpair.second);
++		tune.setTime(SendMessage(h,WM_WA_IPC,1,IPC_GETOUTPUTTIME));
++	}
++
++
++
++	if (prev_tune_ != tune) {
++		prev_tune_ = tune;
++	}
++	setInterval(norminterval_);
++	PollingTuneController::check();
++}
++
++
++Tune WinAmpController::currentTune() const
++{
++	return prev_tune_;
++}
+--- git.orig/src/tools/tunecontroller/winamptunecontroller.h
++++ git/src/tools/tunecontroller/winamptunecontroller.h
+@@ -0,0 +1,47 @@
++/*
++ * winampcontroller.h
++ * Copyright (C) 2006  Remko Troncon
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#ifndef WINAMPTUNECONTROLLER_H
++#define WINAMPTUNECONTROLLER_H
++
++#include "pollingtunecontroller.h"
++
++#include <windows.h>
++#include <QPair>
++
++class WinAmpController : public PollingTuneController
++{
++	Q_OBJECT
++public:
++	WinAmpController();
++	virtual Tune currentTune() const;
++
++protected:
++	QPair<bool, QString> getTrackTitle(HWND waWnd);
++protected slots:
++	void check();
++
++private:
++	Tune prev_tune_;
++	int norminterval_, antiscrollinterval_;
++	int antiscrollcounter_;
++};
++
++#endif
