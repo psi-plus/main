@@ -1,5 +1,1315 @@
---- git.orig/src/widgets/fancypopup.cpp
-+++ git/src/widgets/fancypopup.cpp
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -412,6 +412,7 @@ QLineEdit#le_status_text {
+ 					<at-left-corner type="bool">false</at-left-corner>
+ 					<css type="QString"></css>
+ 					<incoming-chat type="bool">true</incoming-chat>
++					<composing type="bool">true</composing>
+ 					<incoming-file-transfer type="bool">true</incoming-file-transfer>
+ 					<incoming-headline type="bool">true</incoming-headline>
+ 					<incoming-message type="bool">true</incoming-message>
+@@ -630,6 +631,7 @@ QLineEdit#le_status_text {
+ 			<ignore-non-roster-contacts type="bool">false</ignore-non-roster-contacts>
+ 			<send-composing-events type="bool">true</send-composing-events>
+ 			<send-inactivity-events type="bool">false</send-inactivity-events>
++			<dont-send-composing-events type="bool">false</dont-send-composing-events>
+ 		</messages>
+ 		<p2p>
+ 			<bytestreams>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -961,36 +961,38 @@ void ChatDlg::setChatState(ChatState sta
+ 		}
+ 
+ 		// Build event message
+-		Message m(jid());
+-		if (sendComposingEvents_) {
+-			m.setEventId(eventId_);
+-			if (state == XMPP::StateComposing) {
+-				m.addEvent(ComposingEvent);
+-			}
+-			else if (lastChatState_ == XMPP::StateComposing) {
+-				m.addEvent(CancelEvent);
++		if( !PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() ) {
++			Message m(jid());
++			if (sendComposingEvents_) {
++				m.setEventId(eventId_);
++				if (state == XMPP::StateComposing) {
++					m.addEvent(ComposingEvent);
++				}
++				else if (lastChatState_ == XMPP::StateComposing) {
++					m.addEvent(CancelEvent);
++				}
+ 			}
+-		}
+-		if (contactChatState_ != XMPP::StateNone) {
+-			if (lastChatState_ != XMPP::StateGone) {
+-				if ((state == XMPP::StateInactive && lastChatState_ == XMPP::StateComposing) || (state == XMPP::StateComposing && lastChatState_ == XMPP::StateInactive)) {
+-					// First go to the paused state
+-					Message tm(jid());
+-					m.setType("chat");
+-					m.setChatState(XMPP::StatePaused);
+-					if (account()->isAvailable()) {
+-						account()->dj_sendMessage(m, false);
++			if (contactChatState_ != XMPP::StateNone) {
++				if (lastChatState_ != XMPP::StateGone) {
++					if ((state == XMPP::StateInactive && lastChatState_ == XMPP::StateComposing) || (state == XMPP::StateComposing && lastChatState_ == XMPP::StateInactive)) {
++						// First go to the paused state
++						Message tm(jid());
++						m.setType("chat");
++						m.setChatState(XMPP::StatePaused);
++						if (account()->isAvailable()) {
++							account()->dj_sendMessage(m, false);
++						}
+ 					}
++					m.setChatState(state);
+ 				}
+-				m.setChatState(state);
+ 			}
+-		}
+ 
+-		// Send event message
+-		if (m.containsEvents() || m.chatState() != XMPP::StateNone) {
+-			m.setType("chat");
+-			if (account()->isAvailable()) {
+-				account()->dj_sendMessage(m, false);
++			// Send event message
++			if (m.containsEvents() || m.chatState() != XMPP::StateNone) {
++				m.setType("chat");
++				if (account()->isAvailable()) {
++					account()->dj_sendMessage(m, false);
++				}
+ 			}
+ 		}
+ 
+--- psi.orig/src/options/opt_advanced.cpp
++++ psi/src/options/opt_advanced.cpp
+@@ -96,7 +96,9 @@ QWidget *OptionsTabAdvanced::widget()
+ 		" like system-wide news on MSN, announcements, etc."));
+ 
+ 	connect(d->ck_messageevents,SIGNAL(toggled(bool)),d->ck_inactiveevents,SLOT(setEnabled(bool)));
++	connect(d->ck_messageevents,SIGNAL(toggled(bool)),d->ck_sendComposingEvents,SLOT(setEnabled(bool)));
+ 	d->ck_inactiveevents->setEnabled(d->ck_messageevents->isChecked());
++	d->ck_sendComposingEvents->setEnabled(d->ck_messageevents->isChecked());
+ 
+ 	return w;
+ }
+@@ -110,6 +112,7 @@ void OptionsTabAdvanced::applyOptions()
+ 
+ 	PsiOptions::instance()->setOption("options.messages.send-composing-events", d->ck_messageevents->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.send-inactivity-events", d->ck_inactiveevents->isChecked());
++	PsiOptions::instance()->setOption("options.messages.dont-send-composing-events", d->ck_sendComposingEvents->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.request-receipts", d->ck_requestReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.send-receipts", d->ck_sendReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
+@@ -138,6 +141,7 @@ void OptionsTabAdvanced::restoreOptions(
+ 
+ 	d->ck_messageevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool() );
+ 	d->ck_inactiveevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-inactivity-events").toBool() );
++	d->ck_sendComposingEvents->setChecked( PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() );
+ 	d->ck_requestReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool() );
+ 	d->ck_sendReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool() );
+ 	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
+--- psi.orig/src/options/opt_advanced.ui
++++ psi/src/options/opt_advanced.ui
+@@ -34,6 +34,16 @@
+     </widget>
+    </item>
+    <item>
++    <widget class="QCheckBox" name="ck_sendComposingEvents">
++     <property name="whatsThis">
++      <string>Disables the sending of message events such as &quot;Contact is Typing...&quot;</string>
++     </property>
++     <property name="text">
++      <string>Do not send composing events</string>
++     </property>
++    </widget>
++   </item>
++   <item>
+     <widget class="QCheckBox" name="ck_requestReceipts" >
+      <property name="text" >
+       <string>Request receipts</string>
+--- psi.orig/src/options/opt_events.cpp
++++ psi/src/options/opt_events.cpp
+@@ -23,9 +23,9 @@ public:
+ //----------------------------------------------------------------------------
+ 
+ OptionsTabEvents::OptionsTabEvents(QObject *parent)
+-: OptionsTab(parent, "events", "", tr("Events"), tr("The events behaviour"), "psi/events")
++	: OptionsTab(parent, "events", "", tr("Events"), tr("The events behaviour"), "psi/events")
++	, w(0)
+ {
+-	w = 0;
+ }
+ 
+ QWidget *OptionsTabEvents::widget()
+@@ -105,16 +105,6 @@ void OptionsTabEvents::applyOptions()
+ 	PsiOptions::instance()->setOption("options.subscriptions.automatically-allow-authorization", d->ck_autoAuth->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.successful-subscription", d->ck_notifyAuth->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.notifications.bounce-dock", d->cb_bounce->itemData( d->cb_bounce->currentIndex()));
+-
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.enabled", d->ck_popupOn->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-message", d->ck_popupOnMessage->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.showMessage", d->ck_showPopupMessage->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-chat", d->ck_popupOnMessage->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-headline", d->ck_popupOnHeadline->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-file-transfer", d->ck_popupOnFile->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.online", d->ck_popupOnOnline->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.offline", d->ck_popupOnOffline->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.status.other-changes", d->ck_popupOnStatus->isChecked());
+ }
+ 
+ void OptionsTabEvents::restoreOptions()
+@@ -134,12 +124,4 @@ void OptionsTabEvents::restoreOptions()
+ 	d->ck_autoAuth->setChecked( PsiOptions::instance()->getOption("options.subscriptions.automatically-allow-authorization").toBool() );
+ 	d->ck_notifyAuth->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.successful-subscription").toBool() );
+ 	d->cb_bounce->setCurrentIndex( d->cb_bounce->findData(PsiOptions::instance()->getOption("options.ui.notifications.bounce-dock").toString()) );
+-	d->ck_popupOn->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.enabled").toBool() );
+-	d->ck_popupOnMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool() || PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool() );
+-	d->ck_showPopupMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool());
+-	d->ck_popupOnHeadline->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool() );
+-	d->ck_popupOnFile->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool() );
+-	d->ck_popupOnOnline->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.online").toBool() );
+-	d->ck_popupOnOffline->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.offline").toBool() );
+-	d->ck_popupOnStatus->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool() );
+ }
+--- psi.orig/src/options/opt_events.ui
++++ psi/src/options/opt_events.ui
+@@ -6,7 +6,7 @@
+     <x>0</x>
+     <y>0</y>
+     <width>347</width>
+-    <height>588</height>
++    <height>335</height>
+    </rect>
+   </property>
+   <property name="windowTitle" >
+@@ -192,80 +192,6 @@
+      </item>
+     </layout>
+    </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_popupOn" >
+-     <property name="text" >
+-      <string>Enable popup notifications</string>
+-     </property>
+-     <property name="checked" >
+-      <bool>true</bool>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QGroupBox" name="groupBox1" >
+-     <property name="title" >
+-      <string>Popup notifications</string>
+-     </property>
+-     <layout class="QVBoxLayout" >
+-      <property name="margin" >
+-       <number>10</number>
+-      </property>
+-      <property name="spacing" >
+-       <number>6</number>
+-      </property>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnMessage" >
+-        <property name="text" >
+-         <string>On incoming message event</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_showPopupMessage" >
+-        <property name="text" >
+-         <string>Show incoming message on popup</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnHeadline" >
+-        <property name="text" >
+-         <string>On incoming headline event</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnFile" >
+-        <property name="text" >
+-         <string>On incoming file event</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnOnline" >
+-        <property name="text" >
+-         <string>When a contact becomes available</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnOffline" >
+-        <property name="text" >
+-         <string>When a contact becomes unavailable</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_popupOnStatus" >
+-        <property name="text" >
+-         <string>When a contact changes status</string>
+-        </property>
+-       </widget>
+-      </item>
+-     </layout>
+-    </widget>
+-   </item>
+   </layout>
+  </widget>
+  <layoutdefault spacing="6" margin="11" />
+@@ -281,31 +207,6 @@
+   <tabstop>ck_notifyAuth</tabstop>
+   <tabstop>cb_bounce</tabstop>
+   <tabstop>cb_animation</tabstop>
+-  <tabstop>ck_popupOn</tabstop>
+-  <tabstop>ck_popupOnMessage</tabstop>
+-  <tabstop>ck_popupOnHeadline</tabstop>
+-  <tabstop>ck_popupOnFile</tabstop>
+-  <tabstop>ck_popupOnOnline</tabstop>
+-  <tabstop>ck_popupOnOffline</tabstop>
+-  <tabstop>ck_popupOnStatus</tabstop>
+  </tabstops>
+  <resources/>
+- <connections>
+-  <connection>
+-   <sender>ck_popupOn</sender>
+-   <signal>toggled(bool)</signal>
+-   <receiver>groupBox1</receiver>
+-   <slot>setEnabled(bool)</slot>
+-   <hints>
+-    <hint type="sourcelabel" >
+-     <x>158</x>
+-     <y>384</y>
+-    </hint>
+-    <hint type="destinationlabel" >
+-     <x>158</x>
+-     <y>425</y>
+-    </hint>
+-   </hints>
+-  </connection>
+- </connections>
+ </ui>
+--- psi.orig/src/options/optionsdlg.cpp
++++ psi/src/options/optionsdlg.cpp
+@@ -44,6 +44,7 @@
+ #include "opt_appearance.h"
+ #include "opt_chat.h"
+ #include "opt_events.h"
++#include "opt_popups.h"
+ #include "opt_status.h"
+ #include "opt_iconset.h"
+ #include "opt_groupchat.h"
+@@ -277,6 +278,7 @@ void OptionsDlg::Private::createTabs()
+ 	tabs.append( new OptionsTabRoster(this) );
+ 	tabs.append( new OptionsTabChat(this) );
+ 	tabs.append( new OptionsTabEvents(this) );
++	tabs.append( new OptionsTabPopups(this) );
+ 	tabs.append( new OptionsTabStatus(this) );
+ 	tabs.append( new OptionsTabAppearance(this) );
+ 	//tabs.append( new OptionsTabIconsetSystem(this) );
+--- psi.orig/src/options/options.pri
++++ psi/src/options/options.pri
+@@ -15,6 +15,7 @@ HEADERS += \
+ 	$$PWD/opt_roster.h \
+ 	$$PWD/opt_chat.h \
+ 	$$PWD/opt_events.h \
++	$$PWD/opt_popups.h \
+ 	$$PWD/opt_status.h \
+ 	$$PWD/opt_statusgeneral.h \
+ 	$$PWD/opt_statusauto.h \
+@@ -35,6 +36,7 @@ SOURCES += \
+ 	$$PWD/opt_roster.cpp \
+ 	$$PWD/opt_chat.cpp \
+ 	$$PWD/opt_events.cpp \
++	$$PWD/opt_popups.cpp \
+ 	$$PWD/opt_status.cpp \
+ 	$$PWD/opt_statusgeneral.cpp \
+ 	$$PWD/opt_statusauto.cpp \
+@@ -55,6 +57,7 @@ FORMS += \
+ 	$$PWD/opt_roster.ui \
+ 	$$PWD/opt_chat.ui \
+ 	$$PWD/opt_events.ui \
++	$$PWD/opt_popups.ui \
+ 	$$PWD/opt_statusgeneral.ui \
+ 	$$PWD/opt_statusauto.ui \
+ 	$$PWD/opt_appearance.ui \
+--- psi.orig/src/options/opt_popups.cpp
++++ psi/src/options/opt_popups.cpp
+@@ -0,0 +1,141 @@
++/*
++ * opt_popups.cpp
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++//#include <QHBoxLayout>
++
++#include "opt_popups.h"
++#include "ui_opt_popups.h"
++#include "psioptions.h"
++#include "psicon.h"
++#include "popupdurationsmanager.h"
++
++class OptPopupsUI : public QWidget, public Ui::OptPopups
++{
++public:
++	OptPopupsUI() : QWidget() { setupUi(this); }
++};
++
++OptionsTabPopups::OptionsTabPopups(QObject *parent)
++	: OptionsTab(parent, "popups", "", tr("Popups"), tr("The popups behaviour"), "psi/tip")
++	, w(0)
++	, popup_(0)
++{
++}
++
++QWidget *OptionsTabPopups::widget()
++{
++	if ( w )
++		return 0;
++
++	w = new OptPopupsUI();
++	return w;
++}
++
++void OptionsTabPopups::applyOptions()
++{
++	if ( !w )
++		return;
++
++	OptPopupsUI *d = (OptPopupsUI *)w;
++
++	PsiOptions *o = PsiOptions::instance();
++
++	o->setOption("options.ui.notifications.passive-popups.enabled", d->ck_popupOn->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.incoming-message", d->ck_popupOnMessage->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.showMessage", d->ck_showPopupMessage->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.incoming-chat", d->ck_popupOnMessage->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.incoming-headline", d->ck_popupOnHeadline->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.incoming-file-transfer", d->ck_popupOnFile->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.status.online", d->ck_popupOnOnline->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.status.offline", d->ck_popupOnOffline->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.status.other-changes", d->ck_popupOnStatus->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.composing", d->ck_popupComposing->isChecked());
++	o->setOption("options.ui.notifications.passive-popups.avatar-size", d->sb_avatar->value());
++
++	o->setOption("options.ui.notifications.passive-popups.maximum-jid-length", QVariant(d->sb_jid->value()));
++	o->setOption("options.ui.notifications.passive-popups.maximum-status-length", QVariant(d->sb_status->value()));
++	o->setOption("options.ui.notifications.passive-popups.maximum-text-length", QVariant(d->sb_text->value()));
++	o->setOption("options.ui.notifications.passive-popups.top-to-bottom",QVariant(d->ck_topToBottom->isChecked()));
++	o->setOption("options.ui.notifications.passive-popups.at-left-corner",QVariant(d->ck_atLeft->isChecked()));
++	o->setOption("options.ui.notifications.passive-popups.notify-every-muc-message",QVariant(d->ck_everyMucMessage->isChecked()));
++
++	foreach(QObject* obj, d->sa_durations->widget()->children()) {
++		QSpinBox *sb = dynamic_cast<QSpinBox*>(obj);
++		if(sb) {
++			const QString oName = sb->property("name").toString();
++			const QString oPath = sb->property("path").toString();
++			const int value = sb->value();
++			popup_->setValue(oName, value);
++			if(!oPath.isEmpty()) {
++				PsiOptions::instance()->setOption(oPath, value*1000);
++			}
++		}
++	}
++}
++
++void OptionsTabPopups::restoreOptions()
++{
++	if ( !w )
++		return;
++
++	OptPopupsUI *d = (OptPopupsUI *)w;
++
++	PsiOptions *o = PsiOptions::instance();
++
++	d->ck_popupOn->setChecked( o->getOption("options.ui.notifications.passive-popups.enabled").toBool() );
++	d->ck_popupOnMessage->setChecked( o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool() || o->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool() );
++	d->ck_showPopupMessage->setChecked( o->getOption("options.ui.notifications.passive-popups.showMessage").toBool());
++	d->ck_popupOnHeadline->setChecked( o->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool() );
++	d->ck_popupOnFile->setChecked( o->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool() );
++	d->ck_popupOnOnline->setChecked( o->getOption("options.ui.notifications.passive-popups.status.online").toBool() );
++	d->ck_popupOnOffline->setChecked( o->getOption("options.ui.notifications.passive-popups.status.offline").toBool() );
++	d->ck_popupOnStatus->setChecked( o->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool() );
++	d->ck_popupComposing->setChecked( o->getOption("options.ui.notifications.passive-popups.composing").toBool() );
++	d->sb_avatar->setValue( o->getOption("options.ui.notifications.passive-popups.avatar-size").toInt() );
++
++	d->sb_jid->setValue(o->getOption("options.ui.notifications.passive-popups.maximum-jid-length").toInt());
++	d->sb_status->setValue(o->getOption("options.ui.notifications.passive-popups.maximum-status-length").toInt());
++	d->sb_text->setValue(o->getOption("options.ui.notifications.passive-popups.maximum-text-length").toInt());
++	d->ck_topToBottom->setChecked(o->getOption("options.ui.notifications.passive-popups.top-to-bottom").toBool());
++	d->ck_atLeft->setChecked(o->getOption("options.ui.notifications.passive-popups.at-left-corner").toBool());
++	d->ck_everyMucMessage->setChecked(o->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool());
++
++	QWidget *areaWidget = new QWidget;
++	QVBoxLayout *vBox = new QVBoxLayout(areaWidget);
++	foreach(const QString& option, popup_->optionsNamesList()) {
++		QHBoxLayout *l = new QHBoxLayout;
++		l->addWidget(new QLabel(option));
++		l->addStretch();
++		QSpinBox *sb = new QSpinBox();
++		sb->setMinimum(-1);
++		sb->setValue(popup_->value(option));
++		sb->setProperty("path", popup_->optionPath(option));
++		sb->setProperty("name", option);
++		l->addWidget(sb);
++		vBox->addLayout(l);
++	}
++	d->sa_durations->setWidget(areaWidget);
++	emit connectDataChanged(w);
++}
++
++void OptionsTabPopups::setData(PsiCon *psi, QWidget *)
++{
++	popup_ = psi->popupDurationsManager();
++}
+--- psi.orig/src/options/opt_popups.h
++++ psi/src/options/opt_popups.h
+@@ -0,0 +1,49 @@
++/*
++ * opt_popups.h
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef OPT_POPUPS_H
++#define OPT_POPUPS_H
++
++#include "optionstab.h"
++
++class PsiCon;
++class PopupDurationsManager;
++
++class OptionsTabPopups : public OptionsTab
++{
++	Q_OBJECT
++public:
++	OptionsTabPopups(QObject *parent);
++
++	QWidget *widget();
++	void applyOptions();
++	void restoreOptions();
++
++	virtual bool stretchable() const { return true; };
++
++public slots:
++	virtual void setData(PsiCon *psi, QWidget *);
++
++private:
++	QWidget *w;
++	PopupDurationsManager* popup_;
++};
++
++#endif
+--- psi.orig/src/options/opt_popups.ui
++++ psi/src/options/opt_popups.ui
+@@ -0,0 +1,398 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>OptPopups</class>
++ <widget class="QWidget" name="OptPopups">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>608</width>
++    <height>520</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>OptPopupsUI</string>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout_4">
++   <item>
++    <widget class="QCheckBox" name="ck_popupOn">
++     <property name="text">
++      <string>Enable popup notifications</string>
++     </property>
++     <property name="checked">
++      <bool>true</bool>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QTabWidget" name="tabWidget">
++     <property name="autoFillBackground">
++      <bool>false</bool>
++     </property>
++     <property name="currentIndex">
++      <number>0</number>
++     </property>
++     <widget class="QWidget" name="tab">
++      <attribute name="title">
++       <string>General</string>
++      </attribute>
++      <layout class="QVBoxLayout" name="verticalLayout_3">
++       <item>
++        <widget class="QGroupBox" name="groupBox1">
++         <property name="title">
++          <string>Popup notifications</string>
++         </property>
++         <layout class="QVBoxLayout" name="verticalLayout_2">
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnMessage">
++            <property name="text">
++             <string>On incoming message event</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_showPopupMessage">
++            <property name="text">
++             <string>Show incoming message on popup</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnHeadline">
++            <property name="text">
++             <string>On incoming headline event</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnFile">
++            <property name="text">
++             <string>On incoming file event</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupComposing">
++            <property name="text">
++             <string>When a contact begins typing</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnOnline">
++            <property name="text">
++             <string>When a contact becomes available</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnOffline">
++            <property name="text">
++             <string>When a contact becomes unavailable</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_popupOnStatus">
++            <property name="text">
++             <string>When a contact changes status</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QCheckBox" name="ck_everyMucMessage">
++            <property name="text">
++             <string>Enable popup notifications for every muc message</string>
++            </property>
++           </widget>
++          </item>
++         </layout>
++        </widget>
++       </item>
++       <item>
++        <layout class="QGridLayout" name="gridLayout">
++         <item row="0" column="0">
++          <widget class="QGroupBox" name="groupBox">
++           <property name="title">
++            <string>Limitations</string>
++           </property>
++           <layout class="QGridLayout" name="_3">
++            <item row="0" column="0">
++             <widget class="QLabel" name="label">
++              <property name="text">
++               <string>Maximum JID length:</string>
++              </property>
++              <property name="alignment">
++               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
++              </property>
++             </widget>
++            </item>
++            <item row="0" column="1">
++             <widget class="QSpinBox" name="sb_jid">
++              <property name="sizePolicy">
++               <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
++                <horstretch>0</horstretch>
++                <verstretch>0</verstretch>
++               </sizepolicy>
++              </property>
++              <property name="minimum">
++               <number>-1</number>
++              </property>
++              <property name="maximum">
++               <number>999</number>
++              </property>
++             </widget>
++            </item>
++            <item row="1" column="0">
++             <widget class="QLabel" name="label_2">
++              <property name="text">
++               <string>Maximum text length:</string>
++              </property>
++              <property name="alignment">
++               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
++              </property>
++             </widget>
++            </item>
++            <item row="1" column="1">
++             <widget class="QSpinBox" name="sb_text">
++              <property name="sizePolicy">
++               <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
++                <horstretch>0</horstretch>
++                <verstretch>0</verstretch>
++               </sizepolicy>
++              </property>
++              <property name="minimum">
++               <number>-1</number>
++              </property>
++              <property name="maximum">
++               <number>999</number>
++              </property>
++             </widget>
++            </item>
++            <item row="2" column="0">
++             <widget class="QLabel" name="label_3">
++              <property name="text">
++               <string>Maximum status length:</string>
++              </property>
++              <property name="alignment">
++               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
++              </property>
++             </widget>
++            </item>
++            <item row="2" column="1">
++             <widget class="QSpinBox" name="sb_status">
++              <property name="sizePolicy">
++               <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
++                <horstretch>0</horstretch>
++                <verstretch>0</verstretch>
++               </sizepolicy>
++              </property>
++              <property name="minimum">
++               <number>-1</number>
++              </property>
++              <property name="maximum">
++               <number>999</number>
++              </property>
++             </widget>
++            </item>
++           </layout>
++          </widget>
++         </item>
++         <item row="0" column="1">
++          <widget class="QGroupBox" name="groupBox2">
++           <property name="title">
++            <string>Popup location</string>
++           </property>
++           <layout class="QVBoxLayout" name="_2" stretch="0,0,0">
++            <item>
++             <widget class="QCheckBox" name="ck_topToBottom">
++              <property name="text">
++               <string>Show popups from top to bottom</string>
++              </property>
++             </widget>
++            </item>
++            <item>
++             <widget class="QCheckBox" name="ck_atLeft">
++              <property name="text">
++               <string>Place popups at left</string>
++              </property>
++             </widget>
++            </item>
++            <item>
++             <spacer name="verticalSpacer_2">
++              <property name="orientation">
++               <enum>Qt::Vertical</enum>
++              </property>
++              <property name="sizeHint" stdset="0">
++               <size>
++                <width>20</width>
++                <height>40</height>
++               </size>
++              </property>
++             </spacer>
++            </item>
++           </layout>
++          </widget>
++         </item>
++         <item row="0" column="2">
++          <spacer name="horizontalSpacer">
++           <property name="orientation">
++            <enum>Qt::Horizontal</enum>
++           </property>
++           <property name="sizeHint" stdset="0">
++            <size>
++             <width>40</width>
++             <height>20</height>
++            </size>
++           </property>
++          </spacer>
++         </item>
++        </layout>
++       </item>
++      </layout>
++     </widget>
++     <widget class="QWidget" name="tab_2">
++      <attribute name="title">
++       <string>Misc</string>
++      </attribute>
++      <layout class="QVBoxLayout" name="verticalLayout">
++       <item>
++        <layout class="QHBoxLayout" name="horizontalLayout_2">
++         <item>
++          <widget class="QLabel" name="label_4">
++           <property name="text">
++            <string>Avatar size:</string>
++           </property>
++          </widget>
++         </item>
++         <item>
++          <widget class="QSpinBox" name="sb_avatar"/>
++         </item>
++         <item>
++          <spacer name="horizontalSpacer_3">
++           <property name="orientation">
++            <enum>Qt::Horizontal</enum>
++           </property>
++           <property name="sizeHint" stdset="0">
++            <size>
++             <width>40</width>
++             <height>20</height>
++            </size>
++           </property>
++          </spacer>
++         </item>
++        </layout>
++       </item>
++       <item>
++        <layout class="QHBoxLayout" name="horizontalLayout">
++         <item>
++          <widget class="QGroupBox" name="gb_durations">
++           <property name="title">
++            <string>Durations, sec.</string>
++           </property>
++           <layout class="QVBoxLayout" name="verticalLayout_5">
++            <item>
++             <widget class="QScrollArea" name="sa_durations">
++              <property name="autoFillBackground">
++               <bool>false</bool>
++              </property>
++              <property name="frameShape">
++               <enum>QFrame::NoFrame</enum>
++              </property>
++              <property name="frameShadow">
++               <enum>QFrame::Sunken</enum>
++              </property>
++              <property name="lineWidth">
++               <number>0</number>
++              </property>
++              <property name="horizontalScrollBarPolicy">
++               <enum>Qt::ScrollBarAlwaysOff</enum>
++              </property>
++              <property name="widgetResizable">
++               <bool>false</bool>
++              </property>
++              <property name="alignment">
++               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
++              </property>
++              <widget class="QWidget" name="scrollAreaWidgetContents">
++               <property name="geometry">
++                <rect>
++                 <x>0</x>
++                 <y>0</y>
++                 <width>538</width>
++                 <height>81</height>
++                </rect>
++               </property>
++               <property name="autoFillBackground">
++                <bool>false</bool>
++               </property>
++              </widget>
++             </widget>
++            </item>
++           </layout>
++          </widget>
++         </item>
++         <item>
++          <spacer name="horizontalSpacer_2">
++           <property name="orientation">
++            <enum>Qt::Horizontal</enum>
++           </property>
++           <property name="sizeHint" stdset="0">
++            <size>
++             <width>0</width>
++             <height>0</height>
++            </size>
++           </property>
++          </spacer>
++         </item>
++        </layout>
++       </item>
++       <item>
++        <spacer name="verticalSpacer">
++         <property name="orientation">
++          <enum>Qt::Vertical</enum>
++         </property>
++         <property name="sizeHint" stdset="0">
++          <size>
++           <width>10</width>
++           <height>0</height>
++          </size>
++         </property>
++        </spacer>
++       </item>
++      </layout>
++     </widget>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <layoutdefault spacing="6" margin="11"/>
++ <tabstops>
++  <tabstop>ck_popupOn</tabstop>
++  <tabstop>ck_popupOnMessage</tabstop>
++  <tabstop>ck_popupOnHeadline</tabstop>
++  <tabstop>ck_popupOnFile</tabstop>
++  <tabstop>ck_popupOnOnline</tabstop>
++  <tabstop>ck_popupOnOffline</tabstop>
++  <tabstop>ck_popupOnStatus</tabstop>
++ </tabstops>
++ <resources/>
++ <connections>
++  <connection>
++   <sender>ck_popupOn</sender>
++   <signal>toggled(bool)</signal>
++   <receiver>tabWidget</receiver>
++   <slot>setEnabled(bool)</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>303</x>
++     <y>19</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>303</x>
++     <y>273</y>
++    </hint>
++   </hints>
++  </connection>
++ </connections>
++</ui>
+--- psi.orig/src/popupdurationsmanager.cpp
++++ psi/src/popupdurationsmanager.cpp
+@@ -0,0 +1,92 @@
++/*
++ * popupdurationsmanager.cpp - XMPP Ping server
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include "popupdurationsmanager.h"
++
++PopupDurationsManager::PopupDurationsManager()
++{
++}
++
++void PopupDurationsManager::registerOption(const QString& name, int initValue, const QString& path)
++{
++	if(optionsNames_.contains(name)) {
++		return;
++	}
++
++	optionsNames_.push_back(name);
++	OptionValue ov(path, initValue);
++	options_[name] = ov;
++}
++
++void PopupDurationsManager::unregisterOption(const QString &name)
++{
++	optionsNames_.removeAll(name);
++	options_.remove(name);
++}
++
++void PopupDurationsManager::setValue(const QString& name, int value)
++{
++	if(!optionsNames_.contains(name)) {
++		return;
++	}
++
++	OptionValue ov = options_.value(name);
++	ov.second = value;
++	options_[name] = ov;
++}
++
++int PopupDurationsManager::value(const QString& name) const
++{
++	if(!optionsNames_.contains(name)) {
++		return 5;
++	}
++
++	OptionValue ov = options_.value(name);
++	return ov.second;
++}
++
++const QString PopupDurationsManager::optionPath(const QString& name) const
++{
++	if(!optionsNames_.contains(name)) {
++		return QString();
++	}
++
++	OptionValue ov = options_.value(name);
++	return ov.first;
++}
++
++//const QStringList PopupDurationsManager::otionsPathList() const
++//{
++//	QStringList l;
++//	foreach(const OptionValue& ov, options_.values()) {
++//		l.push_back(ov.first);
++//	}
++//	return l;
++//}
++
++const QStringList PopupDurationsManager::optionsNamesList() const
++{
++	return optionsNames_;
++}
++//
++//void PopupDurationsManager::saveOptions() const
++//{
++//
++//}
+--- psi.orig/src/popupdurationsmanager.h
++++ psi/src/popupdurationsmanager.h
+@@ -0,0 +1,49 @@
++/*
++ * popupdurationsmanager.h - XMPP Ping server
++ * Copyright (C) 2011  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef POPUPDURATIONSMANAGER_H
++#define POPUPDURATIONSMANAGER_H
++
++#include <QStringList>
++#include <QPair>
++#include <QHash>
++
++class PopupDurationsManager
++{
++public:
++	PopupDurationsManager();
++	~PopupDurationsManager() {};
++
++	void registerOption(const QString& name, int initValue = 5, const QString& path = QString());
++	void unregisterOption(const QString& name);
++	void setValue(const QString& name, int value);
++	int value(const QString& name) const;
++	const QString optionPath(const QString& name) const;
++	//const QStringList otionsPathList() const;
++	const QStringList optionsNamesList() const;
++	//void saveOptions() const;
++
++private:
++	typedef QPair<QString, int> OptionValue;
++	QHash<QString, OptionValue> options_; // unsorted list
++	QStringList optionsNames_; // list sorted by time
++};
++
++#endif
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -4858,8 +4858,15 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 					c->incomingMessage(m);
+ 				}
+ 			}
+-			delete e;
+-			return;
++			if(m.chatState() == StateComposing) {
++				doPopup = true;
++				putToQueue = false;
++				popupType = PsiPopup::AlertComposing;
++			}
++			else {
++				delete e;
++				return;
++			}
+ 		}
+ 		else if (m.messageReceipt() == ReceiptReceived) {
+ 			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
+@@ -4876,7 +4883,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		}
+ 
+ 		// pass chat messages directly to a chat window if possible (and deal with sound)
+-		if(m.type() == "chat") {
++		else if(m.type() == "chat") {
+ 			ChatDlg *c = findChatDialog(e->from());
+ 			if(!c)
+ 				c = findChatDialog(e->jid());
+@@ -5024,11 +5031,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			r = *(u->priority());
+ 		}
+ 
+-		if ((popupType == PsiPopup::AlertChat     && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
+-		    (popupType == PsiPopup::AlertMessage  && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
+-		    (popupType == PsiPopup::AlertHeadline && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
+-		    (popupType == PsiPopup::AlertFile     && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
+-		    (popupType == PsiPopup::AlertAvCall   && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()))
++		if ((popupType == PsiPopup::AlertChat      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
++		    (popupType == PsiPopup::AlertMessage   && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
++		    (popupType == PsiPopup::AlertHeadline  && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
++		    (popupType == PsiPopup::AlertFile      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
++		    (popupType == PsiPopup::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
++		    (popupType == PsiPopup::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
+ 		{
+ 			PsiPopup *popup = new PsiPopup(popupType, this);
+ 			popup->setData(j, r, u, e);
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -110,6 +110,7 @@
+ #include "avcall/calldlg.h"
+ #include "alertmanager.h"
+ #include "bosskey.h"
++#include "popupdurationsmanager.h"
+ 
+ #include "AutoUpdater/AutoUpdater.h"
+ #ifdef HAVE_SPARKLE
+@@ -222,6 +223,7 @@ public:
+ 		, quitting(false)
+ 		, alertManager(parent)
+ 		, bossKey(0)
++		, popupDurationsManager(0)
+ 	{
+ 		psi = parent;
+ 	}
+@@ -300,6 +302,7 @@ public:
+ 	AutoUpdater *autoUpdater;
+ 	AlertManager alertManager;
+ 	BossKey *bossKey;
++	PopupDurationsManager * popupDurationsManager;
+ };
+ 
+ //----------------------------------------------------------------------------
+@@ -345,6 +348,7 @@ PsiCon::~PsiCon()
+ 	delete d->edb;
+ 	delete d->defaultMenuBar;
+ 	delete d->tabManager;
++	delete d->popupDurationsManager;
+ 	delete d;
+ }
+ 
+@@ -548,6 +552,21 @@ bool PsiCon::init()
+ 
+ 	d->idle.start();
+ 
++	//PopupDurationsManager
++	d->popupDurationsManager = new PopupDurationsManager();
++	d->popupDurationsManager->registerOption(tr("Status"),
++						 PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.status").toInt()/1000,
++						 "options.ui.notifications.passive-popups.delays.status");
++	d->popupDurationsManager->registerOption(tr("Message"),
++						 PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.message").toInt()/1000,
++						 "options.ui.notifications.passive-popups.delays.message");
++	d->popupDurationsManager->registerOption(tr("File"),
++						 PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.file").toInt()/1000,
++						 "options.ui.notifications.passive-popups.delays.file");
++	d->popupDurationsManager->registerOption(tr("Chat"),
++						 PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.chat").toInt()/1000,
++						 "options.ui.notifications.passive-popups.delays.chat");
++
+ 	// S5B
+ 	d->s5bServer = new S5BServer;
+ 	s5b_init();
+@@ -787,6 +806,11 @@ FileTransDlg *PsiCon::ftdlg() const
+ #endif
+ }
+ 
++PopupDurationsManager* PsiCon::popupDurationsManager() const
++{
++	return d->popupDurationsManager;
++}
++
+ TabManager *PsiCon::tabManager() const
+ {
+ 	return d->tabManager;
+--- psi.orig/src/psicon.h
++++ psi/src/psicon.h
+@@ -56,6 +56,7 @@ class TuneController;
+ class PsiContactList;
+ class TabManager;
+ class ContactUpdatesManager;
++class PopupDurationsManager;
+ 
+ namespace OpenPGP {
+ 	class Engine;
+@@ -127,6 +128,8 @@ public:
+ 	bool haveAutoUpdater() const;
+ 	void updateStatusPresets();
+ 
++	PopupDurationsManager* popupDurationsManager() const;
++
+ signals:
+ 	void quit(int);
+ 	void accountAdded(PsiAccount *);
+--- psi.orig/src/psipopup.cpp
++++ psi/src/psipopup.cpp
+@@ -185,11 +185,12 @@ void PsiPopup::Private::popupClicked(int
+ 	else if ( event && event->account() && button == (int)Qt::RightButton ) {
+ 		event->account()->psi()->removeEvent(event);
+ 	}
++
++	popup->deleteLater();
+ }
+ 
+ void PsiPopup::Private::eventDestroyed()
+ {
+-	popup->deleteLater();
+ 	event = 0;
+ }
+ 
+@@ -291,6 +292,11 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
+ 		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/message");
+ 		doAlertIcon = true;
+ 		break;
++	case AlertComposing:
++		text += PsiPopup::tr("Typing notify");
++		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
++		doAlertIcon = false;
++		break;
+ 	case AlertChat:
+ 		text += PsiPopup::tr("Incoming chat message");
+ 		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/chat");
+@@ -349,9 +355,10 @@ void PsiPopup::setData(const Jid &j, con
+ 
+ 	d->jid    = j;
+ 	d->status = r.status();
+-	d->event  = (PsiEvent *)event;
++	if(d->popupType != AlertComposing)
++		d->event  = (PsiEvent *)event;
+ 
+-	if ( event )
++	if ( d->event )
+ 		connect(event, SIGNAL(destroyed()), d, SLOT(eventDestroyed()));
+ 
+ 	PsiIcon *icon = PsiIconset::instance()->statusPtr(j, r.status());
+@@ -411,7 +418,7 @@ void PsiPopup::setData(const Jid &j, con
+ 	}
+ 	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
+ 	// show popup
+-	if ( d->popupType != AlertHeadline && (d->popupType != AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) ) {
++	if ( d->popupType != AlertComposing && d->popupType != AlertHeadline && (d->popupType != AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) ) {
+ 
+ 		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
+ 			const Message *jmessage = &((MessageEvent *)event)->message();
+@@ -429,6 +436,10 @@ void PsiPopup::setData(const Jid &j, con
+ 
+                 setData(&avatar, icon, contactText);
+ 	}
++	else if ( d->popupType == AlertComposing ) {
++		QString txt = "<font size=\"+1\">" + name + tr(" is typing...") + "</font>" ;
++		setData(&avatar, icon, txt);
++	}
+ 	else if ( d->popupType == AlertHeadline ) {
+ 		QVBoxLayout *vbox = new QVBoxLayout;
+ 		vbox->addLayout( d->createContactInfo(&avatar, icon, contactText) );
+--- psi.orig/src/psipopup.h
++++ psi/src/psipopup.h
+@@ -52,6 +52,7 @@ public:
+ 		AlertStatusChange,
+ 
+ 		AlertMessage,
++		AlertComposing,
+ 		AlertChat,
+ 		AlertHeadline,
+ 		AlertFile,
+--- psi.orig/src/src.pri
++++ psi/src/src.pri
+@@ -165,6 +165,7 @@ HEADERS += \
+ 	$$PWD/alerticon.h \
+ 	$$PWD/alertable.h \
+ 	$$PWD/psipopup.h \
++	$$PWD/popupdurationsmanager.h \
+ 	$$PWD/psiapplication.h \
+ 	$$PWD/filecache.h \
+ 	$$PWD/avatars.h \
+@@ -308,6 +309,7 @@ SOURCES += \
+ 	$$PWD/alerticon.cpp \
+ 	$$PWD/alertable.cpp \
+ 	$$PWD/psipopup.cpp \
++	$$PWD/popupdurationsmanager.cpp \
+ 	$$PWD/psiapplication.cpp \
+ 	$$PWD/filecache.cpp \
+ 	$$PWD/avatars.cpp \
+--- psi.orig/src/widgets/fancypopup.cpp
++++ psi/src/widgets/fancypopup.cpp
 @@ -19,15 +19,16 @@
   */
  
@@ -120,8 +1430,8 @@
  }
  
  void FancyPopup::show()
---- /dev/null
-+++ git/src/widgets/fancypopup.ui
+--- psi.orig/src/widgets/fancypopup.ui
++++ psi/src/widgets/fancypopup.ui
 @@ -0,0 +1,777 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -900,8 +2210,8 @@
 + <resources/>
 + <connections/>
 +</ui>
---- git.orig/src/widgets/widgets.pri
-+++ git/src/widgets/widgets.pri
+--- psi.orig/src/widgets/widgets.pri
++++ psi/src/widgets/widgets.pri
 @@ -48,7 +48,8 @@ HEADERS += \
  	$$PWD/actionlineedit.h \
  	$$PWD/typeaheadfind.h
