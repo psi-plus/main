@@ -844,7 +844,7 @@
  	void quit(int);
 --- psi.orig/src/psidbusnotifier.cpp
 +++ psi/src/psidbusnotifier.cpp
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,259 @@
 +/*
 + * psidbusnotifier.cpp: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -974,7 +974,7 @@
 +		if (((int)statusMsg.length()) > len)
 +			statusMsg = statusMsg.left(len) + "...";
 +	bool doAlert = false;
-+	PsiIcon *ico = 0;
++	PsiIcon* ico = 0;
 +
 +	if (uli) {
 +		contact = uli->name();
@@ -995,18 +995,23 @@
 +
 +	text = contact;
 +
-+	title = PsiPopup::title(type, &doAlert, ico);
++	title = PsiPopup::title(type, &doAlert, &ico);
 +
 +	QVariantMap hints;
++	QImage im;
 +	if(account) {
-+		QImage im = account->avatarFactory()->getAvatar(jid.bare()).toImage();
-+		int size = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.avatar-size").toInt();
-+		im = im.scaledToWidth(size, Qt::SmoothTransformation);
-+		iiibiiay i(&im);
-+		hints.insert("icon_data", QVariant(iiibiiay::id, &i));
++		im = account->avatarFactory()->getAvatar(jid.bare()).toImage();
++		if(!im.isNull()) {
++			int size = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.avatar-size").toInt();
++			im = im.scaledToWidth(size, Qt::SmoothTransformation);
++		}
 +	}
-+	else if(ico) {
-+		QImage im = ico->pixmap().toImage();
++
++	if(im.isNull() && ico) {
++		im = ico->pixmap().toImage();
++	}
++
++	if(!im.isNull()) {
 +		iiibiiay i(&im);
 +		hints.insert("icon_data", QVariant(iiibiiay::id, &i));
 +	}
@@ -1334,46 +1339,51 @@
  	QString text = "Psi: ";
  	bool doAlertIcon = false;
  
-+	text += title(type, &doAlertIcon, icon);
++	text += title(type, &doAlertIcon, &icon);
 +
 +	d->init(icon, text, acc, doAlertIcon ? type : AlertNone);
 +}
 +
-+QString PsiPopup::title(PopupType type, bool *doAlertIcon, PsiIcon *icon)
++QString PsiPopup::title(PopupType type, bool *doAlertIcon, PsiIcon **icon)
 +{
 +	QString text;
 +
  	switch(type) {
  	case AlertOnline:
 -		text += PsiPopup::tr("Contact online");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
 +		text = PsiPopup::tr("Contact online");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
 +		*doAlertIcon = false;
  		break;
  	case AlertOffline:
 -		text += PsiPopup::tr("Contact offline");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("status/offline");
 +		text = PsiPopup::tr("Contact offline");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("status/offline");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("status/offline");
 +		*doAlertIcon = false;
  		break;
  	case AlertStatusChange:
 -		text += PsiPopup::tr("Status change");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
 +		text = PsiPopup::tr("Status change");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("status/online");
 +		*doAlertIcon = false;
  		break;
  	case AlertMessage:
 -		text += PsiPopup::tr("Incoming message");
-+		text = PsiPopup::tr("Incoming message");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/message");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/message");
 -		doAlertIcon = true;
++		text = PsiPopup::tr("Incoming message");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/message");
 +		*doAlertIcon = true;
  		break;
  	case AlertComposing:
 -		text += PsiPopup::tr("Typing notify");
-+		text = PsiPopup::tr("Typing notify");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
 -		doAlertIcon = false;
++		text = PsiPopup::tr("Typing notify");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
 +		*doAlertIcon = false;
  		break;
  	case AlertChat:
@@ -1381,7 +1391,7 @@
 -		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/chat");
 -		doAlertIcon = true;
 +		text = PsiPopup::tr("Incoming chat message");
-+		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/chat");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/chat");
 +		*doAlertIcon = true;
  		break;
  	case AlertHeadline:
@@ -1389,7 +1399,7 @@
 -		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
 -		doAlertIcon = true;
 +		text = PsiPopup::tr("Headline");
-+		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
 +		*doAlertIcon = true;
  		break;
  	case AlertFile:
@@ -1397,7 +1407,7 @@
 -		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/file");
 -		doAlertIcon = true;
 +		text = PsiPopup::tr("Incoming file");
-+		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/file");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/file");
 +		*doAlertIcon = true;
  		break;
  	case AlertAvCall:
@@ -1405,14 +1415,15 @@
 -		icon= (PsiIcon *)IconsetFactory::iconPtr("psi/call");
 -		doAlertIcon = true;
 +		text = PsiPopup::tr("Incoming call");
-+		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/call");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/call");
 +		*doAlertIcon = true;
  		break;
  	case AlertGcHighlight:
 -		text += PsiPopup::tr("Groupchat highlight");
-+		text = PsiPopup::tr("Groupchat highlight");
- 		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
+-		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
 -		doAlertIcon = true;
++		text = PsiPopup::tr("Groupchat highlight");
++		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
 +		*doAlertIcon = true;
  		break;
  	default:
@@ -1530,7 +1541,7 @@
 +	static void deleteAll();
 +
 +	static int timeout(PopupType type);
-+	static QString title(PopupType type, bool *doAlertIcon, PsiIcon *icon);
++	static QString title(PopupType type, bool *doAlertIcon, PsiIcon **icon);
 +	static QString clipText(const QString& text);
  
 +private:
