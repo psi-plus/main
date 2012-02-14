@@ -844,7 +844,7 @@
  	void quit(int);
 --- psi.orig/src/psidbusnotifier.cpp
 +++ psi/src/psidbusnotifier.cpp
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,263 @@
 +/*
 + * psidbusnotifier.cpp: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -1031,6 +1031,10 @@
 +		text = QString("%1 (%2)").arg(contact).arg(statusTxt);
 +		desc = statusMsg;
 +		break;
++	case PsiPopup::AlertComposing:
++		text = QString("%1%2").arg(contact).arg(QObject::tr(" is typing..."));
++		desc = "";
++		break;
 +	case PsiPopup::AlertMessage: {
 +			text = QObject::tr("%1 says:").arg(contact);
 +			if(showMessage) {
@@ -1078,7 +1082,7 @@
 +	args << hints;
 +	args << PsiPopup::timeout(type);
 +	m.setArguments(args);
-+	QDBusConnection::sessionBus().call(m);
++	QDBusConnection::sessionBus().asyncCall(m);
 +}
 +
 +void PsiDBusNotifier::popup(PsiAccount */*account*/, const Jid &/*j*/, const PsiIcon *titleIcon, const QString &titleText,
@@ -1102,11 +1106,11 @@
 +	args << hints;
 +	args << PsiPopup::timeout(PsiPopup::AlertStatusChange);
 +	m.setArguments(args);
-+	QDBusConnection::sessionBus().call(m);
++	QDBusConnection::sessionBus().asyncCall(m);
 +}
 --- psi.orig/src/psidbusnotifier.h
 +++ psi/src/psidbusnotifier.h
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,46 @@
 +/*
 + * psidbusnotifier.h: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -1134,8 +1138,6 @@
 +
 +#ifndef PSIDBUSNOTIFIER_H
 +#define PSIDBUSNOTIFIER_H
-+
-+#include <QObject>
 +
 +#include "psipopup.h"
 +
@@ -1209,7 +1211,16 @@
  	switch(type) {
  		case PsiPopup::AlertOnline:
  			name = QObject::tr("Contact becomes Available");
-@@ -151,15 +167,19 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -148,18 +164,28 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 			desc = statusMsg;
+ 			//icon = PsiIconset::instance()->statusPQString(jid, r.status());
+ 			break;
++		case PsiPopup::AlertComposing:
++			name = QObject::tr("Typing notify");
++			title = QString("%1%2").arg(contact).arg(QObject::tr(" is typing..."));
++			desc = "";
++			//icon = (PsiIcon *)IconsetFactory::iconPtr("psi/typing");
++			break;
  		case PsiPopup::AlertMessage: {
  			name = QObject::tr("Incoming Message");
  			title = QObject::tr("%1 says:").arg(contact);
@@ -1233,7 +1244,7 @@
  			//icon = IconsetFactory::iconPQString("psi/start-chat");
  			break;
  		}
-@@ -168,7 +188,9 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -168,7 +194,9 @@ void PsiGrowlNotifier::popup(PsiAccount*
  			const Message* jmessage = &((MessageEvent *)event)->message();
  			if ( !jmessage->subject().isEmpty())
  				title = jmessage->subject();
@@ -1244,7 +1255,7 @@
  			//icon = IconsetFactory::iconPQString("psi/headline");
  			break;
  		}
-@@ -181,11 +203,22 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -181,11 +209,22 @@ void PsiGrowlNotifier::popup(PsiAccount*
  			break;
  	}
  
@@ -1267,7 +1278,7 @@
  void PsiGrowlNotifier::cleanup()
  {
  	// try to keep the garbage bin no larger than 50 entries
-@@ -210,7 +243,8 @@ void PsiGrowlNotifier::tryDeleteContext(
+@@ -210,7 +249,8 @@ void PsiGrowlNotifier::tryDeleteContext(
  void PsiGrowlNotifier::notificationClicked(void* c)
  {
  	NotificationContext* context = (NotificationContext*) c;
