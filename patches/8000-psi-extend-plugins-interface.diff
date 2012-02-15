@@ -135,7 +135,7 @@
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(d->act_icon);
  	((QToolButton *)ui_.toolbar->widgetForAction(d->act_icon))->setPopupMode(QToolButton::InstantPopup);
-@@ -2070,6 +2074,12 @@ void GCMainDlg::buildMenu()
+@@ -2064,6 +2068,12 @@ void GCMainDlg::buildMenu()
  		d->pm_settings->addAction(d->act_ps);
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
@@ -769,7 +769,7 @@
 +	, file_(pluginFile)
 +	, priority_(PsiPlugin::PriorityNormal)
  	, loader_(0)
-+    , iconset_(0)
++	, iconset_(0)
 +	, valid_(false)
  	, connected_(false)
  	, enabled_(false)
@@ -1676,14 +1676,13 @@
  #include "psiplugin.h"
  #include "psiaccount.h"
  #include "stanzafilter.h"
-@@ -26,10 +28,13 @@
+@@ -26,10 +28,12 @@
  #include "iqnamespacefilter.h"
  #include "eventfilter.h"
  #include "optionaccessor.h"
-+#include "psipopup.h"
 +#include "avatars.h"
 +#include "psiiconset.h"
-+#include "popupdurationsmanager.h"
++#include "popupmanager.h"
  
  
  //TODO(mck)
@@ -1691,7 +1690,7 @@
  // - use native separators when displaying file path
  
  
-@@ -57,6 +62,9 @@ static QStringList pluginDirs()
+@@ -57,6 +61,9 @@ static QStringList pluginDirs()
  	QStringList l;
  	l += ApplicationInfo::resourcesDir() + "/plugins";
  	l += ApplicationInfo::homeDir() + "/plugins";
@@ -1701,7 +1700,7 @@
  	return l;
  }
  
-@@ -77,10 +85,9 @@ PluginManager* PluginManager::instance()
+@@ -77,10 +84,9 @@ PluginManager* PluginManager::instance()
   * Default constructor. Locates all plugins, sets watchers on those directories to 
   * locate new ones and loads those enabled in the config.
   */ 
@@ -1713,7 +1712,7 @@
  	foreach (QString path, pluginDirs()) {
  		QCA::DirWatch *dw = new QCA::DirWatch(path, this);
  		connect(dw, SIGNAL(changed()), SLOT(dirsChanged()));
-@@ -89,38 +96,73 @@ PluginManager::PluginManager() : QObject
+@@ -89,38 +95,73 @@ PluginManager::PluginManager() : QObject
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), this, SLOT(optionChanged(const QString&)));
  }
  
@@ -1800,7 +1799,7 @@
  }
  
  /**
-@@ -130,12 +172,32 @@ void PluginManager::dirsChanged()
+@@ -130,12 +171,32 @@ void PluginManager::dirsChanged()
  void PluginManager::loadEnabledPlugins()
  {
  	qDebug("Loading enabled plugins");
@@ -1837,7 +1836,7 @@
  		}
  	}
  }
-@@ -150,6 +212,10 @@ void PluginManager::optionChanged(const 
+@@ -150,6 +211,10 @@ void PluginManager::optionChanged(const 
  	//QString("%1.%2").arg(loadOptionPrefix).arg(shortNames_[plugin]);
  
  	//TODO(mck): implement this... for now, enabling/disabling requires psi restart
@@ -1848,7 +1847,7 @@
  }
  
  /**
-@@ -180,9 +246,7 @@ bool PluginManager::unloadAllPlugins()
+@@ -180,9 +245,7 @@ bool PluginManager::unloadAllPlugins()
  	qDebug("Unloading all plugins");
  	bool ok = true;
  	foreach (PluginHost* plugin, hosts_.values()) {
@@ -1859,7 +1858,7 @@
  			ok = false;
  		}
  	}
-@@ -195,7 +259,7 @@ bool PluginManager::unloadAllPlugins()
+@@ -195,7 +258,7 @@ bool PluginManager::unloadAllPlugins()
   * \param plugin Name of the plugin.
   * \return Path to the plugin file.
   */ 
@@ -1868,7 +1867,7 @@
  {
  	QString path;
  	if (hosts_.contains(plugin)) {
-@@ -210,7 +274,7 @@ QString PluginManager::pathToPlugin(cons
+@@ -210,7 +273,7 @@ QString PluginManager::pathToPlugin(cons
   * \param plugin Name of the plugin.
   * \return Path to the plugin file.
   */ 
@@ -1877,7 +1876,7 @@
  {
  	QString name;
  	if (hosts_.contains(plugin)) {
-@@ -219,10 +283,19 @@ QString PluginManager::shortName(const Q
+@@ -219,10 +282,19 @@ QString PluginManager::shortName(const Q
  	return name;
  }
  
@@ -1898,7 +1897,7 @@
  {
  	return hosts_.keys();
  }
-@@ -235,13 +308,31 @@ QStringList PluginManager::availablePlug
+@@ -235,13 +307,31 @@ QStringList PluginManager::availablePlug
   */
  QWidget* PluginManager::optionsWidget(const QString& plugin)
  {
@@ -1934,7 +1933,7 @@
  }
  
  /**
-@@ -254,10 +345,10 @@ QWidget* PluginManager::optionsWidget(co
+@@ -254,10 +344,10 @@ QWidget* PluginManager::optionsWidget(co
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -1947,7 +1946,7 @@
  		if (host->processMessage(accountIds_[account], jidFrom, body, subject)) {
  			handled = true;
  			break;
-@@ -276,10 +367,10 @@ bool PluginManager::processMessage(const
+@@ -276,10 +366,10 @@ bool PluginManager::processMessage(const
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -1960,7 +1959,7 @@
  		if (host->processEvent(accountIds_[account], event)) {
  			handled = true;
  			break;
-@@ -289,6 +380,40 @@ bool PluginManager::processEvent(const P
+@@ -289,6 +379,40 @@ bool PluginManager::processEvent(const P
  }
  
  /**
@@ -2001,7 +2000,7 @@
   * \brief Give each plugin the opportunity to process the incoming xml
   *
   * Each plugin is passed the xml in turn using various filter interfaces
-@@ -303,7 +428,7 @@ bool PluginManager::processEvent(const P
+@@ -303,7 +427,7 @@ bool PluginManager::processEvent(const P
  bool PluginManager::incomingXml(int account, const QDomElement &xml)
  {
  	bool handled = false;
@@ -2010,7 +2009,7 @@
  		if (host->incomingXml(account, xml)) {
  			handled = true;
  			break;
-@@ -339,7 +464,7 @@ void PluginManager::sendXml(int account,
+@@ -339,7 +463,7 @@ void PluginManager::sendXml(int account,
   * \param account Identifier of the PsiAccount responsible
   * \return Unique ID to be used for when sending a stanza
   */
@@ -2019,7 +2018,7 @@
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -348,15 +473,284 @@ QString PluginManager::uniqueId(int acco
+@@ -348,15 +472,279 @@ QString PluginManager::uniqueId(int acco
  	return id;
  }
  
@@ -2218,45 +2217,40 @@
 +
 +void PluginManager::initPopup(const QString& text, const QString& title, const QString& icon)
 +{
-+	PsiIcon ico = IconsetFactory::icon(icon);
-+	PsiPopup *popup = new PsiPopup(&ico, title, 0);
-+	popup->setData(0, 0, text);
++	const PsiIcon* ico = IconsetFactory::iconPtr(icon);
++	PopupManager::doPopup(0, Jid(), ico, title, 0, 0, text);
 +}
 +
 +void PluginManager::initPopupForJid(int account, const QString &jid, const QString &text, const QString &title, const QString &icon)
 +{
 +	XMPP::Jid j(jid);
-+	PsiIcon ico = IconsetFactory::icon(icon);
-+	PsiPopup *popup;
++	const PsiIcon* ico = IconsetFactory::iconPtr(icon);
 +	if (account < accountIds_.size()) {
 +		PsiAccount * pa = accountIds_.key(account);
 +		if(pa) {
-+			popup = new PsiPopup(&ico, title, pa);
-+			popup->setJid(j);
 +			UserListItem *i = pa->findFirstRelevant(j);
 +			PsiIcon *statusIco = PsiIconset::instance()->statusPtr(i);
 +			const QPixmap pix = pa->avatarFactory()->getAvatar(j);
-+			popup->setData(&pix, statusIco, text);
++			PopupManager::doPopup(pa, j, ico, title, &pix, statusIco, text);
 +			return;
 +		}
 +	}
-+	popup = new PsiPopup(&ico, title, 0);
-+	popup->setData(0, 0, text);
++	PopupManager::doPopup(0, Jid(), ico, title, 0, 0, text);
 +}
 +
 +void PluginManager::registerOption(const QString& name, int initValue, const QString& path)
 +{
-+	psi_->popupDurationsManager()->registerOption(name, initValue, path);
++	psi_->popupManager()->registerOption(name, initValue, path);
 +}
 +
 +int PluginManager::popupDuration(const QString& name) const
 +{
-+	return psi_->popupDurationsManager()->value(name);
++	return psi_->popupManager()->value(name);
 +}
 +
 +void PluginManager::setPopupDuration(const QString& name, int value)
 +{
-+	psi_->popupDurationsManager()->setValue(name, value);
++	psi_->popupManager()->setValue(name, value);
 +}
 +
 +void PluginManager::addAccountMenu(QMenu *menu, PsiAccount* account)
@@ -2305,7 +2299,7 @@
  }
  
  /**
-@@ -369,6 +763,179 @@ bool PluginManager::verifyStanza(const Q
+@@ -369,6 +757,179 @@ bool PluginManager::verifyStanza(const Q
  	return true;
  }
  
@@ -3322,7 +3316,7 @@
 +	$$PWD/include/soundaccessinghost.h
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -738,6 +738,13 @@ public slots:
+@@ -734,6 +734,13 @@ public slots:
  		xmlRingbuf[xmlRingbufWrite].time = QDateTime::currentDateTime();
  		xmlRingbufWrite = (xmlRingbufWrite + 1) % xmlRingbuf.count();
  	}
@@ -3336,7 +3330,7 @@
  	
  	void pm_proxyRemoved(QString proxykey)
  	{
-@@ -1097,6 +1104,11 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1093,6 +1100,11 @@ PsiAccount::PsiAccount(const UserAccount
  
  	// create Jabber::Client
  	d->client = new Client;
@@ -3348,7 +3342,7 @@
  	d->client->setOSName(SystemInfo::instance()->os());
  	d->client->setClientName(ApplicationInfo::name());
  	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1154,6 +1166,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1150,6 +1162,7 @@ PsiAccount::PsiAccount(const UserAccount
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -3356,7 +3350,7 @@
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1218,11 +1231,6 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1214,11 +1227,6 @@ PsiAccount::PsiAccount(const UserAccount
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -3368,7 +3362,7 @@
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1763,6 +1771,10 @@ void PsiAccount::logout(bool fast, const
+@@ -1759,6 +1767,10 @@ void PsiAccount::logout(bool fast, const
  	if(!isActive())
  		return;
  
@@ -3379,7 +3373,7 @@
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4620,6 +4632,22 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4601,6 +4613,22 @@ void PsiAccount::dj_sendMessage(const Me
  		}
  	}
  
@@ -3402,7 +3396,7 @@
  	d->client->sendMessage(nm);
  
  	// only toggle if not an invite or body is not empty
-@@ -4902,6 +4930,15 @@ static bool messageListContainsEvent(con
+@@ -4883,6 +4911,15 @@ static bool messageListContainsEvent(con
  	return false;
  }
  
@@ -3418,7 +3412,7 @@
  // handle an incoming event
  void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  {
-@@ -4946,12 +4983,14 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4927,12 +4964,14 @@ void PsiAccount::handleEvent(PsiEvent* e
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -3435,7 +3429,7 @@
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5168,6 +5207,13 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5149,6 +5188,13 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  #endif
  	}
@@ -3449,28 +3443,25 @@
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5187,8 +5233,18 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5168,7 +5214,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  		    (popupType == PsiPopup::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PsiPopup::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
--			PsiPopup *popup = new PsiPopup(popupType, this);
--			popup->setData(j, r, u, e);
+-			PopupManager::doPopup(this, popupType, j, r, u, e);
 +#ifdef PSI_PLUGINS
 +			if(e->type() != PsiEvent::Plugin) {
 +#endif
-+				PsiPopup *popup = new PsiPopup(popupType, this);
-+				popup->setData(j, r, u, e);
++				PopupManager::doPopup(this, popupType, j, r, u, e);
 +#ifdef PSI_PLUGINS
-+			}
-+			else {
-+				PsiPopup *popup = new PsiPopup(popupType, this);
-+				popup->setData(0,0, e->description());
++ 			}
++ 			else {
++				PopupManager::doPopup(this, j, IconsetFactory::iconPtr("psi/headline"), tr("Headline"), 0, 0, e->description());
 +			}
 +#endif
  		}
- #if defined(Q_WS_MAC) && defined(HAVE_GROWL)
- 		PsiGrowlNotifier::instance()->popup(this, popupType, j, r, u, e);
-@@ -5365,6 +5421,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
+ 
+ 		emit startBounce();
+@@ -5343,6 +5398,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
  		}
  		else if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled())
  			doPopup = false;
@@ -3481,7 +3472,7 @@
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5387,6 +5447,18 @@ void PsiAccount::openNextEvent(const Use
+@@ -5365,6 +5424,18 @@ void PsiAccount::openNextEvent(const Use
  	PsiEvent *e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;
@@ -3533,7 +3524,7 @@
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(act_icon_);
  	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
-@@ -846,6 +850,12 @@ void PsiChatDlg::buildMenu()
+@@ -848,6 +852,12 @@ void PsiChatDlg::buildMenu()
  
  	pm_settings_->addAction(act_info_);
  	pm_settings_->addAction(act_history_);
@@ -3548,7 +3539,7 @@
  void PsiChatDlg::updateCounter()
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -576,7 +576,7 @@ bool PsiCon::init()
+@@ -581,7 +581,7 @@ bool PsiCon::init()
  
  #ifdef PSI_PLUGINS
  	// Plugin Manager
@@ -3557,7 +3548,7 @@
  #endif
  
  	// Global shortcuts
-@@ -774,7 +774,9 @@ void PsiCon::deinit()
+@@ -779,7 +779,9 @@ void PsiCon::deinit()
  	// save profile
  	if(d->contactList)
  		d->saveProfile(acc);
@@ -3568,7 +3559,7 @@
  	GlobalShortcutManager::clear();
  
  	DesktopUtil::unsetUrlHandler("xmpp");
-@@ -794,6 +796,9 @@ void PsiCon::setShortcuts()
+@@ -799,6 +801,9 @@ void PsiCon::setShortcuts()
  #ifdef YAPSI
  	ShortcutManager::connect("global.filter-contacts", d->mainwin, SLOT(filterContacts()));
  #endif
@@ -3697,38 +3688,3 @@
  // normal, chat, error, headline, etc
  class MessageEvent : public PsiEvent
  {
---- psi.orig/src/psipopup.cpp
-+++ psi/src/psipopup.cpp
-@@ -112,7 +112,8 @@ PsiPopup::Private::~Private()
- 
- void PsiPopup::Private::init(const PsiIcon *_titleIcon, QString titleText, PsiAccount *acc, PopupType type)
- {
--	psi = acc->psi();
-+	psi = 0;
-+	if(acc) psi = acc->psi();
- 	account = acc;
- 	display = true;
- 
-@@ -329,6 +330,11 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
- 	d->init(icon, text, acc, doAlertIcon ? type : AlertNone);
- }
- 
-+void PsiPopup::setJid(const Jid &j)
-+{
-+	d->jid = j;
-+}
-+
- void PsiPopup::setData(const QPixmap *avatar, const PsiIcon *icon, QString text)
- {
- 	if ( !d->popup ) {
---- psi.orig/src/psipopup.h
-+++ psi/src/psipopup.h
-@@ -64,6 +64,8 @@ public:
- 	void setData(const QPixmap *avatar, const PsiIcon *icon, QString text);
- 	void setData(const Jid &, const Resource &, const UserListItem * = 0, const PsiEvent * = 0);
- 
-+	void setJid(const Jid &j);
-+
- 	void show();
- 
- 	QString id() const;
