@@ -16,16 +16,19 @@
  					<incoming-file-transfer type="bool">true</incoming-file-transfer>
  					<incoming-headline type="bool">true</incoming-headline>
  					<incoming-message type="bool">true</incoming-message>
-@@ -420,6 +422,8 @@ QLineEdit#le_status_text {
+@@ -420,6 +422,11 @@ QLineEdit#le_status_text {
  					<maximum-text-length type="int">300</maximum-text-length>
  					<maximum-status-length type="int">-1</maximum-status-length>
  					<avatar-size type="int">48</avatar-size>
 +					<suppress-while-away type="bool">false</suppress-while-away>
 +					<suppress-while-dnd type="bool">true</suppress-while-dnd>
++					<dbus>
++						<transient-hint type="bool">false</transient-hint>
++					</dbus>
  					<status>
  						<offline type="bool">true</offline>
  						<online type="bool">true</online>
-@@ -630,6 +634,7 @@ QLineEdit#le_status_text {
+@@ -630,6 +637,7 @@ QLineEdit#le_status_text {
  			<ignore-non-roster-contacts type="bool">false</ignore-non-roster-contacts>
  			<send-composing-events type="bool">true</send-composing-events>
  			<send-inactivity-events type="bool">false</send-inactivity-events>
@@ -1569,7 +1572,7 @@
  	void accountAdded(PsiAccount *);
 --- psi.orig/src/psidbusnotifier.cpp
 +++ psi/src/psidbusnotifier.cpp
-@@ -0,0 +1,349 @@
+@@ -0,0 +1,367 @@
 +/*
 + * psidbusnotifier.cpp: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -1617,7 +1620,7 @@
 +#include "psicon.h"
 +
 +
-+static int maxLifeTime = 10000;
++static int minLifeTime = 5000;
 +
 +class iiibiiay
 +{
@@ -1684,7 +1687,6 @@
 +					      "org.freedesktop.Notifications",
 +					      "NotificationClosed", this, SLOT(popupClosed(uint,uint)));
 +	lifeTimer_->setSingleShot(true);
-+	lifeTimer_->setInterval(maxLifeTime);
 +	connect(lifeTimer_, SIGNAL(timeout()), SLOT(readyToDie()));
 +}
 +
@@ -1743,6 +1745,15 @@
 +	title = PsiPopup::title(type, &doAlert, &ico);
 +
 +	QVariantMap hints;
++	if(PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.dbus.transient-hint").toBool() ||
++	   type == PsiPopup::AlertComposing || type == PsiPopup::AlertOffline ||
++	   type == PsiPopup::AlertOnline || type == PsiPopup::AlertStatusChange || type == PsiPopup::AlertNone)
++	{
++		hints.insert("transient", QVariant(true));
++	}
++//	if(doAlert) {
++//		hints.insert("urgency", QVariant(2));
++//	}
 +	QImage im;
 +	if(account) {
 +		im = account->avatarFactory()->getAvatar(jid.bare()).toImage();
@@ -1816,6 +1827,7 @@
 +		text += "\n" + desc;
 +	}
 +
++	int lifeTime = PsiPopup::timeout(type);
 +	QDBusMessage m = createMessage("Notify");
 +	QVariantList args;
 +	args << QString(ApplicationInfo::name());
@@ -1825,7 +1837,7 @@
 +	args << QString(text);
 +	args << QStringList();
 +	args << hints;
-+	args << PsiPopup::timeout(type);
++	args << lifeTime;
 +	m.setArguments(args);
 +	QDBusPendingCall call = QDBusConnection::sessionBus().asyncCall(m);
 +	QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(call, this);
@@ -1833,7 +1845,9 @@
 +	connect(watcher, SIGNAL(finished(QDBusPendingCallWatcher*)),
 +			 this, SLOT(asyncCallFinished(QDBusPendingCallWatcher*)));
 +
-+	lifeTimer_->start();
++	lifeTime = (lifeTime < 0) ? lifeTime : qMax(minLifeTime, lifeTime);
++	if(lifeTime >= 0)
++		lifeTimer_->start(lifeTime);
 +}
 +
 +void PsiDBusNotifier::popup(PsiAccount *account, const Jid &jid, const PsiIcon *titleIcon, const QString &titleText,
@@ -1843,12 +1857,17 @@
 +	jid_ = jid;
 +
 +	QVariantMap hints;
++	if(PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.dbus.transient-hint").toBool()) {
++		hints.insert("transient", QVariant(true));
++	}
 +	if(avatar || titleIcon) {
 +		int size = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.avatar-size").toInt();
 +		QImage im = avatar ? avatar->toImage().scaledToWidth(size, Qt::SmoothTransformation) : titleIcon->pixmap().toImage();
 +		iiibiiay i(&im);
 +		hints.insert("icon_data", QVariant(iiibiiay::id, &i));
 +	}
++
++	int lifeTime = PsiPopup::timeout(PsiPopup::AlertStatusChange);
 +	QDBusMessage m = createMessage("Notify");
 +	QVariantList args;
 +	args << QString(ApplicationInfo::name());
@@ -1858,7 +1877,7 @@
 +	args << QString(text);
 +	args << QStringList();
 +	args << hints;
-+	args << PsiPopup::timeout(PsiPopup::AlertStatusChange);
++	args << lifeTime;
 +	m.setArguments(args);
 +	QDBusPendingCall call = QDBusConnection::sessionBus().asyncCall(m);
 +	QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(call, this);
@@ -1866,7 +1885,9 @@
 +	connect(watcher, SIGNAL(finished(QDBusPendingCallWatcher*)),
 +			 this, SLOT(asyncCallFinished(QDBusPendingCallWatcher*)));
 +
-+	lifeTimer_->start();
++	lifeTime = (lifeTime < 0) ? lifeTime : qMax(minLifeTime, lifeTime);
++	if(lifeTime >= 0)
++		lifeTimer_->start(lifeTime);
 +}
 +
 +void PsiDBusNotifier::asyncCallFinished(QDBusPendingCallWatcher *watcher)
