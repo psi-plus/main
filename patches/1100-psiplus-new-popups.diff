@@ -8,7 +8,7 @@
  				<bounce-dock type="QString">forever</bounce-dock>
  				<send-receipts type="bool" >true</send-receipts>
  				<request-receipts type="bool" >true</request-receipts>
-@@ -412,6 +413,7 @@ QLineEdit#le_status_text {
+@@ -412,13 +413,20 @@ QLineEdit#le_status_text {
  					<at-left-corner type="bool">false</at-left-corner>
  					<css type="QString"></css>
  					<incoming-chat type="bool">true</incoming-chat>
@@ -16,7 +16,8 @@
  					<incoming-file-transfer type="bool">true</incoming-file-transfer>
  					<incoming-headline type="bool">true</incoming-headline>
  					<incoming-message type="bool">true</incoming-message>
-@@ -420,6 +422,11 @@ QLineEdit#le_status_text {
++					<notify-every-muc-message type="bool">false</notify-every-muc-message>
+ 					<maximum-jid-length type="int">25</maximum-jid-length>
  					<maximum-text-length type="int">300</maximum-text-length>
  					<maximum-status-length type="int">-1</maximum-status-length>
  					<avatar-size type="int">48</avatar-size>
@@ -28,7 +29,7 @@
  					<status>
  						<offline type="bool">true</offline>
  						<online type="bool">true</online>
-@@ -630,6 +637,7 @@ QLineEdit#le_status_text {
+@@ -630,6 +638,7 @@ QLineEdit#le_status_text {
  			<ignore-non-roster-contacts type="bool">false</ignore-non-roster-contacts>
  			<send-composing-events type="bool">true</send-composing-events>
  			<send-inactivity-events type="bool">false</send-inactivity-events>
@@ -116,28 +117,30 @@
  
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -95,7 +95,7 @@
+@@ -95,6 +95,8 @@
  #include <windows.h>
  #endif
  
--#include "psipopup.h"
 +#include "popupmanager.h"
- #include "psievent.h"
++#include "psievent.h"
  
  #define MCMDMUC		"http://psi-im.org/ids/mcmd#mucmain"
-@@ -1633,11 +1633,9 @@ void GCMainDlg::message(const Message &_
- 			account()->playSound(PsiAccount::eChat2);
- 		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
- 			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
--				PsiPopup *popup = new PsiPopup(PsiPopup::AlertGcHighlight, account());
- 				XMPP::Jid jid = m.from().withDomain("");
--				const UserListItem u;
- 				const MessageEvent *e = new MessageEvent(m, account());
--				popup->setData(jid, m.from().resource(), &u, (PsiEvent *)e);
+ #define MCMDMUCNICK	"http://psi-im.org/ids/mcmd#mucnick"
+@@ -1629,6 +1631,14 @@ void GCMainDlg::message(const Message &_
+ 	else {
+ 		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
+ 			account()->playSound(PsiAccount::eGroupChat);
++
++		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
++			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
++				XMPP::Jid jid = m.from().withDomain("");
++				const MessageEvent *e = new MessageEvent(m, account());
 +				account()->psi()->popupManager()->doPopup(account(), PsiPopup::AlertGcHighlight, jid, m.from().resource(), 0, (PsiEvent *)e);
- 			}
++			}
++		}
  	}
  
+ 	if(from.isEmpty())
 --- psi.orig/src/options/opt_advanced.cpp
 +++ psi/src/options/opt_advanced.cpp
 @@ -96,7 +96,9 @@ QWidget *OptionsTabAdvanced::widget()
@@ -1466,7 +1469,7 @@
  void PsiAccount::sentInitialPresence()
  {
  	QTimer::singleShot(15000, this, SLOT(enableNotifyOnline()));
-@@ -4858,8 +4863,15 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4861,8 +4866,15 @@ void PsiAccount::handleEvent(PsiEvent* e
  					c->incomingMessage(m);
  				}
  			}
@@ -1484,7 +1487,7 @@
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
-@@ -4876,7 +4888,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4879,7 +4891,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
@@ -1493,7 +1496,7 @@
  			ChatDlg *c = findChatDialog(e->from());
  			if(!c)
  				c = findChatDialog(e->jid());
-@@ -5024,18 +5036,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5027,18 +5039,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  			r = *(u->priority());
  		}
  
@@ -1520,7 +1523,7 @@
  		emit startBounce();
  	}
  
-@@ -5189,7 +5199,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5192,7 +5202,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
  
  	// FIXME: We shouldn't be doing this kind of stuff here, because this
  	// function is named *queue*Event() not deleteThisMessageSometimes()
@@ -2308,7 +2311,7 @@
  {
  	d = new Private(this);
  	d->init(titleIcon, titleText, acc, AlertNone);
-@@ -273,57 +256,108 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
+@@ -273,52 +256,108 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
  	QString text = "Psi: ";
  	bool doAlertIcon = false;
  
@@ -2387,11 +2390,8 @@
 +		text = PsiPopup::tr("Incoming call");
 +		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/call");
 +		*doAlertIcon = true;
- 		break;
- 	case AlertGcHighlight:
--		text += PsiPopup::tr("Groupchat highlight");
--		icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
--		doAlertIcon = true;
++		break;
++	case AlertGcHighlight:
 +		text = PsiPopup::tr("Groupchat highlight");
 +		*icon = (PsiIcon *)IconsetFactory::iconPtr("psi/headline");
 +		*doAlertIcon = true;
@@ -2402,8 +2402,9 @@
  
 -	d->init(icon, text, acc, doAlertIcon ? type : AlertNone);
 +	return text;
-+}
-+
+ }
+ 
+-void PsiPopup::setData(const QPixmap *avatar, const PsiIcon *icon, QString text)
 +QString PsiPopup::clipText(const QString &text)
 +{
 +	return PsiPopup::Private::clipText(text);
@@ -2436,14 +2437,13 @@
 +void PsiPopup::setJid(const Jid &j)
 +{
 +	d->jid = j;
- }
- 
--void PsiPopup::setData(const QPixmap *avatar, const PsiIcon *icon, QString text)
++}
++
 +void PsiPopup::setData(const QPixmap *avatar, const PsiIcon *icon, const QString& text)
  {
  	if ( !d->popup ) {
  		deleteLater();
-@@ -349,24 +383,26 @@ void PsiPopup::setData(const Jid &j, con
+@@ -344,24 +383,26 @@ void PsiPopup::setData(const Jid &j, con
  
  	d->jid    = j;
  	d->status = r.status();
@@ -2479,7 +2479,7 @@
  
  	QString name;
  	if ( u && !u->name().isEmpty() ) {
-@@ -380,7 +416,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -375,7 +416,7 @@ void PsiPopup::setData(const Jid &j, con
  	}
  		
  	if (!name.isEmpty()) {
@@ -2488,7 +2488,7 @@
  			name = "<nobr>" + Qt::escape(name) + "</nobr>";
  		else
  			name = "<nobr>" + Qt::escape(name) + " &lt;" + Qt::escape(jid) + "&gt;" + "</nobr>";
-@@ -411,8 +447,8 @@ void PsiPopup::setData(const Jid &j, con
+@@ -406,8 +447,8 @@ void PsiPopup::setData(const Jid &j, con
  	}
  	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
  	// show popup
@@ -2499,7 +2499,7 @@
  		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
  			const Message *jmessage = &((MessageEvent *)event)->message();
  			QString message;
-@@ -425,10 +461,12 @@ void PsiPopup::setData(const Jid &j, con
+@@ -420,10 +461,12 @@ void PsiPopup::setData(const Jid &j, con
  				contactText += "<br/><font size=\"+1\">" + message + "</font>";
  			}
  		}
@@ -2514,7 +2514,7 @@
  	else if ( d->popupType == AlertHeadline ) {
  		QVBoxLayout *vbox = new QVBoxLayout;
  		vbox->addLayout( d->createContactInfo(&avatar, icon, contactText) );
-@@ -461,6 +499,9 @@ void PsiPopup::setData(const Jid &j, con
+@@ -456,6 +499,9 @@ void PsiPopup::setData(const Jid &j, con
  		d->popup->addLayout( vbox );
  		show();
  	}
@@ -2536,7 +2536,7 @@
  	enum PopupType {
  		AlertNone = 0,
  
-@@ -52,27 +49,36 @@ public:
+@@ -52,26 +49,36 @@ public:
  		AlertStatusChange,
  
  		AlertMessage,
@@ -2544,8 +2544,9 @@
  		AlertChat,
  		AlertHeadline,
  		AlertFile,
- 		AlertAvCall,
- 		AlertGcHighlight
+-		AlertAvCall
++		AlertAvCall,
++		AlertGcHighlight
  	};
 +
 +	PsiPopup(const PsiIcon *titleIcon, const QString& titleText, PsiAccount *acc);
