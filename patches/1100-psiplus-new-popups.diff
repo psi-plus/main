@@ -1141,11 +1141,11 @@
 +	QList<OptionValue> initList;
 +	initList << OptionValue(QObject::tr("Status"), "options.ui.notifications.passive-popups.delays.status",
 +			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.status").toInt()/1000, AlertOnline)
-+	<< OptionValue(QObject::tr("Message"),  "options.ui.notifications.passive-popups.delays.message",
-+			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.message").toInt()/1000, AlertMessage)
++	<< OptionValue(QObject::tr("Headline"),  "options.ui.notifications.passive-popups.delays.message",
++			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.message").toInt()/1000, AlertHeadline)
 +	<< OptionValue(QObject::tr("File"), "options.ui.notifications.passive-popups.delays.file",
 +			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.file").toInt()/1000, AlertFile)
-+	<< OptionValue(QObject::tr("Chat"), "options.ui.notifications.passive-popups.delays.chat",
++	<< OptionValue(QObject::tr("Chat Message"), "options.ui.notifications.passive-popups.delays.chat",
 +			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.chat").toInt()/1000, AlertChat)
 +	<< OptionValue(QObject::tr("Groupchat Message"),  "options.ui.notifications.passive-popups.delays.gc-message",
 +			PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.delays.gc-message").toInt()/1000, AlertGcHighlight);
@@ -1360,7 +1360,7 @@
 +
 +int PopupManager::timeout(PopupType type) const
 +{
-+	if(type == AlertHeadline || type == AlertAvCall)
++	if(type == AlertMessage || type == AlertAvCall)
 +		type = AlertChat;
 +	else if(type == AlertOffline || type == AlertStatusChange || type == AlertNone || type == AlertComposing)
 +		type = AlertOnline;
@@ -2449,7 +2449,7 @@
  
  private slots:
  	void popupDestroyed();
-@@ -81,7 +80,7 @@ public:
+@@ -81,21 +80,25 @@ public:
  	FancyPopup *popup;
  	PsiPopup *psiPopup;
  	QString id;
@@ -2458,7 +2458,9 @@
  	Jid jid;
  	Status status;
  	PsiEvent *event;
-@@ -90,12 +89,14 @@ public:
+ 	PsiIcon *titleIcon;
+ 	bool display;
++	bool doAlertIcon;
  };
  
  PsiPopup::Private::Private(PsiPopup *p)
@@ -2469,6 +2471,7 @@
 +	, popupType(PopupManager::AlertNone)
 +	, event(0)
 +	, titleIcon(0)
++	, doAlertIcon(false)
  {
 -	psiPopup = p;
 -	popup = 0;
@@ -2478,7 +2481,7 @@
  }
  
  PsiPopup::Private::~Private()
-@@ -110,15 +111,13 @@ PsiPopup::Private::~Private()
+@@ -110,15 +113,13 @@ PsiPopup::Private::~Private()
  	popup = 0;
  }
  
@@ -2497,12 +2500,12 @@
  	if ( !psiPopupList )
  		psiPopupList = new QList<PsiPopup *>();
  
-@@ -129,30 +128,13 @@ void PsiPopup::Private::init(const PsiIc
+@@ -129,30 +130,13 @@ void PsiPopup::Private::init(const PsiIc
  	if ( psiPopupList->count() && psiPopupList->last() )
  		lastPopup = psiPopupList->last()->popup();
  
 -	if ( type != AlertNone )
-+	if ( type != PopupManager::AlertNone )
++	if ( doAlertIcon )
  		titleIcon = new AlertIcon(_titleIcon);
  	else
  		titleIcon = new PsiIcon(*_titleIcon);
@@ -2531,7 +2534,7 @@
  
  	popup = new FancyPopup(titleText, titleIcon, lastPopup, false);
  	connect(popup, SIGNAL(clicked(int)), SLOT(popupClicked(int)));
-@@ -185,35 +167,16 @@ void PsiPopup::Private::popupClicked(int
+@@ -185,35 +169,16 @@ void PsiPopup::Private::popupClicked(int
  	else if ( event && event->account() && button == (int)Qt::RightButton ) {
  		event->account()->psi()->removeEvent(event);
  	}
@@ -2570,7 +2573,7 @@
  {
  	QHBoxLayout *dataBox = new QHBoxLayout();
  
-@@ -242,7 +205,7 @@ QBoxLayout *PsiPopup::Private::createCon
+@@ -242,7 +207,7 @@ QBoxLayout *PsiPopup::Private::createCon
  	textLabel->setFont(font);
  
  	textLabel->setWordWrap(false);
@@ -2579,7 +2582,7 @@
  	textLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
  	dataBox->addWidget(textLabel);
  
-@@ -253,10 +216,11 @@ QBoxLayout *PsiPopup::Private::createCon
+@@ -253,10 +218,11 @@ QBoxLayout *PsiPopup::Private::createCon
  // PsiPopup
  //----------------------------------------------------------------------------
  
@@ -2593,7 +2596,7 @@
  }
  
  PsiPopup::~PsiPopup()
-@@ -264,7 +228,8 @@ PsiPopup::~PsiPopup()
+@@ -264,61 +230,88 @@ PsiPopup::~PsiPopup()
  	delete d;
  }
  
@@ -2603,19 +2606,20 @@
  {
  	d = new Private(this);
  
-@@ -273,52 +238,79 @@ PsiPopup::PsiPopup(PopupType type, PsiAc
+ 	d->popupType = type;
+ 	PsiIcon *icon = 0;
  	QString text = "Psi: ";
- 	bool doAlertIcon = false;
- 
-+	text += title(type, &doAlertIcon, &icon);
+-	bool doAlertIcon = false;
 +
-+	d->init(icon, text, acc, doAlertIcon ? type : PopupManager::AlertNone);
++	text += title(type, &d->doAlertIcon, &icon);
++
++	d->init(icon, text, acc, type);
 +}
 +
 +QString PsiPopup::title(PopupManager::PopupType type, bool *doAlertIcon, PsiIcon **icon)
 +{
 +	QString text;
-+
+ 
  	switch(type) {
 -	case AlertOnline:
 -		text += PsiPopup::tr("Contact online");
@@ -2721,7 +2725,7 @@
  {
  	if ( !d->popup ) {
  		deleteLater();
-@@ -344,24 +336,26 @@ void PsiPopup::setData(const Jid &j, con
+@@ -344,24 +337,26 @@ void PsiPopup::setData(const Jid &j, con
  
  	d->jid    = j;
  	d->status = r.status();
@@ -2757,7 +2761,7 @@
  
  	QString name;
  	if ( u && !u->name().isEmpty() ) {
-@@ -375,7 +369,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -375,7 +370,7 @@ void PsiPopup::setData(const Jid &j, con
  	}
  		
  	if (!name.isEmpty()) {
@@ -2766,7 +2770,7 @@
  			name = "<nobr>" + Qt::escape(name) + "</nobr>";
  		else
  			name = "<nobr>" + Qt::escape(name) + " &lt;" + Qt::escape(jid) + "&gt;" + "</nobr>";
-@@ -397,7 +391,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -397,7 +392,7 @@ void PsiPopup::setData(const Jid &j, con
  	// hack for duplicate "Contact Online"/"Status Change" popups
  	foreach (PsiPopup *pp, *psiPopupList) {
  		if ( d->jid.full() == pp->d->jid.full() && d->status.show() == pp->d->status.show() && d->status.status() == d->status.status() ) {
@@ -2775,7 +2779,7 @@
  				d->display = false;
  				deleteLater();
  				break;
-@@ -406,8 +400,9 @@ void PsiPopup::setData(const Jid &j, con
+@@ -406,8 +401,9 @@ void PsiPopup::setData(const Jid &j, con
  	}
  	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
  	// show popup
@@ -2787,7 +2791,7 @@
  		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
  			const Message *jmessage = &((MessageEvent *)event)->message();
  			QString message;
-@@ -420,11 +415,13 @@ void PsiPopup::setData(const Jid &j, con
+@@ -420,11 +416,13 @@ void PsiPopup::setData(const Jid &j, con
  				contactText += "<br/><font size=\"+1\">" + message + "</font>";
  			}
  		}
@@ -2804,7 +2808,7 @@
  		QVBoxLayout *vbox = new QVBoxLayout;
  		vbox->addLayout( d->createContactInfo(&avatar, icon, contactText) );
  
-@@ -443,7 +440,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -443,7 +441,7 @@ void PsiPopup::setData(const Jid &j, con
  
  		messageLabel->setWordWrap(true);
  		messageLabel->setTextFormat(Qt::RichText);
@@ -2813,7 +2817,7 @@
  		messageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
  		vbox->addWidget(messageLabel);
  
-@@ -456,6 +453,9 @@ void PsiPopup::setData(const Jid &j, con
+@@ -456,6 +454,9 @@ void PsiPopup::setData(const Jid &j, con
  		d->popup->addLayout( vbox );
  		show();
  	}

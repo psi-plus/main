@@ -135,7 +135,7 @@
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(d->act_icon);
  	((QToolButton *)ui_.toolbar->widgetForAction(d->act_icon))->setPopupMode(QToolButton::InstantPopup);
-@@ -2064,6 +2068,12 @@ void GCMainDlg::buildMenu()
+@@ -2066,6 +2070,12 @@ void GCMainDlg::buildMenu()
  		d->pm_settings->addAction(d->act_ps);
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
@@ -1033,7 +1033,7 @@
  }
  
  /**
-@@ -616,6 +769,425 @@ QVariant PluginHost::getGlobalOption(con
+@@ -616,6 +769,430 @@ QVariant PluginHost::getGlobalOption(con
  	return PsiOptions::instance()->getOption(option);
  }
  
@@ -1323,19 +1323,24 @@
 +	}
 +}
 +
-+void PluginHost::initPopup(const QString& text, const QString& title, const QString& icon)
++void PluginHost::initPopup(const QString& text, const QString& title, const QString& icon, int type)
 +{
-+	manager_->initPopup(text, title, icon);
++	manager_->initPopup(text, title, icon, type);
 +}
 +
-+void PluginHost::initPopupForJid(int account, const QString &jid, const QString &text, const QString &title, const QString &icon)
++void PluginHost::initPopupForJid(int account, const QString &jid, const QString &text, const QString &title, const QString &icon, int type)
 +{
-+	manager_->initPopupForJid(account, jid, text, title, icon);
++	manager_->initPopupForJid(account, jid, text, title, icon, type);
 +}
 +
 +void PluginHost::registerOption(const QString& name, int initValue, const QString& path)
 +{
 +	manager_->registerOption(name, initValue, path);
++}
++
++void PluginHost::unregisterOption(const QString &name)
++{
++	manager_->unregisterOption(name);
 +}
 +
 +int PluginHost::popupDuration(const QString& name)
@@ -1536,7 +1541,7 @@
  
  	// IqFilteringHost
  	void addIqNamespaceFilter(const QString& ns, IqNamespaceFilter* filter);
-@@ -70,25 +96,117 @@ public:
+@@ -70,25 +96,119 @@ public:
  
  	// OptionAccessingHost
  	void setPluginOption(const QString& option, const QVariant& value);
@@ -1604,6 +1609,14 @@
 +	bool setMood(int account, const QString& Jid, QDomElement xml);
 +	bool setTune(int account, const QString& Jid, QString tune);
 +
++	//PopupAccessingHost
++	void initPopup(const QString& text, const QString& title, const QString& icon, int type);
++	void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon, int type);
++	void registerOption(const QString& name, int initValue = 5, const QString& path = QString());
++	int popupDuration(const QString& name);
++	void setPopupDuration(const QString& name, int value);
++	void unregisterOption(const QString& name);
++
 +	void addToolBarButton(QObject* parent, QWidget* toolbar, int account, const QString& contact);
 +	void addGCToolBarButton(QObject* parent, QWidget* toolbar, int account, const QString& contact);
 +
@@ -1647,12 +1660,6 @@
 +
 +	QList< QVariantHash > accMenu_;
 +	QList< QVariantHash > contactMenu_;
-+
-+	void initPopup(const QString& text, const QString& title, const QString& icon);
-+	void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon);
-+	void registerOption(const QString& name, int initValue = 5, const QString& path = QString());
-+	int popupDuration(const QString& name);
-+	void setPopupDuration(const QString& name, int value);
  
  	bool loadPlugin(QObject* pluginObject);
  
@@ -2018,7 +2025,7 @@
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -348,15 +472,279 @@ QString PluginManager::uniqueId(int acco
+@@ -348,15 +472,284 @@ QString PluginManager::uniqueId(int acco
  	return id;
  }
  
@@ -2215,13 +2222,13 @@
 +	return true;
 +}
 +
-+void PluginManager::initPopup(const QString& text, const QString& title, const QString& icon)
++void PluginManager::initPopup(const QString& text, const QString& title, const QString& icon, int type)
 +{
 +	const PsiIcon* ico = IconsetFactory::iconPtr(icon);
-+	psi_->popupManager()->doPopup(0, Jid(), ico, title, 0, 0, text);
++	psi_->popupManager()->doPopup(0, Jid(), ico, title, 0, 0, text, true, (PopupManager::PopupType)type);
 +}
 +
-+void PluginManager::initPopupForJid(int account, const QString &jid, const QString &text, const QString &title, const QString &icon)
++void PluginManager::initPopupForJid(int account, const QString &jid, const QString &text, const QString &title, const QString &icon, int type)
 +{
 +	XMPP::Jid j(jid);
 +	const PsiIcon* ico = IconsetFactory::iconPtr(icon);
@@ -2231,16 +2238,21 @@
 +			UserListItem *i = pa->findFirstRelevant(j);
 +			PsiIcon *statusIco = PsiIconset::instance()->statusPtr(i);
 +			const QPixmap pix = pa->avatarFactory()->getAvatar(j);
-+			psi_->popupManager()->doPopup(pa, j, ico, title, &pix, statusIco, text);
++			psi_->popupManager()->doPopup(pa, j, ico, title, &pix, statusIco, text, true, (PopupManager::PopupType)type);
 +			return;
 +		}
 +	}
-+	psi_->popupManager()->doPopup(0, Jid(), ico, title, 0, 0, text);
++	psi_->popupManager()->doPopup(0, Jid(), ico, title, 0, 0, text, true, (PopupManager::PopupType)type);
 +}
 +
 +void PluginManager::registerOption(const QString& name, int initValue, const QString& path)
 +{
 +	psi_->popupManager()->registerOption(name, initValue, path);
++}
++
++void PluginManager::unregisterOption(const QString &name)
++{
++	psi_->popupManager()->unregisterOption(name);
 +}
 +
 +int PluginManager::popupDuration(const QString& name) const
@@ -2299,7 +2311,7 @@
  }
  
  /**
-@@ -369,6 +757,179 @@ bool PluginManager::verifyStanza(const Q
+@@ -369,6 +762,179 @@ bool PluginManager::verifyStanza(const Q
  	return true;
  }
  
@@ -2554,7 +2566,7 @@
  
  	static PluginManager* instance_;
  
-@@ -63,26 +85,67 @@ private:
+@@ -63,26 +85,68 @@ private:
  	QVector<XMPP::Client*> clients_;
  
  	//account, account id
@@ -2607,9 +2619,10 @@
 +	bool setMood(int account, const QString& Jid, QDomElement xml);
 +	bool setTune(int account, const QString& Jid, const QString& tune);
 +
-+	void initPopup(const QString& text, const QString& title, const QString& icon);
-+	void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon);
++	void initPopup(const QString& text, const QString& title, const QString& icon, int type);
++	void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon, int tipe);
 +	void registerOption(const QString& name, int initValue = 5, const QString& path = QString());
++	void unregisterOption(const QString& name);
 +	int popupDuration(const QString& name) const;
 +	void setPopupDuration(const QString& name, int value);
 +
@@ -3029,7 +3042,7 @@
 +#endif // PLUGININFOPROVIDER_H
 --- psi.orig/src/plugins/include/popupaccessinghost.h
 +++ psi/src/plugins/include/popupaccessinghost.h
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,21 @@
 +#ifndef POPUPACCESSINGHOST_H
 +#define POPUPACCESSINGHOST_H
 +
@@ -3040,11 +3053,12 @@
 +public:
 +	virtual ~PopupAccessingHost() {}
 +
-+	virtual void initPopup(const QString& text, const QString& title, const QString& icon = "psi/headline") = 0;
-+	virtual void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon = "psi/headline") = 0;
++	virtual void initPopup(const QString& text, const QString& title, const QString& icon = "psi/headline", int type = 0) = 0;
++	virtual void initPopupForJid(int account, const QString& jid, const QString& text, const QString& title, const QString& icon = "psi/headline", int type = 0) = 0;
 +	virtual void registerOption(const QString& name, int initValue = 5, const QString& path = QString()) = 0;
 +	virtual int popupDuration(const QString& name) = 0;
 +	virtual void setPopupDuration(const QString& name, int value) = 0;
++	virtual void unregisterOption(const QString& name) = 0;
 +};
 +
 +Q_DECLARE_INTERFACE(PopupAccessingHost, "org.psi-im.PopupAccessingHost/0.1");
@@ -3444,8 +3458,8 @@
  		putToQueue = false;
  		doPopup = false;
 @@ -5195,7 +5241,16 @@ void PsiAccount::handleEvent(PsiEvent* e
- 		    (popupType == PsiPopup::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
- 		    (popupType == PsiPopup::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
+ 		    (popupType == PopupManager::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
+ 		    (popupType == PopupManager::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
 -			psi()->popupManager()->doPopup(this, popupType, j, r, u, e, false);
 +#ifdef PSI_PLUGINS
@@ -3455,7 +3469,7 @@
 +#ifdef PSI_PLUGINS
 + 			}
 + 			else {
-+				psi()->popupManager()->doPopup(this, j, IconsetFactory::iconPtr("psi/headline"), tr("Headline"), 0, 0, e->description(), false);
++				psi()->popupManager()->doPopup(this, j, IconsetFactory::iconPtr("psi/headline"), tr("Headline"), 0, 0, e->description(), false, popupType);
 +			}
 +#endif
  		}
@@ -3539,7 +3553,7 @@
  void PsiChatDlg::updateCounter()
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -581,7 +581,7 @@ bool PsiCon::init()
+@@ -569,7 +569,7 @@ bool PsiCon::init()
  
  #ifdef PSI_PLUGINS
  	// Plugin Manager
@@ -3548,7 +3562,7 @@
  #endif
  
  	// Global shortcuts
-@@ -779,7 +779,9 @@ void PsiCon::deinit()
+@@ -767,7 +767,9 @@ void PsiCon::deinit()
  	// save profile
  	if(d->contactList)
  		d->saveProfile(acc);
@@ -3559,7 +3573,7 @@
  	GlobalShortcutManager::clear();
  
  	DesktopUtil::unsetUrlHandler("xmpp");
-@@ -799,6 +801,9 @@ void PsiCon::setShortcuts()
+@@ -787,6 +789,9 @@ void PsiCon::setShortcuts()
  #ifdef YAPSI
  	ShortcutManager::connect("global.filter-contacts", d->mainwin, SLOT(filterContacts()));
  #endif
