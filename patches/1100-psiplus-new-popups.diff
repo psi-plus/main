@@ -1802,7 +1802,7 @@
  	void accountAdded(PsiAccount *);
 --- psi.orig/src/psidbusnotifier.cpp
 +++ psi/src/psidbusnotifier.cpp
-@@ -0,0 +1,368 @@
+@@ -0,0 +1,375 @@
 +/*
 + * psidbusnotifier.cpp: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -1849,6 +1849,7 @@
 +#include "psioptions.h"
 +#include "psicon.h"
 +
++#include <QtDBus/QDBusPendingCallWatcher>
 +
 +static int minLifeTime = 5000;
 +
@@ -2123,12 +2124,18 @@
 +
 +void PsiDBusNotifier::asyncCallFinished(QDBusPendingCallWatcher *watcher)
 +{
-+	QDBusPendingReply<uint> repl(*watcher);
-+	if(repl.value() == 0) {
++	QDBusMessage m = watcher->reply();
++	if(m.type() == QDBusMessage::InvalidMessage || m.arguments().isEmpty()) {
++		readyToDie();
++		return;
++	}
++
++	QVariant repl = m.arguments().first();
++	if(repl.type() != QVariant::UInt || repl.toUInt() == 0) {
 +		readyToDie();
 +	}
 +	else {
-+		id_ = repl.value();
++		id_ = repl.toUInt();
 +	}
 +}
 +
