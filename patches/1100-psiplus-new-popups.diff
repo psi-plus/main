@@ -2258,7 +2258,18 @@
  
  /**
   * A class representing the notification context, which will be passed to
-@@ -106,79 +107,114 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
+@@ -42,8 +43,8 @@ class NotificationContext
+ {
+ public:
+ 	NotificationContext(PsiAccount* a, Jid j) : account_(a), jid_(j), deleteCount_(0) { }
+-	PsiAccount* account() { return account_; }
+-	Jid jid() { return jid_; }
++	PsiAccount* account() const { return account_; }
++	Jid jid() const { return jid_; }
+ 
+ private:
+ 	PsiAccount* account_;
+@@ -106,79 +107,126 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
   * \param uli The originating userlist item. Can be NULL.
   * \param event The originating event. Can be NULL.
   */
@@ -2342,7 +2353,8 @@
 +			if(showMessage) {
 +				const Message* jmessage = &((MessageEvent *)event)->message();
 +				desc = jmessage->body();
-+			}
++			} else
++				desc = QObject::tr("[Incoming Message]");
  			//icon = IconsetFactory::iconPQString("psi/message");
  			break;
  		}
@@ -2354,7 +2366,8 @@
 +			if(showMessage) {
 +				const Message* jmessage = &((MessageEvent *)event)->message();
 +				desc = jmessage->body();
-+			}
++			} else
++				desc = QObject::tr("[Incoming Message]");
  			//icon = IconsetFactory::iconPQString("psi/start-chat");
  			break;
  		}
@@ -2367,7 +2380,8 @@
 -			desc = jmessage->body();
 +			if(showMessage) {
 +				desc = jmessage->body();
-+			}
++			} else
++				desc = QObject::tr("[Incoming Headline]");
  			//icon = IconsetFactory::iconPQString("psi/headline");
  			break;
  		}
@@ -2377,9 +2391,18 @@
  			desc = QObject::tr("[Incoming File]");
  			//icon = IconsetFactory::iconPQString("psi/file");
  			break;
-+		case PopupManager::AlertGcHighlight:
++		case PopupManager::AlertGcHighlight: {
 +			name = QObject::tr("Groupchat highlight");
-+			desc = QObject::tr("[Groupchat highlight]");
++			if(showMessage) {
++				const Message* jmessage = &((MessageEvent *)event)->message();
++				desc = jmessage->body();
++			} else
++				desc = QObject::tr("[Groupchat highlight]");
++			break;
++		}
++		case PopupManager::AlertAvCall:
++			name = QObject::tr("Incoming Call");
++			desc = QObject::tr("[Incoming Call]");
 +			break;
  		default:
  			break;
@@ -2390,7 +2413,7 @@
  	}
  
  	// Notify Growl
-@@ -186,6 +222,13 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -186,6 +234,14 @@ void PsiGrowlNotifier::popup(PsiAccount*
  	gn_->notify(name, title, desc, icon, false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
  }
  
@@ -2398,13 +2421,14 @@
 +{
 +	// Notify Growl
 +	NotificationContext* context = new NotificationContext(account, jid);
-+	gn_->notify(titleText, QString(), text, titleIcon->pixmap(), false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
++	gn_->notify(titleText, QString("[%1]").arg(titleText), text,
++		    titleIcon->pixmap(), false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
 +}
 +
  void PsiGrowlNotifier::cleanup()
  {
  	// try to keep the garbage bin no larger than 50 entries
-@@ -210,7 +253,8 @@ void PsiGrowlNotifier::tryDeleteContext(
+@@ -210,7 +266,8 @@ void PsiGrowlNotifier::tryDeleteContext(
  void PsiGrowlNotifier::notificationClicked(void* c)
  {
  	NotificationContext* context = (NotificationContext*) c;
