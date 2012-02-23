@@ -1,0 +1,62 @@
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -1739,7 +1739,9 @@ void GCMainDlg::message(const Message &_
+ 			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
+ 				XMPP::Jid jid = m.from()/*.withDomain("")*/;
+ 				MessageEvent *e = new MessageEvent(m, account());
+-				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), 0, (PsiEvent *)e);
++				UserListItem i;
++				i.setPrivate(true);
++				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), &i, (PsiEvent *)e);
+ 				e->deleteLater();
+ 			}
+ 		}
+--- psi.orig/src/psidbusnotifier.cpp
++++ psi/src/psidbusnotifier.cpp
+@@ -185,7 +185,11 @@ void PsiDBusNotifier::popup(PsiAccount* 
+ //	}
+ 	QImage im;
+ 	if(account) {
+-		im = account->avatarFactory()->getAvatar(jid.bare()).toImage();
++		if(uli && uli->isPrivate())
++			im = account->avatarFactory()->getMucAvatar(jid).toImage();
++		else
++			im = account->avatarFactory()->getAvatar(jid).toImage();
++
+ 		if(!im.isNull()) {
+ 			int size = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.avatar-size").toInt();
+ 			im = im.scaledToWidth(size, Qt::SmoothTransformation);
+--- psi.orig/src/psigrowlnotifier.cpp
++++ psi/src/psigrowlnotifier.cpp
+@@ -120,8 +120,12 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 		if (((int)statusMsg.length()) > len)
+ 			statusMsg = statusMsg.left(len) + "...";
+ 	QPixmap icon;
+-	if(account)
+-		icon = account->avatarFactory()->getAvatar(jid.bare());
++	if(account) {
++		if(uli && uli->isPrivate())
++			icon = account->avatarFactory()->getMucAvatar(jid);
++		else
++			icon = account->avatarFactory()->getAvatar(jid);
++	}
+ 
+ 	if (uli) {
+ 		contact = uli->name();
+--- psi.orig/src/psipopup.cpp
++++ psi/src/psipopup.cpp
+@@ -400,7 +400,13 @@ void PsiPopup::setData(const Jid &j, con
+ 			}
+ 		}
+ 	}
+-	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
++	QPixmap avatar;
++	if(d->account) {
++		if(u && u->isPrivate())
++			avatar = d->account->avatarFactory()->getMucAvatar(j);
++		else
++			avatar = d->account->avatarFactory()->getAvatar(j);
++	}
+ 	// show popup
+ 	if ( d->popupType != PopupManager::AlertComposing && d->popupType != PopupManager::AlertHeadline &&
+ 	     (d->popupType != PopupManager::AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) )
