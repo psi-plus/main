@@ -1803,7 +1803,7 @@
  	void accountAdded(PsiAccount *);
 --- psi.orig/src/psidbusnotifier.cpp
 +++ psi/src/psidbusnotifier.cpp
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,378 @@
 +/*
 + * psidbusnotifier.cpp: Psi's interface to org.freedesktop.Notify
 + * Copyright (C) 2012  Khryukin Evgeny
@@ -1849,6 +1849,7 @@
 +#include "psipopup.h"
 +#include "psioptions.h"
 +#include "psicon.h"
++#include "textutil.h"
 +
 +
 +static int minLifeTime = 5000;
@@ -2109,7 +2110,7 @@
 +	args << QVariant(QVariant::UInt);
 +	args << QVariant("");
 +	args << QString(titleText);
-+	args << QString(text);
++	args << QString(TextUtil::rich2plain(text));
 +	args << QStringList();
 +	args << hints;
 +	args << lifeTime;
@@ -2250,15 +2251,16 @@
 +#endif
 --- psi.orig/src/psigrowlnotifier.cpp
 +++ psi/src/psigrowlnotifier.cpp
-@@ -33,6 +33,7 @@
+@@ -33,6 +33,8 @@
  #include "psigrowlnotifier.h"
  #include "psievent.h"
  #include "userlist.h"
 +#include "psioptions.h"
++#include "textutil.h"
  
  /**
   * A class representing the notification context, which will be passed to
-@@ -42,8 +43,8 @@ class NotificationContext
+@@ -42,8 +44,8 @@ class NotificationContext
  {
  public:
  	NotificationContext(PsiAccount* a, Jid j) : account_(a), jid_(j), deleteCount_(0) { }
@@ -2269,7 +2271,35 @@
  
  private:
  	PsiAccount* account_;
-@@ -106,79 +107,126 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
+@@ -68,16 +70,19 @@ PsiGrowlNotifier::PsiGrowlNotifier() : Q
+ 	nots << QObject::tr("Incoming Message");
+ 	nots << QObject::tr("Incoming Headline");
+ 	nots << QObject::tr("Incoming File");
+-
+-	// Initialize default notifications
+-	QStringList defaults;
+-	defaults << QObject::tr("Contact becomes Available");
+-	defaults << QObject::tr("Incoming Message");
+-	defaults << QObject::tr("Incoming Headline");
+-	defaults << QObject::tr("Incoming File");
++	nots << QObject::tr("Typing notify");
++	nots << QObject::tr("Groupchat highlight");
++	nots << QObject::tr("Incoming Call");
++
++//	Initialize default notifications
++//	QStringList defaults;
++//	defaults << QObject::tr("Contact becomes Available");
++//	defaults << QObject::tr("Incoming Message");
++//	defaults << QObject::tr("Incoming Headline");
++//	defaults << QObject::tr("Incoming File");
+ 
+ 	// Register with Growl
+-	gn_ = new GrowlNotifier(nots, defaults, "Psi");
++	gn_ = new GrowlNotifier(nots, nots, QCoreApplication::applicationName());
+ }
+ 
+ 
+@@ -106,79 +111,126 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
   * \param uli The originating userlist item. Can be NULL.
   * \param event The originating event. Can be NULL.
   */
@@ -2413,7 +2443,7 @@
  	}
  
  	// Notify Growl
-@@ -186,6 +234,14 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -186,6 +238,14 @@ void PsiGrowlNotifier::popup(PsiAccount*
  	gn_->notify(name, title, desc, icon, false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
  }
  
@@ -2421,14 +2451,14 @@
 +{
 +	// Notify Growl
 +	NotificationContext* context = new NotificationContext(account, jid);
-+	gn_->notify(titleText, QString("[%1]").arg(titleText), text,
++	gn_->notify("Incoming Headline", titleText, TextUtil::rich2plain(text),
 +		    titleIcon->pixmap(), false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
 +}
 +
  void PsiGrowlNotifier::cleanup()
  {
  	// try to keep the garbage bin no larger than 50 entries
-@@ -210,7 +266,8 @@ void PsiGrowlNotifier::tryDeleteContext(
+@@ -210,7 +270,8 @@ void PsiGrowlNotifier::tryDeleteContext(
  void PsiGrowlNotifier::notificationClicked(void* c)
  {
  	NotificationContext* context = (NotificationContext*) c;
@@ -2630,7 +2660,7 @@
  }
  
  PsiPopup::~PsiPopup()
-@@ -264,61 +230,89 @@ PsiPopup::~PsiPopup()
+@@ -264,61 +230,87 @@ PsiPopup::~PsiPopup()
  	delete d;
  }
  
@@ -2746,9 +2776,7 @@
  	}
  
 -	d->init(icon, text, acc, doAlertIcon ? type : AlertNone);
-+	text = QString("%1: %2").arg(QApplication::applicationName(), text);
-+
-+	return text;
++	return CAP(text);
 +}
 +
 +void PsiPopup::setJid(const Jid &j)
@@ -2761,7 +2789,7 @@
  {
  	if ( !d->popup ) {
  		deleteLater();
-@@ -344,24 +338,26 @@ void PsiPopup::setData(const Jid &j, con
+@@ -344,24 +336,26 @@ void PsiPopup::setData(const Jid &j, con
  
  	d->jid    = j;
  	d->status = r.status();
@@ -2797,7 +2825,7 @@
  
  	QString name;
  	if ( u && !u->name().isEmpty() ) {
-@@ -375,7 +371,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -375,7 +369,7 @@ void PsiPopup::setData(const Jid &j, con
  	}
  		
  	if (!name.isEmpty()) {
@@ -2806,7 +2834,7 @@
  			name = "<nobr>" + Qt::escape(name) + "</nobr>";
  		else
  			name = "<nobr>" + Qt::escape(name) + " &lt;" + Qt::escape(jid) + "&gt;" + "</nobr>";
-@@ -397,7 +393,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -397,7 +391,7 @@ void PsiPopup::setData(const Jid &j, con
  	// hack for duplicate "Contact Online"/"Status Change" popups
  	foreach (PsiPopup *pp, *psiPopupList) {
  		if ( d->jid.full() == pp->d->jid.full() && d->status.show() == pp->d->status.show() && d->status.status() == d->status.status() ) {
@@ -2815,7 +2843,7 @@
  				d->display = false;
  				deleteLater();
  				break;
-@@ -406,8 +402,9 @@ void PsiPopup::setData(const Jid &j, con
+@@ -406,8 +400,9 @@ void PsiPopup::setData(const Jid &j, con
  	}
  	QPixmap avatar = d->account->avatarFactory()->getAvatar(jid);
  	// show popup
@@ -2827,7 +2855,7 @@
  		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
  			const Message *jmessage = &((MessageEvent *)event)->message();
  			QString message;
-@@ -420,11 +417,13 @@ void PsiPopup::setData(const Jid &j, con
+@@ -420,11 +415,13 @@ void PsiPopup::setData(const Jid &j, con
  				contactText += "<br/><font size=\"+1\">" + message + "</font>";
  			}
  		}
@@ -2844,7 +2872,7 @@
  		QVBoxLayout *vbox = new QVBoxLayout;
  		vbox->addLayout( d->createContactInfo(&avatar, icon, contactText) );
  
-@@ -443,7 +442,7 @@ void PsiPopup::setData(const Jid &j, con
+@@ -443,7 +440,7 @@ void PsiPopup::setData(const Jid &j, con
  
  		messageLabel->setWordWrap(true);
  		messageLabel->setTextFormat(Qt::RichText);
@@ -2853,7 +2881,7 @@
  		messageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
  		vbox->addWidget(messageLabel);
  
-@@ -456,6 +455,9 @@ void PsiPopup::setData(const Jid &j, con
+@@ -456,6 +453,9 @@ void PsiPopup::setData(const Jid &j, con
  		d->popup->addLayout( vbox );
  		show();
  	}
