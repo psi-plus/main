@@ -1,55 +1,55 @@
---- psi.orig/src/accountmodifydlg.cpp
-+++ psi/src/accountmodifydlg.cpp
-@@ -135,6 +135,7 @@ void AccountModifyDlg::init()
- 	cb_priority->addItem(tr("Depends on status"));
- 	cb_priority->setCurrentIndex(acc.priority_dep_on_status ? 1 : 0);
- 	sb_priority->setValue(acc.priority);
-+	ck_ignore_global->setChecked(acc.ignore_global_actions);
+--- psi.orig/src/contactlistaccountmenu.cpp
++++ psi/src/contactlistaccountmenu.cpp
+@@ -43,6 +43,7 @@ class ContactListAccountMenu::Private :
  
- 	connect(ck_custom_auth,SIGNAL(toggled(bool)), lb_authid, SLOT(setEnabled(bool)));
- 	connect(ck_custom_auth,SIGNAL(toggled(bool)), le_authid, SLOT(setEnabled(bool)));
-@@ -271,6 +272,9 @@ void AccountModifyDlg::init()
- 		"with a low priority, and you can still use the same account "
- 		"from home, using a client with higher priority to "
- 		"temporary \"disable\" the lower priority client at work.</p>"));
-+	ck_ignore_global->setWhatsThis(
-+		tr("<p>Ignoring any the global actions for this account.</p>"
-+		"<p>For example, autostatus, mood, activity etc.</p>"));
+ 	QPointer<ContactListAccountGroup> account;
+ 	AccountStatusMenu* statusMenu_;
++	QAction* blockAction_;
+ 	QAction* moodAction_;
+ 	QAction* activityAction_;
+ 	QAction* geolocationAction_;
+@@ -78,6 +79,10 @@ public:
+ 		connect(account->account(), SIGNAL(updatedActivity()), SLOT(updateActions()));
+ 		connect(account->account(), SIGNAL(updatedAccount()), SLOT(updateActions()));
  
- 	// Hiding of UI components
- 	if ((!pa && acc.name.isEmpty()) || PsiOptions::instance()->getOption("options.ui.account.single").toBool()) {
-@@ -533,6 +537,7 @@ void AccountModifyDlg::save()
- 	acc.resource = le_resource->text();
- 	acc.priority_dep_on_status = (cb_priority->currentIndex() == 1);
- 	acc.priority = sb_priority->value();
-+	acc.ignore_global_actions = ck_ignore_global->isChecked();
- 	acc.customAuth = ck_custom_auth->isChecked();
- 	acc.authid = le_authid->text();
- 	acc.realm = le_realm->text();
---- psi.orig/src/accountmodify.ui
-+++ psi/src/accountmodify.ui
-@@ -170,6 +170,13 @@
-             </property>
-            </widget>
-           </item>
-+          <item>
-+           <widget class="QCheckBox" name="ck_ignore_global">
-+            <property name="text">
-+             <string>Ignoring the global statuses</string>
-+            </property>
-+           </widget>
-+          </item>
-          </layout>
-         </widget>
-        </item>
-@@ -1108,6 +1115,7 @@
-   <tabstop>ck_connectAfterSleep</tabstop>
-   <tabstop>ck_reconn</tabstop>
-   <tabstop>ck_log</tabstop>
-+  <tabstop>ck_ignore_global</tabstop>
-   <tabstop>pb_vcard</tabstop>
-   <tabstop>pb_key</tabstop>
-   <tabstop>pb_keyclear</tabstop>
++		blockAction_ = new IconAction(tr("Blocked"), this, "psi/cryptoYes");
++		blockAction_->setCheckable(true);
++		connect(blockAction_, SIGNAL(triggered()), SLOT(setBlock()));
++
+ 		statusMenu_ = new AccountStatusMenu(0, account->account()->psi(), account->account());
+ 		statusMenu_->fill();
+ 		statusMenu_->setTitle(tr("&Status"));
+@@ -148,6 +153,7 @@ public:
+ 		adminDeleteMotdAction_ = new IconAction(tr("Delete MOTD"), this, "psi/remove");
+ 		connect(adminDeleteMotdAction_, SIGNAL(triggered()), SLOT(adminDeleteMotd()));
+ 
++		menu->addAction(blockAction_);
+ 		menu->addMenu(statusMenu_);
+ 		menu->addAction(moodAction_);
+ 		menu->addAction(activityAction_);
+@@ -196,6 +202,7 @@ private slots:
+ 		if (!account)
+ 			return;
+ 
++		blockAction_->setChecked(account->account()->userAccount().ignore_global_actions);
+ 		statusMenu_->statusChanged(account->account()->status());
+ #ifndef USE_PEP
+ 		moodAction_->setVisible(false);
+@@ -259,6 +266,14 @@ private slots:
+ 		account->account()->changeStatus(static_cast<int>(statusType), forceDialog);
+ 	}
+ 
++	void setBlock()
++	{
++		if (!account)
++			return;
++
++		account->account()->actionSetBlock(!account->account()->userAccount().ignore_global_actions);
++	}
++
+ 	void setMood()
+ 	{
+ 		if (!account)
 --- psi.orig/src/mainwin.cpp
 +++ psi/src/mainwin.cpp
 @@ -1203,7 +1203,7 @@ void MainWin::actSetMoodActivated()
@@ -102,6 +102,28 @@
  	d->lastIdle = seconds;
  	int minutes = seconds / 60;
  
+@@ -4066,6 +4069,11 @@ void PsiAccount::actionExecuteCommandSpe
+ 	}
+ }
+ 
++void PsiAccount::actionSetBlock(bool blocked)
++{
++	d->acc.ignore_global_actions = blocked;
++}
++
+ void PsiAccount::actionSetMood()
+ {
+ 	QList<PsiAccount*> list;
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -374,6 +374,7 @@ public slots:
+ 	void actionSendFiles(const Jid &, const QStringList&);
+ 	void actionExecuteCommand(const Jid& j, const QString& = QString());
+ 	void actionExecuteCommandSpecific(const Jid&, const QString& = QString());
++	void actionSetBlock(bool);
+ 	void actionSetMood();
+ 	void actionSetActivity();
+ 	void actionSetGeoLocation();
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -1151,7 +1151,7 @@ void PsiCon::setGlobalStatus(const Statu
