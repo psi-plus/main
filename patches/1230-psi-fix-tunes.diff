@@ -331,7 +331,7 @@
  include($$PWD/tools/tunecontroller/tunecontroller.pri)
 --- git.orig/src/tools/tunecontroller/aimptunecontroller.cpp
 +++ git/src/tools/tunecontroller/aimptunecontroller.cpp
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,136 @@
 +/*
 + * aimptunecontroller.cpp
 + * Copyright (C) 2012 Vitaly Tonkacheyev
@@ -404,38 +404,53 @@
 +
 +Tune AIMPTuneController::getTune() const
 +{
-+	QString title = "";
-+	QString album = "";
-+	QString artist = "";
-+	QString url="";
 +	HANDLE aFile=OpenFileMapping(FILE_MAP_READ, TRUE, AIMP_REMOTE_CLASS);
 +	TAIMPFileInfo *aInfo=(TAIMPFileInfo *)MapViewOfFile(aFile, FILE_MAP_READ, 0, 0, AIMPRemoteAccessMapFileSize);
 +	if (aInfo != NULL) {
 +		wchar_t *str = (wchar_t *)((DWORD)aInfo+ aInfo->StructSize);
-+		album = QString::fromWCharArray(str, aInfo->AlbumLength);
++		QString album = QString::fromWCharArray(str, aInfo->AlbumLength);
 +		str += aInfo->AlbumLength;
-+		artist = QString::fromWCharArray(str, aInfo->ArtistLength);
++		QString artist = QString::fromWCharArray(str, aInfo->ArtistLength);
 +		str += aInfo->ArtistLength + aInfo->DateLength;
-+		url = QString::fromWCharArray(str, aInfo->FileNameLength);
++		QString url = QString::fromWCharArray(str, aInfo->FileNameLength);
 +		str += aInfo->FileNameLength + aInfo->GenreLength;
-+		title = QString::fromWCharArray(str, aInfo->TitleLength);
++		QString title = QString::fromWCharArray(str, aInfo->TitleLength);
++		DWORD trackNumber = aInfo->TrackNumber;
++		DWORD time = aInfo->Duration;
++		Tune tune = Tune();
++		if (!url.isEmpty()) {
++			if (!title.isEmpty()) {
++				tune.setName(title);
++			}
++			else {
++				int index = url.replace("/", "\\").lastIndexOf("\\");
++				if (index > 0) {
++					QString filename = url.right(url.length()-index-1);
++					index = filename.lastIndexOf(".");
++					if (index > 0) {
++						tune.setName(filename.left(filename.length()+1-index));
++					}
++				}
++			}
++			if (trackNumber > 0) {
++				tune.setTrack(QString::number(trackNumber));
++			}
++			if (time > 0) {
++				tune.setTime((uint)time);
++			}
++			if (!artist.isEmpty()) {
++				tune.setArtist(artist);
++			}
++			if (!album.isEmpty()) {
++				tune.setAlbum(album);
++			}
++			tune.setURL(url);
++		}
++		return tune;
 +	}
 +	UnmapViewOfFile(aInfo);
 +	CloseHandle(aFile);
-+	Tune tune = Tune();
-+	if (!title.isEmpty()) {
-+		tune.setName(title);
-+	}
-+	if (!artist.isEmpty()) {
-+		tune.setArtist(artist);
-+	}
-+	if (!album.isEmpty()) {
-+		tune.setAlbum(album);
-+	}
-+	if (!url.isEmpty()) {
-+		tune.setURL(url);
-+	}
-+	return tune;
++	return Tune();
 +}
 +
 +void AIMPTuneController::sendTune(const Tune &tune)
