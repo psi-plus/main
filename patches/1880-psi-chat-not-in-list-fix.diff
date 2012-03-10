@@ -1,0 +1,29 @@
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -4249,7 +4249,7 @@ void PsiAccount::actionHistoryBox(PsiEve
+ 
+ void PsiAccount::actionOpenChat(const Jid &j, const QString & body)
+ {
+-	UserListItem *u = find(j);
++	UserListItem *u = (findGCContact(j)) ? find(j) : find(j.bare());
+ 	if(!u) {
+ 		qWarning("[%s] not in userlist\n", qPrintable(j.full()));
+ 		return;
+@@ -4257,7 +4257,7 @@ void PsiAccount::actionOpenChat(const Ji
+ 
+ 	// if 'j' is bare, we might want to switch to a specific resource
+ 	QString res;
+-	if(u && j.resource().isEmpty()) {
++	if(j.resource().isEmpty()) {
+ 		// first, are there any queued chats?
+ 		/*PsiEvent *e = d->eventQueue->peekFirstChat(j, false);
+ 		if(e) {
+@@ -4591,7 +4591,7 @@ void PsiAccount::openUri(const QUrl &uri
+ 		QString body = uri.queryItemValue("body");
+ 		QString type = uri.queryItemValue("type");
+ 		if (type == "chat" && subject.isEmpty()) {
+-			if (!find(entity)) {
++			if (!find(entity.bare())) {
+ 				addUserListItem(entity);
+ 			}
+ 			actionOpenChat(entity, body);
