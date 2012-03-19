@@ -1,57 +1,35 @@
---- psi.orig/src/contactlistaccountmenu.cpp
-+++ psi/src/contactlistaccountmenu.cpp
-@@ -43,6 +43,7 @@ class ContactListAccountMenu::Private :
- 
- 	QPointer<ContactListAccountGroup> account;
- 	AccountStatusMenu* statusMenu_;
-+	QAction* blockAction_;
- 	QAction* moodAction_;
- 	QAction* activityAction_;
- 	QAction* geolocationAction_;
-@@ -100,6 +101,11 @@ public:
- 		geolocationAction_ = new IconAction(tr("GeoLocation"), this, "system/geolocation");
- 		connect(geolocationAction_, SIGNAL(triggered()), SLOT(setGeolocation()));
- 
-+		blockAction_ = new IconAction(tr("Ignore global actions"), this, "psi/cryptoYes");
-+		blockAction_->setCheckable(true);
-+		blockAction_->setToolTip(tr("Ignore all global actions for this account. For example, autostatus, mood, activity etc."));
-+		connect(blockAction_, SIGNAL(triggered(bool)), SLOT(setBlock(bool)));
+--- psi.orig/src/accountstatusmenu.cpp
++++ psi/src/accountstatusmenu.cpp
+@@ -30,4 +30,17 @@ void AccountStatusMenu::fill()
+ {
+ 	StatusMenu::fill();
+ 	statusChanged(account->status());
++	addIgnoreGlobalActions();
+ }
 +
- 		setAvatarAction_ = new QAction(tr("Set Avatar"), this);
- 		connect(setAvatarAction_, SIGNAL(triggered()), SLOT(setAvatar()));
- 
-@@ -152,6 +158,8 @@ public:
- 		menu->addAction(moodAction_);
- 		menu->addAction(activityAction_);
- 		menu->addAction(geolocationAction_);
-+		menu->addAction(blockAction_);
-+		menu->addSeparator();
- 		avatarMenu_ = menu->addMenu(IconsetFactory::icon("psi/vCard").icon(), tr("Avatar"));
- 		avatarMenu_->addAction(setAvatarAction_);
- 		avatarMenu_->addAction(unsetAvatarAction_);
-@@ -196,6 +204,7 @@ private slots:
- 		if (!account)
- 			return;
- 
-+		blockAction_->setChecked(account->account()->userAccount().ignore_global_actions);
- 		statusMenu_->statusChanged(account->account()->status());
- #ifndef USE_PEP
- 		moodAction_->setVisible(false);
-@@ -259,6 +268,14 @@ private slots:
- 		account->account()->changeStatus(static_cast<int>(statusType), forceDialog);
- 	}
- 
-+	void setBlock(bool block)
-+	{
-+		if (!account)
-+			return;
++void AccountStatusMenu::addIgnoreGlobalActions()
++{
++	QAction *blockAction = new IconAction(tr("Ignore global actions"), this, "psi/ignore_global_actions");
++	blockAction->setCheckable(true);
++	blockAction->setToolTip(tr("Ignore all global actions for this account. For example, autostatus, mood, activity etc."));
++	connect(blockAction, SIGNAL(triggered(bool)), account, SLOT(actionSetBlock(bool)));
++	addSeparator();
++	addAction(blockAction);
 +
-+		account->account()->actionSetBlock(block);
-+	}
++}
 +
- 	void setMood()
- 	{
- 		if (!account)
+--- psi.orig/src/accountstatusmenu.h
++++ psi/src/accountstatusmenu.h
+@@ -20,6 +20,9 @@ protected:
+ 	void addChoose();
+ 	void addReconnect();
+ 
++private:
++	void addIgnoreGlobalActions();
++
+ private slots:
+ 	void chooseStatusActivated();
+ 
 --- psi.orig/src/mainwin.cpp
 +++ psi/src/mainwin.cpp
 @@ -1203,7 +1203,7 @@ void MainWin::actSetMoodActivated()
@@ -128,7 +106,7 @@
  	void actionSetGeoLocation();
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -1151,7 +1151,7 @@ void PsiCon::setGlobalStatus(const Statu
+@@ -1155,7 +1155,7 @@ void PsiCon::setGlobalStatus(const Statu
  
  	// globally set each account which is logged in
  	foreach(PsiAccount* account, d->contactList->enabledAccounts())
