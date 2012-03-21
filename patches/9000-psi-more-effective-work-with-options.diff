@@ -85,131 +85,24 @@
  
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -683,8 +683,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- 	ui_.lb_ident->setAccount(account());
- 	ui_.lb_ident->setShowJid(false);
- 	ui_.log->setSessionData(true, jid().full(), jid().full()); //FIXME change conference name
--	d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
--	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
-+	d->tabmode = options_->getOption("options.ui.tabs.use-tabs").toBool();
-+	setWindowBorder(options_->getOption("options.ui.decorate-windows").toBool());
- 	if (!d->tabmode && !isBorder()) {
- 		d->winHeader_ = new PsiWindowHeader(this);
- 		ui_.vboxLayout1->insertWidget(0, d->winHeader_);
-@@ -716,7 +716,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- #endif
+@@ -654,8 +654,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	connect(account(), SIGNAL(updatedActivity()), SLOT(pa_updatedActivity()));
+ 	d->mucManager = new MUCManager(account()->client(), jid());
  
- 	ui_.lv_users->setMainDlg(this);
--	if ( PsiOptions::instance()->getOption("options.ui.contactlist.disable-scrollbar").toBool() ) {
-+	if ( options_->getOption("options.ui.contactlist.disable-scrollbar").toBool() ) {
- 		ui_.lv_users->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+-	options_ = PsiOptions::instance();
+-
+ 	d->pending = 0;
+ 	d->hPending = 0;
+ 	d->connecting = false;
+@@ -1461,6 +1459,7 @@ void GCMainDlg::presence(const QString &
+ 		d->act_configure->setEnabled(s.mucItem().affiliation() >= MUCItem::Member);
  	}
- 	connect(ui_.lv_users, SIGNAL(action(const QString &, const Status &, int)), SLOT(lv_action(const QString &, const Status &, int)));
-@@ -803,7 +803,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- 	((QToolButton *)ui_.toolbar->widgetForAction(d->act_icon))->setPopupMode(QToolButton::InstantPopup);
- 	ui_.toolbar->addAction(d->act_templates);
- 	((QToolButton *)ui_.toolbar->widgetForAction(d->act_templates))->setPopupMode(QToolButton::InstantPopup);
--	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
-+	if (!options_->getOption("options.ui.chat.disable-paste-send").toBool())
- 		ui_.toolbar->addAction(d->act_ps);
- 	ui_.toolbar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
+ 	
++	PsiOptions *options_ = PsiOptions::instance();
  
-@@ -842,10 +842,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- 	connect(ui_.vsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(verticalSplitterMoved(int,int)));
- 
- 	// resize the horizontal splitter
--	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
--	d->rosterSize = PsiOptions::instance()->getOption("options.ui.muc.roster-width").toInt();
-+	d->logSize = options_->getOption("options.ui.muc.log-width").toInt();
-+	d->rosterSize = options_->getOption("options.ui.muc.roster-width").toInt();
- 	QList<int> list;
--	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
-+	bool leftRoster = options_->getOption("options.ui.muc.roster-at-left").toBool();
- 	if(leftRoster)
- 		list << d->rosterSize << d->logSize;
- 	else
-@@ -857,8 +857,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- 		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
- 
- 	// resize the vertical splitter
--	d->logHeight = PsiOptions::instance()->getOption("options.ui.chat.log-height").toInt();
--	d->chateditHeight = PsiOptions::instance()->getOption("options.ui.chat.chatedit-height").toInt();
-+	d->logHeight = options_->getOption("options.ui.chat.log-height").toInt();
-+	d->chateditHeight = options_->getOption("options.ui.chat.chatedit-height").toInt();
- 	setVSplitterPosition(d->logHeight, d->chateditHeight);
- 
- 	X11WM_CLASS("groupchat");
-@@ -891,8 +891,8 @@ void GCMainDlg::vcard(const QString& _st
- GCMainDlg::~GCMainDlg()
- {
- 	//  Save splitters size
--	PsiOptions::instance()->setOption("options.ui.muc.log-width", d->logSize);
--	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
-+	options_->setOption("options.ui.muc.log-width", d->logSize);
-+	options_->setOption("options.ui.muc.roster-width", d->rosterSize);
- 
- 	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
- 		account()->groupChatLeave(jid().domain(), jid().node());
-@@ -917,12 +917,12 @@ GCMainDlg::~GCMainDlg()
- void GCMainDlg::horizSplitterMoved()
- {
- 	QList<int> list = ui_.hsplitter->sizes();
--	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
-+	bool leftRoster = options_->getOption("options.ui.muc.roster-at-left").toBool();
- 	d->rosterSize = !leftRoster ? list.last() : list.first();
- 	d->logSize = leftRoster ? list.last() : list.first();
- 
--	PsiOptions::instance()->setOption("options.ui.muc.log-width", d->logSize);
--	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
-+	options_->setOption("options.ui.muc.log-width", d->logSize);
-+	options_->setOption("options.ui.muc.roster-width", d->rosterSize);
- }
- 
- void GCMainDlg::verticalSplitterMoved(int, int)
-@@ -930,8 +930,8 @@ void GCMainDlg::verticalSplitterMoved(in
- 	QList<int> list = ui_.vsplitter->sizes();
- 	d->logHeight = list.first();
- 	d->chateditHeight = list.last();
--	PsiOptions::instance()->setOption("options.ui.chat.log-height", d->logHeight);
--	PsiOptions::instance()->setOption("options.ui.chat.chatedit-height", d->chateditHeight);
-+	options_->setOption("options.ui.chat.log-height", d->logHeight);
-+	options_->setOption("options.ui.chat.chatedit-height", d->chateditHeight);
- 
- 	emit vSplitterMoved(d->logHeight, d->chateditHeight);
- }
-@@ -957,10 +957,10 @@ void GCMainDlg::ensureTabbedCorrectly()
- 	// QSplitter is broken again, force resize so that
- 	// lv_users gets initizalised properly and context menu
- 	// works in tabs too.
--	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
--	d->rosterSize = PsiOptions::instance()->getOption("options.ui.muc.roster-width").toInt();
-+	d->logSize = options_->getOption("options.ui.muc.log-width").toInt();
-+	d->rosterSize = options_->getOption("options.ui.muc.roster-width").toInt();
- 	QList<int> list;
--	if(PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool())
-+	if(options_->getOption("options.ui.muc.roster-at-left").toBool())
- 		list << d->rosterSize << d->logSize;
- 	else
- 		list <<  d->logSize << d->rosterSize;
-@@ -1241,7 +1241,7 @@ void GCMainDlg::doClear()
- 
- void GCMainDlg::doClearButton()
- {
--	if (PsiOptions::instance()->getOption("options.ui.chat.warn-before-clear").toBool()) {
-+	if (options_->getOption("options.ui.chat.warn-before-clear").toBool()) {
- 		switch (
- 			QMessageBox::warning(
- 				this,
-@@ -1253,7 +1253,7 @@ void GCMainDlg::doClearButton()
- 		case QMessageBox::No:
- 		break;
- 		case QMessageBox::YesAll:
--			PsiOptions::instance()->setOption("options.ui.chat.warn-before-clear", false);
-+			options_->setOption("options.ui.chat.warn-before-clear", false);
- 			// fall-through
- 		case QMessageBox::Yes:
- 			doClear();
-@@ -1536,7 +1536,7 @@ void GCMainDlg::presence(const QString &
+ 	if(s.isAvailable()) {
+ 		// Available
+@@ -1536,7 +1535,7 @@ void GCMainDlg::presence(const QString &
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -218,12 +111,18 @@
  				if (s.status() != contact->s.status() || s.show() != contact->s.show() ||
  						(statusWithPriority && s.priority() != contact->s.priority())) {
  					ui_.log->dispatchMessage(MessageView::statusMessage(
-@@ -1683,7 +1683,7 @@ void GCMainDlg::message(const Message &_
+@@ -1678,12 +1677,13 @@ void GCMainDlg::message(const Message &_
+ 		d->nonAnonymous = false;
+ 	}
+ 
++	PsiOptions *options = PsiOptions::instance();
+ 	if(!m.subject().isNull()) {
+ 		QString subject = m.subject();
  		d->topic = subject;
  		QString subjectTooltip = TextUtil::plain2rich(subject);
  		subjectTooltip = TextUtil::linkify(subjectTooltip);
 -		if(PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool()) {
-+		if(options_->getOption("options.ui.emoticons.use-emoticons").toBool()) {
++		if(options->getOption("options.ui.emoticons.use-emoticons").toBool()) {
  			subjectTooltip = TextUtil::emoticonify(subjectTooltip);
  		}
  		ui_.le_topic->setText(subject.replace("\n\n", " || ").replace("\n", " | ").replace("\t", " ").replace(QRegExp("\\s{2,}"), " "));
@@ -233,8 +132,8 @@
  
 -	if(PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool()) {
 -		QStringList highlightWords = PsiOptions::instance()->getOption("options.ui.muc.highlight-words").toStringList();
-+	if(options_->getOption("options.ui.muc.use-highlighting").toBool()) {
-+		QStringList highlightWords = options_->getOption("options.ui.muc.highlight-words").toStringList();
++	if(options->getOption("options.ui.muc.use-highlighting").toBool()) {
++		QStringList highlightWords = options->getOption("options.ui.muc.highlight-words").toStringList();
  		foreach (QString word, highlightWords) {
  			if(m.body().contains((word), Qt::CaseInsensitive)) {
  				alert = true;
@@ -243,352 +142,95 @@
  	}
  	else {
 -		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
-+		if(alert || (options_->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
++		if(alert || (options->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
  			account()->playSound(PsiAccount::eGroupChat);
  
 -		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
-+		if(alert || (options_->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
++		if(alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
  			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
  				XMPP::Jid jid = m.from()/*.withDomain("")*/;
  				MessageEvent *e = new MessageEvent(m, account());
-@@ -1785,7 +1785,7 @@ const QString& GCMainDlg::topic() const
- void GCMainDlg::appendSysMsg(const QString &str, bool alert, const QDateTime &ts)
- {
- 	MessageView mv = MessageView::fromPlainText(str, MessageView::System);
--	if (!PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool()) {
-+	if (!options_->getOption("options.ui.muc.use-highlighting").toBool()) {
- 		alert = false;
- 	}
- 	mv.setAlert(alert);
-@@ -1809,14 +1809,13 @@ void GCMainDlg::appendSysMsg(const Messa
+@@ -1809,9 +1809,8 @@ void GCMainDlg::appendSysMsg(const Messa
  void GCMainDlg::appendMessage(const Message &m, bool alert)
  {
  	MessageView mv(MessageView::Message);
 -	if (m.containsHTML() && PsiOptions::instance()
 -							->getOption("options.html.muc.render").toBool() &&
 -							!m.html().text().isEmpty()) {
-+	if (m.containsHTML() && options_->getOption("options.html.muc.render").toBool() &&
++	if (m.containsHTML() && PsiOptions::instance()->getOption("options.html.muc.render").toBool() &&
 +					!m.html().text().isEmpty()) {
  		mv.setHtml(m.html().toString("span"));
  	} else {
  		mv.setPlainText(m.body());
- 	}
--	if (!PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool())
-+	if (!options_->getOption("options.ui.muc.use-highlighting").toBool())
- 		alert=false;
- 	mv.setAlert(alert);
- 	mv.setUserId(m.from().full());
-@@ -1859,13 +1858,13 @@ void GCMainDlg::appendMessage(const Mess
- void GCMainDlg::doAlert()
- {
- 	if(!isActiveTab())
--		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool())
-+		if (options_->getOption("options.ui.flash-windows").toBool())
- 			doFlash(true);
- }
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
+@@ -171,7 +171,6 @@ private:
  
- QString GCMainDlg::desiredCaption() const
- {
--	QString cap = PsiOptions::instance()->getOption("options.ui.chat.caption").toString();
-+	QString cap = options_->getOption("options.ui.chat.caption").toString();
- 	if(!cap.isEmpty()) {
- 		return cap;
- 	}
-@@ -1883,7 +1882,7 @@ QString GCMainDlg::desiredCaption() cons
+ 	void contextMenuEvent(QContextMenuEvent *);
  
- void GCMainDlg::setLooks()
- {
--	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
-+	const QString css = options_->getOption("options.ui.chat.css").toString();
- 	if (!css.isEmpty()) {
- 		setStyleSheet(css);
- 		d->mle()->setCssString(css);
-@@ -1893,32 +1892,32 @@ void GCMainDlg::setLooks()
+-	PsiOptions* options_;
+ 	QDateTime lastMsgTime_;
  
- 	// update the fonts
- 	QFont f;
--	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.chat").toString());
-+	f.fromString(options_->getOption("options.ui.look.font.chat").toString());
- 	ui_.log->setFont(f);
- 	ui_.mle->chatEdit()->setFont(f);
- 
--	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
-+	f.fromString(options_->getOption("options.ui.look.font.contactlist").toString());
- 	ui_.lv_users->setFont(f);
- 
--	if (PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool()) {
-+	if (options_->getOption("options.ui.chat.central-toolbar").toBool()) {
- 		ui_.toolbar->show();
- 		ui_.tb_actions->hide();
- 		ui_.tb_emoticons->hide();
- 	}
- 	else {
- 		ui_.toolbar->hide();
--		ui_.tb_emoticons->setVisible(PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool());
-+		ui_.tb_emoticons->setVisible(options_->getOption("options.ui.emoticons.use-emoticons").toBool());
- 		ui_.tb_actions->show();
- 	}
- 
--	if (PsiOptions::instance()->getOption("options.ui.disable-send-button").toBool()) {
-+	if (options_->getOption("options.ui.disable-send-button").toBool()) {
- 		ui_.pb_send->hide();
- 	}
- 	else {
- 		ui_.pb_send->show();
- 	}
- 
--	setWindowOpacity(double(qMax(MINIMUM_OPACITY,PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt()))/100);
-+	setWindowOpacity(double(qMax(MINIMUM_OPACITY,options_->getOption("options.ui.chat.opacity").toInt()))/100);
- 
- 	// update the widget icon
- #ifndef Q_WS_MAC
-@@ -2022,7 +2021,7 @@ void GCMainDlg::lv_action(const QString 
- 	else if(x >= 100 && x<300) {
- 		// Kick || Ban with reason
- 		QString reason;
--		QStringList reasons = PsiOptions::instance()->getOption("options.muc.reasons").toStringList();
-+		QStringList reasons = options_->getOption("options.muc.reasons").toStringList();
- 		if (x==100 || x==200) {
- 			// Show custom reason dialog
- 			MUCReasonsEditor *editor=new MUCReasonsEditor(this);
-@@ -2069,12 +2068,12 @@ void GCMainDlg::buildMenu()
- 
- 	d->pm_settings->addAction(d->act_icon);
- 	d->pm_settings->addAction(d->act_templates);
--	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
-+	if (!options_->getOption("options.ui.chat.disable-paste-send").toBool())
- 		d->pm_settings->addAction(d->act_ps);
- 	d->pm_settings->addAction(d->act_nick);
- 	d->pm_settings->addAction(d->act_bookmark);
- #ifdef PSI_PLUGINS
--	if(!PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool()) {
-+	if(!options_->getOption("options.ui.chat.central-toolbar").toBool()) {
- 		d->pm_settings->addSeparator();
- 		PluginManager::instance()->addGCToolBarButton(this, d->pm_settings, account(), jid().full());
- 	}
-@@ -2218,7 +2217,7 @@ void GCMainDlg::sendTemp(const QString &
- 	if(TabbableWidget::isActiveTab()) {
- 		if (!templText.isEmpty()) {
- 			d->mle()->textCursor().insertText(templText);
--			if (!PsiOptions::instance()->getOption("options.ui.chat.only-paste-template").toBool())
-+			if (!options_->getOption("options.ui.chat.only-paste-template").toBool())
- 				mle_returnPressed();
- 		}
- 	}
-@@ -2234,7 +2233,7 @@ void GCMainDlg::resizeEvent(QResizeEvent
- 		return;
- 
- 	QList<int> sizes = ui_.hsplitter->sizes();
--	bool leftRoster = PsiOptions::instance()->getOption("options.ui.muc.roster-at-left").toBool();
-+	bool leftRoster = options_->getOption("options.ui.muc.roster-at-left").toBool();
- 	int logWidth = !leftRoster ? sizes.first() : sizes.last();
- 	int rosterWidth = leftRoster ? sizes.first() : sizes.last();
- 	int dw = rosterWidth - d->rosterSize;
+ 	void setMargins();
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -541,12 +541,12 @@ public:
- 
- 		if (lastManualStatus().isAvailable()) {
- 			if (lastManualStatus().type() == XMPP::Status::DND &&
--			    PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.suppress-while-dnd").toBool())
-+			    options->getOption("options.ui.notifications.passive-popups.suppress-while-dnd").toBool())
- 			{
- 				return true;
- 			}
- 			if ((lastManualStatus().type() == XMPP::Status::Away || lastManualStatus().type() == XMPP::Status::XA) &&
--			    PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.suppress-while-away").toBool())
-+			    options->getOption("options.ui.notifications.passive-popups.suppress-while-away").toBool())
- 			{
- 				return true;
- 			}
-@@ -564,7 +564,7 @@ public:
- 			if (lastManualStatus().type() == XMPP::Status::DND)
- 				return true;
- 			if ((lastManualStatus().type() == XMPP::Status::Away || lastManualStatus().type() == XMPP::Status::XA) &&
--			    PsiOptions::instance()->getOption("options.ui.notifications.popup-dialogs.suppress-while-away").toBool())
-+			    options->getOption("options.ui.notifications.popup-dialogs.suppress-while-away").toBool())
- 			{
- 				return true;
- 			}
-@@ -719,15 +719,15 @@ public slots:
- 
- 	void loadQueue()
- 	{
--		bool soundEnabled = PsiOptions::instance()->getOption("options.ui.notifications.sounds.enable").toBool();
--		PsiOptions::instance()->setOption("options.ui.notifications.sounds.enable", false); // disable the sound and popups
-+		bool soundEnabled = options->getOption("options.ui.notifications.sounds.enable").toBool();
-+		options->setOption("options.ui.notifications.sounds.enable", false); // disable the sound and popups
- 		doPopups_ = false;
- 
- 		QFileInfo fi( pathToProfileEvents() );
- 		if ( fi.exists() )
- 			eventQueue->fromFile(pathToProfileEvents());
- 
--		PsiOptions::instance()->setOption("options.ui.notifications.sounds.enable", soundEnabled);
-+		options->setOption("options.ui.notifications.sounds.enable", soundEnabled);
- 		doPopups_ = true;
+@@ -395,7 +395,6 @@ public:
+ 		, selfContact(0)
+ 		, psi(0)
+ 		, account(parent)
+-		, options(0)
+ 		, client(0)
+ 		, eventQueue(0)
+ 		, xmlConsole(0)
+@@ -443,7 +442,6 @@ public:
+ 	PsiSelfContact* selfContact;
+ 	PsiCon *psi;
+ 	PsiAccount *account;
+-	PsiOptions *options;
+ 	Client *client;
+ 	UserAccount acc;
+ 	Jid jid, nextJid;
+@@ -1086,7 +1084,6 @@ PsiAccount::PsiAccount(const UserAccount
+ 	d->contactList = parent;
+ 	d->tabManager = tabManager;
+ 	d->psi = parent->psi();
+-	d->options = PsiOptions::instance();
+ 	d->client = 0;
+ 	d->userCounter = 0;
+ 	d->avatarFactory = 0;
+@@ -1340,7 +1337,7 @@ PsiAccount::PsiAccount(const UserAccount
  	}
  
-@@ -982,12 +982,12 @@ private:
- 		withPriority = loginWithPriority;
- 		if (!lastManualStatus().isAway() && !lastManualStatus().isInvisible()) {
- 			int priority;
--			if (autoAway == AutoAway_Away && PsiOptions::instance()->getOption("options.status.auto-away.force-priority").toBool()) {
--				priority = PsiOptions::instance()->getOption("options.status.auto-away.priority").toInt();
-+			if (autoAway == AutoAway_Away && options->getOption("options.status.auto-away.force-priority").toBool()) {
-+				priority = options->getOption("options.status.auto-away.priority").toInt();
- 				withPriority = true;
- 			}
--			else if (autoAway == AutoAway_XA && PsiOptions::instance()->getOption("options.status.auto-away.force-xa-priority").toBool()) {
--				priority = PsiOptions::instance()->getOption("options.status.auto-away.xa-priority").toInt();
-+			else if (autoAway == AutoAway_XA && options->getOption("options.status.auto-away.force-xa-priority").toBool()) {
-+				priority = options->getOption("options.status.auto-away.xa-priority").toInt();
- 				withPriority = true;
- 			}
- 			else {
-@@ -1001,9 +1001,9 @@ private:
+ 	// Extended presence
+-	if (d->options->getOption("options.extended-presence.notify").toBool()) {
++	if (PsiOptions::instance()->getOption("options.extended-presence.notify").toBool()) {
+ 		QStringList pepNodes;
+ 		pepNodes += "http://jabber.org/protocol/mood+notify";
+ 		pepNodes += "http://jabber.org/protocol/activity+notify";
+@@ -1808,7 +1805,7 @@ void PsiAccount::forceDisconnect(bool fa
  
- 			switch (autoAway) {
- 			case AutoAway_Away:
--				return Status(XMPP::Status::Away, PsiOptions::instance()->getOption("options.status.auto-away.message").toString(), priority);
-+				return Status(XMPP::Status::Away, options->getOption("options.status.auto-away.message").toString(), priority);
- 			case AutoAway_XA:
--				return Status(XMPP::Status::XA, PsiOptions::instance()->getOption("options.status.auto-away.message").toString(), priority);
-+				return Status(XMPP::Status::XA, options->getOption("options.status.auto-away.message").toString(), priority);
- 			case AutoAway_Offline:
- 				return Status(Status::Offline, loginStatus.status(), priority);
- 			default:
-@@ -1248,13 +1248,13 @@ PsiAccount::PsiAccount(const UserAccount
- 	d->rcLeaveMucServer =0;
+ 	if(loggedIn()) {
+ 		// Extended Presence
+-		if (d->options->getOption("options.extended-presence.tune.publish").toBool() && !d->lastTune.isNull())
++		if (PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool() && !d->lastTune.isNull())
+ 			publishTune(Tune());
  
- 	//Idle server
--	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
-+	if(d->options->getOption("options.service-discovery.last-activity").toBool()) {
- 		new IdleServer(this, d->client->rootTask());
- 		d->client->addExtension("last-act", QStringList("jabber:iq:last"));
+ 		d->client->removeExtension("ep");
+@@ -2376,7 +2373,7 @@ void PsiAccount::setPEPAvailable(bool b)
  	}
  
- 	// HTML
--	if(PsiOptions::instance()->getOption("options.html.chat.render").toBool())
-+	if(d->options->getOption("options.html.chat.render").toBool())
- 		d->client->addExtension("html",Features("http://jabber.org/protocol/xhtml-im"));
- 
- 	d->selfContact = new PsiSelfContact(d->self, this);
-@@ -1291,7 +1291,7 @@ PsiAccount::PsiAccount(const UserAccount
- 
- 	//printf("PsiAccount: [%s] loaded\n", name().latin1());
- 
--	if(PsiOptions::instance()->getOption("options.xml-console.enable-at-login").toBool() && enabled()) {
-+	if(d->options->getOption("options.xml-console.enable-at-login").toBool() && enabled()) {
- 		this->showXmlConsole();
- 		d->xmlConsole->enable();
- 	}
-@@ -1815,7 +1815,7 @@ void PsiAccount::forceDisconnect(bool fa
- 		d->client->removeExtension("pep");
- 
- 		// send logout status
--		d->client->groupChatLeaveAll(PsiOptions::instance()->getOption("options.muc.leave-status-message").toString());
-+		d->client->groupChatLeaveAll(d->options->getOption("options.muc.leave-status-message").toString());
- 		d->client->setPresence(s);
- 	}
- 
-@@ -2320,8 +2320,8 @@ void PsiAccount::client_rosterRequestFin
- 
- 	// Get stored options
- 	// FIXME: Should be an account-specific option
--	//if (PsiOptions::instance()->getOption("options.options-storage.load").toBool())
--	//	PsiOptions::instance()->load(d->client);
-+	//if (d->options->getOption("options.options-storage.load").toBool())
-+	//	d->options->load(d->client);
- 
- 	// we need to have up-to-date photoHash for initial presence
- 	d->vcardChanged(jid());
-@@ -2387,7 +2387,7 @@ void PsiAccount::setPEPAvailable(bool b)
- void PsiAccount::bookmarksAvailabilityChanged()
- {
- 	if (!d->bookmarkManager->isAvailable() ||
--	    !PsiOptions::instance()->getOption("options.muc.bookmarks.auto-join").toBool())
-+	    !d->options->getOption("options.muc.bookmarks.auto-join").toBool())
- 	{
- 		return;
- 	}
-@@ -2419,7 +2419,7 @@ void PsiAccount::incomingHttpAuthRequest
- 
- void PsiAccount::client_rosterItemAdded(const RosterItem &r)
- {
--	if ( r.isPush() && r.name().isEmpty() && PsiOptions::instance()->getOption("options.contactlist.resolve-nicks-on-contact-add").toBool() ) {
-+	if ( r.isPush() && r.name().isEmpty() && d->options->getOption("options.contactlist.resolve-nicks-on-contact-add").toBool() ) {
- 		// automatically resolve nickname from vCard, if newly added item doesn't have any
- 		VCardFactory::instance()->getVCard(r.jid(), d->client->rootTask(), this, SLOT(resolveContactName()));
- 	}
-@@ -2549,7 +2549,7 @@ void PsiAccount::client_resourceAvailabl
- 		u->setPresenceError("");
- 		cpUpdate(*u, r.name(), true);
- 
--		if(doAnim && PsiOptions::instance()->getOption("options.ui.contactlist.use-status-change-animation").toBool())
-+		if(doAnim && d->options->getOption("options.ui.contactlist.use-status-change-animation").toBool())
- 			profileAnimateNick(u->jid());
- 
- 	}
-@@ -2558,7 +2558,7 @@ void PsiAccount::client_resourceAvailabl
- 		playSound(eOnline);
- 
- 	// Do the popup test earlier (to avoid needless JID lookups)
--	if ((popupType == PopupOnline && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.online").toBool()) || (popupType == PopupStatusChange && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool())) {
-+	if ((popupType == PopupOnline && d->options->getOption("options.ui.notifications.passive-popups.status.online").toBool()) || (popupType == PopupStatusChange && d->options->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool())) {
- 		if(notifyOnlineOk && doPopup && !d->blockTransportPopupList->find(j, popupType == PopupOnline) && !d->noPopup(IncomingStanza)) {
- 			UserListItem *u = findFirstRelevant(j);
- 			PopupManager::PopupType pt = PopupManager::AlertNone;
-@@ -2567,7 +2567,7 @@ void PsiAccount::client_resourceAvailabl
- 			else if ( popupType == PopupStatusChange )
- 				pt = PopupManager::AlertStatusChange;
- 
--			if ((popupType == PopupOnline && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.online").toBool()) || (popupType == PopupStatusChange && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool())) {
-+			if ((popupType == PopupOnline && d->options->getOption("options.ui.notifications.passive-popups.status.online").toBool()) || (popupType == PopupStatusChange && d->options->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool())) {
- 				psi()->popupManager()->doPopup(this, pt, j, r, u, 0, false);
- 			}
- 		}
-@@ -2652,11 +2652,11 @@ void PsiAccount::client_resourceUnavaila
- 		playSound(eOffline);
- 
- 	// Do the popup test earlier (to avoid needless JID lookups)
--	if(PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.offline").toBool() &&
-+	if(d->options->getOption("options.ui.notifications.passive-popups.status.offline").toBool() &&
- 	   doPopup && !d->blockTransportPopupList->find(j) && !d->noPopup(IncomingStanza)) {
- 		UserListItem *u = findFirstRelevant(j);
- 
--		if (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.offline").toBool()) {
-+		if (d->options->getOption("options.ui.notifications.passive-popups.status.offline").toBool()) {
- 			psi()->popupManager()->doPopup(this, PopupManager::AlertOffline, j, r, u, 0, false);
- 		}
- 	}
-@@ -2729,7 +2729,7 @@ void PsiAccount::processIncomingMessage(
- 		return;
- 
- 	// skip headlines?
--	if(_m.type() == "headline" && PsiOptions::instance()->getOption("options.messages.ignore-headlines").toBool())
-+	if(_m.type() == "headline" && d->options->getOption("options.messages.ignore-headlines").toBool())
- 		return;
- 
- 	if(_m.type() == "groupchat") {
-@@ -2760,9 +2760,9 @@ void PsiAccount::processIncomingMessage(
- 	QList<UserListItem*> ul = findRelevant(m.from());
- 
- 	// ignore events from non-roster JIDs?
--	if (ul.isEmpty() && PsiOptions::instance()->getOption("options.messages.ignore-non-roster-contacts").toBool())
-+	if (ul.isEmpty() && d->options->getOption("options.messages.ignore-non-roster-contacts").toBool())
- 	{
--		if (PsiOptions::instance()->getOption("options.messages.exclude-muc-from-ignore").toBool())
-+		if (d->options->getOption("options.messages.exclude-muc-from-ignore").toBool())
- 		{
- #ifdef GROUPCHAT
- 			GCMainDlg *w = findDialog<GCMainDlg*>(Jid(_m.from().bare()));
-@@ -2809,11 +2809,12 @@ void PsiAccount::processIncomingMessage(
+ 	// Publish current tune information
+-	if (b && d->psi->tuneManager() && d->options->getOption("options.extended-presence.tune.publish").toBool()) {
++	if (b && d->psi->tuneManager() && PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool()) {
+ 		Tune current = d->psi->tuneManager()->currentTune();
+ 		if (!current.isNull())
+ 			publishTune(current);
+@@ -2809,11 +2806,12 @@ void PsiAccount::processIncomingMessage(
  		m.setType("chat");
  	}
  	else if (m.type() != "headline" && m.invite().isEmpty() && m.mucInvites().isEmpty()) {
 -		if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "message")
-+		const QString type = d->options->getOption("options.messages.force-incoming-message-type").toString();
++		const QString type = PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString();
 +		if (type == "message")
  			m.setType("");
 -		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "chat")
@@ -599,191 +241,78 @@
  			c = NULL;
  			foreach (ChatDlg *cl, findChatDialogs(m.from(), false)) {
  				if (cl->autoSelectContact() || cl->jid().resource().isEmpty() || m.from().resource() == cl->jid().resource()) {
-@@ -2833,7 +2834,7 @@ void PsiAccount::processIncomingMessage(
- 	//	m.setType("");
+@@ -3142,7 +3140,7 @@ void PsiAccount::tuneStopped()
  
- 	if( m.messageReceipt() == ReceiptRequest && !m.id().isEmpty() &&
--		PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()) {
-+		d->options->getOption("options.ui.notifications.send-receipts").toBool()) {
- 		UserListItem *u;
- 		if(j.compare(d->self.jid(), false) || groupchats().contains(j.bare()) || (!d->loginStatus.isInvisible() && (u = d->userList.find(j)) && (u->subscription().type() == Subscription::To || u->subscription().type() == Subscription::Both))) {
- 			Message tm(m.from());
-@@ -2995,7 +2996,7 @@ void PsiAccount::setStatus(const Status 
- void PsiAccount::showStatusDialog(const QString& presetName)
+ void PsiAccount::tunePlaying(const Tune& tune)
  {
- 	StatusPreset preset;
--	preset.fromOptions(PsiOptions::instance(), presetName);
-+	preset.fromOptions(d->options, presetName);
- 	Status status(preset.status(), preset.message(), preset.priority().hasValue() ? preset.priority().value() : this->status().priority());
- 	StatusSetDlg *w = new StatusSetDlg(this, status, preset.priority().hasValue());
- 	connect(w, SIGNAL(set(const XMPP::Status &, bool, bool)), SLOT(setStatus(const XMPP::Status &, bool, bool)));
-@@ -3101,7 +3102,7 @@ void PsiAccount::sentInitialPresence()
- 
- 	// Get the vcard
- 	const VCard *vcard = VCardFactory::instance()->vcard(d->jid);
--	if (PsiOptions::instance()->getOption("options.vcard.query-own-vcard-on-login").toBool() || !vcard || vcard->isEmpty() || (vcard->nickName().isEmpty() && vcard->fullName().isEmpty()))
-+	if (d->options->getOption("options.vcard.query-own-vcard-on-login").toBool() || !vcard || vcard->isEmpty() || (vcard->nickName().isEmpty() && vcard->fullName().isEmpty()))
- 		VCardFactory::instance()->getVCard(d->jid, d->client->rootTask(), this, SLOT(slotCheckVCard()));
- 	else {
- 		d->nickFromVCard = true;
-@@ -3195,37 +3196,37 @@ void PsiAccount::playSound(PsiAccount::S
- 	QString str;
- 	switch (onevent) {
- 	case eMessage:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.incoming-message").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.incoming-message").toString();
- 		break;
- 	case eChat1:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.new-chat").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.new-chat").toString();
- 		break;
- 	case eChat2:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.chat-message").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.chat-message").toString();
- 		break;
- 	case eGroupChat:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.groupchat-message").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.groupchat-message").toString();
- 		break;
- 	case eHeadline:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.incoming-headline").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.incoming-headline").toString();
- 		break;
- 	case eSystem:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.system-message").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.system-message").toString();
- 		break;
- 	case eOnline:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.contact-online").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.contact-online").toString();
- 		break;
- 	case eOffline:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.contact-offline").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.contact-offline").toString();
- 		break;
- 	case eSend:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.outgoing-chat").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.outgoing-chat").toString();
- 		break;
- 	case eIncomingFT:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.incoming-file-transfer").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.incoming-file-transfer").toString();
- 		break;
- 	case eFTComplete:
--		str = PsiOptions::instance()->getOption("options.ui.notifications.sounds.completed-file-transfer").toString();
-+		str = d->options->getOption("options.ui.notifications.sounds.completed-file-transfer").toString();
- 		break;
- 	default:
- 		Q_ASSERT(false);
-@@ -3242,7 +3243,7 @@ void PsiAccount::playSound(PsiAccount::S
- 		return;
- 
- 	// no away sounds?
--	if(PsiOptions::instance()->getOption("options.ui.notifications.sounds.silent-while-away").toBool() && (s == STATUS_AWAY || s == STATUS_XA))
-+	if(d->options->getOption("options.ui.notifications.sounds.silent-while-away").toBool() && (s == STATUS_AWAY || s == STATUS_XA))
- 		return;
- 
- 	d->psi->playSound(str);
-@@ -3505,7 +3506,7 @@ void PsiAccount::actionJoin(const Confer
- 	w->setPassword(bookmark.password());
- 
- 	if(reason != MUCJoinDlg::MucAutoJoin
--	   || !PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool())
-+	   || !d->options->getOption("options.ui.muc.hide-on-autojoin").toBool())
- 		w->show();
- 	if (connectImmediately) {
- 		w->doJoin(reason);
-@@ -3866,7 +3867,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const
- 		 * only way */
- 		//TODO: This doesn't work as expected atm, it doesn't seem to reparent the tabset
- 		QWidget *window=c;
--		if ( PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool() )
-+		if ( d->options->getOption("options.ui.tabs.use-tabs").toBool() )
- 			window = d->tabManager->getManagingTabs(c);
- 		if(window && window->isHidden()) {
- 			QPixmap pp = c->windowIcon().pixmap(16,16); // FIXME: 16x16 is just a guess of what size old QWidget::icon() used
-@@ -3914,7 +3915,7 @@ void PsiAccount::changeStatus(int x, boo
- 		}
+-	if (loggedIn() && d->options->getOption("options.extended-presence.tune.publish").toBool()) {
++	if (loggedIn() && PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool()) {
+ 		publishTune(tune);
  	}
- 
--	PsiOptions* o = PsiOptions::instance();
-+	PsiOptions* o = d->options;
- 
- 	//If option name is not empty (it is empty for Invisible) and option is set to ask for message, show dialog
- 	if (forceDialog || (!optionName.isEmpty() && o->getOption("options.status.ask-for-message-on-" + optionName).toBool())) {
-@@ -4130,7 +4131,7 @@ void PsiAccount::actionDefault(const Jid
- 		}
+ }
+@@ -4960,6 +4958,7 @@ void PsiAccount::createNewPluginEvent(co
+ // handle an incoming event
+ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+ {
++	PsiOptions *o = PsiOptions::instance();
+ 	if (e && activationType != FromXml) {
+ 		setEnabled();
  	}
- 	else {
--		if(PsiOptions::instance()->getOption("options.messages.default-outgoing-message-type").toString() == "message")
-+		if(d->options->getOption("options.messages.default-outgoing-message-type").toString() == "message")
- 			actionSendMessage(u->jid());
- 		else
- 			actionOpenChat(u->jid());
-@@ -4634,7 +4635,7 @@ void PsiAccount::dj_sendMessage(const Me
- 	UserListItem *u = findFirstRelevant(m.to());
- 	Message nm = m;
- 
--	if(PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "current-open") {
-+	if(d->options->getOption("options.messages.force-incoming-message-type").toString() == "current-open") {
- 		if(u) {
- 			switch(u->lastMessageType()) {
- 				case 0: nm.setType(""); break;
-@@ -5059,7 +5060,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5059,7 +5058,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
 -			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
-+			if (d->options->getOption("options.messages.send-composing-events").toBool()) {
++			if (o->getOption("options.messages.send-composing-events").toBool()) {
  				ChatDlg *c = findChatDialogEx(e->from());
  				if (c) {
  					c->setJid(e->from());
-@@ -5077,7 +5078,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5077,7 +5076,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  			}
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
 -			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
-+			if (d->options->getOption("options.ui.notifications.request-receipts").toBool()) {
++			if (o->getOption("options.ui.notifications.request-receipts").toBool()) {
  				foreach (ChatDlg *c, findChatDialogs(e->from(), false)) {
  					if (c->autoSelectContact()  || c->jid().resource().isEmpty() || e->from().resource() == c->jid().resource()) {
  						if (c->autoSelectContact())
-@@ -5108,7 +5109,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5108,7 +5107,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  #endif
  				c->incomingMessage(m);
  				soundType = eChat2;
 -				if((PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && !c->isActiveTab())
-+				if((d->options->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && !c->isActiveTab())
++				if((o->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && !c->isActiveTab())
  					|| (c->isTabbed() && c->getManagingTabDlg()->isHidden()) ) {
  					// to alert the chat also, we put it in the queue
  					me->setSentToChatWindow(true);
-@@ -5116,7 +5117,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5116,7 +5115,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  				else {
  					putToQueue = false;
  #ifdef YAPSI
 -					if (!d->noPopup(activationType) && PsiOptions::instance()->getOption("options.ui.chat.auto-popup").toBool()) {
-+					if (!d->noPopup(activationType) && d->options->getOption("options.ui.chat.auto-popup").toBool()) {
++					if (!d->noPopup(activationType) && o->getOption("options.ui.chat.auto-popup").toBool()) {
  						openChat(e->from(), activationType);
  					}
  #endif
-@@ -5197,7 +5198,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5197,7 +5196,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  			}
  			else if (userListItem && userListItem->inList()) {
  #else
 -			if(PsiOptions::instance()->getOption("options.subscriptions.automatically-allow-authorization").toBool()) {
-+			if(d->options->getOption("options.subscriptions.automatically-allow-authorization").toBool()) {
++			if(o->getOption("options.subscriptions.automatically-allow-authorization").toBool()) {
  #endif
  				// Check if we want to request auth as well
  				UserListItem *u = d->userList.find(ae->from());
-@@ -5211,7 +5212,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5211,7 +5210,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  			}
  		}
  		else if(ae->authType() == "subscribed") {
 -			if(!PsiOptions::instance()->getOption("options.ui.notifications.successful-subscription").toBool())
-+			if(!d->options->getOption("options.ui.notifications.successful-subscription").toBool())
++			if(!o->getOption("options.ui.notifications.successful-subscription").toBool())
  				putToQueue = false;
  		}
  		else if(ae->authType() == "unsubscribe") {
-@@ -5244,12 +5245,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5244,12 +5243,12 @@ void PsiAccount::handleEvent(PsiEvent* e
  			r = *(u->priority());
  		}
  
@@ -793,126 +322,60 @@
 -		    (popupType == PopupManager::AlertFile      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
 -		    (popupType == PopupManager::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
 -		    (popupType == PopupManager::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
-+		if ((popupType == PopupManager::AlertChat      && d->options->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
-+		    (popupType == PopupManager::AlertMessage   && d->options->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
-+		    (popupType == PopupManager::AlertHeadline  && d->options->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
-+		    (popupType == PopupManager::AlertFile      && d->options->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
-+		    (popupType == PopupManager::AlertAvCall    && d->options->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
-+		    (popupType == PopupManager::AlertComposing && d->options->getOption("options.ui.notifications.passive-popups.composing").toBool()))
++		if ((popupType == PopupManager::AlertChat      && o->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
++		    (popupType == PopupManager::AlertMessage   && o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
++		    (popupType == PopupManager::AlertHeadline  && o->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
++		    (popupType == PopupManager::AlertFile      && o->getOption("options.ui.notifications.passive-popups.incoming-file-transfer").toBool()) ||
++		    (popupType == PopupManager::AlertAvCall    && o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
++		    (popupType == PopupManager::AlertComposing && o->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
  #ifdef PSI_PLUGINS
  			if(e->type() != PsiEvent::Plugin) {
-@@ -5403,7 +5404,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
- 	d->eventQueue->enqueue(e);
- 
- 	updateReadNext(e->jid());
--	if(PsiOptions::instance()->getOption("options.ui.contactlist.raise-on-new-event").toBool())
-+	if(d->options->getOption("options.ui.contactlist.raise-on-new-event").toBool())
- 		d->psi->raiseMainwin();
- 
- 	// update the roster
-@@ -5424,14 +5425,14 @@ void PsiAccount::queueEvent(PsiEvent* e,
- 			MessageEvent *me = (MessageEvent *)e;
- 			const Message &m = me->message();
- 			if (m.type() == "chat")
--				doPopup = PsiOptions::instance()->getOption("options.ui.chat.auto-popup").toBool();
-+				doPopup = d->options->getOption("options.ui.chat.auto-popup").toBool();
- 			else if (m.type() == "headline")
--				doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup-headlines").toBool();
-+				doPopup = d->options->getOption("options.ui.message.auto-popup-headlines").toBool();
- 			else
--				doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
-+				doPopup = d->options->getOption("options.ui.message.auto-popup").toBool();
- 		}
- 		else if (e->type() == PsiEvent::File) {
--			doPopup = PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool();
-+			doPopup = d->options->getOption("options.ui.file-transfer.auto-popup").toBool();
- 		}
- 		else if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled())
- 			doPopup = false;
-@@ -5440,13 +5441,13 @@ void PsiAccount::queueEvent(PsiEvent* e,
- 			doPopup = false;
- #endif
- 		else {
--			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
-+			doPopup = d->options->getOption("options.ui.message.auto-popup").toBool();
- 		}
- 
- 		// Popup
- 		if (doPopup) {
- 			UserListItem *u = find(e->jid());
--			if (u && (!PsiOptions::instance()->getOption("options.ui.notifications.popup-dialogs.suppress-when-not-on-roster").toBool() || u->inList()))
-+			if (u && (!d->options->getOption("options.ui.notifications.popup-dialogs.suppress-when-not-on-roster").toBool() || u->inList()))
- 				openNextEvent(*u, activationType);
- 		}
+@@ -5726,7 +5725,7 @@ bool PsiAccount::groupChatJoin(const QSt
+ 	else {
+ 		Status s = d->loginStatus;
+ 		s.setXSigned("");
+-		return d->client->groupChatJoin(host, room, nick, pass, d->options->getOption("options.muc.context.maxchars").toInt(),d->options->getOption("options.muc.context.maxstanzas").toInt(),d->options->getOption("options.muc.context.seconds").toInt(),s);
++		return d->client->groupChatJoin(host, room, nick, pass, PsiOptions::instance()->getOption("options.muc.context.maxchars").toInt(),PsiOptions::instance()->getOption("options.muc.context.maxstanzas").toInt(),PsiOptions::instance()->getOption("options.muc.context.seconds").toInt(),s);
  	}
-@@ -5683,7 +5684,7 @@ void PsiAccount::openChat(const Jid& j, 
- 
- void PsiAccount::chatMessagesRead(const Jid &j)
- {
--//	if(PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool()) {
-+//	if(d->options->getOption("options.ui.chat.alert-for-already-open-chats").toBool()) {
- 		processChats(j);
- //	}
  }
-@@ -5711,7 +5712,7 @@ void PsiAccount::openGroupChat(const Jid
- 	w->setPassword(d->client->groupChatPassword(j.domain(), j.node()));
- 	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
- 	connect(d->psi, SIGNAL(emitOptionsUpdate()), w, SLOT(optionsUpdate()));
--	if(reason != MUCJoinDlg::MucAutoJoin || !PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
-+	if(reason != MUCJoinDlg::MucAutoJoin || !d->options->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
- 		w->ensureTabbedCorrectly();
- 		if (activationType == UserAction)
- 			w->bringToFront();
-@@ -5744,7 +5745,7 @@ void PsiAccount::groupChatLeave(const QS
+ 
+@@ -6252,11 +6251,12 @@ void PsiAccount::processEncryptedMessage
+ 
+ void PsiAccount::optionsUpdate()
  {
- 	Jid j(room + '@' + host);
- 	d->groupchats.removeAll(j.bare());
--	d->client->groupChatLeave(host, room, PsiOptions::instance()->getOption("options.muc.leave-status-message").toString());
-+	d->client->groupChatLeave(host, room, d->options->getOption("options.muc.leave-status-message").toString());
- 	UserListItem *u = find(j);
- 	if (u) {
- 		d->removeEntry(j);
-@@ -5794,7 +5795,7 @@ void PsiAccount::client_groupChatJoined(
- 	w->joined();
++	PsiOptions *o = PsiOptions::instance();
+ 	profileUpdateEntry(d->self);
  
- 	openGroupChat(j, UserAction, r);
--	if(r == MUCJoinDlg::MucAutoJoin && PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
-+	if(r == MUCJoinDlg::MucAutoJoin && d->options->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
- 		m = findDialog<GCMainDlg*>(Jid(j.bare()));
- 		if(m) {
- 			QTimer::singleShot(0, m, SLOT(hideTab()));
-@@ -5906,7 +5907,7 @@ void PsiAccount::slotCheckVCard()
+ 	// Tune
+ #ifdef USE_PEP // Tune cleaning not working. It's implemented in psicon.cpp in PsiCon::optionChanged
+-	bool publish = d->options->getOption("options.extended-presence.tune.publish").toBool();
++	bool publish = o->getOption("options.extended-presence.tune.publish").toBool();
+ 	if (!d->lastTune.isNull() && !publish) {
+ 		publishTune(Tune());
  	}
- 
- #ifndef YAPSI
--	if (j->vcard().isEmpty() && PsiOptions::instance()->getOption("options.vcard.query-own-vcard-on-login").toBool())
-+	if (j->vcard().isEmpty() && d->options->getOption("options.vcard.query-own-vcard-on-login").toBool())
- 	{
- 		changeVCard();
- 		return;
-@@ -6268,27 +6269,27 @@ void PsiAccount::optionsUpdate()
+@@ -6268,27 +6268,27 @@ void PsiAccount::optionsUpdate()
  #endif
  
  	// Chat states
 -	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
-+	setSendChatState(d->options->getOption("options.messages.send-composing-events").toBool());
++	setSendChatState(o->getOption("options.messages.send-composing-events").toBool());
  
  	//Receipts
 -	setReceipts(PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
-+	setReceipts(d->options->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
++	setReceipts(o->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
  
  	// Remote Controlling
 -	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
-+	setRCEnabled(d->options->getOption("options.external-control.adhoc-remote-control.enable").toBool());
++	setRCEnabled(o->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
  	// Roster item exchange
 -	d->rosterItemExchangeTask->setIgnoreNonRoster(PsiOptions::instance()->getOption("options.messages.ignore-non-roster-contacts").toBool());
-+	d->rosterItemExchangeTask->setIgnoreNonRoster(d->options->getOption("options.messages.ignore-non-roster-contacts").toBool());
++	d->rosterItemExchangeTask->setIgnoreNonRoster(o->getOption("options.messages.ignore-non-roster-contacts").toBool());
  
  	// Caps manager
 -	d->capsManager->setEnabled(PsiOptions::instance()->getOption("options.service-discovery.enable-entity-capabilities").toBool());
-+	d->capsManager->setEnabled(d->options->getOption("options.service-discovery.enable-entity-capabilities").toBool());
++	d->capsManager->setEnabled(o->getOption("options.service-discovery.enable-entity-capabilities").toBool());
  
 -	d->useOffline = PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool();
 -	d->useNotAvailable = PsiOptions::instance()->getOption("options.status.auto-away.use-not-availible").toBool();
@@ -921,13 +384,13 @@
 -	d->notAvailableAfter = PsiOptions::instance()->getOption("options.status.auto-away.not-availible-after").toInt();
 -	d->awayAfter = PsiOptions::instance()->getOption("options.status.auto-away.away-after").toInt();
 -	d->menuXA = PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool();
-+	d->useOffline = d->options->getOption("options.status.auto-away.use-offline").toBool();
-+	d->useNotAvailable = d->options->getOption("options.status.auto-away.use-not-availible").toBool();
-+	d->useAway = d->options->getOption("options.status.auto-away.use-away").toBool();
-+	d->offlineAfter = d->options->getOption("options.status.auto-away.offline-after").toInt();
-+	d->notAvailableAfter = d->options->getOption("options.status.auto-away.not-availible-after").toInt();
-+	d->awayAfter = d->options->getOption("options.status.auto-away.away-after").toInt();
-+	d->menuXA = d->options->getOption("options.ui.menu.status.xa").toBool();
++	d->useOffline = o->getOption("options.status.auto-away.use-offline").toBool();
++	d->useNotAvailable = o->getOption("options.status.auto-away.use-not-availible").toBool();
++	d->useAway = o->getOption("options.status.auto-away.use-away").toBool();
++	d->offlineAfter = o->getOption("options.status.auto-away.offline-after").toInt();
++	d->notAvailableAfter = o->getOption("options.status.auto-away.not-availible-after").toInt();
++	d->awayAfter = o->getOption("options.status.auto-away.away-after").toInt();
++	d->menuXA = o->getOption("options.ui.menu.status.xa").toBool();
  }
  
  
@@ -1250,13 +713,3 @@
  };
  
  #endif
---- psi.orig/src/psirosterwidget.cpp
-+++ psi/src/psirosterwidget.cpp
-@@ -222,6 +222,7 @@ void PsiRosterWidget::optionChanged(cons
- {
- 	if (!contactList_)
- 		return;
-+
- 	if (option == contactSortStyleOptionPath) {
- 		contactList_->setContactSortStyle(PsiOptions::instance()->getOption(contactSortStyleOptionPath).toString());
- 	}
