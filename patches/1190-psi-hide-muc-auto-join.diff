@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -291,6 +291,7 @@ QLineEdit#le_status_text {
  				</view>
  			</menu>
@@ -8,8 +8,8 @@
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  				<show-initial-joins comment="Show joins on your MUC join (with status and priority, depends on options)" type="bool">false</show-initial-joins>
  				<log-width type="int">500</log-width>
---- git.orig/src/mucjoindlg.cpp
-+++ git/src/mucjoindlg.cpp
+--- psi.orig/src/mucjoindlg.cpp
++++ psi/src/mucjoindlg.cpp
 @@ -48,6 +48,8 @@ MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiA
  	joinButton_ = ui_.buttonBox->addButton(tr("&Join"), QDialogButtonBox::AcceptRole);
  	joinButton_->setDefault(true);
@@ -44,8 +44,8 @@
  	ui_.busy->stop();
  	setWidgetsEnabled(true);
  
---- git.orig/src/mucjoindlg.h
-+++ git/src/mucjoindlg.h
+--- psi.orig/src/mucjoindlg.h
++++ psi/src/mucjoindlg.h
 @@ -36,6 +36,12 @@ class MUCJoinDlg : public QDialog
  	Q_OBJECT
  
@@ -84,8 +84,8 @@
  
  	void disableWidgets();
  	void enableWidgets();
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
 @@ -130,7 +130,6 @@
  #include "systeminfo.h"
  #include "avatars.h"
@@ -94,7 +94,7 @@
  #include "ahcservermanager.h"
  #include "rc.h"
  #include "tabdlg.h"
-@@ -2276,7 +2275,7 @@ void PsiAccount::bookmarksAvailabilityCh
+@@ -2297,7 +2296,7 @@ void PsiAccount::bookmarksAvailabilityCh
  	foreach(ConferenceBookmark c, d->bookmarkManager->conferences()) {
  		if (!findDialog<GCMainDlg*>(Jid(c.jid().bare())) && c.autoJoin()) {
  			if  (!joinSkip.contains(c.jid().full().toUpper()))
@@ -103,7 +103,7 @@
  		}
  	}
  #endif
-@@ -3307,7 +3306,7 @@ void PsiAccount::actionJoin(const Jid& m
+@@ -3334,7 +3333,7 @@ void PsiAccount::actionJoin(const Jid& m
  	           false);
  }
  
@@ -112,7 +112,7 @@
  {
  #ifdef GROUPCHAT
  	MUCJoinDlg* w = new MUCJoinDlg(psi(), this);
-@@ -3316,9 +3315,11 @@ void PsiAccount::actionJoin(const Confer
+@@ -3343,9 +3342,11 @@ void PsiAccount::actionJoin(const Confer
  	w->setNick(bookmark.nick().isEmpty() ? d->jid.node() : bookmark.nick());
  	w->setPassword(bookmark.password());
  
@@ -126,7 +126,7 @@
  	}
  #else
  	Q_UNUSED(bookmark);
-@@ -5447,16 +5448,18 @@ void PsiAccount::edb_finished()
+@@ -5474,16 +5475,18 @@ void PsiAccount::edb_finished()
  	delete h;
  }
  
@@ -149,7 +149,7 @@
  #endif
  }
  
-@@ -5531,10 +5534,17 @@ void PsiAccount::client_groupChatJoined(
+@@ -5558,10 +5561,17 @@ void PsiAccount::client_groupChatJoined(
  	MUCJoinDlg *w = findDialog<MUCJoinDlg*>(j);
  	if(!w)
  		return;
@@ -159,18 +159,18 @@
 -	// TODO: Correctly handle auto-join groupchats
 -	openGroupChat(j, UserAction);
 +	openGroupChat(j, UserAction, r);
-+	if(r == MUCJoinDlg::MucAutoJoin && PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
-+		m = findDialog<GCMainDlg*>(Jid(j.bare()));
-+		if(m) {
-+			QTimer::singleShot(0, m, SLOT(hideTab()));
-+		}
-+	}
++//	if(r == MUCJoinDlg::MucAutoJoin && PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
++//		m = findDialog<GCMainDlg*>(Jid(j.bare()));
++//		if(m) {
++//			QTimer::singleShot(0, m, SLOT(hideTab()));
++//		}
++//	}
 +
  #endif
  }
  
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
 @@ -35,6 +35,7 @@
  #include "mood.h"
  #include "activity.h"
@@ -179,7 +179,7 @@
  
  namespace XMPP
  {
-@@ -187,7 +188,7 @@ public:
+@@ -188,7 +189,7 @@ public:
  	void showXmlConsole();
  	void openAddUserDlg();
  	void openAddUserDlg(const XMPP::Jid &jid, const QString &nick, const QString &group);
@@ -188,7 +188,7 @@
  	bool groupChatJoin(const QString &host, const QString &room, const QString &nick, const QString& pass, bool nohistory = false);
  	void groupChatSetStatus(const QString &host, const QString &room, const Status &);
  	void groupChatChangeNick(const QString &host, const QString &room, const QString& nick, const Status &);
-@@ -350,7 +351,7 @@ public slots:
+@@ -352,7 +353,7 @@ public slots:
  	void actionSearch(const Jid &);
  	void actionManageBookmarks();
  	void actionJoin(const Jid& mucJid, const QString& password = QString());
@@ -197,3 +197,14 @@
  	void actionDisco(const Jid &, const QString &);
  	void actionInvite(const Jid &, const QString &);
  	void actionVoice(const Jid&);
+--- psi.orig/src/tabs/tabbablewidget.cpp
++++ psi/src/tabs/tabbablewidget.cpp
+@@ -47,7 +47,7 @@ TabbableWidget::TabbableWidget(const Jid
+ 		TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
+ 	}
+ 	++TabbableWidget::chatsCount;
+-	QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
++	//QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
+ }
+ 
+ void TabbableWidget::ensureTabbedCorrectly()
