@@ -1,0 +1,45 @@
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -436,6 +436,11 @@ public:
+ 		reconnectTimeoutTimer_ = new QTimer(this);
+ 		reconnectTimeoutTimer_->setSingleShot(true);
+ 		connect(reconnectTimeoutTimer_, SIGNAL(timeout()), SLOT(reconnectTimerTimeout()));
++
++		updateOnlineContactsCountTimer_ = new QTimer(this);
++		updateOnlineContactsCountTimer_->setInterval(500);
++		updateOnlineContactsCountTimer_->setSingleShot(true);
++		connect(updateOnlineContactsCountTimer_, SIGNAL(timeout()), SLOT(updateOnlineContactsCountTimeout()));
+ 	}
+ 
+ 	PsiContactList* contactList;
+@@ -464,6 +469,7 @@ public:
+ 	bool pepAvailable;
+ 	QString currentConnectionError;
+ 	int currentConnectionErrorCondition;
++	QTimer *updateOnlineContactsCountTimer_;
+ 
+ 	// Tune
+ 	Tune lastTune;
+@@ -633,7 +639,8 @@ public:
+ 		return pathToProfile(activeProfile, ApplicationInfo::DataLocation) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
+ 	}
+ 
+-	void updateOnlineContactsCount()
++private slots:
++	void updateOnlineContactsCountTimeout()
+ 	{
+ 		int newOnlineContactsCount = 0;
+ 		foreach(const PsiContact* c, contacts) {
+@@ -649,6 +656,12 @@ public:
+ 		}
+ 	}
+ 
++public:
++	void updateOnlineContactsCount()
++	{
++		updateOnlineContactsCountTimer_->start();
++	}
++
+ 	// FIXME: Rename updateEntry -> updateContact
+ 	void updateEntry(const UserListItem& u)
+ 	{
