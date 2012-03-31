@@ -62,7 +62,7 @@
  	if(l.isEmpty())
 --- psi.orig/src/profiles.h
 +++ psi/src/profiles.h
-@@ -61,7 +61,7 @@ public:
+@@ -60,7 +60,7 @@ public:
  	XMPP::ClientStream::AllowPlainType allow_plain;
  	bool req_mutual_auth;
  	bool legacy_ssl_probe;
@@ -73,17 +73,7 @@
  
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -3167,6 +3167,9 @@ void PsiAccount::publishTune(const Tune&
- 
- void PsiAccount::secondsIdle(int seconds)
- {
-+	if (d->acc.ignore_global_actions)
-+		return;
-+
- 	d->lastIdle = seconds;
- 	int minutes = seconds / 60;
- 
-@@ -4066,6 +4069,11 @@ void PsiAccount::actionExecuteCommandSpe
+@@ -4032,6 +4032,11 @@ void PsiAccount::actionExecuteCommandSpe
  	}
  }
  
@@ -97,7 +87,7 @@
  	QList<PsiAccount*> list;
 --- psi.orig/src/psiaccount.h
 +++ psi/src/psiaccount.h
-@@ -374,6 +374,7 @@ public slots:
+@@ -377,6 +377,7 @@ public slots:
  	void actionSendFiles(const Jid &, const QStringList&);
  	void actionExecuteCommand(const Jid& j, const QString& = QString());
  	void actionExecuteCommandSpecific(const Jid&, const QString& = QString());
@@ -107,7 +97,7 @@
  	void actionSetGeoLocation();
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -1155,7 +1155,7 @@ void PsiCon::setGlobalStatus(const Statu
+@@ -1172,7 +1172,7 @@ void PsiCon::setGlobalStatus(const Statu
  
  	// globally set each account which is logged in
  	foreach(PsiAccount* account, d->contactList->enabledAccounts())
@@ -116,6 +106,16 @@
  			account->setStatus(s, withPriority, isManualStatus);
  
  	emit statusMessageChanged(s.status());
+@@ -1930,6 +1930,9 @@ void PsiCon::secondsIdle(int sec)
+ 		aa = PsiAccount::AutoAway_None;
+ 
+ 	foreach(PsiAccount* pa, d->contactList->enabledAccounts()) {
++		if(pa->accountOptions().ignore_global_actions)
++			continue;
++
+ 		pa->setAutoAwayStatus(aa);
+ 	}
+ }
 --- psi.orig/src/psi_profiles.cpp
 +++ psi/src/psi_profiles.cpp
 @@ -134,6 +134,7 @@ void UserAccount::reset()
@@ -134,7 +134,7 @@
  	opt_log = o->getOption(base + ".log").toBool();
  	opt_reconn = o->getOption(base + ".reconn").toBool();
  	opt_ignoreSSLWarnings = o->getOption(base + ".ignore-SSL-warnings").toBool();
-@@ -346,6 +348,7 @@ void UserAccount::toOptions(OptionsTree
+@@ -346,6 +348,7 @@ void UserAccount::toOptions(OptionsTree 
  	o->setOption(base + ".legacy-ssl-probe", legacy_ssl_probe);
  	o->setOption(base + ".automatic-resource", opt_automatic_resource);
  	o->setOption(base + ".priority-depends-on-status", priority_dep_on_status);

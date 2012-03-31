@@ -1,5 +1,5 @@
---- git.orig/psi.desktop
-+++ git/psi.desktop
+--- psi.orig/psi.desktop
++++ psi/psi.desktop
 @@ -5,8 +5,8 @@ Type=Application
  Name=Psi+
  GenericName=Jabber Client
@@ -11,8 +11,8 @@
  Terminal=false
  Categories=Network;InstantMessaging;Qt;
  
---- git.orig/qcm/certstore.qcm
-+++ git/qcm/certstore.qcm
+--- psi.orig/qcm/certstore.qcm
++++ psi/qcm/certstore.qcm
 @@ -73,10 +73,10 @@ public:
  			if(QFile::exists(conf->getenv("PREFIX") + "/certs/rootcerts.pem"))
  				path = "$$PREFIX/certs/rootcerts.pem";
@@ -26,8 +26,8 @@
  			"qcasharedfiles.files = third-party/qca/qca/certs\n"
  			"INSTALLS += qcasharedfiles\n";
  			conf->addExtra(extra);
---- git.orig/qcm/conf.qcm
-+++ git/qcm/conf.qcm
+--- psi.orig/qcm/conf.qcm
++++ psi/qcm/conf.qcm
 @@ -20,14 +20,14 @@ public:
  		conf->addExtra("CONFIG += QuickDirtyChecker");
  		return true;
@@ -47,8 +47,8 @@
  		}
  
  		conf->addDefine("HAVE_CONFIG");
---- git.orig/src/activeprofiles_dbus.cpp
-+++ git/src/activeprofiles_dbus.cpp
+--- psi.orig/src/activeprofiles_dbus.cpp
++++ psi/src/activeprofiles_dbus.cpp
 @@ -112,7 +112,7 @@ QString ActiveProfiles::Private::dbusNam
  {
  	QString name = PSIDBUSNAME;
@@ -58,8 +58,19 @@
  	if (!prof.isEmpty()) {
  		name += ".";
  		name += encodeAlNumD(prof).right(qMax(0,250-name.size()));
---- git.orig/src/applicationinfo.cpp
-+++ git/src/applicationinfo.cpp
+--- psi.orig/src/activeprofiles_win.cpp
++++ psi/src/activeprofiles_win.cpp
+@@ -39,7 +39,7 @@
+ class ActiveProfiles::Private : public QWidget
+ {
+ public:
+-	Private(ActiveProfiles *aprof) : app(ApplicationInfo::IPCName()), home(ApplicationInfo::homeDir()), profile(""), ap(aprof), mutex(0), changesMutex(0) {
++	Private(ActiveProfiles *aprof) : app(ApplicationInfo::IPCName()), home(ApplicationInfo::homeDir(ApplicationInfo::ConfigLocation)), profile(""), ap(aprof), mutex(0), changesMutex(0) {
+ 
+ 		app.replace('\\', '/');	// '\\' has a special meaning in mutex name
+ 		home.replace('\\', '/');
+--- psi.orig/src/applicationinfo.cpp
++++ psi/src/applicationinfo.cpp
 @@ -1,6 +1,8 @@
  #include <QString>
  #include <QDir>
@@ -305,8 +316,8 @@
  }
  
  QString ApplicationInfo::desktopFile()
---- git.orig/src/applicationinfo.h
-+++ git/src/applicationinfo.h
+--- psi.orig/src/applicationinfo.h
++++ psi/src/applicationinfo.h
 @@ -7,6 +7,12 @@ class QStringList;
  class ApplicationInfo
  {
@@ -342,8 +353,8 @@
  	static QStringList getCertificateStoreDirs();
  	static QString getCertificateStoreSaveDir();
  	static QStringList dataDirs();
---- git.orig/src/avatars.cpp
-+++ git/src/avatars.cpp
+--- psi.orig/src/avatars.cpp
++++ psi/src/avatars.cpp
 @@ -712,9 +712,9 @@ void AvatarFactory::newMucItem(const Jid
  
  QString AvatarFactory::getManualDir()
@@ -368,8 +379,19 @@
  		home.mkdir("avatars");
  	}
  	return avatars.path();
---- /dev/null
-+++ git/src/homedirmigration.cpp
+--- psi.orig/src/chatviewthemeprovider.cpp
++++ psi/src/chatviewthemeprovider.cpp
+@@ -98,7 +98,7 @@ const QStringList ChatViewThemeProvider:
+ 	QStringList dirs;
+ 	dirs << ":";
+ 	dirs << ".";
+-	dirs << ApplicationInfo::homeDir();
++	dirs << ApplicationInfo::homeDir(ApplicationInfo::DataLocation);
+ 	dirs << ApplicationInfo::resourcesDir();
+ 
+ 	QSet<QString> ret;
+--- psi.orig/src/homedirmigration.cpp
++++ psi/src/homedirmigration.cpp
 @@ -0,0 +1,332 @@
 +/*
 + * homedirmigration.cpp
@@ -703,8 +725,8 @@
 +{
 +	delete ui;
 +}
---- /dev/null
-+++ git/src/homedirmigration.h
+--- psi.orig/src/homedirmigration.h
++++ psi/src/homedirmigration.h
 @@ -0,0 +1,70 @@
 +/*
 + * homedirmigration.h
@@ -776,8 +798,8 @@
 +};
 +
 +#endif // HOMEDIRMIGRATION_H
---- /dev/null
-+++ git/src/homedirmigration.ui
+--- psi.orig/src/homedirmigration.ui
++++ psi/src/homedirmigration.ui
 @@ -0,0 +1,132 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -911,8 +933,8 @@
 +  </connection>
 + </connections>
 +</ui>
---- git.orig/src/main.cpp
-+++ git/src/main.cpp
+--- psi.orig/src/main.cpp
++++ psi/src/main.cpp
 @@ -94,7 +94,7 @@ PsiMain::PsiMain(const QMap<QString, QSt
  	lastLang = sUser.value("last_lang").toString();
  	autoOpen = sUser.value("auto_open", QVariant(false)).toBool();
@@ -957,8 +979,8 @@
  	QApplication::setQuitOnLastWindowClosed(false);
  
  #ifdef Q_WS_MAC
---- git.orig/src/options/opt_application.cpp
-+++ git/src/options/opt_application.cpp
+--- psi.orig/src/options/opt_application.cpp
++++ psi/src/options/opt_application.cpp
 @@ -133,7 +133,7 @@ void OptionsTabApplication::applyOptions
  		TranslationManager::instance()->loadTranslation(itemData);
  		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
@@ -977,9 +999,9 @@
  	QString curL = s.value("last_lang", "").toString();
  	if (curL.isEmpty())
  		d->cb_lang->setCurrentIndex( 0 );
---- git.orig/src/pluginhost.cpp
-+++ git/src/pluginhost.cpp
-@@ -917,9 +917,9 @@ QString PluginHost::appOsName()
+--- psi.orig/src/pluginhost.cpp
++++ psi/src/pluginhost.cpp
+@@ -967,9 +967,9 @@ QString PluginHost::appOsName()
  	return ApplicationInfo::osName();
  }
  
@@ -991,7 +1013,7 @@
  }
  
  QString PluginHost::appResourcesDir()
-@@ -932,9 +932,9 @@ QString PluginHost::appLibDir()
+@@ -982,9 +982,9 @@ QString PluginHost::appLibDir()
  	return ApplicationInfo::libDir();
  }
  
@@ -1003,7 +1025,7 @@
  }
  
  QString PluginHost::appHistoryDir()
-@@ -942,9 +942,9 @@ QString PluginHost::appHistoryDir()
+@@ -992,9 +992,9 @@ QString PluginHost::appHistoryDir()
  	return ApplicationInfo::historyDir();
  }
  
@@ -1015,8 +1037,8 @@
  }
  
  QString PluginHost::appVCardDir()
---- git.orig/src/pluginhost.h
-+++ git/src/pluginhost.h
+--- psi.orig/src/pluginhost.h
++++ psi/src/pluginhost.h
 @@ -13,6 +13,7 @@
  #include <QPointer>
  #include <QTextEdit>
@@ -1041,9 +1063,9 @@
  	QString appVCardDir();
  
  	//AccountInfoAcsessingHost
---- git.orig/src/pluginmanager.cpp
-+++ git/src/pluginmanager.cpp
-@@ -60,7 +60,7 @@ static QStringList pluginDirs()
+--- psi.orig/src/pluginmanager.cpp
++++ psi/src/pluginmanager.cpp
+@@ -62,7 +62,7 @@ static QStringList pluginDirs()
  {
  	QStringList l;
  	l += ApplicationInfo::resourcesDir() + "/plugins";
@@ -1052,8 +1074,8 @@
  #if defined(Q_OS_UNIX)
  	l += ApplicationInfo::libDir() + "/plugins";
  #endif
---- git.orig/src/plugins/include/applicationinfoaccessinghost.h
-+++ git/src/plugins/include/applicationinfoaccessinghost.h
+--- psi.orig/src/plugins/include/applicationinfoaccessinghost.h
++++ psi/src/plugins/include/applicationinfoaccessinghost.h
 @@ -12,6 +12,11 @@ struct Proxy {
  class ApplicationInfoAccessingHost
  {
@@ -1082,8 +1104,8 @@
  	virtual QString appVCardDir() = 0;
  
  	virtual Proxy getProxyFor(const QString& obj) = 0;
---- git.orig/src/plugins/psiplugin.pri
-+++ git/src/plugins/psiplugin.pri
+--- psi.orig/src/plugins/psiplugin.pri
++++ psi/src/plugins/psiplugin.pri
 @@ -2,7 +2,7 @@ TEMPLATE = lib
  CONFIG += plugin
  QT += xml
@@ -1093,8 +1115,8 @@
  INSTALLS += target
  
  include(plugins.pri)
---- git.orig/src/profiledlg.cpp
-+++ git/src/profiledlg.cpp
+--- psi.orig/src/profiledlg.cpp
++++ psi/src/profiledlg.cpp
 @@ -260,7 +260,15 @@ void ProfileManageDlg::slotProfileDelete
  	if(x == -1)
  		return;
@@ -1139,8 +1161,8 @@
  	
  	accept();
  }
---- git.orig/src/profiles.h
-+++ git/src/profiles.h
+--- psi.orig/src/profiles.h
++++ psi/src/profiles.h
 @@ -33,6 +33,7 @@
  #include "xmpp_clientstream.h"
  #include "xmpp_roster.h"
@@ -1165,9 +1187,107 @@
  
  extern QString activeProfile;
  
---- git.orig/src/psi_profiles.cpp
-+++ git/src/psi_profiles.cpp
-@@ -1388,21 +1388,21 @@ void OptionsMigration::lateMigration()
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -633,7 +633,7 @@ public:
+ 
+ 	QString pathToProfileEvents() const
+ 	{
+-		return pathToProfile(activeProfile) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
++		return pathToProfile(activeProfile, ApplicationInfo::DataLocation) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
+ 	}
+ 
+ private slots:
+@@ -2390,7 +2390,7 @@ void PsiAccount::bookmarksAvailabilityCh
+ 
+ #ifdef GROUPCHAT
+ 	QSet<QString> joinSkip;
+-	QFile file(pathToProfile(activeProfile)+"/mucskipautojoin.txt");
++	QFile file(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation)+"/mucskipautojoin.txt");
+ 	if (file.exists() && file.open(QIODevice::ReadOnly)) {
+ 		QTextStream stream(&file);
+ 		while (!stream.atEnd()) {
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -142,8 +142,8 @@ public:
+ 	PsiConObject(QObject *parent)
+ 	: QObject(parent)
+ 	{
+-		QDir p(ApplicationInfo::homeDir());
+-		QDir v(ApplicationInfo::homeDir() + "/tmp-sounds");
++		QDir p(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
++		QDir v(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/tmp-sounds");
+ 		if(!v.exists())
+ 			p.mkdir("tmp-sounds");
+ 		Iconset::setSoundPrefs(v.absolutePath(), this, SLOT(playSound(QString)));
+@@ -153,8 +153,8 @@ public:
+ 	~PsiConObject()
+ 	{
+ 		// removing temp dirs
+-		QDir p(ApplicationInfo::homeDir());
+-		QDir v(ApplicationInfo::homeDir() + "/tmp-sounds");
++		QDir p(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
++		QDir v(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/tmp-sounds");
+ 		folderRemove(v);
+ 	}
+ 
+@@ -262,7 +262,7 @@ public:
+ 			}
+ 		}
+ 		accountTree.setOption("order", order);
+-		QFile accountsFile(pathToProfile( activeProfile ) + "/accounts.xml");	
++		QFile accountsFile(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/accounts.xml");
+ 		accountTree.saveOptions(accountsFile.fileName(), "accounts", ApplicationInfo::optionsNS(), ApplicationInfo::version());;
+ 		
+ 	}
+@@ -425,7 +425,7 @@ bool PsiCon::init()
+ 	
+ 	PsiRichText::setAllowedImageDirs(QStringList()
+ 									 << ApplicationInfo::resourcesDir()
+-									 << ApplicationInfo::homeDir());
++									 << ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
+ 	
+ 	// To allow us to upgrade from old hardcoded options gracefully, be careful about the order here
+ 	PsiOptions *options=PsiOptions::instance();
+@@ -469,7 +469,7 @@ bool PsiCon::init()
+ 		common_smallFontSize = minimumFontSize;
+ 	FancyLabel::setSmallFontSize( common_smallFontSize );
+ 	
+-	QFile accountsFile(pathToProfile( activeProfile ) + "/accounts.xml");
++	QFile accountsFile(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/accounts.xml");
+ 	bool accountMigration = false;	
+ 	if (!accountsFile.exists()) {
+ 		accountMigration = true;
+@@ -493,7 +493,7 @@ bool PsiCon::init()
+ 
+ 	contactUpdatesManager_ = new ContactUpdatesManager(this);
+ 
+-	QDir profileDir( pathToProfile( activeProfile ) );
++	QDir profileDir( pathToProfile(activeProfile, ApplicationInfo::DataLocation) );
+ 	profileDir.rmdir( "info" ); // remove unused dir
+ 
+ 	// Auto updater initialization
+@@ -1240,7 +1240,7 @@ void PsiCon::saveAccounts()
+ 
+ void PsiCon::saveCapabilities()
+ {
+-	QFile file(ApplicationInfo::homeDir() + "/caps.xml");
++	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
+ 	d->capsRegistry->save(file);
+ }
+ 
+@@ -1918,7 +1918,7 @@ void PsiCon::promptUserToCreateAccount()
+ 
+ QString PsiCon::optionsFile() const
+ {
+-	return pathToProfile(activeProfile) + "/options.xml";
++	return pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/options.xml";
+ }
+ 
+ void PsiCon::forceSavePreferences()
+--- psi.orig/src/psi_profiles.cpp
++++ psi/src/psi_profiles.cpp
+@@ -1392,21 +1392,21 @@ void OptionsMigration::lateMigration()
  }
  
  
@@ -1193,7 +1313,7 @@
  	if(!d.exists())
  		return list;
  
-@@ -1446,17 +1446,34 @@ bool profileNew(const QString &name)
+@@ -1450,17 +1450,34 @@ bool profileNew(const QString &name)
  	}
  
  	// make it
@@ -1235,7 +1355,7 @@
  
  	return true;
  }
-@@ -1469,13 +1486,31 @@ bool profileRename(const QString &oldnam
+@@ -1473,13 +1490,31 @@ bool profileRename(const QString &oldnam
  			return false;
  	}
  
@@ -1272,7 +1392,7 @@
  	return true;
  }
  
-@@ -1506,13 +1541,20 @@ static bool folderRemove(const QDir &_d)
+@@ -1510,13 +1545,20 @@ static bool folderRemove(const QDir &_d)
  	return true;
  }
  
@@ -1298,117 +1418,8 @@
  }
  
  QString activeProfile;
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -608,7 +608,7 @@ public:
- 
- 	QString pathToProfileEvents() const
- 	{
--		return pathToProfile(activeProfile) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
-+		return pathToProfile(activeProfile, ApplicationInfo::DataLocation) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
- 	}
- 
- 	void updateOnlineContactsCount()
-@@ -2371,7 +2371,7 @@ void PsiAccount::bookmarksAvailabilityCh
- 
- #ifdef GROUPCHAT
- 	QSet<QString> joinSkip;
--	QFile file(pathToProfile(activeProfile)+"/mucskipautojoin.txt");
-+	QFile file(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation)+"/mucskipautojoin.txt");
- 	if (file.exists() && file.open(QIODevice::ReadOnly)) {
- 		QTextStream stream(&file);
- 		while (!stream.atEnd()) {
---- git.orig/src/chatviewthemeprovider.cpp
-+++ git/src/chatviewthemeprovider.cpp
-@@ -98,7 +98,7 @@ const QStringList ChatViewThemeProvider:
- 	QStringList dirs;
- 	dirs << ":";
- 	dirs << ".";
--	dirs << ApplicationInfo::homeDir();
-+	dirs << ApplicationInfo::homeDir(ApplicationInfo::DataLocation);
- 	dirs << ApplicationInfo::resourcesDir();
- 
- 	QSet<QString> ret;
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
-@@ -141,8 +141,8 @@ public:
- 	PsiConObject(QObject *parent)
- 	: QObject(parent)
- 	{
--		QDir p(ApplicationInfo::homeDir());
--		QDir v(ApplicationInfo::homeDir() + "/tmp-sounds");
-+		QDir p(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
-+		QDir v(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/tmp-sounds");
- 		if(!v.exists())
- 			p.mkdir("tmp-sounds");
- 		Iconset::setSoundPrefs(v.absolutePath(), this, SLOT(playSound(QString)));
-@@ -152,8 +152,8 @@ public:
- 	~PsiConObject()
- 	{
- 		// removing temp dirs
--		QDir p(ApplicationInfo::homeDir());
--		QDir v(ApplicationInfo::homeDir() + "/tmp-sounds");
-+		QDir p(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
-+		QDir v(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/tmp-sounds");
- 		folderRemove(v);
- 	}
- 
-@@ -261,7 +261,7 @@ public:
- 			}
- 		}
- 		accountTree.setOption("order", order);
--		QFile accountsFile(pathToProfile( activeProfile ) + "/accounts.xml");	
-+		QFile accountsFile(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/accounts.xml");
- 		accountTree.saveOptions(accountsFile.fileName(), "accounts", ApplicationInfo::optionsNS(), ApplicationInfo::version());;
- 		
- 	}
-@@ -398,7 +398,7 @@ bool PsiCon::init()
- 	
- 	PsiRichText::setAllowedImageDirs(QStringList()
- 									 << ApplicationInfo::resourcesDir()
--									 << ApplicationInfo::homeDir());
-+									 << ApplicationInfo::homeDir(ApplicationInfo::CacheLocation));
- 	
- 	// To allow us to upgrade from old hardcoded options gracefully, be careful about the order here
- 	PsiOptions *options=PsiOptions::instance();
-@@ -442,7 +442,7 @@ bool PsiCon::init()
- 		common_smallFontSize = minimumFontSize;
- 	FancyLabel::setSmallFontSize( common_smallFontSize );
- 	
--	QFile accountsFile(pathToProfile( activeProfile ) + "/accounts.xml");
-+	QFile accountsFile(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/accounts.xml");
- 	bool accountMigration = false;	
- 	if (!accountsFile.exists()) {
- 		accountMigration = true;
-@@ -466,7 +466,7 @@ bool PsiCon::init()
- 
- 	contactUpdatesManager_ = new ContactUpdatesManager(this);
- 
--	QDir profileDir( pathToProfile( activeProfile ) );
-+	QDir profileDir( pathToProfile(activeProfile, ApplicationInfo::DataLocation) );
- 	profileDir.rmdir( "info" ); // remove unused dir
- 
- 	// Auto updater initialization
-@@ -1220,7 +1220,7 @@ void PsiCon::saveAccounts()
- 
- void PsiCon::saveCapabilities()
- {
--	QFile file(ApplicationInfo::homeDir() + "/caps.xml");
-+	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
- 	d->capsRegistry->save(file);
- }
- 
-@@ -1877,7 +1877,7 @@ void PsiCon::promptUserToCreateAccount()
- 
- QString PsiCon::optionsFile() const
- {
--	return pathToProfile(activeProfile) + "/options.xml";
-+	return pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/options.xml";
- }
- 
- void PsiCon::forceSavePreferences()
---- git.orig/src/psithemeprovider.cpp
-+++ git/src/psithemeprovider.cpp
+--- psi.orig/src/psithemeprovider.cpp
++++ psi/src/psithemeprovider.cpp
 @@ -36,7 +36,7 @@ QString PsiThemeProvider::themePath(cons
  	QStringList dirs;
  	dirs << ":";
@@ -1418,8 +1429,8 @@
  	dirs << ApplicationInfo::resourcesDir();
  
  	foreach (QString dir, dirs) {
---- git.orig/src/src.pri
-+++ git/src/src.pri
+--- psi.orig/src/src.pri
++++ psi/src/src.pri
 @@ -227,7 +227,8 @@ HEADERS += \
  	$$PWD/coloropt.h \
  	$$PWD/geolocationdlg.h \
@@ -1450,8 +1461,8 @@
  
  # options dialog
  include($$PWD/options/options.pri)
---- git.orig/src/src.pro
-+++ git/src/src.pro
+--- psi.orig/src/src.pro
++++ psi/src/src.pro
 @@ -4,7 +4,7 @@
  
  # Configuration
@@ -1494,8 +1505,8 @@
  }
  win32 {
  	contains(QMAKE_HOST.arch, x86_64):{
---- git.orig/src/tools/tunecontroller/plugins/psifile/psifileplugin.cpp
-+++ git/src/tools/tunecontroller/plugins/psifile/psifileplugin.cpp
+--- psi.orig/src/tools/tunecontroller/plugins/psifile/psifileplugin.cpp
++++ psi/src/tools/tunecontroller/plugins/psifile/psifileplugin.cpp
 @@ -29,7 +29,7 @@ QString PsiFilePlugin::name()
  
  TuneController* PsiFilePlugin::createController() 
@@ -1505,8 +1516,8 @@
  }
  
  Q_EXPORT_PLUGIN2(psifileplugin, PsiFilePlugin);
---- git.orig/src/translationmanager.cpp
-+++ git/src/translationmanager.cpp
+--- psi.orig/src/translationmanager.cpp
++++ psi/src/translationmanager.cpp
 @@ -174,7 +174,7 @@ QStringList TranslationManager::translat
  	QStringList dirs;
  	QString subdir = "";
@@ -1516,8 +1527,8 @@
  	dirs += ApplicationInfo::resourcesDir() + subdir;
  	return dirs;
  }
---- git.orig/src/vcardfactory.cpp
-+++ git/src/vcardfactory.cpp
+--- psi.orig/src/vcardfactory.cpp
++++ psi/src/vcardfactory.cpp
 @@ -101,8 +101,8 @@ void VCardFactory::saveVCard(const Jid& 
  	// save vCard to disk
  
@@ -1529,14 +1540,3 @@
  	if(!v.exists())
  		p.mkdir("vcard");
  
---- git.orig/src/activeprofiles_win.cpp
-+++ git/src/activeprofiles_win.cpp
-@@ -39,7 +39,7 @@
- class ActiveProfiles::Private : public QWidget
- {
- public:
--	Private(ActiveProfiles *aprof) : app(ApplicationInfo::IPCName()), home(ApplicationInfo::homeDir()), profile(""), ap(aprof), mutex(0), changesMutex(0) {
-+	Private(ActiveProfiles *aprof) : app(ApplicationInfo::IPCName()), home(ApplicationInfo::homeDir(ApplicationInfo::ConfigLocation)), profile(""), ap(aprof), mutex(0), changesMutex(0) {
- 
- 		app.replace('\\', '/');	// '\\' has a special meaning in mutex name
- 		home.replace('\\', '/');

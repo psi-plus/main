@@ -1,6 +1,6 @@
 --- psi.orig/iris/src/xmpp/xmpp-im/client.cpp
 +++ psi/iris/src/xmpp/xmpp-im/client.cpp
-@@ -624,6 +624,7 @@ void Client::send(const QDomElement &x)
+@@ -618,6 +618,7 @@ void Client::send(const QDomElement &x)
  		return;
  	}
  
@@ -3533,7 +3533,7 @@
 +	$$PWD/include/soundaccessinghost.h
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -771,6 +771,13 @@ public slots:
+@@ -768,6 +768,13 @@ public slots:
  		xmlRingbuf[xmlRingbufWrite].time = QDateTime::currentDateTime();
  		xmlRingbufWrite = (xmlRingbufWrite + 1) % xmlRingbuf.count();
  	}
@@ -3547,7 +3547,7 @@
  	
  	void pm_proxyRemoved(QString proxykey)
  	{
-@@ -1130,6 +1137,11 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1120,6 +1127,11 @@ PsiAccount::PsiAccount(const UserAccount
  
  	// create Jabber::Client
  	d->client = new Client;
@@ -3559,7 +3559,7 @@
  	d->client->setOSName(SystemInfo::instance()->os());
  	d->client->setClientName(ApplicationInfo::name());
  	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1185,6 +1197,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1177,6 +1189,7 @@ PsiAccount::PsiAccount(const UserAccount
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -3567,9 +3567,9 @@
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1247,11 +1260,6 @@ PsiAccount::PsiAccount(const UserAccount
- 	d->rcForwardServer = 0;
+@@ -1241,11 +1254,6 @@ PsiAccount::PsiAccount(const UserAccount
  	d->rcLeaveMucServer =0;
+ 	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
 -	// Plugins
 -#ifdef PSI_PLUGINS
@@ -3579,7 +3579,7 @@
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1795,6 +1803,10 @@ void PsiAccount::logout(bool fast, const
+@@ -1781,6 +1789,10 @@ void PsiAccount::logout(bool fast, const
  	if(!isActive())
  		return;
  
@@ -3590,7 +3590,7 @@
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4651,6 +4663,22 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4624,6 +4636,22 @@ void PsiAccount::dj_sendMessage(const Me
  		}
  	}
  
@@ -3613,7 +3613,7 @@
  	d->client->sendMessage(nm);
  
  	// only toggle if not an invite or body is not empty
-@@ -4933,6 +4961,15 @@ static bool messageListContainsEvent(con
+@@ -4906,6 +4934,15 @@ static bool messageListContainsEvent(con
  	return false;
  }
  
@@ -3629,7 +3629,7 @@
  // handle an incoming event
  void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  {
-@@ -4977,12 +5014,14 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4950,12 +4987,14 @@ void PsiAccount::handleEvent(PsiEvent* e
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -3646,7 +3646,7 @@
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5199,6 +5238,13 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5172,6 +5211,13 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  #endif
  	}
@@ -3660,7 +3660,7 @@
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5218,7 +5264,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5191,7 +5237,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  		    (popupType == PopupManager::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PopupManager::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
@@ -3678,7 +3678,7 @@
  		}
  
  		emit startBounce();
-@@ -5393,6 +5448,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5366,6 +5421,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
  		}
  		else if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled())
  			doPopup = false;
@@ -3689,7 +3689,7 @@
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5415,6 +5474,18 @@ void PsiAccount::openNextEvent(const Use
+@@ -5388,6 +5447,18 @@ void PsiAccount::openNextEvent(const Use
  	PsiEvent *e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;
@@ -3710,7 +3710,7 @@
  }
 --- psi.orig/src/psiaccount.h
 +++ psi/src/psiaccount.h
-@@ -238,6 +238,10 @@ public:
+@@ -246,6 +246,10 @@ public:
  	};
  	void playSound(SoundType onevent);
  
@@ -3756,7 +3756,7 @@
  void PsiChatDlg::updateCounter()
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -570,7 +570,7 @@ bool PsiCon::init()
+@@ -596,7 +596,7 @@ bool PsiCon::init()
  
  #ifdef PSI_PLUGINS
  	// Plugin Manager
@@ -3765,7 +3765,7 @@
  #endif
  
  	// Global shortcuts
-@@ -771,7 +771,9 @@ void PsiCon::deinit()
+@@ -797,7 +797,9 @@ void PsiCon::deinit()
  	// save profile
  	if(d->contactList)
  		d->saveProfile(acc);
@@ -3776,7 +3776,7 @@
  	GlobalShortcutManager::clear();
  
  	DesktopUtil::unsetUrlHandler("xmpp");
-@@ -791,6 +793,9 @@ void PsiCon::setShortcuts()
+@@ -817,6 +819,9 @@ void PsiCon::setShortcuts()
  #ifdef YAPSI
  	ShortcutManager::connect("global.filter-contacts", d->mainwin, SLOT(filterContacts()));
  #endif
