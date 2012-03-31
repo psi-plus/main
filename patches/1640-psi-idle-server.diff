@@ -1,6 +1,6 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -671,6 +671,7 @@ QLineEdit#le_status_text {
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -678,6 +678,7 @@ QLineEdit#le_status_text {
  		</p2p>
  		<service-discovery>
  			<enable-entity-capabilities type="bool">true</enable-entity-capabilities>
@@ -8,8 +8,8 @@
  		</service-discovery>
  		<status>
  			<ask-for-message-on-offline type="bool">false</ask-for-message-on-offline>
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
 @@ -307,6 +307,48 @@ bool BlockTransportPopupList::find(const
  	return false;
  }
@@ -43,7 +43,7 @@
 +			QDomElement query = doc()->createElement("query");
 +			query.setAttribute("xmlns", ns);
 +			iq.appendChild(query);
-+			query.setAttribute("seconds", pa_->idle());
++			query.setAttribute("seconds", pa_->psi()->idle());
 +
 +			send(iq);
 +			return true;
@@ -59,7 +59,7 @@
  //----------------------------------------------------------------------------
  // PsiAccount
  //----------------------------------------------------------------------------
-@@ -1177,6 +1219,12 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1191,6 +1233,12 @@ PsiAccount::PsiAccount(const UserAccount
  	PluginManager::instance()->addAccount(this, d->client);
  #endif
  
@@ -72,34 +72,73 @@
  	// HTML
  	if(PsiOptions::instance()->getOption("options.html.chat.render").toBool())
  		d->client->addExtension("html",Features("http://jabber.org/protocol/xhtml-im"));
-@@ -1577,6 +1625,11 @@ QString PsiAccount::nameWithJid() const
- 	return (name() + " (" + JIDUtil::toString(jid(),true) + ')');
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -309,7 +309,7 @@ public:
+ 
+ 	struct IdleSettings
+ 	{
+-		IdleSettings()
++		IdleSettings() : secondsIdle(0)
+ 		{}
+ 
+ 		void update()
+@@ -322,10 +322,13 @@ public:
+ 			notAvailableAfter = o->getOption("options.status.auto-away.not-availible-after").toInt();
+ 			awayAfter = o->getOption("options.status.auto-away.away-after").toInt();
+ 			menuXA = o->getOption("options.ui.menu.status.xa").toBool();
++			useIdleServer = o->getOption("options.service-discovery.last-activity").toBool();
+ 		}
+ 
+ 		bool useOffline, useNotAvailable, useAway, menuXA;
+ 		int offlineAfter, notAvailableAfter, awayAfter;
++		int secondsIdle;
++		bool useIdleServer;
+ 	};
+ 
+ 	IdleSettings idleSettings_;
+@@ -1395,10 +1398,12 @@ void PsiCon::optionChanged(const QString
+ 
+ 	//Idle server
+ 	d->idleSettings_.update();
+-	if(d->idleSettings_.useAway || d->idleSettings_.useNotAvailable || d->idleSettings_.useOffline)
++	if(d->idleSettings_.useAway || d->idleSettings_.useNotAvailable || d->idleSettings_.useOffline || d->idleSettings_.useIdleServer)
+ 		d->idle.start();
+-	else
++	else {
+ 		d->idle.stop();
++		d->idleSettings_.secondsIdle = 0;
++	}
+ 
+ 	if (option == "options.ui.notifications.alert-style") {
+ 		alertIconUpdateAlertStyle();
+@@ -1911,6 +1916,7 @@ void PsiCon::aboutToQuit()
+ 
+ void PsiCon::secondsIdle(int sec)
+ {
++	d->idleSettings_.secondsIdle = sec;
+ 	int minutes = sec / 60;
+ 	PsiAccount::AutoAway aa;
+ 
+@@ -1928,6 +1934,11 @@ void PsiCon::secondsIdle(int sec)
+ 	}
  }
  
-+int PsiAccount::idle() const
++int PsiCon::idle() const
 +{
-+	return d->lastIdle;
++	return d->idleSettings_.secondsIdle;
 +}
 +
- void PsiAccount::autoLogin()
+ ContactUpdatesManager* PsiCon::contactUpdatesManager() const
  {
- 	// auto-login ?
-@@ -3078,6 +3131,7 @@ void PsiAccount::publishTune(const Tune&
- 
- void PsiAccount::secondsIdle(int seconds)
- {
-+	d->lastIdle = seconds;
- 	int minutes = seconds / 60;
- 
- 	if(PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() && PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt() > 0 && minutes >= PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt())
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
-@@ -126,6 +126,8 @@ public:
- 	const Jid & jid() const;
- 	QString nameWithJid() const;
- 
+ 	return contactUpdatesManager_;
+--- psi.orig/src/psicon.h
++++ psi/src/psicon.h
+@@ -90,6 +90,7 @@ public:
+ 	QWidget *dialogFind(const char *className);
+ 	void dialogRegister(QWidget *w);
+ 	void dialogUnregister(QWidget *w);
 +	int idle() const;
-+
- 	XMPP::Client *client() const;
- 	virtual ContactProfile *contactProfile() const;
- 	EventQueue *eventQueue() const;
+ 
+ 	QMenuBar* defaultMenuBar() const;
+ 
