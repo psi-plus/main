@@ -1531,7 +1531,7 @@
  			if (lastManualStatus().type() == XMPP::Status::DND)
  				return true;
  			if ((lastManualStatus().type() == XMPP::Status::Away || lastManualStatus().type() == XMPP::Status::XA) &&
-@@ -2432,34 +2449,24 @@ void PsiAccount::client_resourceAvailabl
+@@ -2425,34 +2442,24 @@ void PsiAccount::client_resourceAvailabl
  	if(doSound)
  		playSound(eOnline);
  
@@ -1570,7 +1570,7 @@
  
  	// Update entity capabilities.
  	// This has to happen after the userlist item has been created.
-@@ -2536,21 +2543,14 @@ void PsiAccount::client_resourceUnavaila
+@@ -2529,21 +2536,14 @@ void PsiAccount::client_resourceUnavaila
  	if(doSound)
  		playSound(eOffline);
  
@@ -1595,7 +1595,7 @@
  	}
  }
  
-@@ -2975,6 +2975,11 @@ void PsiAccount::setStatusActual(const S
+@@ -2968,6 +2968,11 @@ void PsiAccount::setStatusActual(const S
  	}
  }
  
@@ -1607,7 +1607,7 @@
  void PsiAccount::sentInitialPresence()
  {
  	QTimer::singleShot(15000, this, SLOT(enableNotifyOnline()));
-@@ -4761,7 +4766,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4745,7 +4750,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  	bool doPopup    = false;
  	bool putToQueue = true;
@@ -1616,7 +1616,7 @@
  	SoundType soundType = eNone;
  
  	// find someone to accept the event
-@@ -4861,8 +4866,15 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4845,8 +4850,15 @@ void PsiAccount::handleEvent(PsiEvent* e
  					c->incomingMessage(m);
  				}
  			}
@@ -1634,7 +1634,7 @@
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
-@@ -4879,7 +4891,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4863,7 +4875,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
@@ -1643,7 +1643,7 @@
  			ChatDlg *c = findChatDialog(e->from());
  			if(!c)
  				c = findChatDialog(e->jid());
-@@ -4919,18 +4931,18 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4903,18 +4915,18 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  			if (putToQueue) {
  				doPopup = true;
@@ -1665,7 +1665,7 @@
  		} // /""
  		else {
  			soundType = eSystem;
-@@ -4947,12 +4959,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4931,12 +4943,12 @@ void PsiAccount::handleEvent(PsiEvent* e
  	else if(e->type() == PsiEvent::File) {
  		soundType = eIncomingFT;
  		doPopup = true;
@@ -1680,7 +1680,7 @@
  	}
  	else if(e->type() == PsiEvent::RosterExchange) {
  		RosterExchangeEvent* re = (RosterExchangeEvent*) e;
-@@ -5027,18 +5039,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5011,18 +5023,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  			r = *(u->priority());
  		}
  
@@ -1707,7 +1707,7 @@
  		emit startBounce();
  	}
  
-@@ -5192,7 +5202,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5176,7 +5186,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
  
  	// FIXME: We shouldn't be doing this kind of stuff here, because this
  	// function is named *queue*Event() not deleteThisMessageSometimes()
@@ -1718,10 +1718,10 @@
  		// Check to see if we need to popup
 --- psi.orig/src/psiaccount.h
 +++ psi/src/psiaccount.h
-@@ -139,6 +139,7 @@ public:
- 	int defaultPriority(const XMPP::Status &);
- 	void setStatusDirect(const XMPP::Status &, bool withPriority = false);
- 	void setStatusActual(const XMPP::Status &);
+@@ -149,6 +149,7 @@ public:
+ 
+ 	void setAutoAwayStatus(AutoAway status);
+ 
 +	bool noPopup() const;
  	bool loggedIn() const;
  	void setNick(const QString &);
@@ -1749,10 +1749,10 @@
  	AlertManager alertManager;
  	BossKey *bossKey;
 +	PopupManager * popupManager;
- };
  
- //----------------------------------------------------------------------------
-@@ -345,6 +348,7 @@ PsiCon::~PsiCon()
+ 	struct IdleSettings
+ 	{
+@@ -368,6 +371,7 @@ PsiCon::~PsiCon()
  	delete d->edb;
  	delete d->defaultMenuBar;
  	delete d->tabManager;
@@ -1760,9 +1760,9 @@
  	delete d;
  }
  
-@@ -548,6 +552,9 @@ bool PsiCon::init()
+@@ -571,6 +575,9 @@ bool PsiCon::init()
  
- 	d->idle.start();
+ 	connect(&d->idle, SIGNAL(secondsIdle(int)), SLOT(secondsIdle(int)));
  
 +	//PopupDurationsManager
 +	d->popupManager = new PopupManager(this);
@@ -1770,7 +1770,7 @@
  	// S5B
  	d->s5bServer = new S5BServer;
  	s5b_init();
-@@ -787,6 +794,11 @@ FileTransDlg *PsiCon::ftdlg() const
+@@ -810,6 +817,11 @@ FileTransDlg *PsiCon::ftdlg() const
  #endif
  }
  
