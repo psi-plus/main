@@ -1,0 +1,140 @@
+--- psi.orig/src/CocoaUtilities/CocoaTrayClick.h
++++ psi/src/CocoaUtilities/CocoaTrayClick.h
+@@ -0,0 +1,42 @@
++/*
++ * CocoaTrayClick
++ * Copyright (C) 2012  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef COCOATRAYCLICK_H
++#define COCOATRAYCLICK_H
++
++#include <QObject>
++class CocoaTrayClick : public QObject
++{
++	Q_OBJECT
++public:
++	static CocoaTrayClick* instance();
++	~CocoaTrayClick();
++
++	void emitTrayClicked();
++
++signals:
++	void trayClicked();
++
++private:
++	CocoaTrayClick();
++	static CocoaTrayClick* instance_;
++};
++
++#endif // COCOATRAYCLICK_H
+--- psi.orig/src/CocoaUtilities/CocoaTrayClick.mm
++++ psi/src/CocoaUtilities/CocoaTrayClick.mm
+@@ -0,0 +1,57 @@
++/*
++ * CocoaTrayClick
++ * Copyright (C) 2012  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include "CocoaUtilities/CocoaTrayClick.h"
++#include <objc/runtime.h>
++#include <QApplication>
++#include <QDebug>
++
++void dockClickHandler(id /*self*/, SEL /*_cmd*/)
++{
++	CocoaTrayClick::instance()->emitTrayClicked();
++}
++
++
++CocoaTrayClick * CocoaTrayClick::instance()
++{
++	if(!instance_)
++		instance_ = new CocoaTrayClick();
++
++	return instance_;
++}
++
++CocoaTrayClick::CocoaTrayClick()
++	: QObject(qApp)
++{
++	Class cls = [[[NSApplication sharedApplication] delegate] class];
++	if (!class_addMethod(cls, @selector(applicationShouldHandleReopen:hasVisibleWindows:), (IMP) dockClickHandler, "v@:"))
++		qDebug() << "CocoaTrayClick::Private : class_addMethod failed!";
++}
++
++CocoaTrayClick::~CocoaTrayClick()
++{
++}
++
++void CocoaTrayClick::emitTrayClicked()
++{
++	emit trayClicked();
++}
++
++CocoaTrayClick* CocoaTrayClick::instance_ = NULL;
+--- psi.orig/src/CocoaUtilities/CocoaUtilities.pri
++++ psi/src/CocoaUtilities/CocoaUtilities.pri
+@@ -3,8 +3,10 @@ DEPENDPATH *= $$PWD $$PWD/..
+ 
+ HEADERS += \
+ 	$$PWD/CocoaInitializer.h \
+-	$$PWD/cocoacommon.h
++	$$PWD/cocoacommon.h \
++	$$PWD/CocoaTrayClick.h
+ 
+ OBJECTIVE_SOURCES += \
+ 	$$PWD/CocoaInitializer.mm \
+-	$$PWD/cocoacommon.mm
++	$$PWD/cocoacommon.mm \
++	$$PWD/CocoaTrayClick.mm
+--- psi.orig/src/psiapplication.cpp
++++ psi/src/psiapplication.cpp
+@@ -25,6 +25,7 @@
+ 
+ #ifdef Q_WS_MAC
+ #include <Carbon/Carbon.h>
++#include "CocoaUtilities/CocoaTrayClick.h"
+ #endif
+ 
+ #ifdef Q_WS_X11
+@@ -177,6 +178,9 @@ PsiApplication::PsiApplication(int &argc
+ 	portableBase_(0)
+ {
+ 	init(GUIenabled);
++#ifdef Q_WS_MAC
++	connect(CocoaTrayClick::instance(), SIGNAL(trayClicked()), this, SIGNAL(dockActivated()));
++#endif
+ }
+ 
+ PsiApplication::~PsiApplication()

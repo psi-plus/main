@@ -1,0 +1,128 @@
+--- psi.orig/mac/Info.plist
++++ psi/mac/Info.plist
+@@ -7,23 +7,25 @@
+ 	<key>CFBundleExecutable</key>
+ 	<string>psi</string>
+ 	<key>CFBundleGetInfoString</key>
+-	<string>Psi 0.15-devel by the Psi team. This program is licensed under the GNU GPL.</string>
++	<string>Psi+ 0.15-devel by the Psi+ team. This program is licensed under the GNU GPL.</string>
+ 	<key>CFBundleIconFile</key>
+ 	<string>application.icns</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.psi-im</string>
++	<string>com.googlecode.psi-dev</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+-	<string>Psi</string>
++	<string>Psi+</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>APPL</string>
+ 	<key>CFBundleShortVersionString</key>
+-	<string>Psi 0.15-devel</string>
++	<string>Psi+ 0.15-devel</string>
+ 	<key>CFBundleSignature</key>
+ 	<string>psi</string>
+ 	<key>CFBundleVersion</key>
+ 	<string>0.15-devel</string>
++	<key>SUPublicDSAKeyFile</key>
++	<string>dsa_pub.pem</string>
+ 	<key>CSResourcesFileMapped</key>
+ 	<true/>
+ </dict>
+--- psi.orig/src/applicationinfo.cpp
++++ psi/src/applicationinfo.cpp
+@@ -36,7 +36,7 @@
+ #define PROG_STORAGE_NS "http://psi-im.org/storage"
+ #define PROG_FILECACHE_NS "http://psi-im.org/filecache"
+ #ifdef Q_WS_MAC
+-#define PROG_APPCAST_URL "http://psi-im.org/appcast/psi-mac.xml"
++#define PROG_APPCAST_URL "http://psi-plus.droppages.com/psi-plus-mac.xml"
+ #else
+ #define PROG_APPCAST_URL ""
+ #endif
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
+@@ -89,6 +89,11 @@
+ #include <x11windowsystem.h>
+ #endif
+ 
++#include "AutoUpdater/AutoUpdater.h"
++#ifdef HAVE_SPARKLE
++#include "AutoUpdater/SparkleAutoUpdater.h"
++#endif
++
+ using namespace XMPP;
+ 
+ static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
+@@ -536,6 +541,7 @@ MainWin::MainWin(bool _onTop, bool _asTo
+ 	d->getAction("help_online_home")->addTo (helpMenu);
+ 	d->getAction("help_online_forum")->addTo (helpMenu);
+ 	d->getAction("help_psi_muc")->addTo (helpMenu);
++	d->getAction("help_update")->addTo (helpMenu);
+ 	d->getAction("help_report_bug")->addTo (helpMenu);
+ 	QMenu* diagMenu = new QMenu(tr("Diagnostics"), this);
+ 	helpMenu->addMenu(diagMenu);
+@@ -718,6 +724,7 @@ void MainWin::registerAction( IconAction
+ 		{ "help_online_home", activated, this, SLOT( actOnlineHomeActivated() ) },
+ 		{ "help_online_forum", activated, this, SLOT( actOnlineForumActivated() ) },
+ 		{ "help_psi_muc",     activated, this, SLOT( actJoinPsiMUCActivated() ) },
++		{ "help_update",     activated, this, SLOT( actCheckUpdateActivated() ) },
+ 		{ "help_report_bug",  activated, this, SLOT( actBugReportActivated() ) },
+ 		{ "help_about",       activated, this, SLOT( actAboutActivated() ) },
+ 		{ "help_about_qt",    activated, this, SLOT( actAboutQtActivated() ) },
+@@ -972,6 +979,7 @@ void MainWin::buildOptionsMenu()
+ 	        << "help_report_bug"
+ 	        << "diagnostics"
+ 	        << "separator"
++	        << "help_update"
+ 	        << "help_about"
+ 	        << "help_about_qt";
+ 
+@@ -1097,6 +1105,16 @@ void MainWin::actAboutQtActivated ()
+ 	QMessageBox::aboutQt(this);
+ }
+ 
++void MainWin::actCheckUpdateActivated()
++{
++#ifdef HAVE_SPARKLE
++	AutoUpdater* autoUpdater;
++	autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
++	autoUpdater->checkForUpdates();
++	delete autoUpdater;
++#endif
++}
++
+ void MainWin::actAboutPsiMediaActivated ()
+ {
+ 	QString creditText = PsiMedia::creditText();
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
+@@ -133,6 +133,7 @@ private slots:
+ 	void actOnlineHomeActivated ();
+ 	void actOnlineForumActivated ();
+ 	void actJoinPsiMUCActivated();
++	void actCheckUpdateActivated();
+ 	void actBugReportActivated ();
+ 	void actAboutActivated ();
+ 	void actAboutQtActivated ();
+--- psi.orig/src/psiactionlist.cpp
++++ psi/src/psiactionlist.cpp
+@@ -387,6 +387,9 @@ void PsiActionList::Private::createMainW
+ 		IconAction *actPsiMUC = new IconAction (tr("Join Psi Discussion Room (Online)"), tr("&Join Psi Discussion Room (Online)"), 0, this);
+ 		actOnlineHome->setWhatsThis (tr("Join Psi Discussion Room (Online)"));
+ 
++		IconAction *actCheckUpdate = new IconAction (tr("Check for Updates..."), tr("&Check for Updates..."), 0, this);
++		actCheckUpdate->setWhatsThis (tr("Check for Updates..."));
++
+ 		IconAction *actBugReport = new IconAction (tr("Report a Bug (Online)"), tr("Report a &Bug (Online)"), 0, this);
+ 		actBugReport->setWhatsThis (tr("Report a Bug (Online)"));
+ 
+@@ -415,6 +418,7 @@ void PsiActionList::Private::createMainW
+ 			{ "help_report_bug",       actBugReport       },
+ 			{ "help_about",            actAbout           },
+ 			{ "help_about_qt",         actAboutQt         },
++			{ "help_update",           actCheckUpdate     },
+ 			{ "help_about_psimedia",   actAboutPsiMedia   },
+ 			{ "help_diag_qcaplugin",   actDiagQCAPlugin   },
+ 			{ "help_diag_qcakeystore", actDiagQCAKeyStore },
