@@ -1303,9 +1303,9 @@
 +	return ApplicationInfo::osName();
 +}
 +
-+QString PluginHost::appHomeDir()
++QString PluginHost::appHomeDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::homeDir();
++	return ApplicationInfo::homeDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appResourcesDir()
@@ -1318,9 +1318,9 @@
 +	return ApplicationInfo::libDir();
 +}
 +
-+QString PluginHost::appProfilesDir()
++QString PluginHost::appProfilesDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::profilesDir();
++	return ApplicationInfo::profilesDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appHistoryDir()
@@ -1328,9 +1328,9 @@
 +	return ApplicationInfo::historyDir();
 +}
 +
-+QString PluginHost::appCurrentProfileDir()
++QString PluginHost::appCurrentProfileDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::currentProfileDir();
++	return ApplicationInfo::currentProfileDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appVCardDir()
@@ -1589,13 +1589,14 @@
  
 --- psi.orig/src/pluginhost.h
 +++ psi/src/pluginhost.h
-@@ -10,10 +10,27 @@
+@@ -10,10 +10,28 @@
  #include <QVariant>
  #include <QRegExp>
  #include <QMultiMap>
 +#include <QPointer>
 +#include <QTextEdit>
  
++#include "applicationinfo.h"
 +#include "userlist.h"
 +#include "iconset.h"
  #include "stanzasendinghost.h"
@@ -1617,7 +1618,7 @@
  
  class QWidget;
  class QPluginLoader;
-@@ -21,10 +38,14 @@ class QPluginLoader;
+@@ -21,10 +39,14 @@ class QPluginLoader;
  class PluginManager;
  class IqNamespaceFilter;
  
@@ -1634,7 +1635,7 @@
  
  public:
  	PluginHost(PluginManager* manager, const QString& pluginFile);
-@@ -38,6 +59,7 @@ public:
+@@ -38,6 +60,7 @@ public:
  	const QString& name() const;
  	const QString& shortName() const;
  	const QString& version() const;
@@ -1642,7 +1643,7 @@
  
  	// loading
  	bool load();
-@@ -51,16 +73,20 @@ public:
+@@ -51,16 +74,20 @@ public:
  
  	// for StanzaFilter and IqNamespaceFilter
  	bool incomingXml(int account, const QDomElement& e);
@@ -1664,7 +1665,7 @@
  
  	// IqFilteringHost
  	void addIqNamespaceFilter(const QString& ns, IqNamespaceFilter* filter);
-@@ -70,25 +96,121 @@ public:
+@@ -70,25 +97,121 @@ public:
  
  	// OptionAccessingHost
  	void setPluginOption(const QString& option, const QVariant& value);
@@ -1696,12 +1697,12 @@
 +	QString appCapsNode();
 +	QString appCapsVersion();
 +	QString appOsName();
-+	QString appHomeDir();
++	QString appHomeDir(HomedirType type);
 +	QString appResourcesDir();
 +	QString appLibDir();
-+	QString appProfilesDir();
++	QString appProfilesDir(HomedirType type);
 +	QString appHistoryDir();
-+	QString appCurrentProfileDir();
++	QString appCurrentProfileDir(HomedirType type);
 +	QString appVCardDir();
 +
 +	//AccountInfoAcsessingHost
@@ -2900,7 +2901,7 @@
 +#endif // ACTIVETABACCESSOR_H
 --- psi.orig/src/plugins/include/applicationinfoaccessinghost.h
 +++ psi/src/plugins/include/applicationinfoaccessinghost.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,43 @@
 +#ifndef APPLICATIONINFOACCESSINGHOST_H
 +#define APPLICATIONINFOACCESSINGHOST_H
 +
@@ -2915,6 +2916,11 @@
 +class ApplicationInfoAccessingHost
 +{
 +public:
++	enum HomedirType {
++		ConfigLocation,
++		DataLocation,
++		CacheLocation
++	};
 +	virtual ~ApplicationInfoAccessingHost() {}
 +
 +	// Version info
@@ -2925,12 +2931,12 @@
 +	virtual QString appOsName() = 0;
 +
 +	// Directories
-+	virtual QString appHomeDir() = 0;
++	virtual QString appHomeDir(HomedirType type) = 0;
 +	virtual QString appResourcesDir() = 0;
 +	virtual QString appLibDir() = 0;
-+	virtual QString appProfilesDir() = 0;
++	virtual QString appProfilesDir(HomedirType type) = 0;
 +	virtual QString appHistoryDir() = 0;
-+	virtual QString appCurrentProfileDir() = 0;
++	virtual QString appCurrentProfileDir(HomedirType type) = 0;
 +	virtual QString appVCardDir() = 0;
 +
 +	virtual Proxy getProxyFor(const QString& obj) = 0;
