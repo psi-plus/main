@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -166,12 +166,16 @@
  				<disable-scrollbar type="bool">true</disable-scrollbar>
  				<avatars>
@@ -17,8 +17,8 @@
  				<show-tune-icons type="bool">true</show-tune-icons>
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
---- git.orig/src/contactlistmodel.cpp
-+++ git/src/contactlistmodel.cpp
+--- psi.orig/src/contactlistmodel.cpp
++++ psi/src/contactlistmodel.cpp
 @@ -38,6 +38,7 @@
  #include "contactlistmodelupdater.h"
  #include "contactlistspecialgroup.h"
@@ -27,9 +27,9 @@
  #ifdef YAPSI
  #include "yacommon.h"
  #endif
-@@ -502,6 +503,36 @@ QVariant ContactListModel::contactData(c
- 	else if (role == AlertPictureRole) {
- 		return QVariant(contact->alertPicture());
+@@ -517,6 +518,36 @@ QVariant ContactListModel::contactData(c
+ 	else if (role == PhaseRole) {
+ 		return QVariant(false);
  	}
 +	else if (role == MoodRole) {
 +		if(contact->userListItem().mood().isNull())
@@ -64,23 +64,23 @@
  #ifdef YAPSI
  	else if (role == Qt::ForegroundRole) {
  		return QVariant(Ya::statusColor(contact->status().type()));
---- git.orig/src/contactlistmodel.h
-+++ git/src/contactlistmodel.h
-@@ -76,6 +76,12 @@ public:
- 		AskingForAuthRole = Qt::UserRole + 9,
- 		IsAlertingRole = Qt::UserRole + 10,
+--- psi.orig/src/contactlistmodel.h
++++ psi/src/contactlistmodel.h
+@@ -78,6 +78,12 @@ public:
  		AlertPictureRole = Qt::UserRole + 11,
-+		MoodRole = Qt::UserRole + 21,
-+		ActivityRole = Qt::UserRole + 22,
-+		GeolocationRole = Qt::UserRole + 23,
-+		ClientRole = Qt::UserRole + 24,
-+		TuneRole = Qt::UserRole + 25,
-+		AvatarRole = Qt::UserRole + 26,
+ 		IsAnimRole = Qt::UserRole + 21,
+ 		PhaseRole = Qt::UserRole + 22,
++		MoodRole = Qt::UserRole + 23,
++		ActivityRole = Qt::UserRole + 24,
++		GeolocationRole = Qt::UserRole + 25,
++		ClientRole = Qt::UserRole + 26,
++		TuneRole = Qt::UserRole + 27,
++		AvatarRole = Qt::UserRole + 28,
  
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
---- git.orig/src/contactlistviewdelegate.cpp
-+++ git/src/contactlistviewdelegate.cpp
+--- psi.orig/src/contactlistviewdelegate.cpp
++++ psi/src/contactlistviewdelegate.cpp
 @@ -197,7 +197,9 @@ void ContactListViewDelegate::drawText(Q
  		txt = option.fontMetrics.elidedText(text, option.textElideMode, rect.width());
  #endif
@@ -92,9 +92,9 @@
  	}
  
  	// painter->save();
---- git.orig/src/psicontactlistviewdelegate.cpp
-+++ git/src/psicontactlistviewdelegate.cpp
-@@ -32,6 +32,19 @@
+--- psi.orig/src/psicontactlistviewdelegate.cpp
++++ psi/src/psicontactlistviewdelegate.cpp
+@@ -34,6 +34,19 @@ static const QString slimGroupsOptionPat
  static const QString outlinedGroupsOptionPath = "options.ui.look.contactlist.use-outlined-group-headings";
  static const QString contactListBackgroundOptionPath = "options.ui.look.colors.contactlist.background";
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
@@ -114,7 +114,7 @@
  
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
-@@ -47,6 +60,19 @@ PsiContactListViewDelegate::PsiContactLi
+@@ -51,6 +64,19 @@ PsiContactListViewDelegate::PsiContactLi
  	optionChanged(contactListFontOptionPath);
  	optionChanged(contactListBackgroundOptionPath);
  	optionChanged(showStatusMessagesOptionPath);
@@ -134,7 +134,7 @@
  }
  
  PsiContactListViewDelegate::~PsiContactListViewDelegate()
-@@ -57,7 +83,8 @@ PsiContactListViewDelegate::~PsiContactL
+@@ -61,7 +87,8 @@ PsiContactListViewDelegate::~PsiContactL
  
  int PsiContactListViewDelegate::avatarSize() const
  {
@@ -144,7 +144,7 @@
  }
  
  QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
-@@ -85,6 +112,9 @@ QPixmap PsiContactListViewDelegate::stat
+@@ -89,6 +116,9 @@ QPixmap PsiContactListViewDelegate::stat
  		}
  	}
  
@@ -154,7 +154,7 @@
  	if (type == ContactListModel::ContactType) {
  		if (!index.data(ContactListModel::PresenceErrorRole).toString().isEmpty())
  			s = STATUS_ERROR;
-@@ -99,6 +129,73 @@ QPixmap PsiContactListViewDelegate::stat
+@@ -103,6 +133,73 @@ QPixmap PsiContactListViewDelegate::stat
  	return PsiIconset::instance()->statusPtr(index.data(ContactListModel::JidRole).toString(), s)->pixmap();
  }
  
@@ -228,7 +228,7 @@
  void PsiContactListViewDelegate::drawContact(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
  {
  	drawBackground(painter, option, index);
-@@ -106,12 +203,51 @@ void PsiContactListViewDelegate::drawCon
+@@ -110,12 +207,51 @@ void PsiContactListViewDelegate::drawCon
  	QRect r = option.rect;
  
  	QRect avatarRect(r);
@@ -283,9 +283,9 @@
 +	} else
 +		r.setLeft(r.left() + 3);
  
- 	QColor textColor = ColorOpt::instance()->color("options.ui.look.colors.contactlist.status.online");
- 	if (statusType(index) == XMPP::Status::Away || statusType(index) == XMPP::Status::XA)
-@@ -137,10 +273,97 @@ void PsiContactListViewDelegate::drawCon
+ 	QColor textColor;
+ 	if(index.data(ContactListModel::IsAnimRole).toBool()) {
+@@ -146,10 +282,97 @@ void PsiContactListViewDelegate::drawCon
  
  	QString text = nameText(o, index);
  	if (showStatusMessages_ && !statusText(index).isEmpty()) {
@@ -312,9 +312,8 @@
 +		if(showStatusMessages_ && statusSingle_)
 +			r.setHeight(r.height()*2/3);
 +		drawText(painter, o, r, text, index);
- 	}
- 
--	drawText(painter, o, r, text, index);
++	}
++
 +	QRect iconRect(r);
 +	QList<QPixmap> rightPixs;
 +	QList<int> rightWidths;
@@ -328,8 +327,9 @@
 +			rightWidths.push_back(pix.width());
 +			if(!showAllClients) break;
 +		}
-+	}
-+
+ 	}
+ 
+-	drawText(painter, o, r, text, index);
 +	if (showMoodIcons_ && !index.data(ContactListModel::MoodRole).isNull()) {
 +		const QPixmap &pix = IconsetFactory::iconPixmap(QString("mood/%1").arg(index.data(ContactListModel::MoodRole).toString()));
 +		if(!pix.isNull()) {
@@ -385,7 +385,7 @@
  
  #if 0
  	int x;
-@@ -265,17 +488,71 @@ void PsiContactListViewDelegate::optionC
+@@ -295,17 +518,71 @@ void PsiContactListViewDelegate::optionC
  		font_ = new QFont();
  		font_->fromString(PsiOptions::instance()->getOption(contactListFontOptionPath).toString());
  		fontMetrics_ = new QFontMetrics(*font_);
@@ -457,8 +457,8 @@
  	else if(option == slimGroupsOptionPath) {
  		slimGroup_ = PsiOptions::instance()->getOption(slimGroupsOptionPath).toBool();
  		contactList()->viewport()->update();
---- git.orig/src/psicontactlistviewdelegate.h
-+++ git/src/psicontactlistviewdelegate.h
+--- psi.orig/src/psicontactlistviewdelegate.h
++++ psi/src/psicontactlistviewdelegate.h
 @@ -35,6 +35,7 @@ public:
  
  	// reimplemented

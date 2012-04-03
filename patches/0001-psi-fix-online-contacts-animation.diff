@@ -1,6 +1,6 @@
---- git.orig/src/contactlistmodel.cpp
-+++ git/src/contactlistmodel.cpp
-@@ -63,6 +63,7 @@ ContactListModel::ContactListModel(PsiCo
+--- psi.orig/src/contactlistmodel.cpp
++++ psi/src/contactlistmodel.cpp
+@@ -62,6 +62,7 @@ ContactListModel::ContactListModel(PsiCo
  	connect(updater_, SIGNAL(addedContact(PsiContact*)), SLOT(addContact(PsiContact*)));
  	connect(updater_, SIGNAL(removedContact(PsiContact*)), SLOT(removeContact(PsiContact*)));
  	connect(updater_, SIGNAL(contactAlert(PsiContact*)), SLOT(contactAlert(PsiContact*)));
@@ -8,7 +8,7 @@
  	connect(updater_, SIGNAL(contactUpdated(PsiContact*)), SLOT(contactUpdated(PsiContact*)));
  	connect(updater_, SIGNAL(contactGroupsChanged(PsiContact*)), SLOT(contactGroupsChanged(PsiContact*)));
  	connect(updater_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
-@@ -306,6 +307,10 @@ void ContactListModel::contactAlert(PsiC
+@@ -305,6 +306,10 @@ void ContactListModel::contactAlert(PsiC
  	}
  }
  
@@ -19,9 +19,9 @@
  void ContactListModel::contactUpdated(PsiContact* contact)
  {
  	Q_ASSERT(rootGroup_);
-@@ -543,6 +548,12 @@ QVariant ContactListModel::contactData(c
- 	else if (role == BlockRole) {
- 		return QVariant(contact->isBlocked());
+@@ -503,6 +508,12 @@ QVariant ContactListModel::contactData(c
+ 	else if (role == AlertPictureRole) {
+ 		return QVariant(contact->alertPicture());
  	}
 +	else if (role == IsAnimRole) {
 +		return QVariant(contact->isAnimated());
@@ -32,18 +32,18 @@
  #ifdef YAPSI
  	else if (role == Qt::ForegroundRole) {
  		return QVariant(Ya::statusColor(contact->status().type()));
---- git.orig/src/contactlistmodel.h
-+++ git/src/contactlistmodel.h
-@@ -85,6 +85,8 @@ public:
- 		IsMucRole = Qt::UserRole + 27,
- 		MucMessagesRole = Qt::UserRole + 28,
- 		BlockRole = Qt::UserRole + 29,
-+		IsAnimRole = Qt::UserRole + 30,
-+		PhaseRole = Qt::UserRole + 31,
+--- psi.orig/src/contactlistmodel.h
++++ psi/src/contactlistmodel.h
+@@ -76,6 +76,8 @@ public:
+ 		AskingForAuthRole = Qt::UserRole + 9,
+ 		IsAlertingRole = Qt::UserRole + 10,
+ 		AlertPictureRole = Qt::UserRole + 11,
++		IsAnimRole = Qt::UserRole + 21,
++		PhaseRole = Qt::UserRole + 22,
  
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
-@@ -197,6 +199,7 @@ protected slots:
+@@ -188,6 +190,7 @@ protected slots:
  	void removeContact(PsiContact*);
  
  	void contactAlert(PsiContact*);
@@ -51,8 +51,8 @@
  	void contactUpdated(PsiContact*);
  	void contactGroupsChanged(PsiContact*);
  
---- git.orig/src/contactlistmodelupdater.cpp
-+++ git/src/contactlistmodelupdater.cpp
+--- psi.orig/src/contactlistmodelupdater.cpp
++++ psi/src/contactlistmodelupdater.cpp
 @@ -88,6 +88,8 @@ void ContactListModelUpdater::commit()
  			emit contactUpdated(it.key());
  		if (operations & ContactGroupsChanged)
@@ -85,8 +85,8 @@
  void ContactListModelUpdater::contactUpdated()
  {
  	PsiContact* contact = static_cast<PsiContact*>(sender());
---- git.orig/src/contactlistmodelupdater.h
-+++ git/src/contactlistmodelupdater.h
+--- psi.orig/src/contactlistmodelupdater.h
++++ psi/src/contactlistmodelupdater.h
 @@ -48,6 +48,7 @@ signals:
  	void addedContact(PsiContact*);
  	void removedContact(PsiContact*);
@@ -113,9 +113,9 @@
  	};
  	QHash<PsiContact*, int> operationQueue_;
  
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -640,8 +640,9 @@ public:
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -635,8 +635,9 @@ public:
  
  	void animateNick(const Jid& jid)
  	{
@@ -127,9 +127,9 @@
  	}
  
  public slots:
---- git.orig/src/psicontact.cpp
-+++ git/src/psicontact.cpp
-@@ -66,6 +66,7 @@ public:
+--- psi.orig/src/psicontact.cpp
++++ psi/src/psicontact.cpp
+@@ -64,6 +64,7 @@ public:
  		: account_(0)
  		, statusTimer_(0)
  		, isValid_(true)
@@ -137,7 +137,7 @@
  		, contact_(contact)
  #ifdef YAPSI
  		, gender_(XMPP::VCard::UnknownGender)
-@@ -87,6 +88,11 @@ public:
+@@ -85,6 +86,11 @@ public:
  		statusTimer_->setInterval(statusTimerInterval);
  		statusTimer_->setSingleShot(true);
  		connect(statusTimer_, SIGNAL(timeout()), SLOT(updateStatus()));
@@ -149,7 +149,7 @@
  	}
  
  	~Private()
-@@ -95,11 +101,13 @@ public:
+@@ -93,11 +99,13 @@ public:
  
  	PsiAccount* account_;
  	QTimer* statusTimer_;
@@ -163,7 +163,7 @@
  #ifdef YAPSI
  	bool showOnlineTemporarily_;
  	bool reconnecting_;
-@@ -510,6 +518,25 @@ void PsiContact::setAlert(const PsiIcon*
+@@ -507,6 +515,25 @@ void PsiContact::setAlert(const PsiIcon*
  	emit alert();
  }
  
@@ -189,9 +189,9 @@
  /**
   * Contact should always be visible if it's alerting.
   */
---- git.orig/src/psicontact.h
-+++ git/src/psicontact.h
-@@ -64,6 +64,8 @@ public:
+--- psi.orig/src/psicontact.h
++++ psi/src/psicontact.h
+@@ -63,6 +63,8 @@ public:
  	virtual bool isHidden() const;
  	virtual bool isValid() const;
  
@@ -200,7 +200,7 @@
  	void activate();
  
  	virtual void setEditing(bool editing);
-@@ -116,6 +118,7 @@ public:
+@@ -115,6 +117,7 @@ public:
  	virtual void setGroups(QStringList);
  	bool alerting() const;
  	void setAlert(const PsiIcon* icon);
@@ -208,7 +208,7 @@
  	bool find(const Jid& jid) const;
  	// PsiContactList* contactList() const;
  
-@@ -159,6 +162,8 @@ public slots:
+@@ -158,6 +161,8 @@ public slots:
  	void moodUpdate();
  #endif
  
@@ -217,7 +217,7 @@
  private slots:
  	void avatarChanged(const Jid&);
  	void vcardChanged(const Jid&);
-@@ -168,6 +173,7 @@ private slots:
+@@ -167,6 +172,7 @@ private slots:
  
  signals:
  	void alert();
@@ -225,8 +225,8 @@
  	void updated();
  	void groupsChanged();
  #ifdef YAPSI
---- git.orig/src/psicontactlistmodel.cpp
-+++ git/src/psicontactlistmodel.cpp
+--- psi.orig/src/psicontactlistmodel.cpp
++++ psi/src/psicontactlistmodel.cpp
 @@ -18,6 +18,8 @@
   *
   */
@@ -293,8 +293,8 @@
 +		dataChanged(index, index);
 +	}
 +}
---- git.orig/src/psicontactlistmodel.h
-+++ git/src/psicontactlistmodel.h
+--- psi.orig/src/psicontactlistmodel.h
++++ psi/src/psicontactlistmodel.h
 @@ -24,6 +24,7 @@
  #include "contactlistdragmodel.h"
  
@@ -321,11 +321,11 @@
  };
  
  #endif
---- git.orig/src/psicontactlistviewdelegate.cpp
-+++ git/src/psicontactlistviewdelegate.cpp
-@@ -252,20 +252,25 @@ void PsiContactListViewDelegate::drawCon
- 	} else
- 		r.setLeft(r.left() + 3);
+--- psi.orig/src/psicontactlistviewdelegate.cpp
++++ psi/src/psicontactlistviewdelegate.cpp
+@@ -117,20 +117,25 @@ void PsiContactListViewDelegate::drawCon
+ 
+ 	r.setLeft(avatarRect.right() + 3);
  
 -	QColor textColor = ColorOpt::instance()->color("options.ui.look.colors.contactlist.status.online");
 -	if (statusType(index) == XMPP::Status::Away || statusType(index) == XMPP::Status::XA)
