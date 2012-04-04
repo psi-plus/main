@@ -1,41 +1,85 @@
 --- psi.orig/src/contactlistdragview.cpp
 +++ psi/src/contactlistdragview.cpp
-@@ -252,6 +252,7 @@ void ContactListDragView::setModel(QAbst
- 		disconnect(model(), SIGNAL(modelAboutToBeReset()), this, SLOT(modelChanged()));
- 		disconnect(model(), SIGNAL(layoutAboutToBeChanged()), this, SLOT(modelChanged()));
- 		disconnect(model(), SIGNAL(layoutChanged()), this, SLOT(doItemsLayout()));
-+		disconnect(model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(closeCurrentEditor()));
- 	}
- 
- 	// it's critical that we hook on signals prior to selectionModel,
-@@ -265,6 +266,8 @@ void ContactListDragView::setModel(QAbst
- 		// invalidating proxy model, and we want tree state to be up to date in order
- 		// to avoid weird impossible crashes
- 		connect(newModel, SIGNAL(layoutChanged()), this, SLOT(doItemsLayout()));
-+
-+		connect(newModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(closeCurrentEditor()));
- 	}
- 
- 	ContactListView::setModel(newModel);
-@@ -652,6 +655,11 @@ void ContactListDragView::removeSelectio
- 	delete mimeData;
+@@ -53,6 +53,7 @@ ContactListDragView::ContactListDragView
+ 	, pressedIndex_(0)
+ 	, pressedIndexWasSelected_(false)
+ 	, viewportMenu_(0)
++	, editing(false)
+ {
+ 	removeAction_ = new IconAction("", "psi/remove", QString(), ShortcutManager::instance()->shortcuts("contactlist.delete"), this, "act_remove");
+ 	connect(removeAction_, SIGNAL(triggered()), SLOT(removeSelection()));
+@@ -101,11 +102,38 @@ void ContactListDragView::setItemDelegat
+ {
+ 	if (delegate == itemDelegate())
+ 		return;
++	if (itemDelegate()) {
++		disconnect(itemDelegate(), SIGNAL(commitData(QWidget*)), this, SLOT(finishedEditing()));
++		disconnect(itemDelegate(), SIGNAL(closeEditor(QWidget*)), this, SLOT(finishedEditing()));
++	}
++	if (delegate) {
++		connect(delegate, SIGNAL(commitData(QWidget*)), this, SLOT(finishedEditing()));
++		connect(itemDelegate(), SIGNAL(closeEditor(QWidget*)), this, SLOT(finishedEditing()));
++	}
+ 	ContactListView::setItemDelegate(delegate);
+ 	modelChanged();
+ 	doItemsLayout();
  }
  
-+void ContactListDragView::closeCurrentEditor()
++void ContactListDragView::startedEditing()
 +{
-+	closeEditor(currentEditor(), QAbstractItemDelegate::NoHint);
++	editing = true;
 +}
 +
- bool ContactListDragView::extendedSelectionAllowed() const
++void ContactListDragView::finishedEditing()
++{
++	editing = false;
++}
++
++bool ContactListDragView::edit(const QModelIndex &index, EditTrigger trigger, QEvent *event)
++{
++	if (ContactListView::edit(index, trigger, event)) {
++		startedEditing();
++		return true;
++	}
++	return false;
++}
++
+ void ContactListDragView::leaveEvent(QEvent* e)
  {
- 	return selectedIndexes().count() > 1 || keyboardModifiers_ != 0;
+ 	ContactListView::leaveEvent(e);
+@@ -788,7 +816,7 @@ void ContactListDragView::modelChanged()
+ 	if (!dirty_) {
+ 		setUpdatesEnabled(false);
+ 		backedUpVerticalScrollBarValue_ = verticalScrollBar()->value();
+-		if (currentEditor()) {
++		if (currentEditor() && editing) {
+ 			backedUpEditorValue_ = currentEditor()->text();
+ 			closeEditor(currentEditor(), QAbstractItemDelegate::NoHint);
+ 			setEditingIndex(currentIndex(), true);
 --- psi.orig/src/contactlistdragview.h
 +++ psi/src/contactlistdragview.h
-@@ -127,6 +127,7 @@ private slots:
+@@ -61,6 +61,7 @@ public:
+ 	bool extendedSelectionAllowed() const;
+ 
+ 	virtual bool drawSelectionBackground() const;
++	virtual bool edit(const QModelIndex &index, EditTrigger trigger, QEvent *event);
+ 
+ public:
+ 	virtual int suggestedItemHeight();
+@@ -127,6 +128,8 @@ private slots:
  	void updateCursorMouseHover(const QModelIndex&);
  	void updateCursorMouseHover();
  	void removeSelection();
-+	void closeCurrentEditor();
++	void startedEditing();
++	void finishedEditing();
  
  private:
  	QMimeData* backedUpSelection_;
+@@ -141,6 +144,7 @@ private:
+ 	QPoint pressPosition_;
+ 	bool pressedIndexWasSelected_;
+ 	QMenu* viewportMenu_;
++	bool editing;
+ 
+ 	void backupCurrentSelection();
+ 	void restoreBackedUpSelection();
