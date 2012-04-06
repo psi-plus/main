@@ -18,7 +18,7 @@
  
  #include "mcmdsimplesite.h"
  
-@@ -239,9 +240,13 @@ public:
+@@ -237,9 +238,13 @@ public:
  
  	int logSize;
  	int rosterSize;
@@ -32,7 +32,7 @@
  public:
  	ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
  	ChatView* te_log() const { return dlg->ui_.log; }
-@@ -633,6 +638,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -631,6 +636,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	ui_.lb_ident->setAccount(account());
  	ui_.lb_ident->setShowJid(false);
  	ui_.log->setSessionData(true, jid().full(), jid().full()); //FIXME change conference name
@@ -47,7 +47,7 @@
  #ifdef WEBKIT
  	ui_.log->setAccount(account());
  #endif
-@@ -2107,6 +2120,25 @@ void GCMainDlg::resizeEvent(QResizeEvent
+@@ -2097,6 +2110,25 @@ void GCMainDlg::resizeEvent(QResizeEvent
  	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
  }
  
@@ -301,7 +301,7 @@
  }
  
  void PsiChatDlg::setContactToolTip(QString text)
-@@ -788,4 +812,23 @@ void PsiChatDlg::sendTemp(const QString 
+@@ -788,4 +812,23 @@ void PsiChatDlg::sendTemp(const QString
  	}
  }
  
@@ -414,7 +414,7 @@
  #include <QWidget>
  
  class GAdvancedWidget : public QObject
-@@ -65,6 +66,85 @@ class AdvancedWidget : public BaseClass
+@@ -65,6 +66,81 @@ class AdvancedWidget : public BaseClass
  {
  private:
  	GAdvancedWidget *gAdvWidget;
@@ -426,66 +426,62 @@
 +	bool isDrag;
 +	bool border;
 +	QMap <QString, bool> regions;
-+	void mouseEnterEvent(int mouse_x, int mouse_y, QRect geom){
-+		int top = geom.top();
-+		int bottom = geom.bottom();
-+		int left = geom.left();
-+		int right = geom.right();
++	void mouseEnterEvent(const int mouse_x, const int mouse_y, const QRect &geom)
++	{
++		const int top = geom.top();
++		const int bottom = geom.bottom();
++		const int left = geom.left();
++		const int right = geom.right();
++		const int delta = 10;
++		const int maxtop = top + delta;
++		const int minbottom = bottom -delta;
 +		if(mouse_y <= bottom
-+			&& mouse_y >= (bottom - 10)
-+			&& qAbs(mouse_x - left) < 10) {
++				&& mouse_y >= minbottom
++				&& qAbs(mouse_x - left) < delta) {
 +			setMouseRegion("leftbottom");
 +		}
-+		else if (mouse_x > left
-+			&& (mouse_x - left) > 10
-+			&& mouse_x < right
-+			&& (right - mouse_x) > 10
-+			&& qAbs(mouse_y - bottom) < 10) {
++		else if (mouse_x > (left + delta)
++			 && mouse_x < (right - delta)
++			 && qAbs(mouse_y - bottom) < delta) {
 +			setMouseRegion("bottom");
 +		}
-+		else if (mouse_y <= bottom
-+			&& mouse_y >= (bottom - 10)
-+			&& qAbs(mouse_x - right) < 10){
++		else if ((bottom - mouse_y) < delta
++			     && qAbs(mouse_x - right) < delta){
 +			setMouseRegion("rightbottom");
 +		}
-+		else if (mouse_x <= right
-+			&& qAbs(mouse_x - right) < 7
-+			&&  mouse_y > (top + 10)
-+			&& mouse_y < (bottom - 10)) {
++		else if ((right - mouse_x) < delta
++			 &&  mouse_y > maxtop
++			 && mouse_y < minbottom) {
 +			setMouseRegion("right");
 +		}
-+		else if (mouse_x >= left
-+			&& qAbs(mouse_x - left) < 7
-+			&&  mouse_y > (top + 10)
-+			&& mouse_y < (bottom - 10)) {
++		else if ((mouse_x - left) < delta
++			 &&  mouse_y > maxtop
++			 && mouse_y < minbottom) {
 +			setMouseRegion("left");
 +		}
-+		else if (mouse_y >= top
-+			&& qAbs(mouse_y - top)<10
-+			&& mouse_x > (left + 10)
-+			&& mouse_x < (right -10)){
++		else if ((mouse_y - top) < delta
++			 && mouse_x > (left + delta)
++			 && mouse_x < (right -delta)){
 +			setMouseRegion("top");
 +		}
-+		else if (mouse_y >= top
-+			&& mouse_y < (top + 10)
-+			&& qAbs(mouse_x - right) < 10){
++		else if ((top - mouse_y) < delta
++			 && qAbs(mouse_x - right) < delta){
 +			setMouseRegion("righttop");
 +		}
-+		else if (mouse_y >= top
-+			&& mouse_y < (top + 10)
-+			&& qAbs(mouse_x - left) < 10){
++		else if ((top - mouse_y) < delta
++			 && qAbs(mouse_x - left) < delta){
 +			setMouseRegion("lefttop");
 +		}
 +		else {
 +			setMouseRegion("");
 +		}
 +	}
-+	void setMouseRegion(QString region)
++	void setMouseRegion(const QString &region)
 +	{
-+		foreach(QString item, regions.keys()) {
++		foreach(const QString &item, regions.keys()) {
 +			regions.insert(item, false);
 +		}
-+			if (!region.isEmpty()) {
++		if (!region.isEmpty()) {
 +			regions.insert(region, true);
 +		}
 +	}
@@ -500,7 +496,7 @@
  
  public:
  	AdvancedWidget(QWidget *parent = 0, Qt::WindowFlags f = 0)
-@@ -73,6 +153,7 @@ public:
+@@ -73,6 +149,7 @@ public:
  	{
  		if (f != 0)
  			BaseClass::setWindowFlags(f);
@@ -508,11 +504,12 @@
  		gAdvWidget = new GAdvancedWidget( this );
  	}
  
-@@ -151,6 +232,45 @@ public:
+@@ -151,6 +228,46 @@ public:
  		windowTitleChanged();
  	}
  
-+	void setWindowBorder(bool isDecorated){
++	void setWindowBorder(bool isDecorated)
++	{
 +		Qt::WindowFlags flags = BaseClass::windowFlags();
 +#ifdef Q_OS_WIN
 +		if (deltaflags == 0) {
@@ -554,7 +551,7 @@
  protected:
  	virtual void windowTitleChanged()
  	{
-@@ -165,6 +285,181 @@ protected:
+@@ -165,6 +282,122 @@ protected:
  		}
  		BaseClass::changeEvent(event);
  	}
@@ -563,7 +560,8 @@
 +	void setWindowFlags(Qt::WindowFlags flags){
 +		BaseClass::setWindowFlags(flags);
 +	}
-+	void mousePressEvent(QMouseEvent *event){
++	void mousePressEvent(QMouseEvent *event)
++	{
 +		QWidget *window = BaseClass::window();
 +		if (!border && (event->button()==Qt::LeftButton)) {
 +			mouseEnterEvent(event->globalPos().x(), event->globalPos().y(), window->geometry());
@@ -581,138 +579,78 @@
 +	void mouseMoveEvent(QMouseEvent *event)
 +	{
 +		bool isLeftButton = (event->buttons() & Qt::LeftButton);
-+		QPoint pg = event->globalPos();
++		const QPoint pg = event->globalPos();
 +		QWidget *window = BaseClass::window();
 +		int ypath = 0;
 +		int xpath = 0;
-+		int right = window->geometry().right();
-+		int left =  window->geometry().left();
-+		int top =  window->geometry().top();
-+		int bottom = window->geometry().bottom();
++		const int right = window->geometry().right();
++		const int left =  window->geometry().left();
++		const int top =  window->geometry().top();
++		const int bottom = window->geometry().bottom();
 +		if (isLeftButton && regions.value("leftbottom") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeBDiagCursor));
-+			if (pg.y() < bottom) {
-+				ypath = -(bottom - pg.y());
-+			}
-+			else if (pg.y() > bottom) {
-+				ypath =  pg.y() - bottom;
-+			}
-+			if (pg.x() < left) {
-+				xpath = left - pg.x();
-+			}
-+			else if (pg.x() > left) {
-+				xpath = -(pg.x() - left);
-+			}
++			ypath =  pg.y() - bottom;
++			xpath = left - pg.x();
 +			if ((window->width() + xpath) < window->minimumWidth()) {
-+				xpath = -(window->width() - window->minimumWidth());
++				xpath = window->minimumWidth() - window->width();
 +			}
 +			window->setGeometry(window->x() - xpath, window->y(), window->width() + xpath, window->height() + ypath);
 +
 +		}
 +		else if (isLeftButton && regions.value("rightbottom") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeFDiagCursor));
-+			if (pg.y() < bottom) {
-+				ypath = -(bottom - pg.y());
-+			}
-+			else {
-+				ypath =  pg.y() - bottom;
-+			}
-+			if (pg.x() < right) {
-+				xpath = - (right - pg.x());
-+			}
-+			else {
-+				xpath = pg.x() - right;
-+			}
++			ypath = pg.y() - bottom;
++			xpath = pg.x() - right;
 +			window->resize(window->width() + xpath, window->height() + ypath);
 +
 +		}
 +		else if (isLeftButton && regions.value("lefttop") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeFDiagCursor));
-+			if (pg.y() > top) {
-+				ypath = -(pg.y() - top);
-+			}
-+			else {
-+				ypath =  top - pg.y();
-+			}
-+			if (pg.x() > left) {
-+				xpath = -(pg.x() - left);
-+			}
-+			else {
-+				xpath = left - pg.x();
-+			}
++			ypath =  top - pg.y();
++			xpath = left - pg.x();
 +			if ((window->width() + xpath) < window->minimumWidth()) {
-+				xpath = -(window->width() - window->minimumWidth());
++				xpath = window->minimumWidth() - window->width();
 +			}
 +			if ((window->height() + ypath) < window->minimumHeight()) {
-+				ypath = -(window->height() - window->minimumHeight());
++				ypath = window->minimumHeight() - window->height();
 +			}
 +			window->setGeometry(window->x() - xpath, window->y() - ypath, window->width() + xpath, window->height() + ypath);
 +		}
 +		else if (isLeftButton && regions.value("righttop") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeBDiagCursor));
-+			if (pg.y() > top) {
-+				ypath = -(pg.y() - top);
-+			}
-+			else {
-+				ypath =  top - pg.y();
-+			}
-+			if (pg.x() < right) {
-+				xpath = -(right - pg.x());
-+			}
-+			else {
-+				xpath = pg.x() - right;
-+			}
++			ypath =  top - pg.y();
++			xpath = pg.x() - right;
 +			if ((window->width() + xpath) < window->minimumWidth()) {
-+				xpath = -(window->width() - window->minimumWidth());
++				xpath = window->minimumWidth() - window->width();
 +			}
 +			if ((window->height() + ypath) < window->minimumHeight()) {
-+				ypath = -(window->height() - window->minimumHeight());
++				ypath = window->minimumHeight() - window->height();
 +			}
 +			window->setGeometry(window->x(), window->y() - ypath, window->width() + xpath, window->height() + ypath);
 +		}
 +		else if (isLeftButton && regions.value("bottom") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeVerCursor));
-+			if (pg.y() < bottom) {
-+				ypath = -(bottom - pg.y());
-+			}
-+			else {
-+				ypath =  pg.y() - bottom;
-+			}
++			ypath =  pg.y() - bottom;
 +			window->resize(window->width(), window->height() + ypath);
 +		}
 +		else if (isLeftButton && regions.value("right") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeHorCursor));
-+			if (pg.x() < right) {
-+				xpath = -(right - pg.x());
-+			}
-+			else {
-+				xpath =  pg.x() - right;
-+			}
++			xpath =  pg.x() - right;
 +			window->resize(window->width() + xpath, window->height());
 +		}
 +		else if (isLeftButton && regions.value("left") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeHorCursor));
-+			if (pg.x() > left) {
-+				xpath = -(pg.x() - left);
-+			}
-+			else {
-+				xpath =  left - pg.x();
-+			}
++			xpath =  left - pg.x();
 +			if ((window->width() + xpath) < window->minimumWidth()) {
-+				xpath = -(window->width() - window->minimumWidth());
++				xpath = window->minimumWidth() - window->width();
 +			}
 +			window->setGeometry(window->x() - xpath, window->y(), window->width() + xpath, window->height());
 +		}
 +		else if (isLeftButton && regions.value("top") && isResize && !border) {
 +			window->setCursor(QCursor(Qt::SizeVerCursor));
-+			if (pg.y() > top) {
-+				ypath = -(pg.y() - top);
-+			}
-+			else {
-+				ypath =  top - pg.y();
-+			}
++			ypath =  top - pg.y();
 +			if ((window->height() + ypath) < window->minimumHeight()) {
-+				ypath = -(window->height() - window->minimumHeight());
++				ypath = window->minimumHeight() - window->height();
 +			}
 +			window->setGeometry(window->x(), window->y() - ypath, window->width(), window->height() + ypath);
 +		}
@@ -736,9 +674,9 @@
  };
  
  #endif
---- /dev/null
+--- git.orig/src/widgets/psiwindowheader.cpp
 +++ git/src/widgets/psiwindowheader.cpp
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,226 @@
 +/*
 + * psiwindowheader.cpp
 + * Copyright (C) 2010  Khryukin Evgeny, Vitaly Tonkacheyev
@@ -767,10 +705,17 @@
 +#include "psiiconset.h"
 +
 +PsiWindowHeader::PsiWindowHeader(QWidget *p)
-+	: QWidget(p)
++	: QWidget(p),
++	  maximized(false),
++	  defaultSize(QSize(320, 280))
 +{
 +	parent_ = p->window();
 +	ui_.setupUi(this);
++#ifdef Q_WS_MAC
++	ui_.horiz->insertWidget(0, ui_.closeButton);
++	ui_.horiz->insertWidget(1, ui_.hideButton);
++	ui_.horiz->insertWidget(2, ui_.maximizeButton);
++#endif
 +	ui_.hideButton->setIcon(qApp->style()->standardIcon(QStyle::SP_TitleBarMinButton));
 +	ui_.maximizeButton->setIcon(qApp->style()->standardIcon(QStyle::SP_TitleBarMaxButton));
 +	ui_.closeButton->setIcon(qApp->style()->standardIcon(QStyle::SP_TitleBarCloseButton));
@@ -780,8 +725,6 @@
 +	connect(ui_.closeButton, SIGNAL(clicked()), SLOT(closePressed()));
 +	connect(ui_.maximizeButton, SIGNAL(clicked()), SLOT(maximizePressed()));
 +	setMouseTracking(true);
-+	maximized = false;
-+	defaultSize = QSize(320, 280);
 +}
 +
 +PsiWindowHeader::~PsiWindowHeader()
@@ -800,17 +743,35 @@
 +
 +void PsiWindowHeader::maximizePressed()
 +{
++	const QRect desktop = qApp->desktop()->availableGeometry(-1);
 +	if (!maximized) {
 +		if (parent_->window()->width() != qApp->desktop()->width()
 +			&& parent_->window()->height() != qApp->desktop()->height()) {
 +			oldSize = parent_->window()->geometry();
-+			parent_->window()->setGeometry(qApp->desktop()->availableGeometry(-1));
++			parent_->window()->setGeometry(desktop);
 +			maximized = true;
-+		} else {
++		}
++		else if (!oldSize.isNull() && !oldSize.isEmpty()) {
++			parent_->window()->setGeometry(oldSize);
++			maximized = false;
++		}
++		else {
 +			parent_->window()->resize(defaultSize);
 +			maximized = false;
 +		}
 +	} else {
++		if (oldSize.top() < desktop.top()) {
++			oldSize.setTop(desktop.top());
++		}
++		if (oldSize.left() < desktop.left() ) {
++			oldSize.setLeft(desktop.left());
++		}
++		if (oldSize.right() > desktop.right()) {
++			oldSize.setRight(desktop.right());
++		}
++		if (oldSize.bottom() > desktop.bottom()) {
++			oldSize.setBottom(desktop.bottom());
++		}
 +		parent_->window()->setGeometry(oldSize);
 +		maximized = false;
 +	}
@@ -843,28 +804,18 @@
 +void PsiWindowHeader::mouseMoveEvent(QMouseEvent *e)
 +{
 +	bool isLeftButton = (e->buttons() & Qt::LeftButton);
-+	QPoint pg = e->globalPos();
++	const QPoint pg = e->globalPos();
 +	int ypath = 0;
 +	int xpath = 0;
-+	if (isLeftButton && inLDRect && isResize) {
++	if (isLeftButton && inLDRect && isResize && !maximized) {
 +		setCursor(QCursor(Qt::SizeFDiagCursor));
-+		if (pg.y() < parent_->window()->y()) {
-+			ypath = parent_->window()->y() - pg.y();
-+		}
-+		else {
-+			ypath =  -(pg.y() - parent_->window()->y());
-+		}
-+		if (pg.x() < parent_->window()->x()) {
-+			xpath = parent_->window()->x() - pg.x();
-+		}
-+		else {
-+			xpath = -(pg.x() - parent_->window()->x());
-+		}
++		ypath = parent_->window()->y() - pg.y() ;
++		xpath = parent_->window()->x() - pg.x();
 +		if ((parent_->window()->width() + xpath) < parent_->window()->minimumWidth()) {
-+			xpath = -(parent_->window()->width() - parent_->window()->minimumWidth());
++			xpath = parent_->window()->minimumWidth() - parent_->window()->width();
 +		}
 +		if ((parent_->window()->height() + ypath) < parent_->window()->minimumHeight()) {
-+			ypath = -(parent_->window()->height() - parent_->window()->minimumHeight());
++			ypath = parent_->window()->minimumHeight() - parent_->window()->height();
 +		}
 +		parent_->window()->setGeometry(parent_->window()->x() - xpath,
 +						parent_->window()->y() - ypath,
@@ -872,38 +823,23 @@
 +						parent_->window()->height() + ypath);
 +
 +	}
-+	else if (isLeftButton && inVRect && isResize) {
++	else if (isLeftButton && inVRect && isResize && !maximized) {
 +		setCursor(QCursor(Qt::SizeVerCursor));
-+		if (pg.y() < parent_->window()->y()) {
-+			ypath = parent_->window()->y() - pg.y();
-+		}
-+		else {
-+			ypath =  -(pg.y() - parent_->window()->y());
-+		}
++		ypath = parent_->window()->y() - pg.y();
 +		if ((parent_->window()->height() + ypath) < parent_->window()->minimumHeight()) {
-+			ypath = -(parent_->window()->height() - parent_->window()->minimumHeight());
++			ypath = parent_->window()->minimumHeight() - parent_->window()->height();
 +		}
 +		parent_->window()->setGeometry(parent_->window()->x(),
 +						parent_->window()->y() - ypath,
 +						parent_->window()->width(),
 +						parent_->window()->height() + ypath);
 +	}
-+	else if (isLeftButton && inRDRect && isResize) {
++	else if (isLeftButton && inRDRect && isResize && !maximized) {
 +		setCursor(QCursor(Qt::SizeBDiagCursor));
-+		if (pg.y() < parent_->window()->y()) {
-+			ypath = parent_->window()->y() - pg.y();
-+		}
-+		else {
-+			ypath = -(pg.y() - parent_->window()->y());
-+		}
-+		if (pg.x() < parent_->window()->geometry().right()) {
-+			xpath = -(parent_->window()->geometry().right() - pg.x());
-+		}
-+		else {
-+			xpath = pg.x() - parent_->window()->geometry().right();
-+		}
++		ypath = parent_->window()->y() - pg.y();
++		xpath = pg.x() - parent_->window()->geometry().right();
 +		if ((parent_->window()->height() + ypath) < parent_->window()->minimumHeight()) {
-+			ypath = -(parent_->window()->height() - parent_->window()->minimumHeight());
++			ypath = parent_->window()->minimumHeight() - parent_->window()->height();
 +		}
 +		parent_->window()->setGeometry(parent_->window()->x(),
 +						parent_->window()->y() - ypath,
@@ -911,14 +847,14 @@
 +						parent_->window()->height() + ypath);
 +
 +	}
-+	else if(isLeftButton && isDrag &&!isResize) {
++	else if(isLeftButton && isDrag &&!isResize && !maximized) {
 +		setCursor(QCursor(Qt::ArrowCursor));
 +		parent_->window()->move( e->globalPos() - movepath );
 +	}
 +	e->accept();
 +}
 +
-+void PsiWindowHeader::mouseEnterEvent(int mouse_x, int mouse_y, QRect geom)
++void PsiWindowHeader::mouseEnterEvent(const int mouse_x, const int mouse_y, const QRect &geom)
 +{
 +	if(mouse_y <= geom.top()+7
 +		&& qAbs(mouse_x - geom.left()) <= 4) {
@@ -967,7 +903,7 @@
 +	}
 +	e->accept();
 +}
---- /dev/null
+--- git.orig/src/widgets/psiwindowheader.h
 +++ git/src/widgets/psiwindowheader.h
 @@ -0,0 +1,65 @@
 +/*
@@ -1019,7 +955,7 @@
 +	bool maximized;
 +	QRect oldSize;
 +	QSize defaultSize;
-+	void mouseEnterEvent(int mouse_x, int mouse_y, QRect geom);
++	void mouseEnterEvent(const int mouse_x, const int mouse_y, const QRect &geom);
 +
 +private slots:
 +	void hidePressed();
@@ -1035,7 +971,7 @@
 +};
 +
 +#endif // PSIWINDOWHEADER_H
---- /dev/null
+--- git.orig/src/widgets/psiwindowheader.ui
 +++ git/src/widgets/psiwindowheader.ui
 @@ -0,0 +1,120 @@
 +<?xml version="1.0" encoding="UTF-8"?>
