@@ -20,15 +20,15 @@
  		void groupChatPresence(const Jid &, const Status &);
 --- psi.orig/src/applicationinfo.cpp
 +++ psi/src/applicationinfo.cpp
-@@ -17,6 +17,7 @@
+@@ -22,6 +22,7 @@
  
  #include "psiapplication.h"
  #include "applicationinfo.h"
 +#include "systeminfo.h"
  #include "profiles.h"
- #ifdef HAVE_CONFIG
- #include "config.h"
-@@ -67,6 +68,11 @@ QString ApplicationInfo::capsVersion()
+ #include "homedirmigration.h"
+ #include "activeprofiles.h"
+@@ -75,6 +76,11 @@ QString ApplicationInfo::capsVersion()
  	return PROG_CAPS_VERSION;
  }
  
@@ -40,21 +40,9 @@
  QString ApplicationInfo::IPCName()
  {
  	return PROG_IPC_NAME;
-@@ -269,6 +275,11 @@ QString ApplicationInfo::bobDir()
- 	return makeSubhomePath("bob");
- }
- 
-+QString ApplicationInfo::currentProfileDir()
-+{
-+	return pathToProfile(activeProfile);
-+}
-+
- QString ApplicationInfo::profilesDir()
- {
- 	return makeSubhomePath("profiles");
 --- psi.orig/src/applicationinfo.h
 +++ psi/src/applicationinfo.h
-@@ -12,6 +12,7 @@ public:
+@@ -18,6 +18,7 @@ public:
  	static QString version();
  	static QString capsNode();
  	static QString capsVersion();
@@ -62,14 +50,6 @@
  	static QString IPCName();
  
  	// URLs
-@@ -27,6 +28,7 @@ public:
- 	static QString historyDir();
- 	static QString vCardDir();
- 	static QString bobDir();
-+	static QString currentProfileDir();
- 	static QStringList getCertificateStoreDirs();
- 	static QString getCertificateStoreSaveDir();
- 	static QStringList dataDirs();
 --- psi.orig/src/chatdlg.h
 +++ psi/src/chatdlg.h
 @@ -171,7 +171,11 @@ protected:
@@ -733,13 +713,22 @@
 +</ui>
 --- psi.orig/src/pluginhost.cpp
 +++ psi/src/pluginhost.cpp
-@@ -6,17 +6,42 @@
+@@ -6,17 +6,51 @@
  #include "pluginhost.h"
  
  #include <QPluginLoader>
 -
 +#include <QWidget>
 +#include <QSplitter>
++#include <QAction>
++#include <QByteArray>
++#include <QDomElement>
++#include <QKeySequence>
++#include <QObject>
++#include <QRegExp>
++#include <QString>
++#include <QStringList>
++#include <QTextEdit>
  //#include "xmpp_message.h"
  #include "psioptions.h"
 +#include "psiaccount.h"
@@ -777,7 +766,7 @@
  
  /**
   * \brief Constructs a host/wrapper for a plugin.
-@@ -32,12 +57,16 @@
+@@ -32,12 +66,16 @@
   */
  PluginHost::PluginHost(PluginManager* manager, const QString& pluginFile)
  	: manager_(manager)
@@ -796,7 +785,7 @@
  {
  	load();	// reads plugin name, etc
  	unload();
-@@ -107,6 +136,16 @@ const QString& PluginHost::version() con
+@@ -107,6 +145,16 @@ const QString& PluginHost::version() con
  }
  
  /**
@@ -813,7 +802,7 @@
   * \brief Returns plugin options widget.
   *
   * Always returns null if plugin is not currently loaded.
-@@ -136,21 +175,27 @@ QWidget* PluginHost::optionsWidget() con
+@@ -136,21 +184,27 @@ QWidget* PluginHost::optionsWidget() con
   */
  bool PluginHost::load()
  {
@@ -844,7 +833,7 @@
  			//Check it's the right sort of plugin
  			PsiPlugin* psiPlugin = qobject_cast<PsiPlugin*>(plugin);
  			if (psiPlugin) {
-@@ -161,6 +206,12 @@ bool PluginHost::load()
+@@ -161,6 +215,12 @@ bool PluginHost::load()
  				name_ = psiPlugin->name();
  				shortName_ = psiPlugin->shortName();
  				version_ = psiPlugin->version();
@@ -857,7 +846,7 @@
  			} else  {
  				qWarning("Attempted to load %s, but it is not a valid plugin.", qPrintable(file_));
  				if (loader_->isLoaded()) {
-@@ -168,6 +219,7 @@ bool PluginHost::load()
+@@ -168,6 +228,7 @@ bool PluginHost::load()
  					loader_->unload();
  				}
  				delete loader_;
@@ -865,7 +854,7 @@
  			}
  		}
  	}
-@@ -187,20 +239,24 @@ bool PluginHost::load()
+@@ -187,20 +248,24 @@ bool PluginHost::load()
   */
  bool PluginHost::unload()
  {
@@ -896,7 +885,7 @@
  		}	  	
  	}
  	return plugin_ == 0;
-@@ -231,26 +287,135 @@ bool PluginHost::enable()
+@@ -231,26 +296,135 @@ bool PluginHost::enable()
  {
  	if (!enabled_ && load()) {
  		if (!connected_) {
@@ -1033,7 +1022,7 @@
  			connected_ = true;
  		}
  
-@@ -271,7 +436,7 @@ bool PluginHost::enable()
+@@ -271,7 +445,7 @@ bool PluginHost::enable()
  bool PluginHost::disable()
  {
  	if (enabled_) {
@@ -1042,7 +1031,7 @@
  	}
  	return !enabled_;
  }
-@@ -356,6 +521,16 @@ bool PluginHost::incomingXml(int account
+@@ -356,6 +530,16 @@ bool PluginHost::incomingXml(int account
  }
  
  
@@ -1059,7 +1048,7 @@
  //-- for EventFilter ------------------------------------------------
  
  /**
-@@ -365,13 +540,12 @@ bool PluginHost::incomingXml(int account
+@@ -365,13 +549,12 @@ bool PluginHost::incomingXml(int account
   * this will call its processEvent() handler.
   * Handler may then modify the event and may cause the event to be
   * silently discarded.
@@ -1074,7 +1063,7 @@
  {
  	bool handled = false;
  	EventFilter *ef = qobject_cast<EventFilter*>(plugin_);
-@@ -406,6 +580,23 @@ bool PluginHost::processMessage(int acco
+@@ -406,6 +589,23 @@ bool PluginHost::processMessage(int acco
  	return handled;
  }
  
@@ -1098,7 +1087,7 @@
  
  //-- StanzaSender ---------------------------------------------------
  
-@@ -456,7 +647,8 @@ void PluginHost::sendMessage(int account
+@@ -456,7 +656,8 @@ void PluginHost::sendMessage(int account
  	//manager_->sendXml(account, m.toStanza(...).toString());
  
  	//TODO(mck): yeah, that's sick..
@@ -1108,7 +1097,7 @@
  
  }
  
-@@ -471,6 +663,10 @@ QString PluginHost::uniqueId(int account
+@@ -471,6 +672,10 @@ QString PluginHost::uniqueId(int account
  	return manager_->uniqueId(account);
  }
  
@@ -1119,7 +1108,7 @@
  
  //-- IqFilter -------------------------------------------------------
  
-@@ -494,7 +690,9 @@ QString PluginHost::uniqueId(int account
+@@ -494,7 +699,9 @@ QString PluginHost::uniqueId(int account
  void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filter)
  {
  	if (iqNsFilters_.values(ns).contains(filter)) {
@@ -1130,7 +1119,7 @@
  	} else {
  		iqNsFilters_.insert(ns, filter);
  	}
-@@ -519,9 +717,13 @@ void PluginHost::addIqNamespaceFilter(co
+@@ -519,9 +726,13 @@ void PluginHost::addIqNamespaceFilter(co
   */
  void PluginHost::addIqNamespaceFilter(const QRegExp &ns, IqNamespaceFilter *filter)
  {
@@ -1145,7 +1134,7 @@
  	} else {
  		iqNsxFilters_.insert(ns, filter);
  	}
-@@ -570,9 +772,8 @@ void PluginHost::setPluginOption( const 
+@@ -570,9 +781,8 @@ void PluginHost::setPluginOption( const 
  	//
  	//if (!plugin)
  	//	return;
@@ -1157,7 +1146,7 @@
  }
  
  /**
-@@ -585,9 +786,11 @@ void PluginHost::setPluginOption( const 
+@@ -585,9 +795,11 @@ void PluginHost::setPluginOption( const 
   * \param  option Option to set
   * \param value Return value
   */
@@ -1171,7 +1160,7 @@
  }
  
  /**
-@@ -616,6 +819,435 @@ QVariant PluginHost::getGlobalOption(con
+@@ -616,6 +828,435 @@ QVariant PluginHost::getGlobalOption(con
  	return PsiOptions::instance()->getOption(option);
  }
  
@@ -1323,9 +1312,9 @@
 +	return ApplicationInfo::osName();
 +}
 +
-+QString PluginHost::appHomeDir()
++QString PluginHost::appHomeDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::homeDir();
++	return ApplicationInfo::homeDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appResourcesDir()
@@ -1338,9 +1327,9 @@
 +	return ApplicationInfo::libDir();
 +}
 +
-+QString PluginHost::appProfilesDir()
++QString PluginHost::appProfilesDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::profilesDir();
++	return ApplicationInfo::profilesDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appHistoryDir()
@@ -1348,9 +1337,9 @@
 +	return ApplicationInfo::historyDir();
 +}
 +
-+QString PluginHost::appCurrentProfileDir()
++QString PluginHost::appCurrentProfileDir(ApplicationInfoAccessingHost::HomedirType type)
 +{
-+	return ApplicationInfo::currentProfileDir();
++	return ApplicationInfo::currentProfileDir((ApplicationInfo::HomedirType)type);
 +}
 +
 +QString PluginHost::appVCardDir()
@@ -1609,13 +1598,14 @@
  
 --- psi.orig/src/pluginhost.h
 +++ psi/src/pluginhost.h
-@@ -10,10 +10,27 @@
+@@ -10,10 +10,28 @@
  #include <QVariant>
  #include <QRegExp>
  #include <QMultiMap>
 +#include <QPointer>
 +#include <QTextEdit>
  
++#include "applicationinfo.h"
 +#include "userlist.h"
 +#include "iconset.h"
  #include "stanzasendinghost.h"
@@ -1637,7 +1627,7 @@
  
  class QWidget;
  class QPluginLoader;
-@@ -21,10 +38,14 @@ class QPluginLoader;
+@@ -21,10 +39,14 @@ class QPluginLoader;
  class PluginManager;
  class IqNamespaceFilter;
  
@@ -1654,7 +1644,7 @@
  
  public:
  	PluginHost(PluginManager* manager, const QString& pluginFile);
-@@ -38,6 +59,7 @@ public:
+@@ -38,6 +60,7 @@ public:
  	const QString& name() const;
  	const QString& shortName() const;
  	const QString& version() const;
@@ -1662,7 +1652,7 @@
  
  	// loading
  	bool load();
-@@ -51,16 +73,20 @@ public:
+@@ -51,16 +74,20 @@ public:
  
  	// for StanzaFilter and IqNamespaceFilter
  	bool incomingXml(int account, const QDomElement& e);
@@ -1684,7 +1674,7 @@
  
  	// IqFilteringHost
  	void addIqNamespaceFilter(const QString& ns, IqNamespaceFilter* filter);
-@@ -70,25 +96,121 @@ public:
+@@ -70,25 +97,121 @@ public:
  
  	// OptionAccessingHost
  	void setPluginOption(const QString& option, const QVariant& value);
@@ -1716,12 +1706,12 @@
 +	QString appCapsNode();
 +	QString appCapsVersion();
 +	QString appOsName();
-+	QString appHomeDir();
++	QString appHomeDir(HomedirType type);
 +	QString appResourcesDir();
 +	QString appLibDir();
-+	QString appProfilesDir();
++	QString appProfilesDir(HomedirType type);
 +	QString appHistoryDir();
-+	QString appCurrentProfileDir();
++	QString appCurrentProfileDir(HomedirType type);
 +	QString appVCardDir();
 +
 +	//AccountInfoAcsessingHost
@@ -1844,17 +1834,7 @@
  // - use native separators when displaying file path
  
  
-@@ -57,6 +63,9 @@ static QStringList pluginDirs()
- 	QStringList l;
- 	l += ApplicationInfo::resourcesDir() + "/plugins";
- 	l += ApplicationInfo::homeDir() + "/plugins";
-+#if defined(Q_OS_UNIX)
-+	l += ApplicationInfo::libDir() + "/plugins";
-+#endif
- 	return l;
- }
- 
-@@ -77,10 +86,9 @@ PluginManager* PluginManager::instance()
+@@ -80,10 +86,9 @@ PluginManager* PluginManager::instance()
   * Default constructor. Locates all plugins, sets watchers on those directories to 
   * locate new ones and loads those enabled in the config.
   */ 
@@ -1866,7 +1846,7 @@
  	foreach (QString path, pluginDirs()) {
  		QCA::DirWatch *dw = new QCA::DirWatch(path, this);
  		connect(dw, SIGNAL(changed()), SLOT(dirsChanged()));
-@@ -89,38 +97,77 @@ PluginManager::PluginManager() : QObject
+@@ -92,38 +97,77 @@ PluginManager::PluginManager() : QObject
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), this, SLOT(optionChanged(const QString&)));
  }
  
@@ -1957,7 +1937,7 @@
  }
  
  /**
-@@ -129,14 +176,27 @@ void PluginManager::dirsChanged()
+@@ -132,14 +176,27 @@ void PluginManager::dirsChanged()
   */
  void PluginManager::loadEnabledPlugins()
  {
@@ -1992,7 +1972,7 @@
  	}
  }
  
-@@ -147,9 +207,21 @@ void PluginManager::loadEnabledPlugins()
+@@ -150,9 +207,21 @@ void PluginManager::loadEnabledPlugins()
   */
  void PluginManager::optionChanged(const QString& option)
  {
@@ -2017,7 +1997,7 @@
  }
  
  /**
-@@ -157,7 +229,9 @@ void PluginManager::optionChanged(const 
+@@ -160,7 +229,9 @@ void PluginManager::optionChanged(const 
   */ 
  void PluginManager::loadAllPlugins()
  {
@@ -2027,7 +2007,7 @@
    	//Any static (compiled in) plugins we happen to have
  	/*foreach( QObject* plugin, QPluginLoader::staticInstances() ) {
  		loadPlugin( plugin );
-@@ -177,12 +251,12 @@ void PluginManager::loadAllPlugins()
+@@ -180,12 +251,12 @@ void PluginManager::loadAllPlugins()
   */ 
  bool PluginManager::unloadAllPlugins()
  {
@@ -2043,7 +2023,7 @@
  			ok = false;
  		}
  	}
-@@ -195,7 +269,7 @@ bool PluginManager::unloadAllPlugins()
+@@ -198,7 +269,7 @@ bool PluginManager::unloadAllPlugins()
   * \param plugin Name of the plugin.
   * \return Path to the plugin file.
   */ 
@@ -2052,7 +2032,7 @@
  {
  	QString path;
  	if (hosts_.contains(plugin)) {
-@@ -210,7 +284,7 @@ QString PluginManager::pathToPlugin(cons
+@@ -213,7 +284,7 @@ QString PluginManager::pathToPlugin(cons
   * \param plugin Name of the plugin.
   * \return Path to the plugin file.
   */ 
@@ -2061,7 +2041,7 @@
  {
  	QString name;
  	if (hosts_.contains(plugin)) {
-@@ -219,10 +293,19 @@ QString PluginManager::shortName(const Q
+@@ -222,10 +293,19 @@ QString PluginManager::shortName(const Q
  	return name;
  }
  
@@ -2082,7 +2062,7 @@
  {
  	return hosts_.keys();
  }
-@@ -235,13 +318,33 @@ QStringList PluginManager::availablePlug
+@@ -238,13 +318,33 @@ QStringList PluginManager::availablePlug
   */
  QWidget* PluginManager::optionsWidget(const QString& plugin)
  {
@@ -2120,7 +2100,7 @@
  }
  
  /**
-@@ -254,10 +357,10 @@ QWidget* PluginManager::optionsWidget(co
+@@ -257,10 +357,10 @@ QWidget* PluginManager::optionsWidget(co
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -2133,7 +2113,7 @@
  		if (host->processMessage(accountIds_[account], jidFrom, body, subject)) {
  			handled = true;
  			break;
-@@ -276,10 +379,10 @@ bool PluginManager::processMessage(const
+@@ -279,10 +379,10 @@ bool PluginManager::processMessage(const
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -2146,7 +2126,7 @@
  		if (host->processEvent(accountIds_[account], event)) {
  			handled = true;
  			break;
-@@ -289,6 +392,40 @@ bool PluginManager::processEvent(const P
+@@ -292,6 +392,40 @@ bool PluginManager::processEvent(const P
  }
  
  /**
@@ -2187,7 +2167,7 @@
   * \brief Give each plugin the opportunity to process the incoming xml
   *
   * Each plugin is passed the xml in turn using various filter interfaces
-@@ -303,7 +440,7 @@ bool PluginManager::processEvent(const P
+@@ -306,7 +440,7 @@ bool PluginManager::processEvent(const P
  bool PluginManager::incomingXml(int account, const QDomElement &xml)
  {
  	bool handled = false;
@@ -2196,7 +2176,7 @@
  		if (host->incomingXml(account, xml)) {
  			handled = true;
  			break;
-@@ -339,7 +476,7 @@ void PluginManager::sendXml(int account,
+@@ -342,7 +476,7 @@ void PluginManager::sendXml(int account,
   * \param account Identifier of the PsiAccount responsible
   * \return Unique ID to be used for when sending a stanza
   */
@@ -2205,7 +2185,7 @@
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -348,15 +485,284 @@ QString PluginManager::uniqueId(int acco
+@@ -351,15 +485,284 @@ QString PluginManager::uniqueId(int acco
  	return id;
  }
  
@@ -2491,7 +2471,7 @@
  }
  
  /**
-@@ -369,6 +775,199 @@ bool PluginManager::verifyStanza(const Q
+@@ -372,6 +775,199 @@ bool PluginManager::verifyStanza(const Q
  	return true;
  }
  
@@ -2842,10 +2822,12 @@
  #endif
 --- psi.orig/src/plugins/include/accountinfoaccessinghost.h
 +++ psi/src/plugins/include/accountinfoaccessinghost.h
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,26 @@
 +#ifndef ACCOUNTINFOACCESSINGHOST_H
 +#define ACCOUNTINFOACCESSINGHOST_H
 +
++class QString;
++class QStringList;
 +
 +class AccountInfoAccessingHost
 +{
@@ -2890,11 +2872,12 @@
 +#endif // ACCOUNTINFOACCESSOR_H
 --- psi.orig/src/plugins/include/activetabaccessinghost.h
 +++ psi/src/plugins/include/activetabaccessinghost.h
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +#ifndef ACTIVETABACCESSINGHOST_H
 +#define ACTIVETABACCESSINGHOST_H
 +
-+#include <QTextEdit>
++class QString;
++class QTextEdit;
 +
 +class ActiveTabAccessingHost
 +{
@@ -2930,9 +2913,11 @@
 +#endif // ACTIVETABACCESSOR_H
 --- psi.orig/src/plugins/include/applicationinfoaccessinghost.h
 +++ psi/src/plugins/include/applicationinfoaccessinghost.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,45 @@
 +#ifndef APPLICATIONINFOACCESSINGHOST_H
 +#define APPLICATIONINFOACCESSINGHOST_H
++
++class QString;
 +
 +struct Proxy {
 +	QString type;
@@ -2945,6 +2930,11 @@
 +class ApplicationInfoAccessingHost
 +{
 +public:
++	enum HomedirType {
++		ConfigLocation,
++		DataLocation,
++		CacheLocation
++	};
 +	virtual ~ApplicationInfoAccessingHost() {}
 +
 +	// Version info
@@ -2955,12 +2945,12 @@
 +	virtual QString appOsName() = 0;
 +
 +	// Directories
-+	virtual QString appHomeDir() = 0;
++	virtual QString appHomeDir(HomedirType type) = 0;
 +	virtual QString appResourcesDir() = 0;
 +	virtual QString appLibDir() = 0;
-+	virtual QString appProfilesDir() = 0;
++	virtual QString appProfilesDir(HomedirType type) = 0;
 +	virtual QString appHistoryDir() = 0;
-+	virtual QString appCurrentProfileDir() = 0;
++	virtual QString appCurrentProfileDir(HomedirType type) = 0;
 +	virtual QString appVCardDir() = 0;
 +
 +	virtual Proxy getProxyFor(const QString& obj) = 0;
@@ -2991,10 +2981,12 @@
 +#endif // APPLICATIONINFOACCESSOR_H
 --- psi.orig/src/plugins/include/contactinfoaccessinghost.h
 +++ psi/src/plugins/include/contactinfoaccessinghost.h
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,27 @@
 +#ifndef CONTACTINFOACCESSINGHOST_H
 +#define CONTACTINFOACCESSINGHOST_H
 +
++class QString;
++class QStringList;
 +
 +class ContactInfoAccessingHost
 +{
@@ -3040,9 +3032,12 @@
 +#endif // CONTACTINFOACCESSOR_H
 --- psi.orig/src/plugins/include/contactstateaccessinghost.h
 +++ psi/src/plugins/include/contactstateaccessinghost.h
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,19 @@
 +#ifndef CONTACTSTATEACCESSINGHOST_H
 +#define CONTACTSTATEACCESSINGHOST_H
++
++class QDomElement;
++class QString;
 +
 +class ContactStateAccessingHost
 +{
@@ -3080,11 +3075,12 @@
 +#endif // CONTACTSTATEACCESSOR_H
 --- psi.orig/src/plugins/include/eventcreatinghost.h
 +++ psi/src/plugins/include/eventcreatinghost.h
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,16 @@
 +#ifndef EVENTCREATINGHOST_H
 +#define EVENTCREATINGHOST_H
 +
-+#include <QObject>
++class QObject;
++class QString;
 +
 +class EventCreatingHost
 +{
@@ -3118,7 +3114,17 @@
 +#endif
 --- psi.orig/src/plugins/include/eventfilter.h
 +++ psi/src/plugins/include/eventfilter.h
-@@ -10,8 +10,10 @@ public:
+@@ -1,7 +1,8 @@
+ #ifndef EVENTFILTER_H
+ #define EVENTFILTER_H
+ 
+-#include <QDomElement>
++class QDomElement;
++class QString;
+ 
+ class EventFilter
+ {
+@@ -10,8 +11,10 @@ public:
  
  	// true = handled, don't pass to next handler
  
@@ -3132,9 +3138,16 @@
  Q_DECLARE_INTERFACE(EventFilter, "org.psi-im.EventFilter/0.1");
 --- psi.orig/src/plugins/include/gctoolbariconaccessor.h
 +++ psi/src/plugins/include/gctoolbariconaccessor.h
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,22 @@
 +#ifndef GCTOOLBARICONACCESSOR_H
 +#define GCTOOLBARICONACCESSOR_H
++
++#include <QList>
++#include <QVariantHash>
++
++class QObject;
++class QAction;
++class QString;
 +
 +class GCToolbarIconAccessor
 +{
@@ -3150,11 +3163,12 @@
 +#endif // GCTOOLBARICONACCESSOR_H
 --- psi.orig/src/plugins/include/iconfactoryaccessinghost.h
 +++ psi/src/plugins/include/iconfactoryaccessinghost.h
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +#ifndef ICONFACTORYACCESSINGHOST_H
 +#define ICONFACTORYACCESSINGHOST_H
 +
-+#include <QByteArray>
++class QByteArray;
++class QString;
 +
 +class IconFactoryAccessingHost
 +{
@@ -3187,14 +3201,42 @@
 +Q_DECLARE_INTERFACE(IconFactoryAccessor, "org.psi-im.IconFactoryAccessor/0.1");
 +
 +#endif // ICONFACTORYACCESSOR_H
+--- psi.orig/src/plugins/include/iqfilteringhost.h
++++ psi/src/plugins/include/iqfilteringhost.h
+@@ -1,8 +1,8 @@
+ #ifndef IQFILTERINGHOST_H
+ #define IQFILTERINGHOST_H
+ 
+-#include <QString>
+-#include <QRegExp>
++class QString;
++class QRegExp;
+ 
+ class IqNamespaceFilter;
+ 
+--- psi.orig/src/plugins/include/iqnamespacefilter.h
++++ psi/src/plugins/include/iqnamespacefilter.h
+@@ -1,7 +1,7 @@
+ #ifndef IQNAMESPACEFILTER_H
+ #define IQNAMESPACEFILTER_H
+ 
+-#include <QDomElement>
++class QDomElement;
+ 
+ class IqNamespaceFilter
+ {
 --- psi.orig/src/plugins/include/menuaccessor.h
 +++ psi/src/plugins/include/menuaccessor.h
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,25 @@
 +#ifndef MENUACCESSOR_H
 +#define MENUACCESSOR_H
 +
 +#include <QList>
 +#include <QVariantHash>
++
++class QObject;
++class QAction;
++class QString;
 +
 +class MenuAccessor
 +{
@@ -3213,6 +3255,17 @@
 +#endif
 --- psi.orig/src/plugins/include/optionaccessinghost.h
 +++ psi/src/plugins/include/optionaccessinghost.h
+@@ -1,8 +1,8 @@
+ #ifndef OPTIONACCESSINGHOST_H
+ #define OPTIONACCESSINGHOST_H
+ 
+-#include <QDomElement>
+-#include <QVariant>
++class QString;
++class QVariant;
+ 
+ class OptionAccessingHost
+ {
 @@ -10,7 +10,7 @@ public:
  	virtual ~OptionAccessingHost() {}
  
@@ -3222,11 +3275,25 @@
  
  	virtual void setGlobalOption(const QString& option, const QVariant& value) = 0;
  	virtual QVariant getGlobalOption(const QString& option) = 0;
+--- psi.orig/src/plugins/include/optionaccessor.h
++++ psi/src/plugins/include/optionaccessor.h
+@@ -1,8 +1,7 @@
+ #ifndef OPTIONACCESSOR_H
+ #define OPTIONACCESSOR_H
+ 
+-#include <QDomElement>
+-//#include <QString>
++class QString;
+ 
+ class OptionAccessingHost;
+ 
 --- psi.orig/src/plugins/include/plugininfoprovider.h
 +++ psi/src/plugins/include/plugininfoprovider.h
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,18 @@
 +#ifndef PLUGININFOPROVIDER_H
 +#define PLUGININFOPROVIDER_H
++
++class QString;
 +
 +class PluginInfoProvider
 +{
@@ -3307,10 +3374,11 @@
 +#endif // PSIACCOUNTCONTROLLER_H
 --- psi.orig/src/plugins/include/psiaccountcontrollinghost.h
 +++ psi/src/plugins/include/psiaccountcontrollinghost.h
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +#ifndef PSIACCOUNTCONTROLLINGHOST_H
 +#define PSIACCOUNTCONTROLLINGHOST_H
 +
++class QString;
 +
 +class PsiAccountControllingHost
 +{
@@ -3377,11 +3445,12 @@
  Q_DECLARE_INTERFACE(PsiPlugin, "org.psi-im.PsiPlugin/0.3");
 --- psi.orig/src/plugins/include/shortcutaccessinghost.h
 +++ psi/src/plugins/include/shortcutaccessinghost.h
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,20 @@
 +#ifndef SHORTCUTACCESSINGHOST_H
 +#define SHORTCUTACCESSINGHOST_H
 +
-+#include <QKeySequence>
++class QObject;
++class QKeySequence;
 +
 +class ShortcutAccessingHost
 +{
@@ -3458,6 +3527,15 @@
 +#endif
 --- psi.orig/src/plugins/include/stanzafilter.h
 +++ psi/src/plugins/include/stanzafilter.h
+@@ -1,7 +1,7 @@
+ #ifndef STANZAFILTER_H
+ #define STANZAFILTER_H
+ 
+-#include <QDomElement>
++class QDomElement;
+ 
+ class StanzaFilter
+ {
 @@ -10,7 +10,8 @@ public:
  
  	// true = handled, don't pass to next handler
@@ -3470,6 +3548,17 @@
  Q_DECLARE_INTERFACE(StanzaFilter, "org.psi-im.StanzaFilter/0.1");
 --- psi.orig/src/plugins/include/stanzasendinghost.h
 +++ psi/src/plugins/include/stanzasendinghost.h
+@@ -1,8 +1,8 @@
+ #ifndef STANZASENDINGHOST_H
+ #define STANZASENDINGHOST_H
+ 
+-#include <QDomElement>
+-#include <QString>
++class QDomElement;
++class QString;
+ 
+ class StanzaSendingHost
+ {
 @@ -15,6 +15,7 @@ public:
  	virtual void sendMessage(int account, const QString& to, const QString& body, const QString& subject, const QString& type) = 0;
  
@@ -3480,9 +3569,16 @@
  Q_DECLARE_INTERFACE(StanzaSendingHost, "org.psi-im.StanzaSendingHost/0.1");
 --- psi.orig/src/plugins/include/toolbariconaccessor.h
 +++ psi/src/plugins/include/toolbariconaccessor.h
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,22 @@
 +#ifndef TOOLBARICONACCESSOR_H
 +#define TOOLBARICONACCESSOR_H
++
++#include <QList>
++#include <QVariantHash>
++
++class QObject;
++class QAction;
++class QString;
 +
 +class ToolbarIconAccessor
 +{
@@ -3533,7 +3629,7 @@
 +	$$PWD/include/soundaccessinghost.h
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -768,6 +768,13 @@ public slots:
+@@ -767,6 +767,13 @@ public slots:
  		xmlRingbuf[xmlRingbufWrite].time = QDateTime::currentDateTime();
  		xmlRingbufWrite = (xmlRingbufWrite + 1) % xmlRingbuf.count();
  	}
@@ -3547,7 +3643,7 @@
  	
  	void pm_proxyRemoved(QString proxykey)
  	{
-@@ -1120,6 +1127,11 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1118,6 +1125,11 @@ PsiAccount::PsiAccount(const UserAccount
  
  	// create Jabber::Client
  	d->client = new Client;
@@ -3559,7 +3655,7 @@
  	d->client->setOSName(SystemInfo::instance()->os());
  	d->client->setClientName(ApplicationInfo::name());
  	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1177,6 +1189,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1175,6 +1187,7 @@ PsiAccount::PsiAccount(const UserAccount
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -3567,7 +3663,7 @@
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1241,11 +1254,6 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1239,11 +1252,6 @@ PsiAccount::PsiAccount(const UserAccount
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -3579,7 +3675,7 @@
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1781,6 +1789,10 @@ void PsiAccount::logout(bool fast, const
+@@ -1779,6 +1787,10 @@ void PsiAccount::logout(bool fast, const
  	if(!isActive())
  		return;
  
@@ -3590,7 +3686,7 @@
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4624,6 +4636,22 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4622,6 +4634,22 @@ void PsiAccount::dj_sendMessage(const Me
  		}
  	}
  
@@ -3613,7 +3709,7 @@
  	d->client->sendMessage(nm);
  
  	// only toggle if not an invite or body is not empty
-@@ -4906,6 +4934,15 @@ static bool messageListContainsEvent(con
+@@ -4904,6 +4932,15 @@ static bool messageListContainsEvent(con
  	return false;
  }
  
@@ -3629,7 +3725,7 @@
  // handle an incoming event
  void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  {
-@@ -4950,12 +4987,14 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4948,12 +4985,14 @@ void PsiAccount::handleEvent(PsiEvent* e
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -3646,7 +3742,7 @@
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5172,6 +5211,13 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5170,6 +5209,13 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  #endif
  	}
@@ -3660,7 +3756,7 @@
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5191,7 +5237,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5189,7 +5235,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  		    (popupType == PopupManager::AlertAvCall    && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PopupManager::AlertComposing && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
@@ -3678,7 +3774,7 @@
  		}
  
  		emit startBounce();
-@@ -5366,6 +5421,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5364,6 +5419,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
  		}
  		else if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled())
  			doPopup = false;
@@ -3689,7 +3785,7 @@
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5388,6 +5447,18 @@ void PsiAccount::openNextEvent(const Use
+@@ -5386,6 +5445,18 @@ void PsiAccount::openNextEvent(const Use
  	PsiEvent *e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;

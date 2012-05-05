@@ -13,10 +13,10 @@
 --- git.orig/src/contactlistmodel.h
 +++ git/src/contactlistmodel.h
 @@ -84,6 +84,7 @@ public:
- 		AvatarRole = Qt::UserRole + 26,
- 		IsMucRole = Qt::UserRole + 27,
- 		MucMessagesRole = Qt::UserRole + 28,
-+		BlockRole = Qt::UserRole + 29,
+ 		AvatarRole = Qt::UserRole + 28,
+ 		IsMucRole = Qt::UserRole + 29,
+ 		MucMessagesRole = Qt::UserRole + 30,
++		BlockRole = Qt::UserRole + 31,
  
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
@@ -717,16 +717,16 @@
 +			return;
 +		}
 +
- 		renameAction_->setEnabled(contact_->isEditable());
- 		removeAction_->setEnabled(contact_->removeAvailable());
- 
+ #ifdef YAPSI
+ 		YaProfile* profile = YaProfile::create(contact_->account(), contact_->jid());
+ 		openHistoryAction_->setEnabled(contact_->historyAvailable());
 @@ -554,6 +567,7 @@ private slots:
  			authMenu_->menuAction()->setVisible(false);
  		}
  		authMenu_->setEnabled(contact_->account()->isAvailable());
 +		updateBlockActionState();
- 		removeAction_->setVisible(!PsiOptions::instance()->getOption("options.ui.contactlist.lockdown-roster").toBool());
- 		removeAction_->setEnabled(contact_->account()->isAvailable());// || !contact_->inList());
+ 		removeAction_->setVisible(!PsiOptions::instance()->getOption("options.ui.contactlist.lockdown-roster").toBool()  && !contact_->isSelf());
+ 		removeAction_->setEnabled(contact_->removeAvailable());
  		if (!PsiOptions::instance()->getOption("options.ui.menu.contact.custom-picture").toBool()) {
 @@ -634,6 +648,14 @@ private slots:
  		contact_->setGroups(QStringList() << group);

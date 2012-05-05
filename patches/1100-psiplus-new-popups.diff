@@ -1057,7 +1057,7 @@
 +</ui>
 --- psi.orig/src/popupmanager.cpp
 +++ psi/src/popupmanager.cpp
-@@ -0,0 +1,316 @@
+@@ -0,0 +1,317 @@
 +/*
 + * popupmanager.cpp
 + * Copyright (C) 2011-2012  Khryukin Evgeny
@@ -1299,7 +1299,8 @@
 +	if(availableTypes_.isEmpty()) {
 +		availableTypes_ << Default;
 +#if defined(Q_WS_MAC) && defined(HAVE_GROWL)
-+		availableTypes_ << Growl;
++		if(PsiGrowlNotifier::isAvailable())
++			availableTypes_ << Growl;
 +#endif
 +#ifdef USE_DBUS
 +		if(PsiDBusNotifier::isAvailable())
@@ -1503,7 +1504,7 @@
  #include "bsocket.h"
  /*#ifdef Q_WS_WIN
  #include <windows.h>
-@@ -500,6 +496,27 @@ public:
+@@ -499,6 +495,27 @@ public:
  			return true;
  
  		if (lastManualStatus().isAvailable()) {
@@ -1531,7 +1532,7 @@
  			if (lastManualStatus().type() == XMPP::Status::DND)
  				return true;
  			if ((lastManualStatus().type() == XMPP::Status::Away || lastManualStatus().type() == XMPP::Status::XA) &&
-@@ -2425,34 +2442,24 @@ void PsiAccount::client_resourceAvailabl
+@@ -2424,34 +2441,24 @@ void PsiAccount::client_resourceAvailabl
  	if(doSound)
  		playSound(eOnline);
  
@@ -1570,7 +1571,7 @@
  
  	// Update entity capabilities.
  	// This has to happen after the userlist item has been created.
-@@ -2529,21 +2536,14 @@ void PsiAccount::client_resourceUnavaila
+@@ -2528,21 +2535,14 @@ void PsiAccount::client_resourceUnavaila
  	if(doSound)
  		playSound(eOffline);
  
@@ -1595,7 +1596,7 @@
  	}
  }
  
-@@ -2968,6 +2968,11 @@ void PsiAccount::setStatusActual(const S
+@@ -2967,6 +2967,11 @@ void PsiAccount::setStatusActual(const S
  	}
  }
  
@@ -1607,7 +1608,7 @@
  void PsiAccount::sentInitialPresence()
  {
  	QTimer::singleShot(15000, this, SLOT(enableNotifyOnline()));
-@@ -4745,7 +4750,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4744,7 +4749,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  	bool doPopup    = false;
  	bool putToQueue = true;
@@ -1616,7 +1617,7 @@
  	SoundType soundType = eNone;
  
  	// find someone to accept the event
-@@ -4845,8 +4850,15 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4844,8 +4849,15 @@ void PsiAccount::handleEvent(PsiEvent* e
  					c->incomingMessage(m);
  				}
  			}
@@ -1634,7 +1635,7 @@
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
-@@ -4863,7 +4875,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4862,7 +4874,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
@@ -1643,7 +1644,7 @@
  			ChatDlg *c = findChatDialog(e->from());
  			if(!c)
  				c = findChatDialog(e->jid());
-@@ -4903,18 +4915,18 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4902,18 +4914,18 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  			if (putToQueue) {
  				doPopup = true;
@@ -1665,7 +1666,7 @@
  		} // /""
  		else {
  			soundType = eSystem;
-@@ -4931,12 +4943,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4930,12 +4942,12 @@ void PsiAccount::handleEvent(PsiEvent* e
  	else if(e->type() == PsiEvent::File) {
  		soundType = eIncomingFT;
  		doPopup = true;
@@ -1680,7 +1681,7 @@
  	}
  	else if(e->type() == PsiEvent::RosterExchange) {
  		RosterExchangeEvent* re = (RosterExchangeEvent*) e;
-@@ -5011,18 +5023,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5010,18 +5022,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  			r = *(u->priority());
  		}
  
@@ -1707,7 +1708,7 @@
  		emit startBounce();
  	}
  
-@@ -5176,7 +5186,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5175,7 +5185,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
  
  	// FIXME: We shouldn't be doing this kind of stuff here, because this
  	// function is named *queue*Event() not deleteThisMessageSometimes()
@@ -2505,6 +2506,16 @@
  	//delete context;
  	tryDeleteContext(context);
  }
+@@ -222,4 +283,9 @@ void PsiGrowlNotifier::notificationTimed
+ 	tryDeleteContext(context);
+ }
+ 
++bool  PsiGrowlNotifier::isAvailable()
++{
++	return GrowlNotifier::isRunning();
++}
++
+ PsiGrowlNotifier* PsiGrowlNotifier::instance_ = 0;
 --- psi.orig/src/psigrowlnotifier.h
 +++ psi/src/psigrowlnotifier.h
 @@ -26,15 +26,13 @@
@@ -2526,11 +2537,12 @@
  /**
   * An interface for Psi to Growl.
   * This class uses GrowlNotifier to interface with Growl.
-@@ -49,7 +47,8 @@ class PsiGrowlNotifier : public QObject
+@@ -49,7 +47,9 @@ class PsiGrowlNotifier : public QObject
  
  public:
  	static PsiGrowlNotifier* instance();
 -	void popup(PsiAccount* account, PsiPopup::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0);
++	static bool isAvailable();
 +	void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0);
 +	void popup(PsiAccount *account, const Jid &j, const PsiIcon *titleIcon, const QString& titleText, const QString& text);
  
@@ -3002,7 +3014,7 @@
  };
 --- psi.orig/src/src.pri
 +++ psi/src/src.pri
-@@ -165,6 +165,7 @@ HEADERS += \
+@@ -166,6 +166,7 @@ HEADERS += \
  	$$PWD/alerticon.h \
  	$$PWD/alertable.h \
  	$$PWD/psipopup.h \
@@ -3010,7 +3022,7 @@
  	$$PWD/psiapplication.h \
  	$$PWD/filecache.h \
  	$$PWD/avatars.h \
-@@ -308,6 +309,7 @@ SOURCES += \
+@@ -310,6 +311,7 @@ SOURCES += \
  	$$PWD/alerticon.cpp \
  	$$PWD/alertable.cpp \
  	$$PWD/psipopup.cpp \
@@ -3018,7 +3030,7 @@
  	$$PWD/psiapplication.cpp \
  	$$PWD/filecache.cpp \
  	$$PWD/avatars.cpp \
-@@ -628,9 +630,11 @@ psi_plugins {
+@@ -631,9 +633,11 @@ psi_plugins {
  }
  
  dbus {
