@@ -1,5 +1,5 @@
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
 @@ -55,6 +55,8 @@
  #include "serverinfomanager.h"
  #include "applicationinfo.h"
@@ -163,7 +163,16 @@
  }
  
  QString MainWin::numEventsString(int x) const
-@@ -1445,6 +1516,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
+@@ -1423,6 +1494,8 @@ void MainWin::updateTray()
+ 	
+ 	buildTrayMenu();
+ 	d->tray->setContextMenu(d->trayMenu);
++
++	d->tray->iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
+ }
+ 
+ void MainWin::doRecvNextEvent()
+@@ -1445,6 +1518,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
  void MainWin::numAccountsChanged()
  {
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
@@ -171,8 +180,8 @@
  }
  
  void MainWin::accountFeaturesChanged()
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
 @@ -101,7 +101,7 @@ private slots:
  	void buildMainMenu();
  	void buildToolsMenu();
@@ -191,8 +200,8 @@
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
---- git.orig/src/psitrayicon.cpp
-+++ git/src/psitrayicon.cpp
+--- psi.orig/src/psitrayicon.cpp
++++ psi/src/psitrayicon.cpp
 @@ -2,6 +2,7 @@
  #include <QPixmapCache>
  #include <QApplication> // old
@@ -201,30 +210,81 @@
  
  #include "psitrayicon.h"
  #include "iconset.h"
-@@ -20,6 +21,7 @@ PsiTrayIcon::PsiTrayIcon(const QString &
+@@ -13,13 +14,16 @@
+ 
+ PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
+ 	: QObject(parent)
++	, icon_(NULL)
++	, trayicon_(new QSystemTrayIcon())
+ {
+-	icon_ = NULL;
+-	trayicon_ = NULL;
+-	trayicon_ = new QSystemTrayIcon();
++
  	trayicon_->setContextMenu(popup);
  	setToolTip(tip);
  	connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
 +	trayicon_->installEventFilter(this);
++
++	iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
  }
  
  PsiTrayIcon::~PsiTrayIcon()
-@@ -188,3 +190,12 @@ void PsiTrayIcon::animate()
+@@ -35,7 +39,11 @@ void PsiTrayIcon::setContextMenu(QMenu*
+ 
+ void PsiTrayIcon::setToolTip(const QString &str)
+ {
++#ifndef Q_WS_X11
+ 	trayicon_->setToolTip(str);
++#else
++	Q_UNUSED(str)
++#endif
+ }
+ 
+ void PsiTrayIcon::setIcon(const PsiIcon *icon, bool alert)
+@@ -78,6 +86,11 @@ bool PsiTrayIcon::isWMDock()
+ 	return false;
+ }
+ 
++void PsiTrayIcon::iconsetChanged(const QString &iconset)
++{
++	iconset_ = iconset;
++}
++
+ void PsiTrayIcon::show()
+ {
+ 	trayicon_->show();
+@@ -179,7 +192,7 @@ void PsiTrayIcon::animate()
+ 	if ( !icon_ )
+ 		return;
+ 
+-	QString cachedName = "PsiTray/" + PsiOptions::instance()->getOption("options.iconsets.status").toString() + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
++	QString cachedName = "PsiTray/" + iconset_ + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
+ 
+ 	QPixmap p;
+ 	if ( !QPixmapCache::find(cachedName, p) ) {
+@@ -188,3 +201,12 @@ void PsiTrayIcon::animate()
  	}
  	trayicon_->setIcon(p);
  }
 +
 +bool PsiTrayIcon::eventFilter(QObject *obj, QEvent *event)
 +{
-+	if(event->type() == QEvent::ToolTip) {
++	if(obj == trayicon_ && event->type() == QEvent::ToolTip) {
 +		doToolTip(obj, ((QHelpEvent*)event)->globalPos());
 +		return true;
 +	}
-+	return false;
++	return QObject::eventFilter(obj, event);
 +}
---- git.orig/src/psitrayicon.h
-+++ git/src/psitrayicon.h
-@@ -29,6 +29,7 @@ signals:
+--- psi.orig/src/psitrayicon.h
++++ psi/src/psitrayicon.h
+@@ -25,10 +25,13 @@ public:
+ 
+ 	bool isWMDock();
+ 
++	void iconsetChanged(const QString& iconset);
++
+ signals:
  	void clicked(const QPoint &, int);
  	void doubleClicked(const QPoint &);
  	void closed();
@@ -232,7 +292,7 @@
  
  public slots:
  	void show();
-@@ -41,6 +42,7 @@ private slots:
+@@ -41,10 +44,12 @@ private slots:
  protected:
  	QPixmap makeIcon();
  	QRgb pixelBlend(QRgb p1, QRgb p2);
@@ -240,3 +300,8 @@
  
  private:
  	PsiIcon* icon_;
+ 	QSystemTrayIcon* trayicon_;
++	QString iconset_;
+ };
+ 
+ 
