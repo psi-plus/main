@@ -75,7 +75,7 @@
  #include "psiaccount.h"
  #include "contactlistaccountgroup.h"
  #include "accountstatusmenu.h"
-@@ -64,6 +66,7 @@ class ContactListAccountMenu::Private : 
+@@ -64,6 +66,7 @@ class ContactListAccountMenu::Private :
  	QAction* adminUpdateMotdAction_;
  	QAction* adminDeleteMotdAction_;
  	QAction *doGroupChatAction_;
@@ -264,7 +264,7 @@
  	if ( !w )
  		return;
  	
-@@ -101,9 +113,10 @@ void OptionsTabPlugins::loadToggled(int 
+@@ -101,9 +113,10 @@ void OptionsTabPlugins::loadToggled(int
  	
  	QString option=QString("%1.%2")
  		.arg(PluginManager::loadOptionPrefix)
@@ -802,7 +802,7 @@
   * \brief Returns plugin options widget.
   *
   * Always returns null if plugin is not currently loaded.
-@@ -136,21 +184,27 @@ QWidget* PluginHost::optionsWidget() con
+@@ -136,21 +184,29 @@ QWidget* PluginHost::optionsWidget() con
   */
  bool PluginHost::load()
  {
@@ -819,12 +819,14 @@
  	else {
  		if (!loader_) {
  			loader_ = new QPluginLoader(file_);
++			loader_->setLoadHints(QLibrary::ResolveAllSymbolsHint);
  		}
 -	
 +
  		QObject* plugin = loader_->instance();
  		if (!loader_->isLoaded()) {
  			delete loader_;
++			loader_ = 0;
  		}
  		else if (plugin) {
 +#ifndef PLUGINS_NO_DEBUG
@@ -833,7 +835,7 @@
  			//Check it's the right sort of plugin
  			PsiPlugin* psiPlugin = qobject_cast<PsiPlugin*>(plugin);
  			if (psiPlugin) {
-@@ -161,6 +215,12 @@ bool PluginHost::load()
+@@ -161,6 +217,12 @@ bool PluginHost::load()
  				name_ = psiPlugin->name();
  				shortName_ = psiPlugin->shortName();
  				version_ = psiPlugin->version();
@@ -846,15 +848,16 @@
  			} else  {
  				qWarning("Attempted to load %s, but it is not a valid plugin.", qPrintable(file_));
  				if (loader_->isLoaded()) {
-@@ -168,6 +228,7 @@ bool PluginHost::load()
+@@ -168,6 +230,8 @@ bool PluginHost::load()
  					loader_->unload();
  				}
  				delete loader_;
++				loader_ = 0;
 +				valid_ = false;
  			}
  		}
  	}
-@@ -187,20 +248,24 @@ bool PluginHost::load()
+@@ -187,20 +251,24 @@ bool PluginHost::load()
   */
  bool PluginHost::unload()
  {
@@ -885,7 +888,7 @@
  		}	  	
  	}
  	return plugin_ == 0;
-@@ -231,26 +296,135 @@ bool PluginHost::enable()
+@@ -231,26 +299,135 @@ bool PluginHost::enable()
  {
  	if (!enabled_ && load()) {
  		if (!connected_) {
@@ -1022,7 +1025,7 @@
  			connected_ = true;
  		}
  
-@@ -271,7 +445,7 @@ bool PluginHost::enable()
+@@ -271,7 +448,7 @@ bool PluginHost::enable()
  bool PluginHost::disable()
  {
  	if (enabled_) {
@@ -1031,7 +1034,7 @@
  	}
  	return !enabled_;
  }
-@@ -356,6 +530,16 @@ bool PluginHost::incomingXml(int account
+@@ -356,6 +533,16 @@ bool PluginHost::incomingXml(int account
  }
  
  
@@ -1048,7 +1051,7 @@
  //-- for EventFilter ------------------------------------------------
  
  /**
-@@ -365,13 +549,12 @@ bool PluginHost::incomingXml(int account
+@@ -365,13 +552,12 @@ bool PluginHost::incomingXml(int account
   * this will call its processEvent() handler.
   * Handler may then modify the event and may cause the event to be
   * silently discarded.
@@ -1063,7 +1066,7 @@
  {
  	bool handled = false;
  	EventFilter *ef = qobject_cast<EventFilter*>(plugin_);
-@@ -406,6 +589,23 @@ bool PluginHost::processMessage(int acco
+@@ -406,6 +592,23 @@ bool PluginHost::processMessage(int acco
  	return handled;
  }
  
@@ -1087,7 +1090,7 @@
  
  //-- StanzaSender ---------------------------------------------------
  
-@@ -456,7 +656,8 @@ void PluginHost::sendMessage(int account
+@@ -456,7 +659,8 @@ void PluginHost::sendMessage(int account
  	//manager_->sendXml(account, m.toStanza(...).toString());
  
  	//TODO(mck): yeah, that's sick..
@@ -1097,7 +1100,7 @@
  
  }
  
-@@ -471,6 +672,10 @@ QString PluginHost::uniqueId(int account
+@@ -471,6 +675,10 @@ QString PluginHost::uniqueId(int account
  	return manager_->uniqueId(account);
  }
  
@@ -1108,7 +1111,7 @@
  
  //-- IqFilter -------------------------------------------------------
  
-@@ -494,7 +699,9 @@ QString PluginHost::uniqueId(int account
+@@ -494,7 +702,9 @@ QString PluginHost::uniqueId(int account
  void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filter)
  {
  	if (iqNsFilters_.values(ns).contains(filter)) {
@@ -1119,7 +1122,7 @@
  	} else {
  		iqNsFilters_.insert(ns, filter);
  	}
-@@ -519,9 +726,13 @@ void PluginHost::addIqNamespaceFilter(co
+@@ -519,9 +729,13 @@ void PluginHost::addIqNamespaceFilter(co
   */
  void PluginHost::addIqNamespaceFilter(const QRegExp &ns, IqNamespaceFilter *filter)
  {
@@ -1134,7 +1137,7 @@
  	} else {
  		iqNsxFilters_.insert(ns, filter);
  	}
-@@ -570,9 +781,8 @@ void PluginHost::setPluginOption( const 
+@@ -570,9 +784,8 @@ void PluginHost::setPluginOption( const
  	//
  	//if (!plugin)
  	//	return;
@@ -1146,7 +1149,7 @@
  }
  
  /**
-@@ -585,9 +795,11 @@ void PluginHost::setPluginOption( const 
+@@ -585,9 +798,11 @@ void PluginHost::setPluginOption( const
   * \param  option Option to set
   * \param value Return value
   */
@@ -1160,7 +1163,7 @@
  }
  
  /**
-@@ -616,6 +828,435 @@ QVariant PluginHost::getGlobalOption(con
+@@ -616,6 +831,435 @@ QVariant PluginHost::getGlobalOption(con
  	return PsiOptions::instance()->getOption(option);
  }
  
@@ -1865,9 +1868,10 @@
 -void PluginManager::updatePluginsList()
 +QList<PluginHost*> PluginManager::updatePluginsList()
  {
+-	foreach (QString d, pluginDirs()) {
 +	QList<PluginHost*> newPlugins;
 +
- 	foreach (QString d, pluginDirs()) {
++	foreach (const QString& d, pluginDirs()) {
  		QDir dir(d);
 -		foreach (QString file, dir.entryList()) {
 +		foreach (QString file, dir.entryList(QDir::Files)) {
@@ -1997,7 +2001,7 @@
  }
  
  /**
-@@ -160,7 +229,9 @@ void PluginManager::optionChanged(const 
+@@ -160,7 +229,9 @@ void PluginManager::optionChanged(const
   */ 
  void PluginManager::loadAllPlugins()
  {
@@ -2673,7 +2677,7 @@
  const QString PluginManager::pluginOptionPrefix = "plugins.options";
 --- psi.orig/src/pluginmanager.h
 +++ psi/src/pluginmanager.h
-@@ -11,12 +11,14 @@
+@@ -11,12 +11,16 @@
  #include <QMap>
  #include <QHash>
  #include <QDomElement>
@@ -2685,10 +2689,12 @@
  class PsiPlugin;
  class PluginHost;
 +class PsiCon;
++
++#define PLUGINS_NO_DEBUG
  
  namespace XMPP {
  	class Client;
-@@ -33,29 +35,48 @@ class PluginManager : public QObject
+@@ -33,29 +37,48 @@ class PluginManager : public QObject
  
  public:
  	static PluginManager* instance();
@@ -2745,7 +2751,7 @@
  
  	static PluginManager* instance_;
  
-@@ -63,26 +84,70 @@ private:
+@@ -63,26 +86,70 @@ private:
  	QVector<XMPP::Client*> clients_;
  
  	//account, account id
@@ -4001,13 +4007,3 @@
  // normal, chat, error, headline, etc
  class MessageEvent : public PsiEvent
  {
---- psi.orig/src/src.pro
-+++ psi/src/src.pro
-@@ -166,3 +166,7 @@ mac {
- 	RC_FILE = ../mac/application.icns
- 	QMAKE_POST_LINK = cp -R ../certs ../iconsets ../sound `dirname $(TARGET)`/../Resources ; echo "APPLpsi " > `dirname $(TARGET)`/../PkgInfo
- }
-+
-+release {
-+        DEFINES += PLUGINS_NO_DEBUG
-+}
