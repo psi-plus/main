@@ -28,3 +28,29 @@
  }
  
  bool AtomicXmlFile::loadDocument(QDomDocument* doc, QString fileName) const
+--- psi.orig/src/libpsi/tools/atomicxmlfile/atomicxmlfile.h
++++ psi/src/libpsi/tools/atomicxmlfile/atomicxmlfile.h
+@@ -60,10 +60,9 @@ public:
+ 			return false;
+ 		}
+ 
+-		if (QFile::exists(backupFileName()))
+-			QFile::remove(backupFileName());
+-
+ 		if (QFile::exists(fileName_)) {
++			if (QFile::exists(backupFileName()))
++				QFile::remove(backupFileName());
+ 			if (!QFile::rename(fileName_, backupFileName())) {
+ 				qWarning("AtomicXmlFile::saveDocument(): Unable to rename '%s' to '%s'.",
+ 				         qPrintable(fileName_), qPrintable(backupFileName()));
+@@ -91,6 +90,10 @@ public:
+ 			if (loadDocument(reader, fileName)) {
+ 				return true;
+ 			}
++			if (QFile::exists(fileName)) {
++				// The file exists, but it is incorrect. Remove it. Otherwise, enter the backup.
++				QFile::remove(fileName);
++			}
+ 		}
+ 
+ 		return false;
