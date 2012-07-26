@@ -1,27 +1,9 @@
---- git.orig/src/applicationinfo.cpp
-+++ git/src/applicationinfo.cpp
-@@ -32,11 +32,15 @@
- // place (like an external file loaded through the resources system)
- // Should also be overridable through an optional file.
- 
--#define PROG_NAME "Psi"
--#define PROG_VERSION "0.15-dev" " (" __DATE__ ")" //CVS Builds are dated
-+#define PROG_NAME "Psi+"
-+#ifdef WEBKIT
-+#define PROG_VERSION "0.15.xxx-webkit" " (" __DATE__ ")" //CVS Builds are dated
-+#else
-+#define PROG_VERSION "0.15.xxx" " (" __DATE__ ")" //CVS Builds are dated
-+#endif
- //#define PROG_VERSION "0.15";
--#define PROG_CAPS_NODE "http://psi-im.org/caps"
--#define PROG_CAPS_VERSION "caps-b75d8d2b25"
-+#define PROG_CAPS_NODE "http://psi-dev.googlecode.com/caps"
-+#define PROG_CAPS_VERSION "0.15"
- #define PROG_IPC_NAME "org.psi-im.Psi"	// must not contain '\\' character on Windows
- #define PROG_OPTIONS_NS "http://psi-im.org/options"
- #define PROG_STORAGE_NS "http://psi-im.org/storage"
---- psi.orig/psi.desktop
-+++ psi/psi.desktop
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/psi.desktop b/psi.desktop
+index 23a13f9..d4a8de1 100644
+--- a/psi.desktop
++++ b/psi.desktop
 @@ -5,8 +5,8 @@ Type=Application
  Name=Psi+
  GenericName=Jabber Client
@@ -33,8 +15,10 @@
  MimeType=x-scheme-handler/xmpp;
  Terminal=false
  Categories=Network;InstantMessaging;Qt;
---- psi.orig/qcm/certstore.qcm
-+++ psi/qcm/certstore.qcm
+diff --git a/qcm/certstore.qcm b/qcm/certstore.qcm
+index cb45690..a501386 100644
+--- a/qcm/certstore.qcm
++++ b/qcm/certstore.qcm
 @@ -73,10 +73,10 @@ public:
  			if(QFile::exists(conf->getenv("PREFIX") + "/certs/rootcerts.pem"))
  				path = "$$PREFIX/certs/rootcerts.pem";
@@ -48,29 +32,55 @@
  			"qcasharedfiles.files = third-party/qca/qca/certs\n"
  			"INSTALLS += qcasharedfiles\n";
  			conf->addExtra(extra);
---- psi.orig/qcm/conf.qcm
-+++ psi/qcm/conf.qcm
-@@ -20,14 +20,14 @@ public:
- 		conf->addExtra("CONFIG += QuickDirtyChecker");
- 		return true;
- #else
+diff --git a/qcm/conf.qcm b/qcm/conf.qcm
+index e8dd8b7..93dd273 100644
+--- a/qcm/conf.qcm
++++ b/qcm/conf.qcm
+@@ -71,16 +71,16 @@ public:
+ 		psiGenerateFile("mac/Info.plist.in", "mac/Info.plist", vars);
+ 
+ #ifndef Q_OS_WIN
 -		conf->addExtra(QString("PSI_LIBDIR=%1/psi").arg(conf->getenv("LIBDIR")));
 -		conf->addExtra(QString("PSI_DATADIR=%1/psi").arg(conf->getenv("DATADIR")));
 +		conf->addExtra(QString("PSI_LIBDIR=%1/psi-plus").arg(conf->getenv("LIBDIR")));
 +		conf->addExtra(QString("PSI_DATADIR=%1/psi-plus").arg(conf->getenv("DATADIR")));
+ #endif
  
  		QFile file("src/config.h");
  		if ( file.open(QIODevice::WriteOnly | QIODevice::Text) ) {
  			QTextStream stream( &file );
+ #ifndef Q_OS_WIN
 -			stream << "#define PSI_LIBDIR \"" << conf->getenv("LIBDIR") << "/psi\"" << endl;
 -			stream << "#define PSI_DATADIR \"" << conf->getenv("DATADIR") << "/psi\"" << endl;
 +			stream << "#define PSI_LIBDIR \"" << conf->getenv("LIBDIR") << "/psi-plus\"" << endl;
 +			stream << "#define PSI_DATADIR \"" << conf->getenv("DATADIR") << "/psi-plus\"" << endl;
+ #endif
+ 			stream << "#define PSI_VERSION \"" << version << "\"" << endl;
  		}
+diff --git a/src/applicationinfo.cpp b/src/applicationinfo.cpp
+index 002a7db..37beede 100644
+--- a/src/applicationinfo.cpp
++++ b/src/applicationinfo.cpp
+@@ -35,12 +35,12 @@
+ // place (like an external file loaded through the resources system)
+ // Should also be overridable through an optional file.
  
- 		conf->addDefine("HAVE_CONFIG");
---- psi.orig/src/homedirmigration.ui
-+++ psi/src/homedirmigration.ui
+-#define PROG_NAME "Psi"
++#define PROG_NAME "Psi+"
+ #define PROG_VERSION PSI_VERSION
+ //#define PROG_VERSION "0.15-dev" " (" __DATE__ ")" //CVS Builds are dated
+ //#define PROG_VERSION "0.15";
+-#define PROG_CAPS_NODE "http://psi-im.org/caps"
+-#define PROG_CAPS_VERSION "caps-b75d8d2b25"
++#define PROG_CAPS_NODE "http://psi-dev.googlecode.com/caps"
++#define PROG_CAPS_VERSION "0.15"
+ #define PROG_IPC_NAME "org.psi-im.Psi"	// must not contain '\\' character on Windows
+ #define PROG_OPTIONS_NS "http://psi-im.org/options"
+ #define PROG_STORAGE_NS "http://psi-im.org/storage"
+diff --git a/src/homedirmigration.ui b/src/homedirmigration.ui
+index 16dee3d..9b766de 100644
+--- a/src/homedirmigration.ui
++++ b/src/homedirmigration.ui
 @@ -43,7 +43,7 @@ p, li { white-space: pre-wrap; }
  &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
  p, li { white-space: pre-wrap; }
@@ -89,8 +99,10 @@
       </property>
       <property name="text">
        <string>Create new profile</string>
---- psi.orig/src/plugins/psiplugin.pri
-+++ psi/src/plugins/psiplugin.pri
+diff --git a/src/plugins/psiplugin.pri b/src/plugins/psiplugin.pri
+index 5d691f3..dc3bba2 100644
+--- a/src/plugins/psiplugin.pri
++++ b/src/plugins/psiplugin.pri
 @@ -2,7 +2,7 @@ TEMPLATE = lib
  CONFIG += plugin
  QT += xml
@@ -100,8 +112,10 @@
  INSTALLS += target
  
  include(plugins.pri)
---- psi.orig/src/src.pro
-+++ psi/src/src.pro
+diff --git a/src/src.pro b/src/src.pro
+index 71d03cf..0ebe6a6 100644
+--- a/src/src.pro
++++ b/src/src.pro
 @@ -4,7 +4,7 @@
  
  # Configuration
