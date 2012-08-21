@@ -211,11 +211,12 @@
  }
  
  QWidget *OptionsTabEvents::widget()
-@@ -105,16 +105,6 @@ void OptionsTabEvents::applyOptions()
+@@ -105,17 +105,7 @@ void OptionsTabEvents::applyOptions()
  	PsiOptions::instance()->setOption("options.subscriptions.automatically-allow-authorization", d->ck_autoAuth->isChecked());
  	PsiOptions::instance()->setOption("options.ui.notifications.successful-subscription", d->ck_notifyAuth->isChecked());
  	PsiOptions::instance()->setOption("options.ui.notifications.bounce-dock", d->cb_bounce->itemData( d->cb_bounce->currentIndex()));
 -
+ 	PsiOptions::instance()->setOption("options.ui.notifications.enable-growl", d->ck_growl->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.enabled", d->ck_popupOn->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-message", d->ck_popupOnMessage->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.showMessage", d->ck_showPopupMessage->isChecked());
@@ -229,9 +230,9 @@
  
  void OptionsTabEvents::restoreOptions()
 @@ -134,12 +124,4 @@ void OptionsTabEvents::restoreOptions()
- 	d->ck_autoAuth->setChecked( PsiOptions::instance()->getOption("options.subscriptions.automatically-allow-authorization").toBool() );
  	d->ck_notifyAuth->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.successful-subscription").toBool() );
  	d->cb_bounce->setCurrentIndex( d->cb_bounce->findData(PsiOptions::instance()->getOption("options.ui.notifications.bounce-dock").toString()) );
+ 	d->ck_growl->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool() );
 -	d->ck_popupOn->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.enabled").toBool() );
 -	d->ck_popupOnMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool() || PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool() );
 -	d->ck_showPopupMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool());
@@ -334,9 +335,9 @@
   </widget>
   <layoutdefault spacing="6" margin="11" />
 @@ -281,31 +207,6 @@
-   <tabstop>ck_notifyAuth</tabstop>
    <tabstop>cb_bounce</tabstop>
    <tabstop>cb_animation</tabstop>
+   <tabstop>ck_growl</tabstop>
 -  <tabstop>ck_popupOn</tabstop>
 -  <tabstop>ck_popupOnMessage</tabstop>
 -  <tabstop>ck_popupOnHeadline</tabstop>
@@ -2289,11 +2290,10 @@
 +#endif
 --- psi.orig/src/psigrowlnotifier.cpp
 +++ psi/src/psigrowlnotifier.cpp
-@@ -33,6 +33,8 @@
- #include "psigrowlnotifier.h"
+@@ -34,6 +34,7 @@
  #include "psievent.h"
  #include "userlist.h"
-+#include "psioptions.h"
+ #include "psioptions.h"
 +#include "textutil.h"
  
  /**
@@ -2337,13 +2337,17 @@
  }
  
  
-@@ -106,79 +111,126 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
+@@ -106,83 +111,130 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
   * \param uli The originating userlist item. Can be NULL.
   * \param event The originating event. Can be NULL.
   */
 -void PsiGrowlNotifier::popup(PsiAccount* account, PsiPopup::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
 +void PsiGrowlNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
  {
+ 	// if growl is explicitly disabled from within psi then don't send
+ 	if(!PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool())
+ 		return;
+ 
  	QString name;
  	QString title, desc, contact;
  	QString statusTxt = status2txt(makeSTATUS(r.status()));
