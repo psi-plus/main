@@ -1,6 +1,6 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -397,6 +397,7 @@ QLineEdit#le_status_text {
+@@ -397,10 +397,10 @@ QLineEdit#le_status_text {
  			</look>
  			<notifications>
  				<alert-style type="QString">animate</alert-style>
@@ -8,7 +8,11 @@
  				<bounce-dock type="QString">forever</bounce-dock>
  				<send-receipts type="bool" >true</send-receipts>
  				<request-receipts type="bool" >true</request-receipts>
-@@ -406,6 +407,7 @@ QLineEdit#le_status_text {
+-				<enable-growl type="bool">true</enable-growl>
+ 				<passive-popups>
+ 					<delays>
+ 						<chat type="int">5000</chat>
+@@ -406,6 +406,7 @@ QLineEdit#le_status_text {
  						<chat type="int">5000</chat>
  						<file type="int">5000</file>
  						<message type="int">5000</message>
@@ -16,7 +20,7 @@
  						<status type="int">2000</status>
  					</delays>
  					<enabled type="bool">false</enabled>
-@@ -413,13 +415,20 @@ QLineEdit#le_status_text {
+@@ -413,13 +414,20 @@ QLineEdit#le_status_text {
  					<at-left-corner type="bool">false</at-left-corner>
  					<css type="QString"></css>
  					<incoming-chat type="bool">true</incoming-chat>
@@ -37,7 +41,7 @@
  					<status>
  						<offline type="bool">true</offline>
  						<online type="bool">true</online>
-@@ -631,6 +640,7 @@ QLineEdit#le_status_text {
+@@ -631,6 +639,7 @@ QLineEdit#le_status_text {
  			<ignore-non-roster-contacts type="bool">false</ignore-non-roster-contacts>
  			<send-composing-events type="bool">true</send-composing-events>
  			<send-inactivity-events type="bool">false</send-inactivity-events>
@@ -211,12 +215,24 @@
  }
  
  QWidget *OptionsTabEvents::widget()
-@@ -110,17 +110,7 @@ void OptionsTabEvents::applyOptions()
+@@ -79,11 +79,6 @@ QWidget *OptionsTabEvents::widget()
+ 	d->cb_bounce->hide();
+ 	d->lb_bounce->hide();
+ #endif
+-
+-#if !defined(Q_WS_MAC) || !defined(HAVE_GROWL)
+-	d->ck_growl->hide();
+-#endif
+-
+ /*
+ 	list_alerts.insert(0,d->rb_aSolid);
+ 	list_alerts.insert(1,d->rb_aBlink);
+@@ -110,17 +105,6 @@ void OptionsTabEvents::applyOptions()
  	PsiOptions::instance()->setOption("options.subscriptions.automatically-allow-authorization", d->ck_autoAuth->isChecked());
  	PsiOptions::instance()->setOption("options.ui.notifications.successful-subscription", d->ck_notifyAuth->isChecked());
  	PsiOptions::instance()->setOption("options.ui.notifications.bounce-dock", d->cb_bounce->itemData( d->cb_bounce->currentIndex()));
 -
- 	PsiOptions::instance()->setOption("options.ui.notifications.enable-growl", d->ck_growl->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.notifications.enable-growl", d->ck_growl->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.enabled", d->ck_popupOn->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.incoming-message", d->ck_popupOnMessage->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.notifications.passive-popups.showMessage", d->ck_showPopupMessage->isChecked());
@@ -229,10 +245,11 @@
  }
  
  void OptionsTabEvents::restoreOptions()
-@@ -141,12 +131,4 @@ void OptionsTabEvents::restoreOptions()
+@@ -140,13 +124,4 @@ void OptionsTabEvents::restoreOptions()
+ 	d->ck_autoAuth->setChecked( PsiOptions::instance()->getOption("options.subscriptions.automatically-allow-authorization").toBool() );
  	d->ck_notifyAuth->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.successful-subscription").toBool() );
  	d->cb_bounce->setCurrentIndex( d->cb_bounce->findData(PsiOptions::instance()->getOption("options.ui.notifications.bounce-dock").toString()) );
- 	d->ck_growl->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool() );
+-	d->ck_growl->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool() );
 -	d->ck_popupOn->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.enabled").toBool() );
 -	d->ck_popupOnMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool() || PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool() );
 -	d->ck_showPopupMessage->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool());
@@ -253,10 +270,20 @@
     </rect>
    </property>
    <property name="windowTitle" >
-@@ -202,80 +202,6 @@
-      </property>
-     </widget>
+@@ -193,90 +193,6 @@
+      </item>
+     </layout>
     </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_growl" >
+-     <property name="text" >
+-      <string>Enable Growl notifications</string>
+-     </property>
+-     <property name="checked" >
+-      <bool>true</bool>
+-     </property>
+-    </widget>
+-   </item>
 -   <item>
 -    <widget class="QCheckBox" name="ck_popupOn" >
 -     <property name="text" >
@@ -334,10 +361,11 @@
    </layout>
   </widget>
   <layoutdefault spacing="6" margin="11" />
-@@ -292,31 +218,6 @@
+@@ -292,32 +208,6 @@
+   <tabstop>ck_notifyAuth</tabstop>
    <tabstop>cb_bounce</tabstop>
    <tabstop>cb_animation</tabstop>
-   <tabstop>ck_growl</tabstop>
+-  <tabstop>ck_growl</tabstop>
 -  <tabstop>ck_popupOn</tabstop>
 -  <tabstop>ck_popupOnMessage</tabstop>
 -  <tabstop>ck_popupOnHeadline</tabstop>
@@ -2337,16 +2365,17 @@
  }
  
  
-@@ -107,7 +111,7 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
+@@ -107,83 +111,126 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
   * \param uli The originating userlist item. Can be NULL.
   * \param event The originating event. Can be NULL.
   */
 -void PsiGrowlNotifier::popup(PsiAccount* account, PsiPopup::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
 +void PsiGrowlNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
  {
- 	// if growl is explicitly disabled from within psi then don't send
- 	if(!PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool())
-@@ -116,74 +120,121 @@ void PsiGrowlNotifier::popup(PsiAccount*
+-	// if growl is explicitly disabled from within psi then don't send
+-	if(!PsiOptions::instance()->getOption("options.ui.notifications.enable-growl").toBool())
+-		return;
+-
  	QString name;
  	QString title, desc, contact;
  	QString statusTxt = status2txt(makeSTATUS(r.status()));
@@ -2484,7 +2513,7 @@
  	}
  
  	// Notify Growl
-@@ -191,6 +242,14 @@ void PsiGrowlNotifier::popup(PsiAccount*
+@@ -191,6 +238,14 @@ void PsiGrowlNotifier::popup(PsiAccount*
  	gn_->notify(name, title, desc, icon, false, this, SLOT(notificationClicked(void*)), SLOT(notificationTimedOut(void*)), context);
  }
  
@@ -2499,7 +2528,7 @@
  void PsiGrowlNotifier::cleanup()
  {
  	// try to keep the garbage bin no larger than 50 entries
-@@ -215,7 +274,8 @@ void PsiGrowlNotifier::tryDeleteContext(
+@@ -215,7 +270,8 @@ void PsiGrowlNotifier::tryDeleteContext(
  void PsiGrowlNotifier::notificationClicked(void* c)
  {
  	NotificationContext* context = (NotificationContext*) c;
@@ -2509,7 +2538,7 @@
  	//delete context;
  	tryDeleteContext(context);
  }
-@@ -227,4 +287,9 @@ void PsiGrowlNotifier::notificationTimed
+@@ -227,4 +283,9 @@ void PsiGrowlNotifier::notificationTimed
  	tryDeleteContext(context);
  }
  
