@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -114,6 +114,11 @@
  				<scaled-message-icons type="bool">false</scaled-message-icons>
  				<warn-before-clear type="bool">true</warn-before-clear>
@@ -24,7 +24,7 @@
  				<use-transport-icons type="bool">true</use-transport-icons>
  				<saved-window-geometry type="QRect" >
  					<x>64</x>
-@@ -356,7 +361,7 @@
+@@ -357,7 +362,7 @@
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">true</use-tabs>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
@@ -32,9 +32,9 @@
 +				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
  				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
  				<tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
- 			</tabs>
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+ 				<use-tab-shortcuts type="bool">true</use-tab-shortcuts>
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
 @@ -35,6 +35,7 @@
  #include <QVBoxLayout>
  #include <QMenu>
@@ -205,7 +205,7 @@
 -	QMenu* viewMenu = new QMenu(tr("View"), this);
  	mainMenuBar()->addMenu(viewMenu);
  	d->getAction("show_offline")->addTo(viewMenu);
-	// if (PsiOptions::instance()->getOption("options.ui.menu.view.show-away").toBool()) {
+ 	// if (PsiOptions::instance()->getOption("options.ui.menu.view.show-away").toBool()) {
 @@ -461,9 +520,22 @@ MainWin::~MainWin()
  	}
  
@@ -318,8 +318,8 @@
 +}
 +
  //#endif
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+--- psi.orig/src/mainwin.h
++++ psi/src/mainwin.h
 @@ -72,7 +72,9 @@ public:
  
  protected:
@@ -338,8 +338,8 @@
  
  public slots:
  	void setWindowIcon(const QPixmap&);
---- git.orig/src/options/opt_chat.cpp
-+++ git/src/options/opt_chat.cpp
+--- psi.orig/src/options/opt_chat.cpp
++++ psi/src/options/opt_chat.cpp
 @@ -136,12 +136,15 @@ void OptionsTabChat::applyOptions()
  		case 3:
  			tabGrouping = "CM";
@@ -358,7 +358,7 @@
  		}
  	}
  	
-@@ -186,16 +189,18 @@ void OptionsTabChat::restoreOptions()
+@@ -188,16 +191,18 @@ void OptionsTabChat::restoreOptions()
  		d->cb_tabGrouping->setCurrentIndex(2);
  	} else if (tabGrouping == "CM") {
  		d->cb_tabGrouping->setCurrentIndex(3);
@@ -380,9 +380,9 @@
 +		d->cb_tabGrouping->removeItem(5);
  	}
  	d->ck_autoResize->setChecked( PsiOptions::instance()->getOption("options.ui.chat.use-expanding-line-edit").toBool() );
- 	QString delafter = PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString();
---- git.orig/src/options/opt_chat.ui
-+++ git/src/options/opt_chat.ui
+ 	d->ck_tabShortcuts->setChecked( PsiOptions::instance()->getOption("options.ui.tabs.use-tab-shortcuts").toBool() );
+--- psi.orig/src/options/opt_chat.ui
++++ psi/src/options/opt_chat.ui
 @@ -92,6 +92,11 @@
           <string>for mucs and chats in one window</string>
          </property>
@@ -395,9 +395,9 @@
         <item>
          <property name="text" >
           <string>[customized]</string>
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
-@@ -1270,7 +1270,8 @@ void PsiCon::optionChanged(const QString
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -1300,7 +1300,8 @@ void PsiCon::optionChanged(const QString
  		alertIconUpdateAlertStyle();
  	}
  
@@ -407,8 +407,8 @@
  		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
  		notifyRestart = false;
  	}
---- git.orig/src/psicon.h
-+++ git/src/psicon.h
+--- psi.orig/src/psicon.h
++++ psi/src/psicon.h
 @@ -48,6 +48,7 @@ class QThread;
  class PsiActionList;
  class PsiToolBar;
@@ -417,8 +417,8 @@
  class AccountsComboBox;
  class ChatDlg;
  class AlertManager;
---- git.orig/src/psitoolbar.cpp
-+++ git/src/psitoolbar.cpp
+--- psi.orig/src/psitoolbar.cpp
++++ psi/src/psitoolbar.cpp
 @@ -54,7 +54,7 @@ Qt::ToolBarArea dockPositionToToolBarAre
  	return Qt::NoToolBarArea;
  }
@@ -459,8 +459,8 @@
  	}
  
  	updateVisibility();
---- git.orig/src/psitoolbar.h
-+++ git/src/psitoolbar.h
+--- psi.orig/src/psitoolbar.h
++++ psi/src/psitoolbar.h
 @@ -35,11 +35,12 @@ class PsiToolBar : public QToolBar
  	Q_OBJECT
  
@@ -475,11 +475,11 @@
  
  	static void structToOptions(PsiOptions* options, const ToolbarPrefs& s);
  
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -195,7 +195,8 @@ TabDlg::TabDlg(TabManager* tabManager, c
- 		addAction(action);
- 	}
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -185,7 +185,8 @@ TabDlg::TabDlg(TabManager* tabManager, c
+ 
+ 	setShortcuts();
  
 -	setGeometryOptionPath(geometryOption);
 +	if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
@@ -487,7 +487,7 @@
  }
  
  TabDlg::~TabDlg()
-@@ -473,7 +474,7 @@ void TabDlg::selectTab(TabbableWidget* c
+@@ -484,7 +485,7 @@ void TabDlg::selectTab(TabbableWidget* c
  
  void TabDlg::checkHasChats()
  {
