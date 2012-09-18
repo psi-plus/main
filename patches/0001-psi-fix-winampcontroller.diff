@@ -8,16 +8,20 @@
  
  #ifdef Q_CC_MSVC
  #pragma warning(push)
-@@ -45,13 +44,14 @@
+@@ -41,17 +40,18 @@
+  * \brief A controller for WinAmp.
+  */
+
++static const int normInterval = 3000;
++static const int antiscrollInterval = 100;
+
  /**
   * \brief Constructs the controller.
   */
 -WinAmpController::WinAmpController() : TuneController()
 +WinAmpController::WinAmpController()
 +: PollingTuneController(),
-+  norminterval_(3000),
-+  antiscrollinterval_(100),
-+  antiscrollcounter_(0)
++  antiscrollCounter_(0)
  {
 -	connect(&timer_, SIGNAL(timeout()), SLOT(check()));
 -	norminterval_ = 3000;
@@ -25,7 +29,7 @@
 -	antiscrollcounter_ = 0;
 -	timer_.start(norminterval_);
 +	startPoll();
-+	setInterval(norminterval_);
++	setInterval(normInterval);
  }
  
  template <typename char_type> const size_t length (const char_type * begin)
@@ -38,7 +42,7 @@
  {
  	TCHAR waTitle[2048];
  	QString title;
-@@ -156,39 +156,42 @@ void WinAmpController::check()
+@@ -156,41 +156,44 @@ void WinAmpController::check()
  #else
  	HWND h = FindWindow("Winamp v1.x", NULL);
  #endif
@@ -62,23 +66,22 @@
 +	if (h && SendMessage(h, WM_WA_IPC, 0, IPC_ISPLAYING) == 1) {
 +		tune = getTune(h);
  	}
++	if (prevTune_ != tune) {
++		prevTune_ = tune;
++	}
++	setInterval(normInterval);
++	PollingTuneController::check();
++}
+
 -
 -
--
- 	if (prev_tune_ != tune) {
- 		prev_tune_ = tune;
+-	if (prev_tune_ != tune) {
+-		prev_tune_ = tune;
 -		if (tune.isNull()) {
 -			emit stopped();
 -		}
 -		else {
 -			emit playing(tune);
--		}
- 	}
--	timer_.start(norminterval_);
-+	setInterval(norminterval_);
-+	PollingTuneController::check();
- }
- 
 +Tune WinAmpController::getTune(const HWND &hWnd)
 +{
 +	Tune tune = Tune();
@@ -88,29 +91,34 @@
 +			QPair<bool, QString> trackpair(getTrackTitle(hWnd));
 +			if (!trackpair.first) {
 +				// getTrackTitle wants us to retry in a few ms...
-+				int interval = antiscrollinterval_;
-+				if (++antiscrollcounter_ > 10) {
-+					antiscrollcounter_ = 0;
-+					interval = norminterval_;
++				int interval = antiscrollInterval;
++				if (++antiscrollCounter_ > 10) {
++					antiscrollCounter_ = 0;
++					interval = normInterval;
 +				}
 +				setInterval(interval);
 +				return Tune();
 +			}
-+			antiscrollcounter_ = 0;
++			antiscrollCounter_ = 0;
 +			tune.setName(trackpair.second);
 +			tune.setURL(trackpair.second);
 +			tune.setTrack(QString::number(position + 1));
 +			tune.setTime(SendMessage(hWnd, WM_WA_IPC, 1, IPC_GETOUTPUTTIME));
-+		}
-+	}
+ 		}
+ 	}
+-	timer_.start(norminterval_);
 +	return tune;
-+}
+ }
  
+-
  Tune WinAmpController::currentTune() const
  {
+-	return prev_tune_;
++	return prevTune_;
+ }
 --- git.orig/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
 +++ git/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
-@@ -21,27 +21,27 @@
+@@ -21,29 +21,28 @@
  #ifndef WINAMPCONTROLLER_H
  #define WINAMPCONTROLLER_H
  
@@ -138,18 +146,22 @@
  	void check();
  
  private:
- 	Tune prev_tune_;
+-	Tune prev_tune_;
 -	QTimer timer_;
- 	int norminterval_, antiscrollinterval_;
- 	int antiscrollcounter_;
+-	int norminterval_, antiscrollinterval_;
+-	int antiscrollcounter_;
++	Tune prevTune_;
++	int antiscrollCounter_;
  };
+ 
+ #endif
 --- git.orig/src/tools/tunecontroller/pollingtunecontroller.h
 +++ git/src/tools/tunecontroller/pollingtunecontroller.h
 @@ -38,6 +38,7 @@ public:
  	inline bool isPolling() const { return _timer.isActive(); }
  	inline void startPoll() { _timer.start(DefaultInterval); }
  	inline void stopPoll() { _timer.stop(); }
-+	inline void setInterval(const int &interval) { _timer.setInterval(interval); }
++	inline void setInterval(int interval) { _timer.setInterval(interval); }
  
  protected slots:
  	virtual void check();

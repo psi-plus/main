@@ -2078,18 +2078,18 @@
 - * \brief A controller for WinAmp.
 - */
 -
+-static const int normInterval = 3000;
+-static const int antiscrollInterval = 100;
 -
 -/**
 - * \brief Constructs the controller.
 - */
 -WinAmpController::WinAmpController()
 -: PollingTuneController(),
--  norminterval_(3000),
--  antiscrollinterval_(100),
--  antiscrollcounter_(0)
+-  antiscrollCounter_(0)
 -{
 -	startPoll();
--	setInterval(norminterval_);
+-	setInterval(normInterval);
 -}
 -
 -template <typename char_type> const size_t length (const char_type * begin)
@@ -2197,10 +2197,10 @@
 -	if (h && SendMessage(h, WM_WA_IPC, 0, IPC_ISPLAYING) == 1) {
 -		tune = getTune(h);
 -	}
--	if (prev_tune_ != tune) {
--		prev_tune_ = tune;
+-	if (prevTune_ != tune) {
+-		prevTune_ = tune;
 -	}
--	setInterval(norminterval_);
+-	setInterval(normInterval);
 -	PollingTuneController::check();
 -}
 -
@@ -2213,15 +2213,15 @@
 -			QPair<bool, QString> trackpair(getTrackTitle(hWnd));
 -			if (!trackpair.first) {
 -				// getTrackTitle wants us to retry in a few ms...
--				int interval = antiscrollinterval_;
--				if (++antiscrollcounter_ > 10) {
--					antiscrollcounter_ = 0;
--					interval = norminterval_;
+-				int interval = antiscrollInterval;
+-				if (++antiscrollCounter_ > 10) {
+-					antiscrollCounter_ = 0;
+-					interval = normInterval;
 -				}
 -				setInterval(interval);
 -				return Tune();
 -			}
--			antiscrollcounter_ = 0;
+-			antiscrollCounter_ = 0;
 -			tune.setName(trackpair.second);
 -			tune.setURL(trackpair.second);
 -			tune.setTrack(QString::number(position + 1));
@@ -2233,11 +2233,11 @@
 -
 -Tune WinAmpController::currentTune() const
 -{
--	return prev_tune_;
+-	return prevTune_;
 -}
 --- git.orig/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
 +++ git/src/tools/tunecontroller/plugins/winamp/winampcontroller.h
-@@ -1,49 +0,0 @@
+@@ -1,48 +0,0 @@
 -/*
 - * winampcontroller.h
 - * Copyright (C) 2006  Remko Troncon
@@ -2281,9 +2281,8 @@
 -	void check();
 -
 -private:
--	Tune prev_tune_;
--	int norminterval_, antiscrollinterval_;
--	int antiscrollcounter_;
+-	Tune prevTune_;
+-	int antiscrollCounter_;
 -};
 -
 -#endif
@@ -2401,6 +2400,8 @@
 +#define TAGSIZE 100
 +#define FILENAMESIZE 512
 +
++static const int normInterval = 3000;
++static const int antiscrollInterval = 100;
 +const wchar_t *ALBUM_KEY = L"album";
 +const wchar_t *ARTIST_KEY = L"artist";
 +const wchar_t *TITLE_KEY = L"title";
@@ -2416,12 +2417,10 @@
 + */
 +WinAmpController::WinAmpController()
 +: PollingTuneController(),
-+  norminterval_(3000),
-+  antiscrollinterval_(100),
-+  antiscrollcounter_(0)
++  antiscrollCounter_(0)
 +{
 +	startPoll();
-+	setInterval(norminterval_);
++	setInterval(normInterval);
 +}
 +
 +template <typename char_type> const size_t length (const char_type * begin)
@@ -2441,10 +2440,10 @@
 +	if (winamp && SendMessage(winamp, WM_WA_IPC, 0, IPC_ISPLAYING) == 1) {
 +		tune = getTune(winamp);
 +	}
-+	if (prev_tune_ != tune) {
-+		prev_tune_ = tune;
++	if (prevTune_ != tune) {
++		prevTune_ = tune;
 +	}
-+	setInterval(norminterval_);
++	setInterval(normInterval);
 +	PollingTuneController::check();
 +}
 +
@@ -2503,15 +2502,15 @@
 +			QPair<bool, QString> trackpair(getTrackTitle(hWnd));
 +			if (!trackpair.first) {
 +				// getTrackTitle wants us to retry in a few ms...
-+				int interval = antiscrollinterval_;
-+				if (++antiscrollcounter_ > 10) {
-+					antiscrollcounter_ = 0;
-+					interval = norminterval_;
++				int interval = antiscrollInterval;
++				if (++antiscrollCounter_ > 10) {
++					antiscrollCounter_ = 0;
++					interval = normInterval;
 +				}
 +				setInterval(interval);
 +				return Tune();
 +			}
-+			antiscrollcounter_ = 0;
++			antiscrollCounter_ = 0;
 +			tune.setName(trackpair.second);
 +			tune.setURL(trackpair.second);
 +			tune.setTrack(QString::number(position + 1));
@@ -2632,11 +2631,11 @@
 +
 +Tune WinAmpController::currentTune() const
 +{
-+	return prev_tune_;
++	return prevTune_;
 +}
 --- git.orig/src/tools/tunecontroller/winamptunecontroller.h
 +++ git/src/tools/tunecontroller/winamptunecontroller.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,50 @@
 +/*
 + * winamptunecontroller.h
 + * Copyright (C) 2006  Remko Troncon,
@@ -2682,9 +2681,8 @@
 +	QPair<bool, QString> getTrackTitle(const HWND &waWnd) const;
 +
 +private:
-+	Tune prev_tune_;
-+	int norminterval_, antiscrollinterval_;
-+	int antiscrollcounter_;
++	Tune prevTune_;
++	int antiscrollCounter_;
 +};
 +
 +#endif
