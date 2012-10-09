@@ -1,5 +1,5 @@
---- git.orig/src/discodlg.cpp
-+++ git/src/discodlg.cpp
+--- psi.orig/src/discodlg.cpp
++++ psi/src/discodlg.cpp
 @@ -1015,7 +1015,8 @@ DiscoDlg::Private::Private(DiscoDlg *par
  
  	// create toolbar
@@ -10,9 +10,9 @@
  	toolBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
  	replaceWidget(dlg->toolBarPlaceholder, toolBar);
  
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
-@@ -716,7 +716,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -714,7 +714,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateBookmarkIcon()));
  	connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
  
@@ -22,8 +22,8 @@
  	ui_.toolbar->addAction(d->act_clear);
  	ui_.toolbar->addAction(d->act_find);
  	ui_.toolbar->addAction(d->act_configure);
---- git.orig/src/options/optionsdlg.cpp
-+++ git/src/options/optionsdlg.cpp
+--- psi.orig/src/options/optionsdlg.cpp
++++ psi/src/options/optionsdlg.cpp
 @@ -25,6 +25,7 @@
  #include "fancylabel.h"
  #include "iconset.h"
@@ -52,8 +52,8 @@
  
  		int width = iconSize.width();
  		width += 8;
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
 @@ -270,6 +270,10 @@ void PsiChatDlg::setLooks()
  	ui_.splitter->optionsChanged();
  	ui_.mle->optionsChanged();
@@ -75,17 +75,17 @@
  	ui_.toolbar->addAction(act_clear_);
  // typeahead find bar
  	ui_.toolbar->addAction(act_find);
---- git.orig/src/psicontactlistviewdelegate.cpp
-+++ git/src/psicontactlistviewdelegate.cpp
-@@ -45,6 +45,7 @@ static const QString avatarAtLeftOptionP
+--- psi.orig/src/psicontactlistviewdelegate.cpp
++++ psi/src/psicontactlistviewdelegate.cpp
+@@ -47,6 +47,7 @@ static const QString useDefaultAvatarPat
+ static const QString avatarAtLeftOptionPath = "options.ui.contactlist.avatars.avatars-at-left";
  static const QString showStatusIconsPath = "options.ui.contactlist.show-status-icons";
  static const QString statusIconsOverAvatarsPath = "options.ui.contactlist.status-icon-over-avatar";
- static const QString statusSingleOptionPath = "options.ui.contactlist.status-messages.single-line";
 +static const QString statusIconsetOptionPath = "options.iconsets.status";
  
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
-@@ -57,6 +58,8 @@ PsiContactListViewDelegate::PsiContactLi
+@@ -59,6 +60,8 @@ PsiContactListViewDelegate::PsiContactLi
  	connect(alertTimer_, SIGNAL(timeout()), SLOT(updateAlerts()));
  
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), SLOT(optionChanged(const QString&)));
@@ -94,31 +94,31 @@
  	optionChanged(slimGroupsOptionPath);
  	optionChanged(outlinedGroupsOptionPath);
  	optionChanged(contactListFontOptionPath);
-@@ -507,7 +510,7 @@ void PsiContactListViewDelegate::optionC
+@@ -537,7 +540,7 @@ void PsiContactListViewDelegate::optionC
  		font_ = new QFont();
  		font_->fromString(PsiOptions::instance()->getOption(contactListFontOptionPath).toString());
  		fontMetrics_ = new QFontMetrics(*font_);
--		rowHeight = qMax(fontMetrics_->height()+2, 18);
-+		rowHeight = qMax(fontMetrics_->height()+2, statusIconSize_+2);
+-		rowHeight_ = qMax(fontMetrics_->height()+2, 18); // 18 - default row height
++		rowHeight_ = qMax(fontMetrics_->height()+2, statusIconSize_+2);
  		contactList()->viewport()->update();
  	}
  	else if (option == contactListBackgroundOptionPath) {
-@@ -574,6 +577,13 @@ void PsiContactListViewDelegate::optionC
+@@ -612,6 +615,13 @@ void PsiContactListViewDelegate::optionC
  	}
  }
  
 +void PsiContactListViewDelegate::rosterIconsSizeChanged(int size)
 +{
 +	statusIconSize_ = size;
-+	rowHeight = qMax(fontMetrics_->height()+2, statusIconSize_+2);
++	rowHeight_ = qMax(fontMetrics_->height()+2, statusIconSize_+2);
 +	contactList()->viewport()->update();
 +}
 +
  void PsiContactListViewDelegate::drawText(QPainter* painter, const QStyleOptionViewItem& o, const QRect& rect, const QString& text, const QModelIndex& index) const
  {
  	QRect r(rect);
---- git.orig/src/psicontactlistviewdelegate.h
-+++ git/src/psicontactlistviewdelegate.h
+--- psi.orig/src/psicontactlistviewdelegate.h
++++ psi/src/psicontactlistviewdelegate.h
 @@ -58,6 +58,7 @@ protected:
  private slots:
  	void optionChanged(const QString& option);
@@ -127,16 +127,16 @@
  
  private:
  	QTimer* alertTimer_;
-@@ -68,6 +69,7 @@ private:
- 	int avatarSize_, avatarRadius_, rowHeight;
- 	bool statusSingle_;
+@@ -69,6 +70,7 @@ private:
+ 	bool showAvatars_, useDefaultAvatar_, avatarAtLeft_, showStatusIcons_, statusIconsOverAvatars_;
+ 	int avatarSize_, avatarRadius_,;
  	mutable QHash<QModelIndex, bool> alertingIndexes_;
 +	int statusIconSize_;
  };
  
  #endif
---- git.orig/src/psiiconset.cpp
-+++ git/src/psiiconset.cpp
+--- psi.orig/src/psiiconset.cpp
++++ psi/src/psiiconset.cpp
 @@ -333,6 +333,11 @@ bool PsiIconset::loadSystem()
  	QString cur_system = PsiOptions::instance()->getOption("options.iconsets.system").toString();
  	if (d->cur_system != cur_system) {
@@ -160,8 +160,8 @@
  		d->loadIconset(oldDef, newDef);
  
  		roster.remove(d->cur_status);
---- git.orig/src/psiiconset.h
-+++ git/src/psiiconset.h
+--- psi.orig/src/psiiconset.h
++++ psi/src/psiiconset.h
 @@ -80,6 +80,8 @@ public:
  
  signals:
@@ -171,8 +171,8 @@
  
  public slots:
  	static void reset();
---- git.orig/src/psitoolbar.cpp
-+++ git/src/psitoolbar.cpp
+--- psi.orig/src/psitoolbar.cpp
++++ psi/src/psitoolbar.cpp
 @@ -29,6 +29,7 @@
  #include <QToolButton>
  
@@ -189,10 +189,10 @@
 +	int s = PsiIconset::instance()->system().iconSize();
 +	setIconSize(QSize(s, s));
  
- 	customizeAction_ = new QAction(tr("Configure& Toolbar..."), this);
+ 	customizeAction_ = new QAction(tr("&Configure Toolbar..."), this);
  	connect(customizeAction_, SIGNAL(triggered()), this, SIGNAL(customize()));
---- git.orig/src/tools/iconset/iconset.cpp
-+++ git/src/tools/iconset/iconset.cpp
+--- psi.orig/src/tools/iconset/iconset.cpp
++++ psi/src/tools/iconset/iconset.cpp
 @@ -1028,6 +1028,7 @@ private:
  		//authors << "I. M. Anonymous";
  		//creation = "1900-01-01";
@@ -252,8 +252,8 @@
   * Returns the Iconset version.
   */
  const QString &Iconset::version() const
---- git.orig/src/tools/iconset/iconset.h
-+++ git/src/tools/iconset/iconset.h
+--- psi.orig/src/tools/iconset/iconset.h
++++ psi/src/tools/iconset/iconset.h
 @@ -207,6 +207,7 @@ public:
  	const QStringList &authors() const;
  	const QString &creation() const;
