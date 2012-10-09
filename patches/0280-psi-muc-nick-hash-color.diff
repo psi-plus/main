@@ -1,5 +1,3 @@
-Entering 'iris'
-Entering 'src/libpsi'
 --- git.orig/options/default.xml
 +++ git/options/default.xml
 @@ -219,7 +219,7 @@
@@ -11,20 +9,9 @@ Entering 'src/libpsi'
  			</muc>
  			<show-deprecated comment="Deprecated functionality or protocols">
  				<service-discovery comment="Service discovery dialog">
---- git.orig/src/chatview_te.cpp
-+++ git/src/chatview_te.cpp
-@@ -290,7 +290,7 @@ void ChatView::renderMucMessage(const Me
- 		alerttagsc = "</b>";
- 	}
- 
--	if(mv.isSpooled()) {
-+	if(mv.isSpooled() && !PsiOptions::instance()->getOption("options.ui.muc.colored-history").toBool()) {
- 		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
- 	} else {
- 		nickcolor = getMucNickColor(mv.nick(), mv.isLocal());
 --- git.orig/src/chatviewcommon.cpp
 +++ git/src/chatviewcommon.cpp
-@@ -19,6 +19,8 @@
+@@ -19,10 +19,14 @@
   */
  
  #include <QWidget>
@@ -33,7 +20,13 @@ Entering 'src/libpsi'
  
  #include "chatviewcommon.h"
  #include "psioptions.h"
-@@ -42,30 +44,70 @@ bool ChatViewCommon::updateLastMsgTime(Q
+ 
++static const QString rgbBlack = "#000000";
++
+ void ChatViewCommon::setLooks(QWidget *w)
+ {
+ 	QPalette pal = w->palette(); // copy widget's palette to non const QPalette
+@@ -42,30 +46,55 @@ bool ChatViewCommon::updateLastMsgTime(Q
  
  QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
  {
@@ -62,8 +55,7 @@ Entering 'src/libpsi'
  		: validList;
  
 -	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() || nickColors.empty()) {
-+	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool()) {
- 		return "#000000";
+-		return "#000000";
 -	}
 -	else if(sender == -1 || nickColors.size() == 1) {
 -		return nickColors[nickColors.size()-1];
@@ -71,41 +63,28 @@ Entering 'src/libpsi'
 -	else {
 -		int n = sender % (nickColors.size()-1);
 -		return nickColors[n];
++	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool()) {
++		return rgbBlack;
 +	} else {
 +		if (PsiOptions::instance()->getOption("options.ui.muc.use-hash-nick-coloring").toBool()) {
 +			/* Hash-driven colors */
-+			unsigned char hash[4];
-+			unsigned char prev_hash[4];
-+			QByteArray cnick = nickwoun.toUtf8();
-+			unsigned nicklen, i, *h = reinterpret_cast<unsigned *>(hash);
-+			nicklen = cnick.length();
-+			*h = 12345;
-+			memcpy(prev_hash, hash, sizeof(hash));
-+			for (i = 0; i < nicklen; i++) {
-+				*h *= cnick[i];
-+				if(hash[0] || hash[1] || hash[2]) {
-+					memcpy(prev_hash, hash, sizeof(hash));
-+				} else {
-+					*h = 12345;
-+					memcpy(prev_hash, hash, sizeof(hash));
-+				}
-+			}
-+			/* I hope, nobody will use this on big-endian 64bit CPUs */
-+			QColor precolor;
-+			QString color;
-+			color.sprintf("#%02hhX%02hhX%02hhX", prev_hash[0], prev_hash[1], prev_hash[2]);
-+			precolor.setNamedColor(QString(color));
++			Q_ASSERT(nickwoun.size());
++			QByteArray ba = nickwoun.toUtf8();
++			while (ba.size() < 4) { ba += ba; }
++			quint32 num = *(quint32*)ba.left(3).toHex().constData();
++			num ^= num << 4;
++			QColor precolor = QColor(QString("#") + QByteArray::fromRawData((const char*)&num, 3).toHex().constData());
 +			if ( precolor.saturation() < 150 ){
-+			    precolor.setHsv( precolor.hue(), 250, precolor.value());
++				precolor.setHsv( precolor.hue(), 250, precolor.value());
 +			}
 +			if ( precolor.value() > 210 ) {
-+			    precolor.setHsv( precolor.hue(), precolor.saturation() , 210);
++				precolor.setHsv( precolor.hue(), precolor.saturation() , 210);
 +			}
 +			return precolor.name();
 +		} else {
 +			/* Colors from list */
 +			if (nickColors.empty()) {
-+				return "#000000";
++				return rgbBlack;
 +			}
 +			if(sender == -1 || nickColors.size() == 1) {
 +				return nickColors[nickColors.size()-1];
@@ -116,6 +95,17 @@ Entering 'src/libpsi'
 +		}
  	}
  }
+--- git.orig/src/chatview_te.cpp
++++ git/src/chatview_te.cpp
+@@ -290,7 +290,7 @@ void ChatView::renderMucMessage(const Me
+ 		alerttagsc = "</b>";
+ 	}
+ 
+-	if(mv.isSpooled()) {
++	if(mv.isSpooled() && !PsiOptions::instance()->getOption("options.ui.muc.colored-history").toBool()) {
+ 		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
+ 	} else {
+ 		nickcolor = getMucNickColor(mv.nick(), mv.isLocal());
 --- git.orig/src/options/opt_general_groupchat.ui
 +++ git/src/options/opt_general_groupchat.ui
 @@ -157,6 +157,13 @@
@@ -164,7 +154,7 @@ Entering 'src/libpsi'
 +  </connection>
 + </connections>
 + </ui>
-\ No newline at end of file
+\ В конце файла нет новой строки
 --- git.orig/src/options/opt_groupchat.cpp
 +++ git/src/options/opt_groupchat.cpp
 @@ -67,6 +67,7 @@ void OptionsTabGroupchat::applyOptions()
