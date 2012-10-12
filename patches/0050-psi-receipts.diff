@@ -1,7 +1,5 @@
-Entering 'iris'
-Entering 'src/libpsi'
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -110,6 +110,8 @@
  				<use-chat-says-style type="bool">false</use-chat-says-style>
  				<use-expanding-line-edit type="bool">true</use-expanding-line-edit>
@@ -11,17 +9,17 @@ Entering 'src/libpsi'
  				<warn-before-clear type="bool">true</warn-before-clear>
  			</chat>
  			<history comment="History dialog options">
-@@ -285,6 +287,8 @@
+@@ -283,6 +285,8 @@
+ 				</font>
+ 			</look>
  			<notifications>
- 				<alert-style type="QString">animate</alert-style>
- 				<bounce-dock type="QString">forever</bounce-dock>
 +				<send-receipts type="bool" >true</send-receipts>
 +				<request-receipts type="bool" >true</request-receipts>
- 				<enable-growl type="bool">true</enable-growl>
- 				<passive-popups>
- 					<duration type="int">10000</duration>
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
+ 				<alert-style type="QString">animate</alert-style>
+ 				<type type="int">0</type>
+ 				<bounce-dock type="QString">forever</bounce-dock>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
 @@ -668,6 +668,20 @@ void ChatDlg::doSend()
  	}
  	QString id = account()->client()->genUniqueId();
@@ -61,8 +59,8 @@ Entering 'src/libpsi'
  	chatView()->dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
---- git.orig/src/chatview_te.cpp
-+++ git/src/chatview_te.cpp
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
 @@ -27,12 +27,14 @@
  #include "textutil.h"
  #include "psirichtext.h"
@@ -224,8 +222,8 @@ Entering 'src/libpsi'
  						(ut.isEmpty()?"":":<br>") + "</font>" +
  						(ut.isEmpty()?"":QString(" <span style=\"color:%1;font-weight:bold\">%2</span>").arg(userTextColor, ut)));
  }
---- git.orig/src/chatview_te.h
-+++ git/src/chatview_te.h
+--- psi.orig/src/chatview_te.h
++++ psi/src/chatview_te.h
 @@ -39,8 +39,12 @@ public:
  	ChatView(QWidget* parent);
  	~ChatView();
@@ -253,8 +251,8 @@ Entering 'src/libpsi'
  };
  
  #endif
---- git.orig/src/chatview_webkit.cpp
-+++ git/src/chatview_webkit.cpp
+--- psi.orig/src/chatview_webkit.cpp
++++ psi/src/chatview_webkit.cpp
 @@ -191,6 +191,14 @@ void ChatView::embedJsObject()
  	}
  }
@@ -270,8 +268,8 @@ Entering 'src/libpsi'
  QSize ChatView::sizeHint() const
  {
  	return minimumSizeHint();
---- git.orig/src/chatview_webkit.h
-+++ git/src/chatview_webkit.h
+--- psi.orig/src/chatview_webkit.h
++++ psi/src/chatview_webkit.h
 @@ -44,6 +44,8 @@ public:
  	ChatView(QWidget* parent);
  	~ChatView();
@@ -281,8 +279,8 @@ Entering 'src/libpsi'
  	// reimplemented
  	QSize sizeHint() const;
  
---- git.orig/src/messageview.cpp
-+++ git/src/messageview.cpp
+--- psi.orig/src/messageview.cpp
++++ psi/src/messageview.cpp
 @@ -33,6 +33,7 @@ MessageView::MessageView(Type t)
  	, _alert(false)
  	, _local(false)
@@ -300,8 +298,8 @@ Entering 'src/libpsi'
  			}
  			break;
  		case Status:
---- git.orig/src/messageview.h
-+++ git/src/messageview.h
+--- psi.orig/src/messageview.h
++++ psi/src/messageview.h
 @@ -75,6 +75,8 @@ public:
  	inline bool isSpooled() const { return _spooled; }
  	inline void setStatus(int s) { _status = s; }
@@ -319,8 +317,8 @@ Entering 'src/libpsi'
  	int _status;
  	QString _messageId;
  	QString _userId;
---- git.orig/src/options/opt_advanced.cpp
-+++ git/src/options/opt_advanced.cpp
+--- psi.orig/src/options/opt_advanced.cpp
++++ psi/src/options/opt_advanced.cpp
 @@ -52,6 +52,10 @@ QWidget *OptionsTabAdvanced::widget()
  	d->ck_inactiveevents->setWhatsThis(
  		tr("Enables the sending of events when you end or suspend a "
@@ -332,27 +330,27 @@ Entering 'src/libpsi'
  	d->ck_rc->setWhatsThis(
  		tr("Enables remote controlling your client from other locations"));
  	d->ck_spell->setWhatsThis(
-@@ -106,6 +110,8 @@ void OptionsTabAdvanced::applyOptions()
- 
+@@ -109,6 +113,8 @@ void OptionsTabAdvanced::applyOptions()
  	PsiOptions::instance()->setOption("options.messages.send-composing-events", d->ck_messageevents->isChecked());
  	PsiOptions::instance()->setOption("options.messages.send-inactivity-events", d->ck_inactiveevents->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.dont-send-composing-events", d->ck_sendComposingEvents->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.notifications.request-receipts", d->ck_requestReceipts->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.notifications.send-receipts", d->ck_sendReceipts->isChecked());
  	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
  	if ( SpellChecker::instance()->available() )
  		PsiOptions::instance()->setOption("options.ui.spell-check.enabled",d->ck_spell->isChecked());
-@@ -132,6 +138,8 @@ void OptionsTabAdvanced::restoreOptions(
- 
+@@ -136,6 +142,8 @@ void OptionsTabAdvanced::restoreOptions(
  	d->ck_messageevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool() );
  	d->ck_inactiveevents->setChecked( PsiOptions::instance()->getOption("options.messages.send-inactivity-events").toBool() );
+ 	d->ck_sendComposingEvents->setChecked( PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() );
 +	d->ck_requestReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool() );
 +	d->ck_sendReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool() );
  	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
  	if ( !SpellChecker::instance()->available() )
  		d->ck_spell->setChecked(false);
---- git.orig/src/options/opt_advanced.ui
-+++ git/src/options/opt_advanced.ui
-@@ -34,6 +34,20 @@
+--- psi.orig/src/options/opt_advanced.ui
++++ psi/src/options/opt_advanced.ui
+@@ -44,6 +44,20 @@
      </widget>
     </item>
     <item>
@@ -373,9 +371,9 @@ Entering 'src/libpsi'
      <widget class="QCheckBox" name="ck_rc" >
       <property name="text" >
        <string>Enable remote controlling from other locations</string>
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -1034,6 +1034,7 @@ PsiAccount::PsiAccount(const UserAccount
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -1043,6 +1043,7 @@ PsiAccount::PsiAccount(const UserAccount
  #endif
  
  	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
@@ -383,7 +381,7 @@ Entering 'src/libpsi'
  
  	//connect(d->client, SIGNAL(connected()), SLOT(client_connected()));
  	//connect(d->client, SIGNAL(handshaken()), SLOT(client_handshaken()));
-@@ -2545,7 +2546,7 @@ void PsiAccount::client_messageReceived(
+@@ -2558,7 +2559,7 @@ void PsiAccount::client_messageReceived(
  void PsiAccount::processIncomingMessage(const Message &_m)
  {
  	// skip empty messages, but not if the message contains a data form
@@ -392,7 +390,7 @@ Entering 'src/libpsi'
  		return;
  
  	// skip headlines?
-@@ -2645,6 +2646,17 @@ void PsiAccount::processIncomingMessage(
+@@ -2658,6 +2659,17 @@ void PsiAccount::processIncomingMessage(
  	//if(m.type() == "chat" && (!m.urlList().isEmpty() || !m.subject().isEmpty()))
  	//	m.setType("");
  
@@ -410,7 +408,7 @@ Entering 'src/libpsi'
  	MessageEvent *me = new MessageEvent(m, this);
  	me->setOriginLocal(false);
  	handleEvent(me, IncomingStanza);
-@@ -4637,6 +4649,19 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4643,6 +4655,19 @@ void PsiAccount::handleEvent(PsiEvent* e
  			delete e;
  			return;
  		}
@@ -428,9 +426,9 @@ Entering 'src/libpsi'
 +			return;
 +		}
  
- 		// pass chat messages directly to a chat window if possible (and deal with sound)
- 		if(m.type() == "chat") {
-@@ -5601,7 +5626,9 @@ void PsiAccount::pgp_encryptFinished()
+ 		// Pass message events to chat window
+ 		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
+@@ -5627,7 +5652,9 @@ void PsiAccount::pgp_encryptFinished()
  		if (m.containsEvent(DisplayedEvent)) mwrap.addEvent(DisplayedEvent);
  		if (m.containsEvent(ComposingEvent)) mwrap.addEvent(ComposingEvent);
  		if (m.containsEvent(CancelEvent)) mwrap.addEvent(CancelEvent);
@@ -440,7 +438,7 @@ Entering 'src/libpsi'
  		dj_sendMessage(mwrap);
  	}
  	emit encryptedMessageSent(x, pt->success(), pt->errorCode(), pt->diagnosticText());
-@@ -5717,6 +5744,9 @@ void PsiAccount::optionsUpdate()
+@@ -5743,6 +5770,9 @@ void PsiAccount::optionsUpdate()
  	// Chat states
  	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
  
@@ -450,7 +448,7 @@ Entering 'src/libpsi'
  	// Remote Controlling
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
-@@ -5761,6 +5791,19 @@ void PsiAccount::setSendChatState(bool b
+@@ -5787,6 +5817,19 @@ void PsiAccount::setSendChatState(bool b
  	}
  }
  
@@ -470,9 +468,9 @@ Entering 'src/libpsi'
  
  void PsiAccount::invokeGCMessage(const Jid &j)
  {
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
-@@ -429,6 +429,7 @@ protected:
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -440,6 +440,7 @@ protected:
  
  	void publishTune(const Tune&);
  	void setSendChatState(bool);
@@ -480,8 +478,8 @@ Entering 'src/libpsi'
  	void setRCEnabled(bool);
  	void sessionStarted();
  
---- git.orig/themes/chatview/psi/classic/index.html
-+++ git/themes/chatview/psi/classic/index.html
+--- psi.orig/themes/chatview/psi/classic/index.html
++++ psi/themes/chatview/psi/classic/index.html
 @@ -11,6 +11,7 @@ body > div {
  	overflow:hidden;
  }

@@ -77,7 +77,7 @@
  				<log-width type="int">500</log-width>
  				<roster-width type="int">80</roster-width>
  				<roster-at-left type="bool">false</roster-at-left>
-@@ -489,6 +493,7 @@ QLineEdit#le_status_text {
+@@ -498,6 +502,7 @@ QLineEdit#le_status_text {
  				<show_statusmsg type="QKeySequence" comment="Show Status Message"></show_statusmsg>
  				<publish_tune type="QKeySequence" comment="Publish Tune"></publish_tune>
  				<status_all type="QKeySequence" comment="Status All"></status_all>
@@ -85,7 +85,7 @@
  				<status_chat type="QKeySequence" comment="Status Chat"></status_chat>
  				<status_online type="QKeySequence" comment="Status Online"></status_online>
  				<status_away type="QKeySequence" comment="Status Away"></status_away>
-@@ -496,6 +501,8 @@ QLineEdit#le_status_text {
+@@ -505,6 +510,8 @@ QLineEdit#le_status_text {
  				<status_dnd type="QKeySequence" comment="Status DND"></status_dnd>
  				<status_invisible type="QKeySequence" comment="Status Invisible"></status_invisible>
  				<status_offline type="QKeySequence" comment="Status Offline"></status_offline>
@@ -94,7 +94,7 @@
  				<set_mood type="QKeySequence" comment="Set Mood"/>
  				<set_activity type="QKeySequence" comment="Set Activity"/>
  				<set_geoloc type="QKeySequence" comment="Set Geolocation"/>
-@@ -631,17 +638,41 @@ QLineEdit#le_status_text {
+@@ -641,17 +648,41 @@ QLineEdit#le_status_text {
  		<status>
  			<ask-for-message-on-offline type="bool">false</ask-for-message-on-offline>
  			<ask-for-message-on-online type="bool">false</ask-for-message-on-online>
@@ -781,7 +781,7 @@
 +#endif // GLOBALSTATUSMENU_H
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -1363,9 +1363,8 @@ void GCMainDlg::presence(const QString &
+@@ -1365,9 +1365,8 @@ void GCMainDlg::presence(const QString &
  		GCUserViewItem* contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
  		if (contact == NULL) {
  			//contact joining
@@ -792,7 +792,7 @@
  				if ( options_->getOption("options.muc.show-role-affiliation").toBool() ) {
  					if (s.mucItem().role() != MUCItem::NoRole) {
  						if (s.mucItem().affiliation() != MUCItem::NoAffiliation) {
-@@ -1384,6 +1383,15 @@ void GCMainDlg::presence(const QString &
+@@ -1386,6 +1385,15 @@ void GCMainDlg::presence(const QString &
  				} else {
  					message = message.arg(nick);
  				}
@@ -808,7 +808,7 @@
  				appendSysMsg(message);
  			}
  		}
-@@ -1408,14 +1416,11 @@ void GCMainDlg::presence(const QString &
+@@ -1410,14 +1418,11 @@ void GCMainDlg::presence(const QString &
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -1200,7 +1200,7 @@
  	QString _nick; // rich / as is
 --- psi.orig/src/options/optionsdlg.cpp
 +++ psi/src/options/optionsdlg.cpp
-@@ -175,6 +175,7 @@ public:
+@@ -176,6 +176,7 @@ public:
  public slots:
  	void doApply();
  	void openTab(QString id);
@@ -1208,7 +1208,7 @@
  
  private slots:
  	void currentItemChanged(QListWidgetItem* current, QListWidgetItem* previous);
-@@ -423,6 +424,13 @@ void OptionsDlg::Private::openTab(QStrin
+@@ -425,6 +426,13 @@ void OptionsDlg::Private::openTab(QStrin
  	}
  }
  
@@ -1224,28 +1224,28 @@
  	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
 --- psi.orig/src/options/options.pri
 +++ psi/src/options/options.pri
-@@ -16,6 +16,8 @@ HEADERS += \
- 	$$PWD/opt_chat.h \
+@@ -17,6 +17,8 @@ HEADERS += \
  	$$PWD/opt_events.h \
+ 	$$PWD/opt_popups.h \
  	$$PWD/opt_status.h \
 +	$$PWD/opt_statusgeneral.h \
 +	$$PWD/opt_statusauto.h \
  	$$PWD/opt_appearance.h \
  	$$PWD/opt_iconset.h \
  	$$PWD/opt_theme.h \
-@@ -34,6 +36,8 @@ SOURCES += \
- 	$$PWD/opt_chat.cpp \
+@@ -36,6 +38,8 @@ SOURCES += \
  	$$PWD/opt_events.cpp \
+ 	$$PWD/opt_popups.cpp \
  	$$PWD/opt_status.cpp \
 +	$$PWD/opt_statusgeneral.cpp \
 +	$$PWD/opt_statusauto.cpp \
  	$$PWD/opt_appearance.cpp \
  	$$PWD/opt_iconset.cpp \
  	$$PWD/opt_theme.cpp \
-@@ -51,7 +55,8 @@ FORMS += \
- 	$$PWD/opt_roster.ui \
+@@ -54,7 +58,8 @@ FORMS += \
  	$$PWD/opt_chat.ui \
  	$$PWD/opt_events.ui \
+ 	$$PWD/opt_popups.ui \
 -	$$PWD/opt_status.ui \
 +	$$PWD/opt_statusgeneral.ui \
 +	$$PWD/opt_statusauto.ui \
@@ -3818,7 +3818,7 @@
  		bool open;
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
-@@ -411,6 +411,7 @@ public:
+@@ -407,6 +407,7 @@ public:
  	Jid jid, nextJid;
  	Status loginStatus;
  	bool loginWithPriority;
@@ -3826,7 +3826,7 @@
  	EventQueue *eventQueue;
  	XmlConsole *xmlConsole;
  	UserList userList;
-@@ -841,11 +842,9 @@ public:
+@@ -858,11 +859,9 @@ public:
  	{
  		if (!account->isAvailable())
  			return;
@@ -3841,7 +3841,7 @@
  			account->setStatusDirect(status, withPriority);
  		}
  	}
-@@ -870,14 +869,26 @@ public:
+@@ -887,14 +886,26 @@ public:
  private:
  	Status lastManualStatus_;
  
@@ -3871,7 +3871,7 @@
  			}
  
  			switch (autoAway) {
-@@ -1526,13 +1537,35 @@ void PsiAccount::autoLogin()
+@@ -1545,13 +1556,35 @@ void PsiAccount::autoLogin()
  	if (enabled()) {
  		bool autoLogin = d->acc.opt_auto;
  		if (autoLogin) {
@@ -3913,7 +3913,7 @@
  	}
  }
  
-@@ -1661,7 +1694,7 @@ void PsiAccount::forceDisconnect(bool fa
+@@ -1680,7 +1713,7 @@ void PsiAccount::forceDisconnect(bool fa
  		d->client->removeExtension("pep");
  
  		// send logout status
@@ -3922,7 +3922,7 @@
  		d->client->setPresence(s);
  	}
  
-@@ -2767,7 +2800,7 @@ Status PsiAccount::loggedOutStatus()
+@@ -2775,7 +2808,7 @@ Status PsiAccount::loggedOutStatus()
  #ifdef YAPSI
  	return Status(Status::Offline);
  #else
@@ -3931,7 +3931,7 @@
  #endif
  }
  
-@@ -2775,10 +2808,16 @@ void PsiAccount::setStatus(const Status
+@@ -2783,10 +2816,16 @@ void PsiAccount::setStatus(const Status
  {
  	Status s = _s;
  	if (!withPriority)
@@ -3949,7 +3949,7 @@
  	}
  
  	// Block all transports' contacts' status change popups from popping
-@@ -2840,18 +2879,37 @@ void PsiAccount::setStatus(const Status
+@@ -2854,18 +2893,37 @@ void PsiAccount::setStatus(const Status
  	}
  }
  
@@ -3989,7 +3989,7 @@
  
  	// using pgp?
  	if(!d->cur_pgpSecretKey.isNull()) {
-@@ -3625,25 +3683,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const
+@@ -3647,25 +3705,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const
  	return c;
  }
  
@@ -4066,7 +4066,7 @@
  	}
  }
  
-@@ -5374,7 +5468,7 @@ void PsiAccount::groupChatLeave(const QS
+@@ -5401,7 +5495,7 @@ void PsiAccount::groupChatLeave(const QS
  {
  	Jid j(room + '@' + host);
  	d->groupchats.removeAll(j.bare());
@@ -4085,7 +4085,7 @@
  	void setStatusDirect(const XMPP::Status &, bool withPriority = false);
  	void setStatusActual(const XMPP::Status &);
  
-@@ -190,7 +191,7 @@ public:
+@@ -191,7 +192,7 @@ public:
  	void reconfigureFTManager();
  	void changeVCard();
  	void changePW();
@@ -4094,7 +4094,7 @@
  	void doDisco();
  
  	void showXmlConsole();
-@@ -289,6 +290,7 @@ signals:
+@@ -290,6 +291,7 @@ signals:
  
  public slots:
  	void setStatus(const XMPP::Status &, bool withPriority = false, bool isManualStatus = false);
@@ -4102,7 +4102,7 @@
  
  	void capsChanged(const Jid&);
  	void tuneStopped();
-@@ -299,6 +301,7 @@ public slots:
+@@ -300,6 +302,7 @@ public slots:
  	void openNextEvent(ActivationType activationType);
  	int forwardPendingEvents(const Jid &jid);
  	void autoLogin();
@@ -4110,7 +4110,7 @@
  
  	void showCert();
  
-@@ -418,6 +421,7 @@ private slots:
+@@ -419,6 +422,7 @@ private slots:
  
  	void incomingHttpAuthRequest(const PsiHttpAuthRequest &);
  
@@ -4172,7 +4172,7 @@
  
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -543,7 +543,7 @@ bool PsiCon::init()
+@@ -547,7 +547,7 @@ bool PsiCon::init()
  	connect(d->mainwin, SIGNAL(doManageAccounts()), SLOT(doManageAccounts()));
  	connect(d->mainwin, SIGNAL(doGroupChat()), SLOT(doGroupChat()));
  	connect(d->mainwin, SIGNAL(blankMessage()), SLOT(doNewBlankMessage()));
@@ -4181,7 +4181,7 @@
  	connect(d->mainwin, SIGNAL(statusMessageChanged(QString)), SLOT(setStatusMessage(QString)));
  	connect(d->mainwin, SIGNAL(doOptions()), SLOT(doOptions()));
  	connect(d->mainwin, SIGNAL(doToolbars()), SLOT(doToolbars()));
-@@ -720,6 +720,11 @@ bool PsiCon::haveAutoUpdater() const
+@@ -727,6 +727,11 @@ bool PsiCon::haveAutoUpdater() const
  	return d->autoUpdater != 0;
  }
  
@@ -4193,7 +4193,7 @@
  void PsiCon::registerCaps(const QString& ext, const QStringList& features)
  {
  	DiscoItem::Identity identity = { "client", ApplicationInfo::name(), "pc" };
-@@ -837,7 +842,7 @@ void PsiCon::changeProfile()
+@@ -849,7 +854,7 @@ void PsiCon::changeProfile()
  		if (messageBox.clickedButton() == cancel)
  			return;
  
@@ -4202,7 +4202,7 @@
  	}
  
  	doQuit(QuitProfile);
-@@ -995,37 +1000,67 @@ void PsiCon::removeAccount(PsiAccount *p
+@@ -1007,37 +1012,67 @@ void PsiCon::removeAccount(PsiAccount *p
  	d->contactList->removeAccount(pa);
  }
  
@@ -4294,7 +4294,7 @@
  #else
  	setGlobalStatus(makeStatus(x, currentStatusMessage()), false, true);
  #endif
-@@ -1058,16 +1093,6 @@ XMPP::Status::Type PsiCon::currentStatus
+@@ -1070,16 +1105,6 @@ XMPP::Status::Type PsiCon::currentStatus
  #endif
  }
  
@@ -4311,7 +4311,7 @@
  QString PsiCon::currentStatusMessage() const
  {
  #ifdef YAPSI
-@@ -1075,16 +1100,15 @@ QString PsiCon::currentStatusMessage() c
+@@ -1087,16 +1112,15 @@ QString PsiCon::currentStatusMessage() c
  		return QString();
  	return d->mainwin->statusMessage();
  #else
@@ -4336,7 +4336,7 @@
  }
  
  void PsiCon::setStatusFromCommandline(const QString &status, const QString &message)
-@@ -1120,6 +1144,20 @@ void PsiCon::setGlobalStatus(const Statu
+@@ -1132,6 +1156,20 @@ void PsiCon::setGlobalStatus(const Statu
  	emit statusMessageChanged(s.status());
  }
  
@@ -4357,7 +4357,7 @@
  void PsiCon::setStatusMessage(QString message)
  {
  	XMPP::Status s;
-@@ -1302,6 +1340,21 @@ void PsiCon::doToolbars()
+@@ -1314,6 +1352,21 @@ void PsiCon::doToolbars()
  	}
  }
  
@@ -4379,7 +4379,7 @@
  void PsiCon::optionChanged(const QString& option)
  {
  	bool notifyRestart = true;
-@@ -1752,7 +1805,14 @@ void PsiCon::doWakeup()
+@@ -1781,7 +1834,14 @@ void PsiCon::doWakeup()
  	foreach(PsiAccount* account, d->contactList->enabledAccounts()) {
  		if (account->userAccount().opt_connectAfterSleep) {
  			// Should we do this when the network comes up ?
@@ -4397,8 +4397,8 @@
  }
 --- psi.orig/src/psicon.h
 +++ psi/src/psicon.h
-@@ -121,10 +121,10 @@ public:
- 	void processEvent(PsiEvent*, ActivationType activationType);
+@@ -123,10 +123,10 @@ public:
+ 	void removeEvent(PsiEvent* e);
  
  	Status::Type currentStatusType() const;
 -	Status::Type lastLoggedInStatusType() const;
@@ -4407,9 +4407,9 @@
  	bool haveAutoUpdater() const;
 +	void updateStatusPresets();
  
- signals:
- 	void quit(int);
-@@ -136,10 +136,13 @@ signals:
+ 	PopupManager* popupManager() const;
+ 
+@@ -140,10 +140,13 @@ signals:
  	void emitOptionsUpdate();
  	void restoringSavedChatsChanged();
  	void statusMessageChanged(QString);
@@ -4424,7 +4424,7 @@
  	void checkAccountsEmpty();
  
  public slots:
-@@ -152,14 +155,13 @@ public slots:
+@@ -156,14 +159,13 @@ public slots:
  	void doNewBlankMessage();
  	void doOptions();
  	void doFileTransDlg();
@@ -4442,7 +4442,7 @@
  	void updateMainwinStatus();
 --- psi.orig/src/psicontactmenu.cpp
 +++ psi/src/psicontactmenu.cpp
-@@ -730,7 +730,7 @@ private slots:
+@@ -734,7 +734,7 @@ private slots:
  		if (!contact_)
  			return;
  
@@ -4601,7 +4601,7 @@
  {
 --- psi.orig/src/src.pri
 +++ psi/src/src.pri
-@@ -483,6 +483,8 @@ newcontactlist {
+@@ -462,6 +462,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.h \
  		$$PWD/contactupdatesmanager.h \
  		$$PWD/statusmenu.h \
@@ -4610,7 +4610,7 @@
  		$$PWD/psirosterwidget.h \
  		$$PWD/psifilteredcontactlistview.h
  
-@@ -513,6 +515,8 @@ newcontactlist {
+@@ -492,6 +494,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.cpp \
  		$$PWD/contactupdatesmanager.cpp \
  		$$PWD/statusmenu.cpp \

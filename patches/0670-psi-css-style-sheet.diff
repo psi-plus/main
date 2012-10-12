@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -113,6 +113,7 @@
  				<use-message-icons type="bool">true</use-message-icons>
  				<scaled-message-icons type="bool">false</scaled-message-icons>
@@ -82,17 +82,17 @@
 +				<css type="QString" />
  			</look>
  			<notifications>
- 				<alert-style type="QString">animate</alert-style>
-@@ -337,6 +392,7 @@
+ 				<send-receipts type="bool" >true</send-receipts>
+@@ -339,6 +394,7 @@
  						<status type="int">2000</status>
  					</delays>
  					<enabled type="bool">false</enabled>
 +					<css type="QString"></css>
+ 					<top-to-bottom type="bool">false</top-to-bottom>
+ 					<at-left-corner type="bool">false</at-left-corner>
  					<incoming-chat type="bool">true</incoming-chat>
- 					<incoming-file-transfer type="bool">true</incoming-file-transfer>
- 					<incoming-headline type="bool">true</incoming-headline>
---- git.orig/src/contactlistitemmenu.cpp
-+++ git/src/contactlistitemmenu.cpp
+--- psi.orig/src/contactlistitemmenu.cpp
++++ psi/src/contactlistitemmenu.cpp
 @@ -21,12 +21,17 @@
  #include "contactlistitemmenu.h"
  
@@ -111,9 +111,9 @@
  }
  
  ContactListItemMenu::~ContactListItemMenu()
---- git.orig/src/gcuserview.cpp
-+++ git/src/gcuserview.cpp
-@@ -519,6 +519,10 @@ void GCUserView::doContextMenu(QTreeWidg
+--- psi.orig/src/gcuserview.cpp
++++ psi/src/gcuserview.cpp
+@@ -522,6 +522,10 @@ void GCUserView::doContextMenu(QTreeWidg
  	pm->addAction(act);
  	act->setData(3);
  
@@ -124,9 +124,9 @@
  	int x = -1;
  	bool enabled = false;
  	act = pm->exec(QCursor::pos());
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
-@@ -1706,6 +1706,10 @@ QString GCMainDlg::desiredCaption() cons
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -1707,6 +1707,10 @@ QString GCMainDlg::desiredCaption() cons
  
  void GCMainDlg::setLooks()
  {
@@ -137,8 +137,8 @@
  	ui_.vsplitter->optionsChanged();
  	ui_.mle->optionsChanged();
  
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+--- psi.orig/src/mainwin.cpp
++++ psi/src/mainwin.cpp
 @@ -515,6 +515,8 @@ MainWin::MainWin(bool _onTop, bool _asTo
  
          /*QShortcut *sp_ss = new QShortcut(QKeySequence(tr("Ctrl+Shift+N")), this);
@@ -161,8 +161,8 @@
  }
  
  void MainWin::registerAction( IconAction* action )
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
 @@ -263,6 +263,10 @@ void PsiChatDlg::setLooks()
  {
  	ChatDlg::setLooks();
@@ -174,9 +174,9 @@
  	ui_.splitter->optionsChanged();
  	ui_.mle->optionsChanged();
  
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
-@@ -474,6 +474,10 @@ bool PsiCon::init()
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
+@@ -501,6 +501,10 @@ bool PsiCon::init()
  	d->iconSelect = new IconSelectPopup(0);
  	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
  
@@ -187,7 +187,7 @@
  	// first thing, try to load the iconset
  	bool result = true;;
  	if( !PsiIconset::instance()->loadAll() ) {
-@@ -1284,6 +1288,13 @@ void PsiCon::optionChanged(const QString
+@@ -1326,6 +1330,13 @@ void PsiCon::optionChanged(const QString
  	if (option == "options.p2p.bytestreams.listen-port") {
  		s5b_init();
  	}
@@ -201,9 +201,9 @@
  #ifdef USE_PEP
  	if (option == tuneUrlFilterOptionPath || option == tuneTitleFilterOptionPath) {
  		d->tuneManager->setTuneFilters(PsiOptions::instance()->getOption(tuneUrlFilterOptionPath).toString().split(QRegExp("\\W+")),
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -354,6 +354,11 @@ void TabDlg::setLooks()
+--- psi.orig/src/tabs/tabdlg.cpp
++++ psi/src/tabs/tabdlg.cpp
+@@ -365,6 +365,11 @@ void TabDlg::setLooks()
  		tabWidget_->setTabPosition(QTabWidget::South);
  
  	setWindowOpacity(double(qMax(MINIMUM_OPACITY,PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt()))/100);
@@ -215,20 +215,12 @@
  }
  
  void TabDlg::tabSelected(QWidget* _selected)
---- git.orig/src/widgets/fancypopup.cpp
-+++ git/src/widgets/fancypopup.cpp
-@@ -37,6 +37,7 @@
- #include "fancylabel.h"
- #include "iconlabel.h"
- #include "psitooltip.h"
-+#include "psioptions.h"
- 
- #define BUTTON_WIDTH	16
- #define BUTTON_HEIGHT	14
-@@ -317,6 +318,11 @@ void FancyPopup::Private::initContents(Q
- 	bottom3->setFixedSize( 4, 4 );
- 	bottom3->setPalette(backgroundPalette);
- 	bottomhbox->addWidget(bottom3);
+--- psi.orig/src/widgets/fancypopup.cpp
++++ psi/src/widgets/fancypopup.cpp
+@@ -218,6 +218,11 @@ void FancyPopup::Private::initContents(Q
+ 	ui_.closeButton->setIcon( popup->style()->standardPixmap(QStyle::SP_TitleBarCloseButton) );
+ 	ui_.closeButton->setFixedSize(BUTTON_WIDTH, BUTTON_HEIGHT);
+ 	connect(ui_.closeButton, SIGNAL(clicked()), popup, SLOT(hide()));
 +
 +	const QString css = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.css").toString();
 +	if (!css.isEmpty()) {
@@ -237,8 +229,8 @@
  }
  
  bool FancyPopup::Private::eventFilter(QObject *o, QEvent *e)
---- git.orig/src/widgets/iconaction.cpp
-+++ git/src/widgets/iconaction.cpp
+--- psi.orig/src/widgets/iconaction.cpp
++++ psi/src/widgets/iconaction.cpp
 @@ -30,6 +30,8 @@ class PsiIcon;
  class Iconset;
  #endif
@@ -248,7 +240,7 @@
  #include <QLayout>
  #include <QMenu>
  #include <QTimer>
-@@ -427,6 +429,11 @@ IconActionGroup::IconActionGroup(QObject
+@@ -428,6 +430,11 @@ IconActionGroup::IconActionGroup(QObject
  	d->updatePopup();
  
  	d->exclusive = exclusive;
@@ -260,8 +252,8 @@
  }
  
  IconActionGroup::~IconActionGroup()
---- git.orig/src/widgets/psitabwidget.cpp
-+++ git/src/widgets/psitabwidget.cpp
+--- psi.orig/src/widgets/psitabwidget.cpp
++++ psi/src/widgets/psitabwidget.cpp
 @@ -74,6 +74,7 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
  	stacked_ = new QStackedLayout(layout_);
  
@@ -287,8 +279,8 @@
  } 
  
  /**
---- git.orig/src/widgets/psitabwidget.h
-+++ git/src/widgets/psitabwidget.h
+--- psi.orig/src/widgets/psitabwidget.h
++++ psi/src/widgets/psitabwidget.h
 @@ -67,6 +67,7 @@ public:
  public slots:
  	void setCurrentPage(int);
@@ -297,8 +289,8 @@
  
  signals:
  	void mouseDoubleClickTab(QWidget *tab);
---- git.orig/src/widgets/psitiplabel.cpp
-+++ git/src/widgets/psitiplabel.cpp
+--- psi.orig/src/widgets/psitiplabel.cpp
++++ psi/src/widgets/psitiplabel.cpp
 @@ -51,6 +51,10 @@ void PsiTipLabel::init(const QString& te
  		}
  	}
@@ -310,8 +302,8 @@
  }
  
  void PsiTipLabel::setText(const QString& text)
---- git.orig/src/widgets/urlobject.cpp
-+++ git/src/widgets/urlobject.cpp
+--- psi.orig/src/widgets/urlobject.cpp
++++ psi/src/widgets/urlobject.cpp
 @@ -19,6 +19,7 @@
   */
  
@@ -320,7 +312,7 @@
  
  #include <QApplication>
  #include <QClipboard>
-@@ -221,6 +222,7 @@ QMenu *URLObject::createPopupMenu(const 
+@@ -221,6 +222,7 @@ QMenu *URLObject::createPopupMenu(const
  	}
  
  	m->addAction(d->act_copy);
