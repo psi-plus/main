@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
 @@ -62,6 +62,7 @@
  		</muc> 
  		<pgp comment="PGP encryption options">
@@ -8,18 +8,95 @@
  		</pgp>
  		<ui comment="User interface options">
  			<account comment="Account options">
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
-@@ -772,6 +772,12 @@ void PsiChatDlg::updatePGP()
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -169,7 +169,7 @@ private:
+ 
+ 
+ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
+-		: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_)
++	: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_), autoPGP_(true)
  {
- 	if (account()->hasPGP()) {
+ 	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
+ 	connect(account(), SIGNAL(addedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
+@@ -469,6 +469,7 @@ void PsiChatDlg::initToolButtons()
+ 
+ 	act_pgp_ = new IconAction(tr("Toggle Encryption"), "", tr("Toggle Encryption"), 0, this, 0, true);
+ 	ui_.tb_pgp->setDefaultAction(act_pgp_);
++	connect(act_pgp_, SIGNAL(triggered()), SLOT(actPgpToggled()));
+ 
+ 	act_info_ = new IconAction(tr("User Info"), "psi/vCard", tr("User Info"), 0, this);
+ 	connect(act_info_, SIGNAL(triggered()), SLOT(doInfo()));
+@@ -774,10 +775,12 @@ void PsiChatDlg::updatePGP()
  		act_pgp_->setEnabled(true);
-+		if(PsiOptions::instance()->getOption("options.pgp.auto-start").toBool()) {
-+			UserListItem *item = account()->findFirstRelevant(jid());
-+			if(item && !item->publicKeyID().isEmpty()) {
-+				setPGPEnabled(true);
-+			}
-+		}
  	}
  	else {
- 		act_pgp_->setChecked(false);
+-		act_pgp_->setChecked(false);
++		setPGPEnabled(false);
+ 		act_pgp_->setEnabled(false);
+ 	}
+ 
++	checkPGPAutostart();
++
+ 	ui_.tb_pgp->setVisible(account()->hasPGP() &&
+ 	                       !smallChat_ &&
+ 	                       !PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool());
+@@ -785,6 +788,31 @@ void PsiChatDlg::updatePGP()
+ 	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
+ }
+ 
++void PsiChatDlg::checkPGPAutostart()
++{
++	if(account()->hasPGP() && autoPGP_ && PsiOptions::instance()->getOption("options.pgp.auto-start").toBool()) {
++		UserListItem *item = account()->findFirstRelevant(jid());
++		if(item && !item->publicKeyID().isEmpty()) {
++			if(!jid().resource().isEmpty()) {
++				UserResourceList::Iterator rit = item->userResourceList().find(jid().resource());
++				if(rit !=item->userResourceList().end()) {
++					UserResource r = *rit;
++					if(r.pgpVerifyStatus() != 0) {
++						setPGPEnabled(false);
++						return;
++					}
++				}
++			}
++			setPGPEnabled(true);
++		}
++	}
++}
++
++void PsiChatDlg::actPgpToggled()
++{
++	autoPGP_ = false;
++}
++
+ void PsiChatDlg::doClearButton()
+ {
+ 	if (PsiOptions::instance()->getOption("options.ui.chat.warn-before-clear").toBool()) {
+--- psi.orig/src/psichatdlg.h
++++ psi/src/psichatdlg.h
+@@ -60,6 +60,7 @@ private slots:
+ 	QString makeContactName(const QString &name, const Jid &jid) const;
+ 	void doSwitchJidMode();
+ 	void actActiveContacts();
++	void actPgpToggled();
+ 
+ private:
+ 	void initToolBar();
+@@ -74,6 +75,7 @@ private:
+ 	void updateAvatar();
+ 	void optionsUpdate();
+ 	void updatePGP();
++	void checkPGPAutostart();
+ 	void setPGPEnabled(bool enabled);
+ 	void activated();
+ 	void setLooks();
+@@ -121,6 +123,8 @@ private:
+ 	int logHeight;
+ 	int chateditHeight;
+ 
++	bool autoPGP_;
++
+ private:
+ 	bool tabmode;
+ 	QPointer <PsiWindowHeader> winHeader_;
