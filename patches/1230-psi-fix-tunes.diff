@@ -407,7 +407,7 @@
 +	HANDLE aFile=OpenFileMapping(FILE_MAP_READ, TRUE, AIMP_REMOTE_CLASS);
 +	TAIMPFileInfo *aInfo=(TAIMPFileInfo *)MapViewOfFile(aFile, FILE_MAP_READ, 0, 0, AIMPRemoteAccessMapFileSize);
 +	if (aInfo != NULL) {
-+		wchar_t *str = (wchar_t *)((DWORD)aInfo+ aInfo->StructSize);
++		wchar_t *str = (wchar_t *)((char*)aInfo + aInfo->StructSize);
 +		QString album = QString::fromWCharArray(str, aInfo->AlbumLength);
 +		str += aInfo->AlbumLength;
 +		QString artist = QString::fromWCharArray(str, aInfo->ArtistLength);
@@ -415,8 +415,8 @@
 +		QString url = QString::fromWCharArray(str, aInfo->FileNameLength);
 +		str += aInfo->FileNameLength + aInfo->GenreLength;
 +		QString title = QString::fromWCharArray(str, aInfo->TitleLength);
-+		DWORD trackNumber = aInfo->TrackNumber;
-+		DWORD time = aInfo->Duration;
++		unsigned long trackNumber = aInfo->TrackNumber;
++		unsigned long time = aInfo->Duration;
 +		Tune tune = Tune();
 +		if (!url.isEmpty()) {
 +			if (!title.isEmpty()) {
@@ -1049,7 +1049,7 @@
 -
 +#include <windows.h>
 +#include <stddef.h>
-+#if (_MSC_VER <= 1200)
++#ifndef _WIN64
 +typedef int intptr_t;
 +#endif
  
@@ -2441,7 +2441,7 @@
 +		DWORD processId;
 +		GetWindowThreadProcessId(hWnd, &processId);
 +		LPCVOID address = (LPCVOID) SendMessage(hWnd, WM_WA_IPC, position, IPC_GETPLAYLISTFILEW);
-+		if ((uint)address > 1) {
++		if ((quintptr)address > 1) {
 +			wchar_t fileNameW[FILENAMESIZE];
 +			HANDLE hP = OpenProcess(PROCESS_ALL_ACCESS, 0, processId);
 +			ReadProcessMemory(hP, address, fileNameW, FILENAMESIZE, 0);
