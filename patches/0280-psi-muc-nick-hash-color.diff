@@ -27,7 +27,7 @@ index d5cd9d0..1e1fbab 100644
  	} else {
  		nickcolor = getMucNickColor(mv.nick(), mv.isLocal());
 diff --git a/src/chatviewcommon.cpp b/src/chatviewcommon.cpp
-index dcbd311..cd97b62 100644
+index dcbd311..6582012 100644
 --- a/src/chatviewcommon.cpp
 +++ b/src/chatviewcommon.cpp
 @@ -19,6 +19,8 @@
@@ -39,7 +39,7 @@ index dcbd311..cd97b62 100644
  
  #include "chatviewcommon.h"
  #include "psioptions.h"
-@@ -42,30 +44,53 @@ bool ChatViewCommon::updateLastMsgTime(QDateTime t)
+@@ -42,30 +44,50 @@ bool ChatViewCommon::updateLastMsgTime(QDateTime t)
  
  QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
  {
@@ -84,13 +84,10 @@ index dcbd311..cd97b62 100644
 +			/* Hash-driven colors */
 +			Q_ASSERT(nickwoun.size());
 +			quint32 num = qHash(nickwoun);
-+			QColor precolor(((char*)&num)[0], ((char*)&num)[1], ((char*)&num)[2]);
-+			if ( precolor.saturation() < 150 ){
-+				precolor.setHsv( precolor.hue(), 250, precolor.value());
-+			}
-+			if ( precolor.value() > 210 ) {
-+				precolor.setHsv( precolor.hue(), precolor.saturation() , 210);
-+			}
++			int s = ((char*)&num)[2];
++			int v = ((char*)&num)[3];
++			QColor precolor = QColor::fromHsv((num >> 6) % 360,
++					s < 150? 250 : s, v > 210? 210 : v < 100? 150 : v);
 +			return precolor.name();
 +		} else {
 +			/* Colors from list */
