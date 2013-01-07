@@ -309,7 +309,7 @@
  			updatePGP();
  
  			if (fromPresence && statusChanged) {
--				QString msg = tr("%1 is %2").arg(Qt::escape(dispNick_)).arg(status2txt(status_));
+-				QString msg = tr("%1 is %2").arg(TextUtil::escape(dispNick_)).arg(status2txt(status_));
 -				if (!statusString_.isEmpty()) {
 -					QString ss = TextUtil::linkify(TextUtil::plain2rich(statusString_));
 -					if (PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool()) {
@@ -338,7 +338,7 @@
  		result = dispNick_;
  	}
  
--	return Qt::escape(result);
+-	return TextUtil::escape(result);
 +	return result;
  }
  
@@ -935,14 +935,14 @@
 +	}
 +
 +	if(mv.isEmote()) {
-+		appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
++		appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
 +	}
 +	else {
 +		if(PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
-+			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(Qt::escape(mv.nick())) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
++			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(TextUtil::escape(mv.nick())) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc + "</font>");
 +		}
 +		else {
-+			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + Qt::escape(mv.nick()) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc +"</font>");
++			appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + mv.formattedText() + alerttagsc +"</font>");
 +		}
 +	}
 +
@@ -956,13 +956,13 @@
 +	QString timestr = formatTimeStamp(mv.dateTime());
 +	QString color = colorString(mv.isLocal(), mv.isSpooled());
 +	if (mv.isEmote()) {
-+		appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(mv.nick())) + mv.formattedText() + "</span>");
++		appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>");
 +	} else {
 +		if (PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
-+			appendText(QString("<p style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(Qt::escape(mv.nick())) + "</p>" + mv.formattedText());
++			appendText(QString("<p style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</p>" + mv.formattedText());
 +		}
 +		else {
-+			appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + Qt::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
++			appendText(QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
 +		}
 +	}
 +
@@ -1002,7 +1002,7 @@
 +{
 +	QMap<QString, QString> urls = mv.urls();
 +	foreach (const QString &key, urls.keys()) {
-+		appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(Qt::escape(key))));
++		appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(key))));
 +		if (!urls.value(key).isEmpty()) {
 +			appendText(QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(urls.value(key)));
 +		}
@@ -2714,7 +2714,7 @@
 -	QString timestr = ui_.log->formatTimeStamp(time);
 -	QString color = ColorOpt::instance()->color("options.ui.look.colors.messages.informational").name();
 -	ui_.log->appendText(QString("<font color=\"%1\">[%2]").arg(color, timestr) +
--		QString(" *** %1</font>").arg(prepareAsChatMessage ? TextUtil::prepareMessageText(str) : Qt::escape(str)));
+-		QString(" *** %1</font>").arg(prepareAsChatMessage ? TextUtil::prepareMessageText(str) : TextUtil::escape(str)));
 +	ui_.log->dispatchMessage(mv);
  
 -	if(alert)
@@ -2813,17 +2813,17 @@
 -		txt = TextUtil::legacyFormat(txt);
 -
 -	if(emote) {
--		//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(who)) + txt + "</font>");
--		ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(Qt::escape(who)) + alerttagso + txt + alerttagsc + "</font>");
+-		//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(who)) + txt + "</font>");
+-		ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(who)) + alerttagso + txt + alerttagsc + "</font>");
 -	}
 -	else {
 -		if(PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
--			//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(Qt::escape(who)) + "</font><br>" + txt);
--			ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(Qt::escape(who)) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + txt + alerttagsc + "</font>");
+-			//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(TextUtil::escape(who)) + "</font><br>" + txt);
+-			ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] ").arg(timestr) + QString("%1 says:").arg(TextUtil::escape(who)) + "</font><br>" + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + txt + alerttagsc + "</font>");
 -		}
 -		else {
--			//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + Qt::escape(who) + QString("&gt;</font> ") + txt);
--			ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + Qt::escape(who) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + txt + alerttagsc +"</font>");
+-			//ui_.log->append(QString("<font color=\"%1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(who) + QString("&gt;</font> ") + txt);
+-			ui_.log->appendText(QString("<font color=\"%1\">").arg(nickcolor) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(who) + QString("&gt;</font> ") + QString("<font color=\"%1\">").arg(textcolor) + alerttagso + txt + alerttagsc +"</font>");
 -		}
 -	}
 -
@@ -3096,7 +3096,7 @@
 +MessageView MessageView::subjectMessage(const QString &subject, const QString &prefix)
 +{
 +	MessageView mv(Subject);
-+	mv._text = Qt::escape(prefix);
++	mv._text = TextUtil::escape(prefix);
 +	mv._userText = subject;
 +	return mv;
 +}
@@ -4225,7 +4225,7 @@
  		}
 -		dlg_->appendSysMsg(QString("Version response: N: %2 V: %3 OS: %4")
 -			.arg(version->name(), version->version(), version->os()));
-+		dlg_->appendSysMsg(Qt::escape(QString("Version response: N: %2 V: %3 OS: %4")
++		dlg_->appendSysMsg(TextUtil::escape(QString("Version response: N: %2 V: %3 OS: %4")
 +			.arg(version->name(), version->version(), version->os())));
  	};
  
@@ -4235,7 +4235,7 @@
  		} else {
  			dlg_->appendSysMsg(QString("Last activity at %1 (%2)")
 -				.arg(idle->time().toString(), idle->status()));
-+				.arg(idle->time().toString(), Qt::escape(idle->status())));
++				.arg(idle->time().toString(), TextUtil::escape(idle->status())));
  		}
  	}
  
@@ -4291,14 +4291,14 @@
 -void PsiChatDlg::appendMessageFields(const Message& m)
 -{
 -//	if (!m.subject().isEmpty()) {
--//		chatView()->appendText(QString("<b>") + tr("Subject:") + "</b> " + QString("%1").arg(Qt::escape(m.subject())));
+-//		chatView()->appendText(QString("<b>") + tr("Subject:") + "</b> " + QString("%1").arg(TextUtil::escape(m.subject())));
 -//	}
 -	if (!m.urlList().isEmpty()) {
 -		UrlList urls = m.urlList();
 -		chatView()->appendText(QString("<i>") + tr("-- Attached URL(s) --") + "</i>");
 -		for (QList<Url>::ConstIterator it = urls.begin(); it != urls.end(); ++it) {
 -			const Url &u = *it;
--			chatView()->appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(Qt::escape(u.url()))));
+-			chatView()->appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(u.url()))));
 -			chatView()->appendText(QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(u.desc()));
 -		}
 -	}
@@ -4339,7 +4339,7 @@
  		QString str = chatEdit()->toPlainText();
  		if (!mCmdManager_.processCommand(str)) {
 -			appendSysMsg(tr("Error: Can not parse command: ") + str);
-+			appendSysMsg(tr("Error: Can not parse command: ") + Qt::escape(str));
++			appendSysMsg(tr("Error: Can not parse command: ") + TextUtil::escape(str));
  		}
  	} else {
  		ChatDlg::doSend();

@@ -3,7 +3,7 @@
 @@ -23,6 +23,8 @@
  #include <QList>
  #include <QtCrypto>
- #include <QTextDocument> // for Qt::escape()
+ #include <QTextDocument> // for TextUtil::escape()
 +#include <QBuffer>
 +#include <QUrl>
  
@@ -35,11 +35,11 @@
  			if (!mucItem)
  				hr = "<hr/>";
 -			if(r.status().mucItem().jid().isEmpty())
--				str += hr + QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(Qt::escape(name)) \
+-				str += hr + QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(TextUtil::escape(name)) \
 -				+ QString("(%1)").arg(r.priority()) + secstr + "</div>";
 -			else
--				str += hr +  QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(Qt::escape(name)) \
--				+ QString("(%1) &lt;%2&gt;").arg(r.priority()).arg(Qt::escape(JIDUtil::toString(r.status().mucItem().jid(),true))) + secstr + "</div>";
+-				str += hr +  QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(TextUtil::escape(name)) \
+-				+ QString("(%1) &lt;%2&gt;").arg(r.priority()).arg(TextUtil::escape(JIDUtil::toString(r.status().mucItem().jid(),true))) + secstr + "</div>";
 +			str += hr + "<div style='white-space:pre'>";
 +
 +			PsiIcon *statusIcon = PsiIconset::instance()->statusPtr(jid(), makeSTATUS(r.status()));
@@ -51,9 +51,9 @@
 +				str += QString("<img src=\"data:image/png;base64,%1\" alt=\"img\"/>").arg(imgBase64);
 +			}
 +
-+			str += QString(" <b>%1</b> ").arg(Qt::escape(name)) + QString("(%1)").arg(r.priority());
++			str += QString(" <b>%1</b> ").arg(TextUtil::escape(name)) + QString("(%1)").arg(r.priority());
 +			if (!r.status().mucItem().jid().isEmpty())
-+				str += QString(" &lt;%1&gt;").arg(Qt::escape(JIDUtil::toString(r.status().mucItem().jid(),true)));
++				str += QString(" &lt;%1&gt;").arg(TextUtil::escape(JIDUtil::toString(r.status().mucItem().jid(),true)));
 +			str += secstr + "</div>";
  
  			if(!r.publicKeyID().isEmpty() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.pgp").toBool()) {

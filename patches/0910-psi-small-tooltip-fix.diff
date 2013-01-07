@@ -9,7 +9,7 @@
  using namespace XMPP;
  
 @@ -752,31 +753,54 @@ QString UserListItem::makeBareTip(bool t
- 	// you most probably want to wrap it with Qt::escape()
+ 	// you most probably want to wrap it with TextUtil::escape()
  
  	QString str;
 +	int s = PsiIconset::instance()->system().iconSize();
@@ -42,14 +42,14 @@
  
  	QString nick = JIDUtil::nickOrJid(name(), jid().full());
 -	if(jid().full() != nick)
--		str += QString("<div style='white-space:pre'>%1 &lt;%2&gt;</div>").arg(Qt::escape(nick)).arg(Qt::escape(JIDUtil::toString(jid(),true)));
+-		str += QString("<div style='white-space:pre'>%1 &lt;%2&gt;</div>").arg(TextUtil::escape(nick)).arg(TextUtil::escape(JIDUtil::toString(jid(),true)));
 -	else
--		str += QString("<div style='white-space:pre'>%1</div>").arg(Qt::escape(nick));
+-		str += QString("<div style='white-space:pre'>%1</div>").arg(TextUtil::escape(nick));
 +	if (!mucItem) {
 +		if(jid().full() != nick)
-+			str += QString("<div style='white-space:pre'>%1 &lt;%2&gt;</div>").arg(Qt::escape(nick)).arg(Qt::escape(JIDUtil::toString(jid(),true)));
++			str += QString("<div style='white-space:pre'>%1 &lt;%2&gt;</div>").arg(TextUtil::escape(nick)).arg(TextUtil::escape(JIDUtil::toString(jid(),true)));
 +		else
-+			str += QString("<div style='white-space:pre'>%1</div>").arg(Qt::escape(nick));
++			str += QString("<div style='white-space:pre'>%1</div>").arg(TextUtil::escape(nick));
 +	}
  
  	// subscription
@@ -66,7 +66,7 @@
 +	if (!mood().isNull()) {
 +		str += QString("<div style='white-space:pre'><%1=\"mood/%2\"> ").arg(imgTag).arg(mood().typeValue()) + QObject::tr("Mood") + ": " + mood().typeText();
 +		if (!mood().text().isEmpty())
-+			str += QString(" (") + Qt::escape(mood().text()) + QString(")");
++			str += QString(" (") + TextUtil::escape(mood().text()) + QString(")");
 +		str += "</div>";
 +	}
  
@@ -91,14 +91,14 @@
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Mood") + ": " +
 -			QString("<%1=\"mood/%2\"> ").arg(imgTag).arg(mood().typeValue()) + mood().typeText();
 -		if (!mood().text().isEmpty())
--			str += QString(" (") + Qt::escape(mood().text()) + QString(")");
+-			str += QString(" (") + TextUtil::escape(mood().text()) + QString(")");
 -		str += "</div>";
 -	}
 -	
  	// User Tune
  	if (!tune().isEmpty())
--		str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + Qt::escape(tune()) + "</div>";
-+		str += QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg("psi/notification_roster_tune") + QObject::tr("Listening to") + ": " + Qt::escape(tune()) + "</div>";
+-		str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(tune()) + "</div>";
++		str += QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg("psi/notification_roster_tune") + QObject::tr("Listening to") + ": " + TextUtil::escape(tune()) + "</div>";
  
  	// User Physical Location
  	//if (!physicalLocation().isNull())
@@ -106,9 +106,9 @@
  
  	// User Geolocation
  	if (!geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
--		str += QString("<div style='white-space:pre'>") + Qt::escape(geoLocation().toString()) + "</div>";
+-		str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
 +		str += QString("<div style='white-space:pre'><table cellspacing=\"0\"><tr><td><%1=\"%2\"> </td><td><div>%3</div></td></tr></table></div>") \
-+		.arg(imgTag).arg("system/geolocation").arg(Qt::escape(geoLocation().toString().trimmed()));
++		.arg(imgTag).arg("system/geolocation").arg(TextUtil::escape(geoLocation().toString().trimmed()));
  
  	// resources
  	if(!userResourceList().isEmpty()) {
@@ -124,16 +124,16 @@
  			QString secstr;
  			if(isSecure(r.name()) && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.pgp").toBool())
  				secstr += QString(" <%1=\"psi/cryptoYes\">").arg(imgTag);
--			str += QString("<div style='white-space:pre'>") + QString("<%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(Qt::escape(name)) + QString("(%1)").arg(r.priority()) + secstr + "</div>";
+-			str += QString("<div style='white-space:pre'>") + QString("<%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(TextUtil::escape(name)) + QString("(%1)").arg(r.priority()) + secstr + "</div>";
 +			QString hr;
 +			if (!mucItem)
 +				hr = "<hr/>";
 +			if(r.status().mucItem().jid().isEmpty())
-+				str += hr + QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(Qt::escape(name)) \
++				str += hr + QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(TextUtil::escape(name)) \
 +				+ QString("(%1)").arg(r.priority()) + secstr + "</div>";
 +			else
-+				str += hr +  QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(Qt::escape(name)) \
-+				+ QString("(%1) &lt;%2&gt;").arg(r.priority()).arg(Qt::escape(JIDUtil::toString(r.status().mucItem().jid(),true))) + secstr + "</div>";
++				str += hr +  QString("<div style='white-space:pre'><%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b> ").arg(TextUtil::escape(name)) \
++				+ QString("(%1) &lt;%2&gt;").arg(r.priority()).arg(TextUtil::escape(JIDUtil::toString(r.status().mucItem().jid(),true))) + secstr + "</div>";
  
  			if(!r.publicKeyID().isEmpty() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.pgp").toBool()) {
  				int v = r.pgpVerifyStatus();
@@ -183,24 +183,24 @@
 +				QString ver = r.versionString();
  				if(trim)
 -					s = dot_truncate(s, 80);
--				s = Qt::escape(s);
+-				s = TextUtil::escape(s);
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + QString(": %1").arg(s) + "</div>";
 +					ver = dot_truncate(ver, 80);
-+				ver = Qt::escape(ver);
++				ver = TextUtil::escape(ver);
 +				str += QString("<div class='layer1'><%1=\"%2\"> ").arg(imgTag).arg("clients/" + findClient(r.clientName().toLower())) + QObject::tr("Using") + QString(": %3").arg(ver) + "</div>";
  			}
 -			
 -			// User Tune
 -			if (!r.tune().isEmpty())
--				str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + Qt::escape(r.tune()) + "</div>";
+-				str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(r.tune()) + "</div>";
 -
 -			// User Physical Location
 -		//	if (!r.physicalLocation().isNull())
--		//		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + Qt::escape(r.physicalLocation().toString()) + "</div>";
+-		//		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(r.physicalLocation().toString()) + "</div>";
 -
 -			// User Geolocation
 -			if (!r.geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
--				str += QString("<div style='white-space:pre'>") + Qt::escape(geoLocation().toString()) + "</div>";
+-				str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
  
  			// Entity Time
  			if (r.timezoneOffset().hasValue()) {
@@ -214,7 +214,7 @@
 -				QString ver = r.versionString();
 -				if(trim)
 -					ver = dot_truncate(ver, 80);
--				ver = Qt::escape(ver);
+-				ver = TextUtil::escape(ver);
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Using") + QString(": <%1=\"%2\"> %3").arg(imgTag).arg("clients/" + findClient(r.clientName().toLower())).arg(ver) + "</div>";
 +			// MUC
 +			if(!v_isConference && r.status().hasMUCItem()) {
