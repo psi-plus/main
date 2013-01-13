@@ -1,5 +1,9 @@
---- psi.orig/options/default.xml
-+++ psi/options/default.xml
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/options/default.xml b/options/default.xml
+index 1180ab9..83acd29 100644
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -297,6 +297,21 @@ QLineEdit#le_status_text {
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -33,8 +37,10 @@
  					</muc>
  					<messages comment="Message coloring.">
  						<received type="QColor" comment="Color used to indicate received messages.">#0000ff</received>
---- psi.orig/src/avatars.cpp
-+++ psi/src/avatars.cpp
+diff --git a/src/avatars.cpp b/src/avatars.cpp
+index 22a54bb..79fcaaa 100644
+--- a/src/avatars.cpp
++++ b/src/avatars.cpp
 @@ -42,6 +42,7 @@
  #include "xmpp_client.h"
  #include "xmpp_resource.h"
@@ -44,7 +50,7 @@
  #include "applicationinfo.h"
  #include "psiaccount.h"
 @@ -275,7 +276,7 @@ protected:
- 	void avatarUpdated() 
+ 	void avatarUpdated()
  		{ emit avatarChanged(jid_); }
  
 -private:
@@ -101,7 +107,7 @@
  // VCardStaticAvatar: VCard static photo avatar (not published through presence)
  //------------------------------------------------------------------------------
  
-@@ -505,6 +548,25 @@ QPixmap AvatarFactory::getAvatar(const J
+@@ -505,6 +548,25 @@ QPixmap AvatarFactory::getAvatar(const Jid& _jid)
  	return pm;
  }
  
@@ -127,7 +133,7 @@
  Avatar* AvatarFactory::retrieveAvatar(const Jid& jid)
  {
  	//printf("Retrieving avatar of %s\n", jid.full().latin1());
-@@ -577,6 +639,12 @@ void AvatarFactory::updateAvatar(const J
+@@ -577,6 +639,12 @@ void AvatarFactory::updateAvatar(const Jid& j)
  	emit avatarChanged(j);
  }
  
@@ -140,7 +146,7 @@
  void AvatarFactory::importManualAvatar(const Jid& j, const QString& fileName)
  {
  	FileAvatar(this, j).import(fileName);
-@@ -609,6 +677,18 @@ void AvatarFactory::resourceAvailable(co
+@@ -609,6 +677,18 @@ void AvatarFactory::resourceAvailable(const Jid& jid, const Resource& r)
  	}
  }
  
@@ -197,8 +203,10 @@
  void AvatarFactory::itemPublished(const Jid& jid, const QString& n, const PubSubItem& item)
  {
  	if (n == PEP_AVATAR_DATA_NS) {
---- psi.orig/src/avatars.h
-+++ psi/src/avatars.h
+diff --git a/src/avatars.h b/src/avatars.h
+index 2125390..0fa39dc 100644
+--- a/src/avatars.h
++++ b/src/avatars.h
 @@ -37,6 +37,7 @@
  class PsiAccount;
  class Avatar;
@@ -245,9 +253,11 @@
  	QMap<QString,VCardStaticAvatar*> vcard_static_avatars_;
  	PsiAccount* pa_;
  	Iconset iconset_;
---- psi.orig/src/contactlistmodel.cpp
-+++ psi/src/contactlistmodel.cpp
-@@ -536,7 +536,9 @@ QVariant ContactListModel::contactData(c
+diff --git a/src/contactlistmodel.cpp b/src/contactlistmodel.cpp
+index 87579c1..135c387 100755
+--- a/src/contactlistmodel.cpp
++++ b/src/contactlistmodel.cpp
+@@ -552,7 +552,9 @@ QVariant ContactListModel::contactData(const PsiContact* contact, int role) cons
  		return QVariant(contact->userListItem().clients());
  	}
  	else if (role == AvatarRole) {
@@ -258,9 +268,11 @@
  		return QVariant(pix);
  	}
  	else if (role == IsMucRole) {
---- psi.orig/src/gcuserview.cpp
-+++ psi/src/gcuserview.cpp
-@@ -36,6 +36,8 @@
+diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
+index fe2d02e..1258259 100644
+--- a/src/gcuserview.cpp
++++ b/src/gcuserview.cpp
+@@ -37,6 +37,8 @@
  #include "psioptions.h"
  #include "coloropt.h"
  #include "avcall/avcall.h"
@@ -269,7 +281,7 @@
  
  static bool caseInsensitiveLessThan(const QString &s1, const QString &s2)
  {
-@@ -53,6 +55,31 @@ public:
+@@ -54,6 +56,31 @@ public:
  	GCUserViewDelegate(QObject* p)
  		: QItemDelegate(p)
  	{
@@ -301,7 +313,7 @@
  	}
  
  	void paint(QPainter* mp, const QStyleOptionViewItem& option, const QModelIndex& index) const
-@@ -65,52 +91,204 @@ public:
+@@ -66,52 +93,204 @@ public:
  				paintGroup(mp, option, gi);
  			}
  			else {
@@ -313,10 +325,10 @@
  
  	void paintGroup(QPainter* p, const QStyleOptionViewItem& o, GCUserViewGroupItem* gi) const
  	{
+-		bool slimGroups = PsiOptions::instance()->getOption("options.ui.look.contactlist.use-slim-group-headings").toBool();
 +		if(!showGroups_)
 +			return;
 +
--		bool slimGroups = PsiOptions::instance()->getOption("options.ui.look.contactlist.use-slim-group-headings").toBool();
  		QRect rect = o.rect;
  		QFont f = o.font;
 -		f.setPointSize(common_smallFontSize);
@@ -520,7 +532,7 @@
  };
  
  
-@@ -123,10 +303,21 @@ GCUserViewItem::GCUserViewItem(GCUserVie
+@@ -125,10 +304,21 @@ GCUserViewItem::GCUserViewItem(GCUserViewGroupItem *par)
  {
  }
  
@@ -536,14 +548,14 @@
 +}
 +
  bool GCUserViewItem::operator<(const QTreeWidgetItem& it) const
- {	
+ {
  	GCUserViewItem *item = (GCUserViewItem*)(&it);
 -	if(PsiOptions::instance()->getOption("options.ui.contactlist.contact-sort-style").toString() == "status") {
 +	if(PsiOptions::instance()->getOption("options.ui.muc.userlist.contact-sort-style").toString() == "status") {
  		int rank = rankStatus(s.type()) - rankStatus(item->s.type());
  		if (rank == 0)
  			rank = QString::localeAwareCompare(text(0).toLower(), it.text(0).toLower());
-@@ -220,7 +412,7 @@ void GCUserView::updateAll()
+@@ -224,7 +414,7 @@ void GCUserView::updateAll()
  		int count = j->childCount();
  		for(int num = 0; num < count; num++) {
  			GCUserViewItem *i = (GCUserViewItem*)j->child(num);
@@ -552,7 +564,7 @@
  		}
  		j->sortChildren(0, Qt::AscendingOrder);
  	}
-@@ -300,7 +492,7 @@ void GCUserView::updateEntry(const QStri
+@@ -304,7 +494,7 @@ void GCUserView::updateEntry(const QString &nick, const Status &s)
  	}
  
  	lvi->s = s;
@@ -561,7 +573,7 @@
  	gr->sortChildren(0, Qt::AscendingOrder);
  }
  
-@@ -365,6 +557,8 @@ bool GCUserView::maybeTip(const QPoint &
+@@ -369,6 +559,8 @@ bool GCUserView::maybeTip(const QPoint &pos)
  	ur.setClient(client_name,client_version,"");
  	//ur.setClient(QString(),QString(),"");
  	u.userResourceList().append(ur);
@@ -570,7 +582,7 @@
  
  	PsiToolTip::showText(mapToGlobal(pos), u.makeTip(), this);
  	return true;
-@@ -569,4 +763,10 @@ void GCUserView::mousePressEvent(QMouseE
+@@ -573,4 +765,10 @@ void GCUserView::mousePressEvent(QMouseEvent *event)
  		contextMenuRequested(event->pos());
  }
  
@@ -581,9 +593,11 @@
 +}
 +
  #include "gcuserview.moc"
---- psi.orig/src/gcuserview.h
-+++ psi/src/gcuserview.h
-@@ -39,10 +39,18 @@ class GCUserViewItem : public QObject, p
+diff --git a/src/gcuserview.h b/src/gcuserview.h
+index 3cea68a..a6e36cc 100644
+--- a/src/gcuserview.h
++++ b/src/gcuserview.h
+@@ -39,10 +39,18 @@ class GCUserViewItem : public QObject, public QTreeWidgetItem
  {
  public:
  	GCUserViewItem(GCUserViewGroupItem *);
@@ -618,9 +632,11 @@
  
  protected:
  	enum Role { Moderator = 0, Participant = 1, Visitor = 2 };
---- psi.orig/src/groupchatdlg.cpp
-+++ psi/src/groupchatdlg.cpp
-@@ -86,6 +86,7 @@
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+index 6332c9d..5784408 100644
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -85,6 +85,7 @@
  #include "lastactivitytask.h"
  #include "psirichtext.h"
  #include "psiwindowheader.h"
@@ -628,7 +644,7 @@
  
  #include "mcmdsimplesite.h"
  
-@@ -817,6 +818,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -816,6 +817,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
  	// Connect signals from MUC manager
  	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
@@ -636,7 +652,7 @@
  
  	setLooks();
  	setShortcuts();
-@@ -825,6 +827,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -824,6 +826,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
  
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
@@ -645,16 +661,16 @@
  }
  
  void GCMainDlg::vcard(const QString& _str)
-@@ -1485,6 +1489,8 @@ void GCMainDlg::presence(const QString &
+@@ -1484,6 +1488,8 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  			}
  		}
  		ui_.lv_users->updateEntry(nick, s);
 +		if(!nick.isEmpty())
 +			avatarUpdated(jidForNick(nick));
- 	} 
+ 	}
  	else {
  		// Unavailable
-@@ -1579,6 +1585,22 @@ void GCMainDlg::presence(const QString &
+@@ -1578,6 +1584,22 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
  	}
  
@@ -677,7 +693,7 @@
  }
  
  void GCMainDlg::message(const Message &_m)
-@@ -1841,6 +1863,8 @@ void GCMainDlg::setLooks()
+@@ -1838,6 +1860,8 @@ void GCMainDlg::setLooks()
  #ifndef Q_OS_MAC
  	setWindowIcon(IconsetFactory::icon("psi/groupChat").icon());
  #endif
@@ -686,8 +702,10 @@
  }
  
  void GCMainDlg::optionsUpdate()
---- psi.orig/src/groupchatdlg.h
-+++ psi/src/groupchatdlg.h
+diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
+index d517f04..8111fbd 100644
+--- a/src/groupchatdlg.h
++++ b/src/groupchatdlg.h
 @@ -147,6 +147,7 @@ private slots:
  	void horizSplitterMoved();
  	void verticalSplitterMoved(int, int);
@@ -704,9 +722,11 @@
  };
  
  class GCFindDlg : public QDialog
---- psi.orig/src/options/opt_appearance.cpp
-+++ psi/src/options/opt_appearance.cpp
-@@ -99,6 +99,7 @@ OptionsTabIconset::OptionsTabIconset(QOb
+diff --git a/src/options/opt_appearance.cpp b/src/options/opt_appearance.cpp
+index d6d0923..fc3a56c 100644
+--- a/src/options/opt_appearance.cpp
++++ b/src/options/opt_appearance.cpp
+@@ -99,6 +99,7 @@ OptionsTabIconset::OptionsTabIconset(QObject *parent) : MetaOptionsTab(parent, "
  	addTab( new OptionsTabIconsetClients(this) );
  	addTab( new OptionsTabIconsetRoster(this) );
  	addTab( new OptionsTabIconsetSystem(this) );
@@ -714,99 +734,10 @@
  }
  
  
---- psi.orig/src/options/opt_iconset_affiliation.ui
-+++ psi/src/options/opt_iconset_affiliation.ui
-@@ -0,0 +1,88 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<ui version="4.0">
-+ <class>IconsetAffiliation</class>
-+ <widget class="QWidget" name="IconsetAffiliation">
-+  <property name="geometry">
-+   <rect>
-+    <x>0</x>
-+    <y>0</y>
-+    <width>256</width>
-+    <height>195</height>
-+   </rect>
-+  </property>
-+  <property name="windowTitle">
-+   <string>IconsetClientUI</string>
-+  </property>
-+  <layout class="QVBoxLayout">
-+   <property name="spacing">
-+    <number>6</number>
-+   </property>
-+   <property name="margin">
-+    <number>9</number>
-+   </property>
-+   <item>
-+    <widget class="QGroupBox" name="groupBox10">
-+     <property name="title">
-+      <string>Affiliation iconsets</string>
-+     </property>
-+     <layout class="QGridLayout">
-+      <property name="margin">
-+       <number>8</number>
-+      </property>
-+      <property name="spacing">
-+       <number>6</number>
-+      </property>
-+      <item row="1" column="2">
-+       <spacer>
-+        <property name="orientation">
-+         <enum>Qt::Horizontal</enum>
-+        </property>
-+        <property name="sizeType">
-+         <enum>QSizePolicy::Expanding</enum>
-+        </property>
-+        <property name="sizeHint" stdset="0">
-+         <size>
-+          <width>204</width>
-+          <height>20</height>
-+         </size>
-+        </property>
-+       </spacer>
-+      </item>
-+      <item row="1" column="3">
-+       <widget class="IconButton" name="pb_affiliationDetails" native="true">
-+        <property name="text" stdset="0">
-+         <string>&amp;Show Details</string>
-+        </property>
-+       </widget>
-+      </item>
-+      <item row="0" column="0" colspan="4">
-+       <widget class="IconsetSelect" name="iss_affiliation" native="true"/>
-+      </item>
-+     </layout>
-+    </widget>
-+   </item>
-+   <item>
-+    <widget class="QProgressBar" name="progress">
-+     <property name="orientation">
-+      <enum>Qt::Horizontal</enum>
-+     </property>
-+    </widget>
-+   </item>
-+  </layout>
-+ </widget>
-+ <layoutdefault spacing="6" margin="11"/>
-+ <customwidgets>
-+  <customwidget>
-+   <class>IconButton</class>
-+   <extends></extends>
-+   <header>iconbutton.h</header>
-+  </customwidget>
-+  <customwidget>
-+   <class>IconsetSelect</class>
-+   <extends></extends>
-+   <header>iconsetselect.h</header>
-+  </customwidget>
-+ </customwidgets>
-+ <resources/>
-+ <connections/>
-+</ui>
---- psi.orig/src/options/opt_iconset.cpp
-+++ psi/src/options/opt_iconset.cpp
+diff --git a/src/options/opt_iconset.cpp b/src/options/opt_iconset.cpp
+index 5cfe9ad..338c934 100644
+--- a/src/options/opt_iconset.cpp
++++ b/src/options/opt_iconset.cpp
 @@ -28,6 +28,7 @@
  #include "ui_opt_iconset_client.h"
  #include "ui_opt_iconset_system.h"
@@ -828,7 +759,7 @@
  class IconsetRosterUI : public QWidget, public Ui::IconsetRoster
  {
  public:
-@@ -963,6 +970,153 @@ void OptionsTabIconsetActivity::cancelTh
+@@ -963,6 +970,153 @@ void OptionsTabIconsetActivity::cancelThread()
  		thread = 0;
  	}
  }
@@ -982,8 +913,10 @@
  
  //----------------------------------------------------------------------------
  // OptionsTabIconsetClients
---- psi.orig/src/options/opt_iconset.h
-+++ psi/src/options/opt_iconset.h
+diff --git a/src/options/opt_iconset.h b/src/options/opt_iconset.h
+index fbe8f2e..4604459 100644
+--- a/src/options/opt_iconset.h
++++ b/src/options/opt_iconset.h
 @@ -149,6 +149,34 @@ private:
  	IconsetLoadThread *thread;
  };
@@ -1019,8 +952,104 @@
  class OptionsTabIconsetRoster : public OptionsTab
  {
  	Q_OBJECT
---- psi.orig/src/options/options.pri
-+++ psi/src/options/options.pri
+diff --git a/src/options/opt_iconset_affiliation.ui b/src/options/opt_iconset_affiliation.ui
+new file mode 100644
+index 0000000..485c7c4
+--- /dev/null
++++ b/src/options/opt_iconset_affiliation.ui
+@@ -0,0 +1,88 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>IconsetAffiliation</class>
++ <widget class="QWidget" name="IconsetAffiliation">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>256</width>
++    <height>195</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>IconsetClientUI</string>
++  </property>
++  <layout class="QVBoxLayout">
++   <property name="spacing">
++    <number>6</number>
++   </property>
++   <property name="margin">
++    <number>9</number>
++   </property>
++   <item>
++    <widget class="QGroupBox" name="groupBox10">
++     <property name="title">
++      <string>Affiliation iconsets</string>
++     </property>
++     <layout class="QGridLayout">
++      <property name="margin">
++       <number>8</number>
++      </property>
++      <property name="spacing">
++       <number>6</number>
++      </property>
++      <item row="1" column="2">
++       <spacer>
++        <property name="orientation">
++         <enum>Qt::Horizontal</enum>
++        </property>
++        <property name="sizeType">
++         <enum>QSizePolicy::Expanding</enum>
++        </property>
++        <property name="sizeHint" stdset="0">
++         <size>
++          <width>204</width>
++          <height>20</height>
++         </size>
++        </property>
++       </spacer>
++      </item>
++      <item row="1" column="3">
++       <widget class="IconButton" name="pb_affiliationDetails" native="true">
++        <property name="text" stdset="0">
++         <string>&amp;Show Details</string>
++        </property>
++       </widget>
++      </item>
++      <item row="0" column="0" colspan="4">
++       <widget class="IconsetSelect" name="iss_affiliation" native="true"/>
++      </item>
++     </layout>
++    </widget>
++   </item>
++   <item>
++    <widget class="QProgressBar" name="progress">
++     <property name="orientation">
++      <enum>Qt::Horizontal</enum>
++     </property>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <layoutdefault spacing="6" margin="11"/>
++ <customwidgets>
++  <customwidget>
++   <class>IconButton</class>
++   <extends></extends>
++   <header>iconbutton.h</header>
++  </customwidget>
++  <customwidget>
++   <class>IconsetSelect</class>
++   <extends></extends>
++   <header>iconsetselect.h</header>
++  </customwidget>
++ </customwidgets>
++ <resources/>
++ <connections/>
++</ui>
+diff --git a/src/options/options.pri b/src/options/options.pri
+index 2d86895..a4442e4 100644
+--- a/src/options/options.pri
++++ b/src/options/options.pri
 @@ -74,6 +74,7 @@ FORMS += \
  	$$PWD/opt_iconset_mood.ui \
  	$$PWD/opt_iconset_activity.ui \
@@ -1029,9 +1058,11 @@
  	$$PWD/opt_iconset_system.ui \
  	$$PWD/opt_iconset_roster.ui \
  	$$PWD/opt_general_groupchat.ui \
---- psi.orig/src/psiaccount.cpp
-+++ psi/src/psiaccount.cpp
-@@ -6161,6 +6161,7 @@ void PsiAccount::invokeGCChat(const Jid 
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index 4f33be5..e50c8f6 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -6174,6 +6174,7 @@ void PsiAccount::invokeGCMessage(const Jid &j)
  	u->setInList(false);
  	u->setName(j.resource());
  	u->setPrivate(true);
@@ -1039,8 +1070,10 @@
  
  	// make a resource so the contact appears online
  	UserResource ur;
---- psi.orig/src/psichatdlg.cpp
-+++ psi/src/psichatdlg.cpp
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+index de52f2e..0474717 100644
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -716,6 +716,7 @@ void PsiChatDlg::updateAvatar()
  	}
  
@@ -1063,8 +1096,10 @@
  	if (p.isNull()) {
  		ui_.avatar->hide();
  	}
---- psi.orig/src/psicontactlistviewdelegate.cpp
-+++ psi/src/psicontactlistviewdelegate.cpp
+diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate.cpp
+index eb26898..dfbc74d 100644
+--- a/src/psicontactlistviewdelegate.cpp
++++ b/src/psicontactlistviewdelegate.cpp
 @@ -28,6 +28,7 @@
  #include "coloropt.h"
  #include "contactlistview.h"
@@ -1073,7 +1108,7 @@
  
  static const QString contactListFontOptionPath = "options.ui.look.font.contactlist";
  static const QString slimGroupsOptionPath = "options.ui.look.contactlist.use-slim-group-headings";
-@@ -158,33 +159,12 @@ QList<QPixmap> PsiContactListViewDelegat
+@@ -158,33 +159,12 @@ QList<QPixmap> PsiContactListViewDelegate::clientPixmap(const QModelIndex& index
  
  QPixmap PsiContactListViewDelegate::avatarIcon(const QModelIndex& index) const
  {
@@ -1109,8 +1144,10 @@
  }
  
  QSize PsiContactListViewDelegate::sizeHint(const QStyleOptionViewItem& /*option*/, const QModelIndex& index) const
---- psi.orig/src/psiiconset.cpp
-+++ psi/src/psiiconset.cpp
+diff --git a/src/psiiconset.cpp b/src/psiiconset.cpp
+index ca272dc..c4cbae1 100644
+--- a/src/psiiconset.cpp
++++ b/src/psiiconset.cpp
 @@ -42,8 +42,8 @@ class PsiIconset::Private
  private:
  	PsiIconset *psi;
@@ -1176,7 +1213,7 @@
  	return true;
  }
  
-@@ -491,6 +524,9 @@ void PsiIconset::optionChanged(const QSt
+@@ -491,6 +524,9 @@ void PsiIconset::optionChanged(const QString& option)
  	else if (option == "options.iconsets.clients") {
  		loadClients();
  	}
@@ -1186,8 +1223,10 @@
  
  	// currently we rely on PsiCon calling reloadRoster() when
  	// all options are already applied. otherwise we risk the chance
---- psi.orig/src/psiiconset.h
-+++ psi/src/psiiconset.h
+diff --git a/src/psiiconset.h b/src/psiiconset.h
+index 95856f6..f749df4 100644
+--- a/src/psiiconset.h
++++ b/src/psiiconset.h
 @@ -47,6 +47,7 @@ public:
  	Iconset moods;
  	Iconset activities;
@@ -1205,9 +1244,11 @@
  };
  
  QString status2name(int s);
---- psi.orig/src/userlist.cpp
-+++ psi/src/userlist.cpp
-@@ -767,14 +767,18 @@ QString UserListItem::makeBareTip(bool t
+diff --git a/src/userlist.cpp b/src/userlist.cpp
+index 8bcbf22..3ecc39f 100644
+--- a/src/userlist.cpp
++++ b/src/userlist.cpp
+@@ -767,14 +767,18 @@ QString UserListItem::makeBareTip(bool trim, bool doLinkify) const
  		mucItem = userResourceList()[0].status().hasMUCItem();
  	}
  
