@@ -1,57 +1,9 @@
---- psi.orig/iris/src/xmpp/xmpp-im/types.cpp
-+++ psi/iris/src/xmpp/xmpp-im/types.cpp
-@@ -2238,24 +2238,29 @@ void Status::setType(Status::Type _type)
- 	setIsInvisible(invisible);
- }
- 
--void Status::setType(QString stat)
-+Status::Type Status::txt2type(const QString& stat)
- {
- 	if (stat == "offline")
--		setType(XMPP::Status::Offline);
-+		return XMPP::Status::Offline;
- 	else if (stat == "online")
--		setType(XMPP::Status::Online);
-+		return XMPP::Status::Online;
- 	else if (stat == "away")
--		setType(XMPP::Status::Away);
-+		return XMPP::Status::Away;
- 	else if (stat == "xa")
--		setType(XMPP::Status::XA);
-+		return XMPP::Status::XA;
- 	else if (stat == "dnd")
--		setType(XMPP::Status::DND);
-+		return XMPP::Status::DND;
- 	else if (stat == "invisible")
--		setType(XMPP::Status::Invisible);
-+		return XMPP::Status::Invisible;
- 	else if (stat == "chat")
--		setType(XMPP::Status::FFC);
-+		return XMPP::Status::FFC;
- 	else
--		setType(XMPP::Status::Away);
-+		return XMPP::Status::Away;
-+}
-+
-+void Status::setType(QString stat)
-+{
-+	setType(txt2type(stat));
- }
- 
- void Status::setShow(const QString & _show)
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_status.h
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_status.h
-@@ -71,6 +71,8 @@ namespace XMPP
- 		int mucHistoryMaxStanzas() const;
- 		int mucHistorySeconds() const;
- 
-+		static Type txt2type(const QString& stat);
-+
- 		void setPriority(int);
- 		void setType(Type);
- 		void setType(QString);
---- psi.orig/options/default.xml
-+++ psi/options/default.xml
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/options/default.xml b/options/default.xml
+index 0d3d841..ab6bebf 100644
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -58,6 +58,7 @@
  				<maximum comment="The maximum number of recently joined rooms that should be remembered" type="int">10</maximum>
  			</recent-joins>
@@ -137,141 +89,10 @@
  		</status>
  		<subscriptions>
  			<automatically-allow-authorization type="bool">false</automatically-allow-authorization>
---- psi.orig/src/accountmodifydlg.cpp
-+++ psi/src/accountmodifydlg.cpp
-@@ -86,8 +86,6 @@ void AccountModifyDlg::init()
- 	connect(pb_key, SIGNAL(clicked()), SLOT(chooseKey()));
- 	connect(pb_keyclear, SIGNAL(clicked()), SLOT(clearKey()));
- 	connect(buttonBox->button(QDialogButtonBox::Save), SIGNAL(clicked()), SLOT(save()));
--	connect(ck_automatic_resource, SIGNAL(toggled(bool)), le_resource, SLOT(setDisabled(bool)));
--	connect(ck_automatic_resource, SIGNAL(toggled(bool)), lb_resource, SLOT(setDisabled(bool)));
- 
- 	gb_pgp->setEnabled(false);
- 
-@@ -124,9 +122,18 @@ void AccountModifyDlg::init()
- 	le_port->setText(QString::number(acc.port));
- 	ck_req_mutual->setChecked(acc.req_mutual_auth);
- 
--	ck_automatic_resource->setChecked(acc.opt_automatic_resource);
-+	connect(cb_resource, SIGNAL(currentIndexChanged(int)), SLOT(resourceCbChanged(int)));
-+	connect(cb_priority, SIGNAL(currentIndexChanged(int)), SLOT(priorityCbChanged(int)));
-+	connect(ck_auto, SIGNAL(clicked()), SLOT(autoconnectCksChanged()));
-+	connect(ck_connectAfterSleep, SIGNAL(clicked()), SLOT(autoconnectCksChanged()));
-+	cb_resource->addItem(tr("Manual"));
-+	cb_resource->addItem(tr("Use host name"));
-+	cb_resource->setCurrentIndex(acc.opt_automatic_resource ? 1 : 0);
- 	le_resource->setText(acc.resource);
--	le_priority->setText(QString::number(acc.priority));
-+	cb_priority->addItem(tr("Fixed"));
-+	cb_priority->addItem(tr("Depends on status"));
-+	cb_priority->setCurrentIndex(acc.priority_dep_on_status ? 1 : 0);
-+	sb_priority->setValue(acc.priority);
- 
- 	connect(ck_custom_auth,SIGNAL(toggled(bool)), lb_authid, SLOT(setEnabled(bool)));
- 	connect(ck_custom_auth,SIGNAL(toggled(bool)), le_authid, SLOT(setEnabled(bool)));
-@@ -140,6 +147,7 @@ void AccountModifyDlg::init()
- 	ck_auto->setChecked(acc.opt_auto);
- 	ck_reconn->setChecked(acc.opt_reconn);
- 	ck_connectAfterSleep->setChecked(acc.opt_connectAfterSleep);
-+	ck_autoSameStatus->setChecked(acc.opt_autoSameStatus);
- 	ck_log->setChecked(acc.opt_log);
- 	ck_keepAlive->setChecked(acc.opt_keepAlive);
- 	ck_ibbOnly->setChecked(acc.ibbOnly);
-@@ -148,6 +156,7 @@ void AccountModifyDlg::init()
- 	le_stunPort->setText(QString::number(acc.stunPort));
- 	le_stunUser->setText(acc.stunUser);
- 	le_stunPass->setText(acc.stunPass);
-+	autoconnectCksChanged();
- 	connect(ck_ibbOnly, SIGNAL(toggled(bool)), SLOT(ibbOnlyToggled(bool)));
- 	ibbOnlyToggled(acc.ibbOnly);
- 
-@@ -249,7 +258,7 @@ void AccountModifyDlg::init()
- 		tr("This option sets the user (and realm) you want to "
- 			"authenticate as. This overrides the XMPP address you are logging in "
- 			"as."));
--	le_priority->setWhatsThis(
-+	sb_priority->setWhatsThis(
- 		tr("<p>You can have multiple clients connected to the XMPP "
- 		"server with your single account.  In such a situation, "
- 		"the client with the highest priority (that is specified in "
-@@ -309,7 +318,7 @@ void AccountModifyDlg::init()
- 	}
- 	
- 	if (!PsiOptions::instance()->getOption("options.ui.account.resource").toBool()) {
--		ck_automatic_resource->hide();
-+		cb_resource->hide();
- 		lb_resource->hide();
- 		le_resource->hide();
- 	}
-@@ -324,7 +333,8 @@ void AccountModifyDlg::init()
- 	
- 	if (!PsiOptions::instance()->getOption("options.ui.account.priority").toBool()) {
- 		lb_priority->hide();
--		le_priority->hide();
-+		cb_priority->hide();
-+		sb_priority->hide();
- 	}
- 	
- 	if (!PsiOptions::instance()->getOption("options.ui.account.data-proxy").toBool()) {
-@@ -511,9 +521,10 @@ void AccountModifyDlg::save()
- 	acc.req_mutual_auth = ck_req_mutual->isChecked();
- 	acc.security_level = cb_security_level->itemData(cb_security_level->currentIndex()).toInt();
- 
--	acc.opt_automatic_resource = ck_automatic_resource->isChecked();
-+	acc.opt_automatic_resource = (cb_resource->currentIndex() == 1);
- 	acc.resource = le_resource->text();
--	acc.priority = le_priority->text().toInt();
-+	acc.priority_dep_on_status = (cb_priority->currentIndex() == 1);
-+	acc.priority = sb_priority->value();
- 	acc.customAuth = ck_custom_auth->isChecked();
- 	acc.authid = le_authid->text();
- 	acc.realm = le_realm->text();
-@@ -522,6 +533,7 @@ void AccountModifyDlg::save()
- 	acc.opt_compress = ck_compress->isChecked();
- 	acc.opt_auto = ck_auto->isChecked();
- 	acc.opt_connectAfterSleep = ck_connectAfterSleep->isChecked();
-+	acc.opt_autoSameStatus = ck_autoSameStatus->isChecked();
- 	acc.opt_reconn = ck_reconn->isChecked();
- 	acc.opt_log = ck_log->isChecked();
- 	acc.opt_keepAlive = ck_keepAlive->isChecked();
-@@ -648,3 +660,22 @@ void AccountModifyDlg::getDefaultList_er
- 	setPrivacyTabEnabled(false);
- }
- 
-+void AccountModifyDlg::resourceCbChanged(int index)
-+{
-+	le_resource->setEnabled(index == 0);
-+}
-+
-+void AccountModifyDlg::priorityCbChanged(int index)
-+{
-+	sb_priority->setEnabled(index == 0);
-+}
-+
-+void AccountModifyDlg::autoconnectCksChanged()
-+{
-+	if (ck_auto->isChecked() || ck_connectAfterSleep->isChecked()) {
-+		ck_autoSameStatus->setEnabled(true);
-+	}
-+	else {
-+		ck_autoSameStatus->setEnabled(false);
-+	}
-+}
---- psi.orig/src/accountmodifydlg.h
-+++ psi/src/accountmodifydlg.h
-@@ -73,6 +73,10 @@ private slots:
-  	void getDefaultList_error();
-  	void changeList_error();
- 
-+	void resourceCbChanged(int index);
-+	void priorityCbChanged(int index);
-+	void autoconnectCksChanged();
-+
- private:
- 	PsiCon *psi;
- 	PsiAccount *pa;
---- psi.orig/src/accountmodify.ui
-+++ psi/src/accountmodify.ui
+diff --git a/src/accountmodify.ui b/src/accountmodify.ui
+index 05991ad..d6350eb 100644
+--- a/src/accountmodify.ui
++++ b/src/accountmodify.ui
 @@ -150,6 +150,13 @@
             </widget>
            </item>
@@ -386,8 +207,148 @@
    <tabstop>le_dtProxy</tabstop>
    <tabstop>le_stunHost</tabstop>
    <tabstop>le_stunPort</tabstop>
---- psi.orig/src/accountstatusmenu.cpp
-+++ psi/src/accountstatusmenu.cpp
+diff --git a/src/accountmodifydlg.cpp b/src/accountmodifydlg.cpp
+index 3c07b56..7b76e6f 100644
+--- a/src/accountmodifydlg.cpp
++++ b/src/accountmodifydlg.cpp
+@@ -86,8 +86,6 @@ void AccountModifyDlg::init()
+ 	connect(pb_key, SIGNAL(clicked()), SLOT(chooseKey()));
+ 	connect(pb_keyclear, SIGNAL(clicked()), SLOT(clearKey()));
+ 	connect(buttonBox->button(QDialogButtonBox::Save), SIGNAL(clicked()), SLOT(save()));
+-	connect(ck_automatic_resource, SIGNAL(toggled(bool)), le_resource, SLOT(setDisabled(bool)));
+-	connect(ck_automatic_resource, SIGNAL(toggled(bool)), lb_resource, SLOT(setDisabled(bool)));
+ 
+ 	gb_pgp->setEnabled(false);
+ 
+@@ -124,9 +122,18 @@ void AccountModifyDlg::init()
+ 	le_port->setText(QString::number(acc.port));
+ 	ck_req_mutual->setChecked(acc.req_mutual_auth);
+ 
+-	ck_automatic_resource->setChecked(acc.opt_automatic_resource);
++	connect(cb_resource, SIGNAL(currentIndexChanged(int)), SLOT(resourceCbChanged(int)));
++	connect(cb_priority, SIGNAL(currentIndexChanged(int)), SLOT(priorityCbChanged(int)));
++	connect(ck_auto, SIGNAL(clicked()), SLOT(autoconnectCksChanged()));
++	connect(ck_connectAfterSleep, SIGNAL(clicked()), SLOT(autoconnectCksChanged()));
++	cb_resource->addItem(tr("Manual"));
++	cb_resource->addItem(tr("Use host name"));
++	cb_resource->setCurrentIndex(acc.opt_automatic_resource ? 1 : 0);
+ 	le_resource->setText(acc.resource);
+-	le_priority->setText(QString::number(acc.priority));
++	cb_priority->addItem(tr("Fixed"));
++	cb_priority->addItem(tr("Depends on status"));
++	cb_priority->setCurrentIndex(acc.priority_dep_on_status ? 1 : 0);
++	sb_priority->setValue(acc.priority);
+ 
+ 	connect(ck_custom_auth,SIGNAL(toggled(bool)), lb_authid, SLOT(setEnabled(bool)));
+ 	connect(ck_custom_auth,SIGNAL(toggled(bool)), le_authid, SLOT(setEnabled(bool)));
+@@ -140,6 +147,7 @@ void AccountModifyDlg::init()
+ 	ck_auto->setChecked(acc.opt_auto);
+ 	ck_reconn->setChecked(acc.opt_reconn);
+ 	ck_connectAfterSleep->setChecked(acc.opt_connectAfterSleep);
++	ck_autoSameStatus->setChecked(acc.opt_autoSameStatus);
+ 	ck_log->setChecked(acc.opt_log);
+ 	ck_keepAlive->setChecked(acc.opt_keepAlive);
+ 	ck_ibbOnly->setChecked(acc.ibbOnly);
+@@ -148,6 +156,7 @@ void AccountModifyDlg::init()
+ 	le_stunPort->setText(QString::number(acc.stunPort));
+ 	le_stunUser->setText(acc.stunUser);
+ 	le_stunPass->setText(acc.stunPass);
++	autoconnectCksChanged();
+ 	connect(ck_ibbOnly, SIGNAL(toggled(bool)), SLOT(ibbOnlyToggled(bool)));
+ 	ibbOnlyToggled(acc.ibbOnly);
+ 
+@@ -249,7 +258,7 @@ void AccountModifyDlg::init()
+ 		tr("This option sets the user (and realm) you want to "
+ 			"authenticate as. This overrides the XMPP address you are logging in "
+ 			"as."));
+-	le_priority->setWhatsThis(
++	sb_priority->setWhatsThis(
+ 		tr("<p>You can have multiple clients connected to the XMPP "
+ 		"server with your single account.  In such a situation, "
+ 		"the client with the highest priority (that is specified in "
+@@ -309,7 +318,7 @@ void AccountModifyDlg::init()
+ 	}
+ 
+ 	if (!PsiOptions::instance()->getOption("options.ui.account.resource").toBool()) {
+-		ck_automatic_resource->hide();
++		cb_resource->hide();
+ 		lb_resource->hide();
+ 		le_resource->hide();
+ 	}
+@@ -324,7 +333,8 @@ void AccountModifyDlg::init()
+ 
+ 	if (!PsiOptions::instance()->getOption("options.ui.account.priority").toBool()) {
+ 		lb_priority->hide();
+-		le_priority->hide();
++		cb_priority->hide();
++		sb_priority->hide();
+ 	}
+ 
+ 	if (!PsiOptions::instance()->getOption("options.ui.account.data-proxy").toBool()) {
+@@ -511,9 +521,10 @@ void AccountModifyDlg::save()
+ 	acc.req_mutual_auth = ck_req_mutual->isChecked();
+ 	acc.security_level = cb_security_level->itemData(cb_security_level->currentIndex()).toInt();
+ 
+-	acc.opt_automatic_resource = ck_automatic_resource->isChecked();
++	acc.opt_automatic_resource = (cb_resource->currentIndex() == 1);
+ 	acc.resource = le_resource->text();
+-	acc.priority = le_priority->text().toInt();
++	acc.priority_dep_on_status = (cb_priority->currentIndex() == 1);
++	acc.priority = sb_priority->value();
+ 	acc.customAuth = ck_custom_auth->isChecked();
+ 	acc.authid = le_authid->text();
+ 	acc.realm = le_realm->text();
+@@ -522,6 +533,7 @@ void AccountModifyDlg::save()
+ 	acc.opt_compress = ck_compress->isChecked();
+ 	acc.opt_auto = ck_auto->isChecked();
+ 	acc.opt_connectAfterSleep = ck_connectAfterSleep->isChecked();
++	acc.opt_autoSameStatus = ck_autoSameStatus->isChecked();
+ 	acc.opt_reconn = ck_reconn->isChecked();
+ 	acc.opt_log = ck_log->isChecked();
+ 	acc.opt_keepAlive = ck_keepAlive->isChecked();
+@@ -647,3 +659,22 @@ void AccountModifyDlg::getDefaultList_error()
+ 	setPrivacyTabEnabled(false);
+ }
+ 
++void AccountModifyDlg::resourceCbChanged(int index)
++{
++	le_resource->setEnabled(index == 0);
++}
++
++void AccountModifyDlg::priorityCbChanged(int index)
++{
++	sb_priority->setEnabled(index == 0);
++}
++
++void AccountModifyDlg::autoconnectCksChanged()
++{
++	if (ck_auto->isChecked() || ck_connectAfterSleep->isChecked()) {
++		ck_autoSameStatus->setEnabled(true);
++	}
++	else {
++		ck_autoSameStatus->setEnabled(false);
++	}
++}
+diff --git a/src/accountmodifydlg.h b/src/accountmodifydlg.h
+index c5c5824..f838c9c 100644
+--- a/src/accountmodifydlg.h
++++ b/src/accountmodifydlg.h
+@@ -73,6 +73,10 @@ private slots:
+  	void getDefaultList_error();
+  	void changeList_error();
+ 
++	void resourceCbChanged(int index);
++	void priorityCbChanged(int index);
++	void autoconnectCksChanged();
++
+ private:
+ 	PsiCon *psi;
+ 	PsiAccount *pa;
+diff --git a/src/accountstatusmenu.cpp b/src/accountstatusmenu.cpp
+new file mode 100644
+index 0000000..ecb71c8
+--- /dev/null
++++ b/src/accountstatusmenu.cpp
 @@ -0,0 +1,33 @@
 +#include "accountstatusmenu.h"
 +
@@ -422,8 +383,11 @@
 +	StatusMenu::fill();
 +	statusChanged(account->status());
 +}
---- psi.orig/src/accountstatusmenu.h
-+++ psi/src/accountstatusmenu.h
+diff --git a/src/accountstatusmenu.h b/src/accountstatusmenu.h
+new file mode 100644
+index 0000000..3effaad
+--- /dev/null
++++ b/src/accountstatusmenu.h
 @@ -0,0 +1,31 @@
 +#ifndef ACCOUNTSTATUSMENU_H
 +#define ACCOUNTSTATUSMENU_H
@@ -456,9 +420,11 @@
 +};
 +
 +#endif // ACCOUNTSTATUSMENU_H
---- psi.orig/src/chatdlg.cpp
-+++ psi/src/chatdlg.cpp
-@@ -394,6 +394,7 @@ struct UserStatus {
+diff --git a/src/chatdlg.cpp b/src/chatdlg.cpp
+index 6f753ec..26bb986 100644
+--- a/src/chatdlg.cpp
++++ b/src/chatdlg.cpp
+@@ -395,6 +395,7 @@ struct UserStatus {
  	UserListItem* userListItem;
  	XMPP::Status::Type statusType;
  	QString status;
@@ -466,7 +432,7 @@
  	QString publicKeyID;
  };
  
-@@ -411,6 +412,7 @@ UserStatus userStatusFor(const Jid& jid,
+@@ -412,6 +413,7 @@ UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmpt
  			const UserResource &r = *u.userListItem->userResourceList().priority();
  			u.statusType = r.status().type();
  			u.status = r.status().status();
@@ -474,7 +440,7 @@
  			u.publicKeyID = r.publicKeyID();
  		}
  	}
-@@ -420,12 +422,15 @@ UserStatus userStatusFor(const Jid& jid,
+@@ -421,12 +423,15 @@ UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmpt
  		if (rit != u.userListItem->userResourceList().end()) {
  			u.statusType = (*rit).status().type();
  			u.status = (*rit).status().status();
@@ -491,7 +457,7 @@
  
  	return u;
  }
-@@ -455,11 +460,13 @@ void ChatDlg::updateContact(const Jid &j
+@@ -456,11 +461,13 @@ void ChatDlg::updateContact(const Jid &j, bool fromPresence)
  		if (userStatus.statusType == XMPP::Status::Offline)
  			contactChatState_ = XMPP::StateNone;
  
@@ -506,7 +472,7 @@
  		}
  
  		contactUpdated(userStatus.userListItem, userStatus.statusType, userStatus.status);
-@@ -473,7 +480,9 @@ void ChatDlg::updateContact(const Jid &j
+@@ -474,7 +481,9 @@ void ChatDlg::updateContact(const Jid &j, bool fromPresence)
  			updatePGP();
  
  			if (fromPresence && statusChanged) {
@@ -517,8 +483,10 @@
  			}
  		}
  
---- psi.orig/src/chatdlg.h
-+++ psi/src/chatdlg.h
+diff --git a/src/chatdlg.h b/src/chatdlg.h
+index 0ef1c6d..74a754b 100644
+--- a/src/chatdlg.h
++++ b/src/chatdlg.h
 @@ -165,7 +165,7 @@ protected:
  private:
  	bool highlightersInstalled_;
@@ -528,9 +496,11 @@
  	QString statusString_;
  
  	void initActions();
---- psi.orig/src/chatview_te.cpp
-+++ psi/src/chatview_te.cpp
-@@ -348,9 +348,13 @@ void ChatView::renderSysMessage(const Me
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+index b9cf6b4..654ed10 100644
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -348,9 +348,13 @@ void ChatView::renderSysMessage(const MessageView &mv)
  	QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
  	QString userTextColor = ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name();
  	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") +
@@ -547,8 +517,10 @@
  }
  
  void ChatView::renderSubject(const MessageView &mv)
---- psi.orig/src/common.cpp
-+++ psi/src/common.cpp
+diff --git a/src/common.cpp b/src/common.cpp
+index cad6f16..001676d 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
 @@ -295,6 +295,23 @@ void soundPlay(const QString &s)
  #endif
  }
@@ -609,8 +581,10 @@
  #ifdef HAVE_X11
  #include <X11/Xlib.h>
  #include <X11/Xutil.h> // needed for WM_CLASS hinting
---- psi.orig/src/common.h
-+++ psi/src/common.h
+diff --git a/src/common.h b/src/common.h
+index 8a4208a..6a96857 100644
+--- a/src/common.h
++++ b/src/common.h
 @@ -27,6 +27,7 @@
  #include <QStringList>
  #include <QList>
@@ -628,7 +602,7 @@
  XMPP::Status makeStatus(int, const QString &);
  XMPP::Status makeStatus(int, const QString &, int);
  XMPP::Status::Type makeSTATUS(const XMPP::Status &);
-@@ -157,6 +160,7 @@ void x11wmClass(Display *dsp, WId wid, Q
+@@ -157,6 +160,7 @@ void x11wmClass(Display *dsp, WId wid, QString resName);
  #else
  #define X11WM_CLASS(x)	/* dummy */
  #endif
@@ -636,8 +610,10 @@
  
  // -----------------------------------------------------------------------------
  // History utilities
---- psi.orig/src/contactlistaccountmenu.cpp
-+++ psi/src/contactlistaccountmenu.cpp
+diff --git a/src/contactlistaccountmenu.cpp b/src/contactlistaccountmenu.cpp
+index e3663c7..75da6ce 100644
+--- a/src/contactlistaccountmenu.cpp
++++ b/src/contactlistaccountmenu.cpp
 @@ -24,7 +24,7 @@
  
  #include "psiaccount.h"
@@ -647,7 +623,7 @@
  #include "serverinfomanager.h"
  #include "bookmarkmanager.h"
  #include "psioptions.h"
-@@ -40,7 +40,7 @@ class ContactListAccountMenu::Private :
+@@ -40,7 +40,7 @@ class ContactListAccountMenu::Private : public QObject
  	Q_OBJECT
  
  	QPointer<ContactListAccountGroup> account;
@@ -697,8 +673,10 @@
  	}
  
  	void setMood()
---- psi.orig/src/contactlistgroupmenu.cpp
-+++ psi/src/contactlistgroupmenu.cpp
+diff --git a/src/contactlistgroupmenu.cpp b/src/contactlistgroupmenu.cpp
+index f217a67..64a67aa 100755
+--- a/src/contactlistgroupmenu.cpp
++++ b/src/contactlistgroupmenu.cpp
 @@ -253,7 +253,7 @@ private slots:
  			return;
  
@@ -708,8 +686,11 @@
  		QList<XMPP::Jid> list;
  		foreach(PsiContact* contact, group->contacts()) {
  			if(contact->isPrivate()) continue;
---- psi.orig/src/globalstatusmenu.cpp
-+++ psi/src/globalstatusmenu.cpp
+diff --git a/src/globalstatusmenu.cpp b/src/globalstatusmenu.cpp
+new file mode 100644
+index 0000000..b784ce2
+--- /dev/null
++++ b/src/globalstatusmenu.cpp
 @@ -0,0 +1,42 @@
 +#include "globalstatusmenu.h"
 +
@@ -753,8 +734,11 @@
 +	QAction* action = static_cast<QAction*>(sender());
 +	action->setChecked(!checked);
 +}
---- psi.orig/src/globalstatusmenu.h
-+++ psi/src/globalstatusmenu.h
+diff --git a/src/globalstatusmenu.h b/src/globalstatusmenu.h
+new file mode 100644
+index 0000000..17474bd
+--- /dev/null
++++ b/src/globalstatusmenu.h
 @@ -0,0 +1,23 @@
 +#ifndef GLOBALSTATUSMENU_H
 +#define GLOBALSTATUSMENU_H
@@ -779,9 +763,11 @@
 +};
 +
 +#endif // GLOBALSTATUSMENU_H
---- psi.orig/src/groupchatdlg.cpp
-+++ psi/src/groupchatdlg.cpp
-@@ -1365,9 +1365,8 @@ void GCMainDlg::presence(const QString &
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+index a5b3d81..64ddfdc 100644
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -1364,9 +1364,8 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		GCUserViewItem* contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
  		if (contact == NULL) {
  			//contact joining
@@ -792,7 +778,7 @@
  				if ( options_->getOption("options.muc.show-role-affiliation").toBool() ) {
  					if (s.mucItem().role() != MUCItem::NoRole) {
  						if (s.mucItem().affiliation() != MUCItem::NoAffiliation) {
-@@ -1386,6 +1385,15 @@ void GCMainDlg::presence(const QString &
+@@ -1385,6 +1384,15 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  				} else {
  					message = message.arg(nick);
  				}
@@ -808,7 +794,7 @@
  				appendSysMsg(message);
  			}
  		}
-@@ -1410,14 +1418,11 @@ void GCMainDlg::presence(const QString &
+@@ -1409,14 +1417,11 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -828,102 +814,11 @@
  				}
  			}
  		}
---- psi.orig/src/libpsi/tools/priorityvalidator.cpp
-+++ psi/src/libpsi/tools/priorityvalidator.cpp
-@@ -0,0 +1,41 @@
-+/*
-+ * priorityvalidator.cpp - XMPP priority validator
-+ * Copyright (C) 2010 Dmitriy.trt
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+#include "priorityvalidator.h"
-+
-+QValidator::State PriorityValidator::validate(QString &input, int &/*pos*/) const
-+{
-+	if (input.isEmpty()) {
-+		return QValidator::Acceptable;
-+	}
-+	else if (input == "-") {
-+		return QValidator::Intermediate;
-+	}
-+	else {
-+		bool ok = false;
-+		int val = input.toInt(&ok);
-+		if (ok && val >= -128 && val <= 127) {
-+			return QValidator::Acceptable;
-+		}
-+		else {
-+			return QValidator::Invalid;
-+		}
-+	}
-+}
---- psi.orig/src/libpsi/tools/priorityvalidator.h
-+++ psi/src/libpsi/tools/priorityvalidator.h
-@@ -0,0 +1,34 @@
-+/*
-+ * priorityvalidator.h - XMPP priority validator
-+ * Copyright (C) 2010 Dmitriy.trt
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+#ifndef PRIORITYVALIDATOR_H
-+#define PRIORITYVALIDATOR_H
-+
-+#include <QValidator>
-+
-+class PriorityValidator : public QValidator
-+{
-+	Q_OBJECT
-+public:
-+	PriorityValidator(QObject* parent = 0) : QValidator(parent) { };
-+	virtual State validate(QString &input, int &pos) const;
-+};
-+
-+#endif // PRIORITYVALIDATOR_H
---- psi.orig/src/libpsi/tools/tools.pri
-+++ psi/src/libpsi/tools/tools.pri
-@@ -18,7 +18,9 @@ mac {
- 
- HEADERS += \
- 	$$PWD/maybe.h \
-+	$$PWD/priorityvalidator.h \
- 	$$PWD/iodeviceopener.h
- 
- SOURCES += \
-+	$$PWD/priorityvalidator.cpp \
- 	$$PWD/iodeviceopener.cpp
---- psi.orig/src/mainwin.cpp
-+++ psi/src/mainwin.cpp
-@@ -67,6 +67,8 @@
+diff --git a/src/mainwin.cpp b/src/mainwin.cpp
+index f70b730..2779a96 100644
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
+@@ -65,6 +65,8 @@
  #include "mucjoindlg.h"
  #include "psicontactlist.h"
  #include "desktoputil.h"
@@ -932,7 +827,7 @@
  #ifdef NEWCONTACTLIST
  #include "psirosterwidget.h"
  #endif
-@@ -110,7 +112,8 @@ public:
+@@ -108,7 +110,8 @@ public:
  	~Private();
  
  	bool onTop, asTool;
@@ -942,7 +837,7 @@
  	int sbState;
  	QString nickname;
  	PsiTrayIcon* tray;
-@@ -126,6 +129,7 @@ public:
+@@ -124,6 +127,7 @@ public:
  
  	PopupAction* optionsButton, *statusButton;
  	IconActionGroup* statusGroup, *viewGroups;
@@ -950,7 +845,7 @@
  	EventNotifierAction* eventNotifier;
  	PsiCon* psi;
  	MainWin* mainWin;
-@@ -169,12 +173,13 @@ public:
+@@ -167,12 +171,13 @@ public:
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
  {
  
@@ -965,7 +860,7 @@
  
  	statusMapper = new QSignalMapper(mainWin);
  	mainWin->connect(statusMapper, SIGNAL(mapped(int)), mainWin, SLOT(activatedStatusAction(int)));
-@@ -435,8 +440,12 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -433,8 +438,12 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  	d->vb_roster->addWidget(d->rosterWidget_);
  #endif
  
@@ -979,7 +874,7 @@
  	d->optionsMenu = new QMenu(tr("General"), this);
  	d->optionsMenu->setObjectName("optionsMenu");
  #ifdef Q_OS_MAC
-@@ -535,6 +544,7 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -533,6 +542,7 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  	d->optionsButton->setMenu( d->optionsMenu );
  	d->statusButton->setMenu( d->statusMenu );
  	d->rosterAvatar->setStatusMenu( d->statusMenu );
@@ -987,7 +882,7 @@
  
  	buildToolbars();
  	// setUnifiedTitleAndToolBarOnMac(true);
-@@ -635,6 +645,8 @@ void MainWin::registerAction( IconAction
+@@ -630,6 +640,8 @@ void MainWin::registerAction( IconAction* action )
  		QObject* receiver;
  		const char* slot;
  	} actionlist[] = {
@@ -996,7 +891,7 @@
  #ifndef NEWCONTACTLIST
  		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
  		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
-@@ -818,22 +830,7 @@ void MainWin::setUseDock(bool use)
+@@ -813,22 +825,7 @@ void MainWin::setUseDock(bool use)
  void MainWin::buildStatusMenu()
  {
  	d->statusMenu->clear();
@@ -1020,7 +915,7 @@
  #ifdef USE_PEP
  	d->statusMenu->addSeparator();
  	d->getAction("publish_tune")->addTo(d->statusMenu);
-@@ -844,10 +841,10 @@ void MainWin::activatedStatusAction(int
+@@ -839,10 +836,10 @@ void MainWin::activatedStatusAction(int id)
  {
  	QList<IconAction*> l = d->statusGroup->findChildren<IconAction*>();
  	foreach(IconAction* action, l) {
@@ -1033,7 +928,7 @@
  }
  
  QMenuBar* MainWin::mainMenuBar() const
-@@ -1143,6 +1140,25 @@ void MainWin::actDiagQCAKeyStoreActivate
+@@ -1138,6 +1135,25 @@ void MainWin::actDiagQCAKeyStoreActivated()
  	w->show();
  }
  
@@ -1059,7 +954,7 @@
  void MainWin::actPlaySoundsActivated (bool state)
  {
  	PsiOptions::instance()->setOption("options.ui.notifications.sounds.enable", state);
-@@ -1342,31 +1358,30 @@ void MainWin::decorateButton(int status)
+@@ -1337,31 +1353,30 @@ void MainWin::decorateButton(int status)
  	}
  
  	setTrayToolTip();
@@ -1097,8 +992,10 @@
  
  		setWindowIcon(PsiIconset::instance()->status(status).impix());
  	}
---- psi.orig/src/mainwin.h
-+++ psi/src/mainwin.h
+diff --git a/src/mainwin.h b/src/mainwin.h
+index d296d13..ab64313 100644
+--- a/src/mainwin.h
++++ b/src/mainwin.h
 @@ -28,6 +28,7 @@
  #include <QStringList>
  
@@ -1125,9 +1022,11 @@
  	void actSetMoodActivated();
  	void actSetActivityActivated();
  	void actSetGeolocActivated();
---- psi.orig/src/mainwin_p.cpp
-+++ psi/src/mainwin_p.cpp
-@@ -301,7 +301,6 @@ void PopupAction::setIcon (const PsiIcon
+diff --git a/src/mainwin_p.cpp b/src/mainwin_p.cpp
+index c4a3504..c4dc857 100644
+--- a/src/mainwin_p.cpp
++++ b/src/mainwin_p.cpp
+@@ -301,7 +301,6 @@ void PopupAction::setIcon (const PsiIcon *icon, bool showText, bool alert)
  
  void PopupAction::setText (const QString &text)
  {
@@ -1135,8 +1034,10 @@
  	foreach(PopupActionButton* btn, d->buttons) {
  		btn->setLabel (text);
  	}
---- psi.orig/src/messageview.cpp
-+++ psi/src/messageview.cpp
+diff --git a/src/messageview.cpp b/src/messageview.cpp
+index bc7cc84..4443fd6 100644
+--- a/src/messageview.cpp
++++ b/src/messageview.cpp
 @@ -35,6 +35,7 @@ MessageView::MessageView(Type t)
  	, _spooled(false)
  	, _awaitingReceipt(false)
@@ -1145,7 +1046,7 @@
  	, _dateTime(QDateTime::currentDateTime())
  {
  
-@@ -71,13 +72,14 @@ MessageView MessageView::subjectMessage(
+@@ -71,13 +72,14 @@ MessageView MessageView::subjectMessage(const QString &subject, const QString &p
  }
  
  MessageView MessageView::statusMessage(const QString &nick, int status,
@@ -1161,7 +1062,7 @@
  	mv.setUserText(statusText);
  	return mv;
  }
-@@ -166,6 +168,7 @@ QVariantMap MessageView::toVariantMap(bo
+@@ -166,6 +168,7 @@ QVariantMap MessageView::toVariantMap(bool isMuc, bool formatted) const
  		case Status:
  			m["sender"] = _nick;
  			m["status"] = _status;
@@ -1169,8 +1070,10 @@
  			m["message"] = _text;
  			m["usertext"] = formatted?formattedUserText():_userText;
  			break;
---- psi.orig/src/messageview.h
-+++ psi/src/messageview.h
+diff --git a/src/messageview.h b/src/messageview.h
+index 0add96f..d506bfd 100644
+--- a/src/messageview.h
++++ b/src/messageview.h
 @@ -52,7 +52,8 @@ public:
  
  	// accepts plain/text nick, plain/text status and rich/text statusText
@@ -1198,114 +1101,835 @@
  	QString _messageId;
  	QString _userId;
  	QString _nick; // rich / as is
---- psi.orig/src/options/optionsdlg.cpp
-+++ psi/src/options/optionsdlg.cpp
-@@ -176,6 +176,7 @@ public:
- public slots:
- 	void doApply();
- 	void openTab(QString id);
-+	void enableCommonWidgets(bool enable);
+diff --git a/src/options/opt_status.cpp b/src/options/opt_status.cpp
+index ca17652..ba4e4b0 100644
+--- a/src/options/opt_status.cpp
++++ b/src/options/opt_status.cpp
+@@ -1,360 +1,13 @@
+ #include "opt_status.h"
+-#include "common.h"
+-#include "iconwidget.h"
+-#include "psioptions.h"
+-
+-#include <limits.h>
+-#include <QButtonGroup>
+-#include <QMessageBox>
+-#include <QWhatsThis>
+-#include <QCheckBox>
+-#include <QRadioButton>
+-#include <QComboBox>
+-#include <QLineEdit>
+-#include <QSpinBox>
+-#include <QTextEdit>
+-#include <QInputDialog>
+-
+-#include "ui_opt_status.h"
+-
+-class OptStatusUI : public QWidget, public Ui::OptStatus
+-{
+-public:
+-	OptStatusUI() : QWidget() { setupUi(this); }
+-};
+-
+-//----------------------------------------------------------------------------
+-// OptionsTabStatus
+-//----------------------------------------------------------------------------
++#include "opt_statusgeneral.h"
++#include "opt_statusauto.h"
  
- private slots:
- 	void currentItemChanged(QListWidgetItem* current, QListWidgetItem* previous);
-@@ -425,6 +426,13 @@ void OptionsDlg::Private::openTab(QStrin
- 	}
- }
- 
-+// enable/disable list widget and dialog buttons
-+void OptionsDlg::Private::enableCommonWidgets(bool enable)
-+{
-+	dlg->buttonBox->setEnabled(enable);
-+	dlg->lv_tabs->setEnabled(enable);
-+}
-+
- void OptionsDlg::Private::connectDataChanged(QWidget *widget)
+ OptionsTabStatus::OptionsTabStatus(QObject *parent)
+-: OptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
+-{
+-	w = 0;
+-}
+-
+-OptionsTabStatus::~OptionsTabStatus()
+-{
+-}
+-
+-QWidget *OptionsTabStatus::widget()
+-{
+-	if ( w )
+-		return 0;
+-
+-	w = new OptStatusUI();
+-	OptStatusUI *d = (OptStatusUI *)w;
+-
+-	QString s = tr("Makes Psi automatically set your status to \"away\" if your"
+-		" computer is idle for the specified amount of time.");
+-	d->ck_asAway->setWhatsThis(s);
+-	d->sb_asAway->setWhatsThis(s);
+-	s = tr("Makes Psi automatically set your status to \"extended away\" if your"
+-		" computer is idle for the specified amount of time.");
+-	d->ck_asXa->setWhatsThis(s);
+-	d->sb_asXa->setWhatsThis(s);
+-	s = tr("Makes Psi automatically set your status to \"offline\" if your"
+-		" computer is idle for the specified amount of time."
+-		"  This will disconnect you from the XMPP server.");
+-	if (!PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool()) {
+-		d->ck_asXa->hide();
+-		d->sb_asXa->hide();
+-		d->lb_asXa->hide();
+-	}
+-	d->ck_asOffline->setWhatsThis( s);
+-	d->sb_asOffline->setWhatsThis( s);
+-
+-	d->te_asMessage->setWhatsThis(
+-		tr("Specifies an extended message to use if you allow Psi"
+-		" to set your status automatically.  See options above."));
+-	d->le_asPriority->setWhatsThis(
+-		tr("Specifies priority of auto-away status. "
+-		"If empty, Psi will use account's default priority."));
+-
+-	setStatusPresetWidgetsEnabled(false);
+-	connect(d->pb_spNew, SIGNAL(clicked()), SLOT(newStatusPreset()));
+-	connect(d->pb_spDelete, SIGNAL(clicked()), SLOT(removeStatusPreset()));
+-	connect(d->cb_preset, SIGNAL(currentIndexChanged(int)), SLOT(selectStatusPreset(int)));
+-	connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
+-	connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
+-	connect(d->cb_sp_status, SIGNAL(activated(int)), SLOT(changeStatusPreset()));
+-	
+-	d->pb_spNew->setWhatsThis(
+-		tr("Press this button to create a new status message preset."));
+-	d->pb_spDelete->setWhatsThis(
+-		tr("Press this button to delete a status message preset."));
+-	d->cb_preset->setWhatsThis(
+-		tr("Use this list to select a status message preset"
+-		" to view or edit in the box to the bottom."));
+-	d->te_sp->setWhatsThis(
+-		tr("You may edit the message here for the currently selected"
+-		" status message preset in the list to the above."));
+-	d->cb_sp_status->setWhatsThis(
+-		tr("Use this to choose the status that will be assigned to this preset"));
+-	d->le_sp_priority->setWhatsThis(
+-		tr("Fill in the priority that will be assigned to this preset."
+-		   " If no priority is given, the default account priority will be used."));
+-
+-	d->ck_askOnline->setWhatsThis(
+-		tr("XMPP allows you to put extended status messages on"
+-		" all status types.  Normally, Psi does not prompt you for"
+-		" an extended message when you set your status to \"online\"."
+-		"  Check this option if you want to have this prompt."));
+-
+-	return w;
+-}
+-
+-void OptionsTabStatus::applyOptions()
+-{
+-	if ( !w )
+-		return;
+-
+-	OptStatusUI *d = (OptStatusUI *)w;
+-
+-	PsiOptions::instance()->setOption("options.status.auto-away.away-after", d->sb_asAway->value());
+-	PsiOptions::instance()->setOption("options.status.auto-away.not-availible-after", d->sb_asXa->value());
+-	PsiOptions::instance()->setOption("options.status.auto-away.offline-after", d->sb_asOffline->value());
+-	PsiOptions::instance()->setOption("options.status.auto-away.use-away", d->ck_asAway->isChecked());
+-	PsiOptions::instance()->setOption("options.status.auto-away.use-not-availible", d->ck_asXa->isChecked());
+-	PsiOptions::instance()->setOption("options.status.auto-away.use-offline", d->ck_asOffline->isChecked());
+-	PsiOptions::instance()->setOption("options.status.auto-away.message", d->te_asMessage->toPlainText());
+-	bool forcePriority = false;
+-	PsiOptions::instance()->setOption("options.status.auto-away.priority", d->le_asPriority->text().toInt(&forcePriority));
+-	PsiOptions::instance()->setOption("options.status.auto-away.force-priority", forcePriority);
+-	
+-	foreach (QString name, deletedPresets) {
+-		QString base = PsiOptions::instance()->mapLookup("options.status.presets", name);
+-		PsiOptions::instance()->removeOption(base , true);
+-	}
+-	deletedPresets.clear();
+-	foreach (QString name, dirtyPresets.toList() + newPresets.keys()) {
+-		StatusPreset sp;
+-		if (newPresets.contains(name)) {
+-			sp = newPresets[name];
+-		} else {
+-			sp = presets[name];
+-		}
+-		PsiOptions *o = PsiOptions::instance();
+-		sp.toOptions(o);
+-	}
+-	dirtyPresets.clear();
+-	presets.unite(newPresets);
+-	newPresets.clear();
+-	
+-	PsiOptions::instance()->setOption("options.status.ask-for-message-on-online", d->ck_askOnline->isChecked());
+-	PsiOptions::instance()->setOption("options.status.ask-for-message-on-offline", d->ck_askOffline->isChecked());
+-}
+-
+-void OptionsTabStatus::restoreOptions()
+-{
+-	if ( !w )
+-		return;
+-
+-	OptStatusUI *d = (OptStatusUI *)w;
+-
+-	d->sb_asAway->setMinimum(0);
+-	d->sb_asAway->setMaximum(INT_MAX);
+-	d->sb_asAway->setValue( PsiOptions::instance()->getOption("options.status.auto-away.away-after").toInt() );
+-	d->sb_asXa->setMinimum(0);
+-	d->sb_asXa->setMaximum(INT_MAX);
+-	d->sb_asXa->setValue( PsiOptions::instance()->getOption("options.status.auto-away.not-availible-after").toInt() );
+-	d->sb_asOffline->setMinimum(0);
+-	d->sb_asOffline->setMaximum(INT_MAX);
+-	d->sb_asOffline->setValue( PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt() );
+-	/*if (PsiOptions::instance()->getOption("options.status.auto-away.away-after").toInt() <= 0 )
+-		PsiOptions::instance()->getOption("options.status.auto-away.use-away").toBool() = false;
+-	if (PsiOptions::instance()->getOption("options.status.auto-away.not-availible-after").toInt() <= 0 )
+-		PsiOptions::instance()->getOption("options.status.auto-away.use-not-availible").toBool() = false;
+-	if(d->opt.asOffline <= 0)
+-		PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() = false;*/
+-	d->ck_asAway->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-away").toBool() );
+-	d->ck_asXa->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-not-availible").toBool() );
+-	d->ck_asOffline->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() );
+-	d->te_asMessage->setText( PsiOptions::instance()->getOption("options.status.auto-away.message").toString() );
+-	if (PsiOptions::instance()->getOption("options.status.auto-away.force-priority").toBool()) {
+-		d->le_asPriority->setText(QString::number(PsiOptions::instance()->getOption("options.status.auto-away.priority").toInt()));
+-	} else {
+-		d->le_asPriority->clear();
+-	}
+-
+-	
+-	QStringList presetNames;
+-	
+-	foreach(QVariant name, PsiOptions::instance()->mapKeyList("options.status.presets")) {
+-		QString base =  PsiOptions::instance()->mapLookup("options.status.presets", name.toString());
+-		StatusPreset sp;
+-		sp.setName(name.toString());
+-		sp.setMessage(PsiOptions::instance()->getOption(base+".message").toString());
+-		if (PsiOptions::instance()->getOption(base+".force-priority").toBool()) {
+-			sp.setPriority(PsiOptions::instance()->getOption(base+".priority").toInt());
+-		}
+-
+-		XMPP::Status status;
+-		status.setType(PsiOptions::instance()->getOption(base+".status").toString());
+-		sp.setStatus(status.type());
+-		
+-		presets[name.toString()] = sp;
+-		presetNames += name.toString();
+-	}
+-	
+-	
+-	d->cb_preset->addItems(presetNames);
+-
+-	if(d->cb_preset->count() >= 1) {
+-		d->cb_preset->setCurrentIndex(0);
+-		selectStatusPreset(0);
+-	}
+-
+-	d->ck_askOnline->setChecked( PsiOptions::instance()->getOption("options.status.ask-for-message-on-online").toBool() );
+-	d->ck_askOffline->setChecked( PsiOptions::instance()->getOption("options.status.ask-for-message-on-offline").toBool() );
+-}
+-
+-void OptionsTabStatus::setData(PsiCon *, QWidget *parentDialog)
+-{
+-	parentWidget = parentDialog;
+-}
+-
+-void OptionsTabStatus::selectStatusPreset(int x)
+-{
+-	OptStatusUI *d = (OptStatusUI *)w;
+-
+-	//noDirty = true;
+-	disconnect(d->te_sp, SIGNAL(textChanged()), 0, 0);
+-	disconnect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), 0, 0);
+-	if ( x == -1 ) {
+-		setStatusPresetWidgetsEnabled(false);
+-		d->te_sp->setText("");
+-		d->le_sp_priority->clear();
+-
+-		//noDirty = false;
+-		connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
+-		connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
+-		return;
+-	}
+-
+-	StatusPreset preset;
+-	QString name = d->cb_preset->itemText(x);
+-	
+-	if (newPresets.contains(name)) {
+-		preset = newPresets[name];
+-	} else {
+-		preset = presets[name];
+-	}
+-	
+-	d->te_sp->setText(preset.message());
+-	if (preset.priority().hasValue())
+-		d->le_sp_priority->setText(QString::number(preset.priority().value()));
+-	else
+-		d->le_sp_priority->clear();
+-	d->cb_sp_status->setStatus(preset.status());
+-	
+-	//noDirty = false;
+-	connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
+-	connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
+-	
+-	setStatusPresetWidgetsEnabled(true);
+-}
+-
+-void OptionsTabStatus::newStatusPreset()
+-{
+-	OptStatusUI *d = (OptStatusUI *)w;
+-
+-	QString text;
+-
+-	while(1) {
+-		bool ok = false;
+-		text = QInputDialog::getText(parentWidget,
+-			CAP(tr("New Status Preset")),
+-			tr("Please enter a name for the new status preset:"),
+-			QLineEdit::Normal, text, &ok);
+-		if(!ok) {
+-			return;
+-		}
+-
+-		if(text.isEmpty()) {
+-			QMessageBox::information(parentWidget, tr("Error"), tr("Can't create a blank preset!"));
+-		} else if(presets.contains(text) || newPresets.contains(text)) {
+-			QMessageBox::information(parentWidget, tr("Error"), tr("You already have a preset with that name!"));
+-		} else {
+-			break;
+-		}
+-	}
+-
+-	newPresets[text].setName(text);
+-	d->cb_preset->addItem(text);
+-	d->cb_preset->setCurrentIndex(d->cb_preset->count()-1);
+-	selectStatusPreset(d->cb_preset->count()-1);
+-	d->te_sp->setFocus();
+-
+-	emit dataChanged();
+-}
+-
+-void OptionsTabStatus::removeStatusPreset()
+-{
+-	OptStatusUI *d = (OptStatusUI *)w;
+-	int id = d->cb_preset->currentIndex();
+-	if(id == -1)
+-		return;
+-
+-	emit dataChanged();
+-
+-	QString name = d->cb_preset->itemText(id);
+-	
+-	if (newPresets.contains(name)) {
+-		newPresets.remove(name);
+-	} else {
+-		deletedPresets += d->cb_preset->itemText(id);
+-		presets.remove(d->cb_preset->itemText(id));
+-	}
+-	d->cb_preset->removeItem(id);
+-
+-	// select a new entry if possible
+-	if(d->cb_preset->count() == 0) {
+-		selectStatusPreset(-1);
+-		return;
+-	}
+-
+-	if(id >= (int)d->cb_preset->count())
+-		id = d->cb_preset->count()-1;
+-
+-	d->cb_preset->setCurrentIndex(id);
+-	selectStatusPreset(id);
+-}
+-
+-void OptionsTabStatus::changeStatusPreset()
+-{
+-	OptStatusUI *d = (OptStatusUI *)w;
+-	int id = d->cb_preset->currentIndex();
+-	if(id == -1)
+-		return;
+-
+-	StatusPreset sp;
+-	sp.setMessage(d->te_sp->toPlainText());
+-	if (d->le_sp_priority->text().isEmpty())
+-		sp.clearPriority();
+-	else
+-		sp.setPriority(d->le_sp_priority->text().toInt());
+-	sp.setStatus(d->cb_sp_status->status());
+-
+-	QString name = d->cb_preset->itemText(id);
+-	
+-	sp.setName(name);
+-	if (newPresets.contains(name)) {
+-		newPresets[name] = sp;
+-	} else {
+-		dirtyPresets += name;
+-		presets[name] = sp;
+-	}
+-	
+-	emit dataChanged();
+-}
+-
+-void OptionsTabStatus::setStatusPresetWidgetsEnabled(bool enabled)
++: MetaOptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
  {
- 	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
---- psi.orig/src/options/options.pri
-+++ psi/src/options/options.pri
-@@ -17,6 +17,8 @@ HEADERS += \
- 	$$PWD/opt_events.h \
- 	$$PWD/opt_popups.h \
- 	$$PWD/opt_status.h \
-+	$$PWD/opt_statusgeneral.h \
-+	$$PWD/opt_statusauto.h \
- 	$$PWD/opt_appearance.h \
- 	$$PWD/opt_iconset.h \
- 	$$PWD/opt_theme.h \
-@@ -36,6 +38,8 @@ SOURCES += \
- 	$$PWD/opt_events.cpp \
- 	$$PWD/opt_popups.cpp \
- 	$$PWD/opt_status.cpp \
-+	$$PWD/opt_statusgeneral.cpp \
-+	$$PWD/opt_statusauto.cpp \
- 	$$PWD/opt_appearance.cpp \
- 	$$PWD/opt_iconset.cpp \
- 	$$PWD/opt_theme.cpp \
-@@ -54,7 +58,8 @@ FORMS += \
- 	$$PWD/opt_chat.ui \
- 	$$PWD/opt_events.ui \
- 	$$PWD/opt_popups.ui \
--	$$PWD/opt_status.ui \
-+	$$PWD/opt_statusgeneral.ui \
-+	$$PWD/opt_statusauto.ui \
- 	$$PWD/opt_appearance.ui \
- 	$$PWD/opt_appearance_misc.ui \
- 	$$PWD/opt_theme.ui \
---- psi.orig/src/options/optionstab.cpp
-+++ psi/src/options/optionstab.cpp
-@@ -109,6 +109,7 @@ public:
- 	OptionsTabWidget(QWidget *parent);
- 	void addTab(OptionsTab *);
- 	void restoreOptions();
-+	void enableOtherTabs(bool);
- 
- signals:
- 	void connectDataChanged(QWidget *);
-@@ -196,6 +197,15 @@ void OptionsTabWidget::restoreOptions()
- 	emit noDirty(false);
+-	OptStatusUI *d = (OptStatusUI *)w;
+-	d->cb_preset->setEnabled(enabled);
+-	d->pb_spDelete->setEnabled(enabled);
+-	d->cb_sp_status->setEnabled(enabled);
+-	d->le_sp_priority->setEnabled(enabled);
+-	d->te_sp->setEnabled(enabled);
++	OptionsTabStatusGeneral* general = new OptionsTabStatusGeneral(this);
++	addTab(general);
++	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), parent, SLOT(enableCommonWidgets(bool)));
++	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), SLOT(enableOtherTabs(bool)));
++	addTab(new OptionsTabStatusAuto(this));
  }
+diff --git a/src/options/opt_status.h b/src/options/opt_status.h
+index 2a162b1..71ec964 100644
+--- a/src/options/opt_status.h
++++ b/src/options/opt_status.h
+@@ -1,43 +1,13 @@
+ #ifndef OPT_STATUS_H
+ #define OPT_STATUS_H
  
-+void OptionsTabWidget::enableOtherTabs(bool enable)
-+{
-+	for (int i = 0; i < count(); i++)
-+	{
-+		if (i != currentIndex())
-+			setTabEnabled(i, enable);
-+	}
-+}
-+
- //----------------------------------------------------------------------------
- // MetaOptionsTab
- //----------------------------------------------------------------------------
-@@ -235,6 +245,13 @@ void MetaOptionsTab::addTab(OptionsTab *
- 	tabs.append(tab);
- }
+-#include <QMap>
+-#include <QSet>
+-#include <QStringList>
+-
+ #include "optionstab.h"
+-#include "statuspreset.h"
+-
+-class QWidget;
  
-+void MetaOptionsTab::enableOtherTabs(bool enable)
-+{
-+	if (!w)
-+		return;
-+	static_cast<OptionsTabWidget*>(w)->enableOtherTabs(enable);
-+}
-+
- QWidget *MetaOptionsTab::widget()
+-class OptionsTabStatus : public OptionsTab
++class OptionsTabStatus : public MetaOptionsTab
  {
- 	if ( w )
---- psi.orig/src/options/optionstab.h
-+++ psi/src/options/optionstab.h
-@@ -65,6 +65,9 @@ public:
+ 	Q_OBJECT
+ public:
+ 	OptionsTabStatus(QObject *parent);
+-	~OptionsTabStatus();
+-
+-	QWidget *widget();
+-	void applyOptions();
+-	void restoreOptions();
+-
+-	void setData(PsiCon *, QWidget *parentDialog);
+-	//bool stretchable() const { return true; }
+-
+-private slots:
+-	void selectStatusPreset(int x);
+-	void newStatusPreset();
+-	void removeStatusPreset();
+-	void changeStatusPreset();
+-
+-private:
+-	void setStatusPresetWidgetsEnabled(bool);
+-	
+-	QWidget *w, *parentWidget;
+-	QMap<QString, StatusPreset> presets;
+-	QSet<QString> dirtyPresets;
+-	QStringList deletedPresets;
+-	QMap<QString, StatusPreset> newPresets;
+ };
  
- 	void addTab(OptionsTab *);
- 
-+public slots:
-+	void enableOtherTabs(bool);
-+
- private:
- 	void init();
- 	QWidget *w;
---- psi.orig/src/options/opt_statusauto.cpp
-+++ psi/src/options/opt_statusauto.cpp
+ #endif
+diff --git a/src/options/opt_status.ui b/src/options/opt_status.ui
+index 663695d..e69de29 100644
+--- a/src/options/opt_status.ui
++++ b/src/options/opt_status.ui
+@@ -1,397 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<ui version="4.0">
+- <class>OptStatus</class>
+- <widget class="QWidget" name="OptStatus">
+-  <property name="geometry">
+-   <rect>
+-    <x>0</x>
+-    <y>0</y>
+-    <width>407</width>
+-    <height>559</height>
+-   </rect>
+-  </property>
+-  <property name="windowTitle">
+-   <string>OptStatusUI</string>
+-  </property>
+-  <layout class="QVBoxLayout">
+-   <property name="spacing">
+-    <number>6</number>
+-   </property>
+-   <property name="margin">
+-    <number>9</number>
+-   </property>
+-   <item>
+-    <widget class="QGroupBox" name="groupBox1">
+-     <property name="title">
+-      <string>Prompt for status message when choosing</string>
+-     </property>
+-     <layout class="QHBoxLayout">
+-      <property name="spacing">
+-       <number>0</number>
+-      </property>
+-      <property name="margin">
+-       <number>9</number>
+-      </property>
+-      <item>
+-       <widget class="QCheckBox" name="ck_askOnline">
+-        <property name="text">
+-         <string>Online</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QCheckBox" name="ck_askOffline">
+-        <property name="text">
+-         <string>Offline</string>
+-        </property>
+-       </widget>
+-      </item>
+-     </layout>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QGroupBox" name="groupBox">
+-     <property name="title">
+-      <string>Auto status</string>
+-     </property>
+-     <layout class="QVBoxLayout" name="verticalLayout">
+-      <property name="margin">
+-       <number>9</number>
+-      </property>
+-      <item>
+-       <layout class="QGridLayout">
+-        <property name="margin">
+-         <number>0</number>
+-        </property>
+-        <property name="spacing">
+-         <number>6</number>
+-        </property>
+-        <item row="2" column="1">
+-         <widget class="QSpinBox" name="sb_asOffline">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="2" column="2">
+-         <widget class="QLabel" name="lb_asOffline">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-          <property name="text">
+-           <string>Minutes</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="1" column="2">
+-         <widget class="QLabel" name="lb_asXa">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-          <property name="text">
+-           <string>Minutes</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="1" column="1">
+-         <widget class="QSpinBox" name="sb_asXa">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="0" column="2">
+-         <widget class="QLabel" name="lb_asAway">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-          <property name="text">
+-           <string>Minutes</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="2" column="0">
+-         <widget class="QCheckBox" name="ck_asOffline">
+-          <property name="text">
+-           <string>Auto offline after:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="1" column="0">
+-         <widget class="QCheckBox" name="ck_asXa">
+-          <property name="text">
+-           <string>Auto XA after:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="0" column="0">
+-         <widget class="QCheckBox" name="ck_asAway">
+-          <property name="text">
+-           <string>Auto away after:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item row="0" column="1">
+-         <widget class="QSpinBox" name="sb_asAway">
+-          <property name="enabled">
+-           <bool>false</bool>
+-          </property>
+-         </widget>
+-        </item>
+-       </layout>
+-      </item>
+-      <item>
+-       <widget class="QLabel" name="TextLabel1_8">
+-        <property name="text">
+-         <string>Status message:</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QTextEdit" name="te_asMessage">
+-        <property name="maximumSize">
+-         <size>
+-          <width>32767</width>
+-          <height>50</height>
+-         </size>
+-        </property>
+-        <property name="tabChangesFocus">
+-         <bool>true</bool>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <layout class="QHBoxLayout" name="horizontalLayout">
+-        <item>
+-         <widget class="QLabel" name="label_4">
+-          <property name="text">
+-           <string>Priority:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item>
+-         <widget class="QLineEdit" name="le_asPriority"/>
+-        </item>
+-       </layout>
+-      </item>
+-     </layout>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QGroupBox" name="groupBox10">
+-     <property name="title">
+-      <string>Presets</string>
+-     </property>
+-     <layout class="QVBoxLayout">
+-      <property name="spacing">
+-       <number>6</number>
+-      </property>
+-      <property name="margin">
+-       <number>9</number>
+-      </property>
+-      <item>
+-       <layout class="QHBoxLayout">
+-        <property name="spacing">
+-         <number>6</number>
+-        </property>
+-        <property name="margin">
+-         <number>0</number>
+-        </property>
+-        <item>
+-         <widget class="QLabel" name="label_3">
+-          <property name="text">
+-           <string>Preset:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item>
+-         <widget class="QComboBox" name="cb_preset"/>
+-        </item>
+-        <item>
+-         <spacer>
+-          <property name="orientation">
+-           <enum>Qt::Horizontal</enum>
+-          </property>
+-          <property name="sizeHint" stdset="0">
+-           <size>
+-            <width>40</width>
+-            <height>20</height>
+-           </size>
+-          </property>
+-         </spacer>
+-        </item>
+-        <item>
+-         <widget class="QPushButton" name="pb_spNew">
+-          <property name="text">
+-           <string>New</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item>
+-         <widget class="QPushButton" name="pb_spDelete">
+-          <property name="text">
+-           <string>Delete</string>
+-          </property>
+-         </widget>
+-        </item>
+-       </layout>
+-      </item>
+-      <item>
+-       <layout class="QHBoxLayout">
+-        <property name="spacing">
+-         <number>6</number>
+-        </property>
+-        <property name="margin">
+-         <number>0</number>
+-        </property>
+-        <item>
+-         <widget class="QLabel" name="label_2">
+-          <property name="text">
+-           <string>Status:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item>
+-         <widget class="StatusComboBox" name="cb_sp_status"/>
+-        </item>
+-        <item>
+-         <spacer>
+-          <property name="orientation">
+-           <enum>Qt::Horizontal</enum>
+-          </property>
+-          <property name="sizeHint" stdset="0">
+-           <size>
+-            <width>97</width>
+-            <height>20</height>
+-           </size>
+-          </property>
+-         </spacer>
+-        </item>
+-        <item>
+-         <widget class="QLabel" name="label">
+-          <property name="text">
+-           <string>Priority:</string>
+-          </property>
+-         </widget>
+-        </item>
+-        <item>
+-         <widget class="QLineEdit" name="le_sp_priority">
+-          <property name="maximumSize">
+-           <size>
+-            <width>50</width>
+-            <height>16777215</height>
+-           </size>
+-          </property>
+-         </widget>
+-        </item>
+-       </layout>
+-      </item>
+-      <item>
+-       <widget class="QLabel" name="TextLabel2_2">
+-        <property name="text">
+-         <string>Content:</string>
+-        </property>
+-       </widget>
+-      </item>
+-      <item>
+-       <widget class="QTextEdit" name="te_sp">
+-        <property name="sizePolicy">
+-         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+-          <horstretch>0</horstretch>
+-          <verstretch>0</verstretch>
+-         </sizepolicy>
+-        </property>
+-        <property name="maximumSize">
+-         <size>
+-          <width>32767</width>
+-          <height>90</height>
+-         </size>
+-        </property>
+-        <property name="tabChangesFocus">
+-         <bool>true</bool>
+-        </property>
+-       </widget>
+-      </item>
+-     </layout>
+-    </widget>
+-   </item>
+-  </layout>
+- </widget>
+- <layoutdefault spacing="6" margin="11"/>
+- <customwidgets>
+-  <customwidget>
+-   <class>StatusComboBox</class>
+-   <extends>QComboBox</extends>
+-   <header>statuscombobox.h</header>
+-  </customwidget>
+- </customwidgets>
+- <tabstops>
+-  <tabstop>ck_askOnline</tabstop>
+-  <tabstop>ck_askOffline</tabstop>
+-  <tabstop>ck_asAway</tabstop>
+-  <tabstop>sb_asAway</tabstop>
+-  <tabstop>ck_asXa</tabstop>
+-  <tabstop>sb_asXa</tabstop>
+-  <tabstop>ck_asOffline</tabstop>
+-  <tabstop>sb_asOffline</tabstop>
+-  <tabstop>te_asMessage</tabstop>
+-  <tabstop>le_asPriority</tabstop>
+-  <tabstop>cb_preset</tabstop>
+-  <tabstop>pb_spNew</tabstop>
+-  <tabstop>pb_spDelete</tabstop>
+-  <tabstop>cb_sp_status</tabstop>
+-  <tabstop>le_sp_priority</tabstop>
+-  <tabstop>te_sp</tabstop>
+- </tabstops>
+- <resources/>
+- <connections>
+-  <connection>
+-   <sender>ck_asOffline</sender>
+-   <signal>toggled(bool)</signal>
+-   <receiver>sb_asOffline</receiver>
+-   <slot>setEnabled(bool)</slot>
+-   <hints>
+-    <hint type="sourcelabel">
+-     <x>65</x>
+-     <y>109</y>
+-    </hint>
+-    <hint type="destinationlabel">
+-     <x>171</x>
+-     <y>112</y>
+-    </hint>
+-   </hints>
+-  </connection>
+-  <connection>
+-   <sender>ck_asXa</sender>
+-   <signal>toggled(bool)</signal>
+-   <receiver>sb_asXa</receiver>
+-   <slot>setEnabled(bool)</slot>
+-   <hints>
+-    <hint type="sourcelabel">
+-     <x>95</x>
+-     <y>77</y>
+-    </hint>
+-    <hint type="destinationlabel">
+-     <x>172</x>
+-     <y>78</y>
+-    </hint>
+-   </hints>
+-  </connection>
+-  <connection>
+-   <sender>ck_asAway</sender>
+-   <signal>toggled(bool)</signal>
+-   <receiver>sb_asAway</receiver>
+-   <slot>setEnabled(bool)</slot>
+-   <hints>
+-    <hint type="sourcelabel">
+-     <x>61</x>
+-     <y>46</y>
+-    </hint>
+-    <hint type="destinationlabel">
+-     <x>180</x>
+-     <y>42</y>
+-    </hint>
+-   </hints>
+-  </connection>
+- </connections>
+-</ui>
+diff --git a/src/options/opt_statusauto.cpp b/src/options/opt_statusauto.cpp
+new file mode 100644
+index 0000000..2b6d5b5
+--- /dev/null
++++ b/src/options/opt_statusauto.cpp
 @@ -0,0 +1,168 @@
 +#include "opt_statusauto.h"
 +#include "psioptions.h"
@@ -1475,8 +2099,11 @@
 +	parentWidget = parentDialog;
 +}
 +
---- psi.orig/src/options/opt_statusauto.h
-+++ psi/src/options/opt_statusauto.h
+diff --git a/src/options/opt_statusauto.h b/src/options/opt_statusauto.h
+new file mode 100644
+index 0000000..fd181c9
+--- /dev/null
++++ b/src/options/opt_statusauto.h
 @@ -0,0 +1,26 @@
 +#ifndef OPT_STATUSAUTO_H
 +#define OPT_STATUSAUTO_H
@@ -1504,8 +2131,11 @@
 +};
 +
 +#endif // OPT_STATUSAUTO_H
---- psi.orig/src/options/opt_statusauto.ui
-+++ psi/src/options/opt_statusauto.ui
+diff --git a/src/options/opt_statusauto.ui b/src/options/opt_statusauto.ui
+new file mode 100644
+index 0000000..66632ce
+--- /dev/null
++++ b/src/options/opt_statusauto.ui
 @@ -0,0 +1,555 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -2062,379 +2692,11 @@
 +  </connection>
 + </connections>
 +</ui>
---- psi.orig/src/options/opt_status.cpp
-+++ psi/src/options/opt_status.cpp
-@@ -1,360 +1,13 @@
- #include "opt_status.h"
--#include "common.h"
--#include "iconwidget.h"
--#include "psioptions.h"
--
--#include <limits.h>
--#include <QButtonGroup>
--#include <QMessageBox>
--#include <QWhatsThis>
--#include <QCheckBox>
--#include <QRadioButton>
--#include <QComboBox>
--#include <QLineEdit>
--#include <QSpinBox>
--#include <QTextEdit>
--#include <QInputDialog>
--
--#include "ui_opt_status.h"
--
--class OptStatusUI : public QWidget, public Ui::OptStatus
--{
--public:
--	OptStatusUI() : QWidget() { setupUi(this); }
--};
--
--//----------------------------------------------------------------------------
--// OptionsTabStatus
--//----------------------------------------------------------------------------
-+#include "opt_statusgeneral.h"
-+#include "opt_statusauto.h"
- 
- OptionsTabStatus::OptionsTabStatus(QObject *parent)
--: OptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
--{
--	w = 0;
--}
--
--OptionsTabStatus::~OptionsTabStatus()
--{
--}
--
--QWidget *OptionsTabStatus::widget()
--{
--	if ( w )
--		return 0;
--
--	w = new OptStatusUI();
--	OptStatusUI *d = (OptStatusUI *)w;
--
--	QString s = tr("Makes Psi automatically set your status to \"away\" if your"
--		" computer is idle for the specified amount of time.");
--	d->ck_asAway->setWhatsThis(s);
--	d->sb_asAway->setWhatsThis(s);
--	s = tr("Makes Psi automatically set your status to \"extended away\" if your"
--		" computer is idle for the specified amount of time.");
--	d->ck_asXa->setWhatsThis(s);
--	d->sb_asXa->setWhatsThis(s);
--	s = tr("Makes Psi automatically set your status to \"offline\" if your"
--		" computer is idle for the specified amount of time."
--		"  This will disconnect you from the XMPP server.");
--	if (!PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool()) {
--		d->ck_asXa->hide();
--		d->sb_asXa->hide();
--		d->lb_asXa->hide();
--	}
--	d->ck_asOffline->setWhatsThis( s);
--	d->sb_asOffline->setWhatsThis( s);
--
--	d->te_asMessage->setWhatsThis(
--		tr("Specifies an extended message to use if you allow Psi"
--		" to set your status automatically.  See options above."));
--	d->le_asPriority->setWhatsThis(
--		tr("Specifies priority of auto-away status. "
--		"If empty, Psi will use account's default priority."));
--
--	setStatusPresetWidgetsEnabled(false);
--	connect(d->pb_spNew, SIGNAL(clicked()), SLOT(newStatusPreset()));
--	connect(d->pb_spDelete, SIGNAL(clicked()), SLOT(removeStatusPreset()));
--	connect(d->cb_preset, SIGNAL(currentIndexChanged(int)), SLOT(selectStatusPreset(int)));
--	connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
--	connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
--	connect(d->cb_sp_status, SIGNAL(activated(int)), SLOT(changeStatusPreset()));
--	
--	d->pb_spNew->setWhatsThis(
--		tr("Press this button to create a new status message preset."));
--	d->pb_spDelete->setWhatsThis(
--		tr("Press this button to delete a status message preset."));
--	d->cb_preset->setWhatsThis(
--		tr("Use this list to select a status message preset"
--		" to view or edit in the box to the bottom."));
--	d->te_sp->setWhatsThis(
--		tr("You may edit the message here for the currently selected"
--		" status message preset in the list to the above."));
--	d->cb_sp_status->setWhatsThis(
--		tr("Use this to choose the status that will be assigned to this preset"));
--	d->le_sp_priority->setWhatsThis(
--		tr("Fill in the priority that will be assigned to this preset."
--		   " If no priority is given, the default account priority will be used."));
--
--	d->ck_askOnline->setWhatsThis(
--		tr("XMPP allows you to put extended status messages on"
--		" all status types.  Normally, Psi does not prompt you for"
--		" an extended message when you set your status to \"online\"."
--		"  Check this option if you want to have this prompt."));
--
--	return w;
--}
--
--void OptionsTabStatus::applyOptions()
--{
--	if ( !w )
--		return;
--
--	OptStatusUI *d = (OptStatusUI *)w;
--
--	PsiOptions::instance()->setOption("options.status.auto-away.away-after", d->sb_asAway->value());
--	PsiOptions::instance()->setOption("options.status.auto-away.not-availible-after", d->sb_asXa->value());
--	PsiOptions::instance()->setOption("options.status.auto-away.offline-after", d->sb_asOffline->value());
--	PsiOptions::instance()->setOption("options.status.auto-away.use-away", d->ck_asAway->isChecked());
--	PsiOptions::instance()->setOption("options.status.auto-away.use-not-availible", d->ck_asXa->isChecked());
--	PsiOptions::instance()->setOption("options.status.auto-away.use-offline", d->ck_asOffline->isChecked());
--	PsiOptions::instance()->setOption("options.status.auto-away.message", d->te_asMessage->toPlainText());
--	bool forcePriority = false;
--	PsiOptions::instance()->setOption("options.status.auto-away.priority", d->le_asPriority->text().toInt(&forcePriority));
--	PsiOptions::instance()->setOption("options.status.auto-away.force-priority", forcePriority);
--	
--	foreach (QString name, deletedPresets) {
--		QString base = PsiOptions::instance()->mapLookup("options.status.presets", name);
--		PsiOptions::instance()->removeOption(base , true);
--	}
--	deletedPresets.clear();
--	foreach (QString name, dirtyPresets.toList() + newPresets.keys()) {
--		StatusPreset sp;
--		if (newPresets.contains(name)) {
--			sp = newPresets[name];
--		} else {
--			sp = presets[name];
--		}
--		PsiOptions *o = PsiOptions::instance();
--		sp.toOptions(o);
--	}
--	dirtyPresets.clear();
--	presets.unite(newPresets);
--	newPresets.clear();
--	
--	PsiOptions::instance()->setOption("options.status.ask-for-message-on-online", d->ck_askOnline->isChecked());
--	PsiOptions::instance()->setOption("options.status.ask-for-message-on-offline", d->ck_askOffline->isChecked());
--}
--
--void OptionsTabStatus::restoreOptions()
--{
--	if ( !w )
--		return;
--
--	OptStatusUI *d = (OptStatusUI *)w;
--
--	d->sb_asAway->setMinimum(0);
--	d->sb_asAway->setMaximum(INT_MAX);
--	d->sb_asAway->setValue( PsiOptions::instance()->getOption("options.status.auto-away.away-after").toInt() );
--	d->sb_asXa->setMinimum(0);
--	d->sb_asXa->setMaximum(INT_MAX);
--	d->sb_asXa->setValue( PsiOptions::instance()->getOption("options.status.auto-away.not-availible-after").toInt() );
--	d->sb_asOffline->setMinimum(0);
--	d->sb_asOffline->setMaximum(INT_MAX);
--	d->sb_asOffline->setValue( PsiOptions::instance()->getOption("options.status.auto-away.offline-after").toInt() );
--	/*if (PsiOptions::instance()->getOption("options.status.auto-away.away-after").toInt() <= 0 )
--		PsiOptions::instance()->getOption("options.status.auto-away.use-away").toBool() = false;
--	if (PsiOptions::instance()->getOption("options.status.auto-away.not-availible-after").toInt() <= 0 )
--		PsiOptions::instance()->getOption("options.status.auto-away.use-not-availible").toBool() = false;
--	if(d->opt.asOffline <= 0)
--		PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() = false;*/
--	d->ck_asAway->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-away").toBool() );
--	d->ck_asXa->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-not-availible").toBool() );
--	d->ck_asOffline->setChecked( PsiOptions::instance()->getOption("options.status.auto-away.use-offline").toBool() );
--	d->te_asMessage->setText( PsiOptions::instance()->getOption("options.status.auto-away.message").toString() );
--	if (PsiOptions::instance()->getOption("options.status.auto-away.force-priority").toBool()) {
--		d->le_asPriority->setText(QString::number(PsiOptions::instance()->getOption("options.status.auto-away.priority").toInt()));
--	} else {
--		d->le_asPriority->clear();
--	}
--
--	
--	QStringList presetNames;
--	
--	foreach(QVariant name, PsiOptions::instance()->mapKeyList("options.status.presets")) {
--		QString base =  PsiOptions::instance()->mapLookup("options.status.presets", name.toString());
--		StatusPreset sp;
--		sp.setName(name.toString());
--		sp.setMessage(PsiOptions::instance()->getOption(base+".message").toString());
--		if (PsiOptions::instance()->getOption(base+".force-priority").toBool()) {
--			sp.setPriority(PsiOptions::instance()->getOption(base+".priority").toInt());
--		}
--
--		XMPP::Status status;
--		status.setType(PsiOptions::instance()->getOption(base+".status").toString());
--		sp.setStatus(status.type());
--		
--		presets[name.toString()] = sp;
--		presetNames += name.toString();
--	}
--	
--	
--	d->cb_preset->addItems(presetNames);
--
--	if(d->cb_preset->count() >= 1) {
--		d->cb_preset->setCurrentIndex(0);
--		selectStatusPreset(0);
--	}
--
--	d->ck_askOnline->setChecked( PsiOptions::instance()->getOption("options.status.ask-for-message-on-online").toBool() );
--	d->ck_askOffline->setChecked( PsiOptions::instance()->getOption("options.status.ask-for-message-on-offline").toBool() );
--}
--
--void OptionsTabStatus::setData(PsiCon *, QWidget *parentDialog)
--{
--	parentWidget = parentDialog;
--}
--
--void OptionsTabStatus::selectStatusPreset(int x)
--{
--	OptStatusUI *d = (OptStatusUI *)w;
--
--	//noDirty = true;
--	disconnect(d->te_sp, SIGNAL(textChanged()), 0, 0);
--	disconnect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), 0, 0);
--	if ( x == -1 ) {
--		setStatusPresetWidgetsEnabled(false);
--		d->te_sp->setText("");
--		d->le_sp_priority->clear();
--
--		//noDirty = false;
--		connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
--		connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
--		return;
--	}
--
--	StatusPreset preset;
--	QString name = d->cb_preset->itemText(x);
--	
--	if (newPresets.contains(name)) {
--		preset = newPresets[name];
--	} else {
--		preset = presets[name];
--	}
--	
--	d->te_sp->setText(preset.message());
--	if (preset.priority().hasValue())
--		d->le_sp_priority->setText(QString::number(preset.priority().value()));
--	else
--		d->le_sp_priority->clear();
--	d->cb_sp_status->setStatus(preset.status());
--	
--	//noDirty = false;
--	connect(d->te_sp, SIGNAL(textChanged()), SLOT(changeStatusPreset()));
--	connect(d->le_sp_priority, SIGNAL(textChanged(const QString&)), SLOT(changeStatusPreset()));
--	
--	setStatusPresetWidgetsEnabled(true);
--}
--
--void OptionsTabStatus::newStatusPreset()
--{
--	OptStatusUI *d = (OptStatusUI *)w;
--
--	QString text;
--
--	while(1) {
--		bool ok = false;
--		text = QInputDialog::getText(parentWidget,
--			CAP(tr("New Status Preset")),
--			tr("Please enter a name for the new status preset:"),
--			QLineEdit::Normal, text, &ok);
--		if(!ok) {
--			return;
--		}
--
--		if(text.isEmpty()) {
--			QMessageBox::information(parentWidget, tr("Error"), tr("Can't create a blank preset!"));
--		} else if(presets.contains(text) || newPresets.contains(text)) {
--			QMessageBox::information(parentWidget, tr("Error"), tr("You already have a preset with that name!"));
--		} else {
--			break;
--		}
--	}
--
--	newPresets[text].setName(text);
--	d->cb_preset->addItem(text);
--	d->cb_preset->setCurrentIndex(d->cb_preset->count()-1);
--	selectStatusPreset(d->cb_preset->count()-1);
--	d->te_sp->setFocus();
--
--	emit dataChanged();
--}
--
--void OptionsTabStatus::removeStatusPreset()
--{
--	OptStatusUI *d = (OptStatusUI *)w;
--	int id = d->cb_preset->currentIndex();
--	if(id == -1)
--		return;
--
--	emit dataChanged();
--
--	QString name = d->cb_preset->itemText(id);
--	
--	if (newPresets.contains(name)) {
--		newPresets.remove(name);
--	} else {
--		deletedPresets += d->cb_preset->itemText(id);
--		presets.remove(d->cb_preset->itemText(id));
--	}
--	d->cb_preset->removeItem(id);
--
--	// select a new entry if possible
--	if(d->cb_preset->count() == 0) {
--		selectStatusPreset(-1);
--		return;
--	}
--
--	if(id >= (int)d->cb_preset->count())
--		id = d->cb_preset->count()-1;
--
--	d->cb_preset->setCurrentIndex(id);
--	selectStatusPreset(id);
--}
--
--void OptionsTabStatus::changeStatusPreset()
--{
--	OptStatusUI *d = (OptStatusUI *)w;
--	int id = d->cb_preset->currentIndex();
--	if(id == -1)
--		return;
--
--	StatusPreset sp;
--	sp.setMessage(d->te_sp->toPlainText());
--	if (d->le_sp_priority->text().isEmpty())
--		sp.clearPriority();
--	else
--		sp.setPriority(d->le_sp_priority->text().toInt());
--	sp.setStatus(d->cb_sp_status->status());
--
--	QString name = d->cb_preset->itemText(id);
--	
--	sp.setName(name);
--	if (newPresets.contains(name)) {
--		newPresets[name] = sp;
--	} else {
--		dirtyPresets += name;
--		presets[name] = sp;
--	}
--	
--	emit dataChanged();
--}
--
--void OptionsTabStatus::setStatusPresetWidgetsEnabled(bool enabled)
-+: MetaOptionsTab(parent, "status", "", tr("Status"), tr("Status preferences"), "psi/status")
- {
--	OptStatusUI *d = (OptStatusUI *)w;
--	d->cb_preset->setEnabled(enabled);
--	d->pb_spDelete->setEnabled(enabled);
--	d->cb_sp_status->setEnabled(enabled);
--	d->le_sp_priority->setEnabled(enabled);
--	d->te_sp->setEnabled(enabled);
-+	OptionsTabStatusGeneral* general = new OptionsTabStatusGeneral(this);
-+	addTab(general);
-+	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), parent, SLOT(enableCommonWidgets(bool)));
-+	connect(general, SIGNAL(enableDlgCommonWidgets(bool)), SLOT(enableOtherTabs(bool)));
-+	addTab(new OptionsTabStatusAuto(this));
- }
---- psi.orig/src/options/opt_statusgeneral.cpp
-+++ psi/src/options/opt_statusgeneral.cpp
+diff --git a/src/options/opt_statusgeneral.cpp b/src/options/opt_statusgeneral.cpp
+new file mode 100644
+index 0000000..e128a8a
+--- /dev/null
++++ b/src/options/opt_statusgeneral.cpp
 @@ -0,0 +1,398 @@
 +#include "opt_statusgeneral.h"
 +#include "common.h"
@@ -2834,8 +3096,11 @@
 +{
 +	editStatusPreset();
 +}
---- psi.orig/src/options/opt_statusgeneral.h
-+++ psi/src/options/opt_statusgeneral.h
+diff --git a/src/options/opt_statusgeneral.h b/src/options/opt_statusgeneral.h
+new file mode 100644
+index 0000000..11a36b5
+--- /dev/null
++++ b/src/options/opt_statusgeneral.h
 @@ -0,0 +1,52 @@
 +#ifndef OPT_STATUSGENERAL_H
 +#define OPT_STATUSGENERAL_H
@@ -2889,8 +3154,11 @@
 +};
 +
 +#endif // OPT_STATUSGENERAL_H
---- psi.orig/src/options/opt_statusgeneral.ui
-+++ psi/src/options/opt_statusgeneral.ui
+diff --git a/src/options/opt_statusgeneral.ui b/src/options/opt_statusgeneral.ui
+new file mode 100644
+index 0000000..944ac73
+--- /dev/null
++++ b/src/options/opt_statusgeneral.ui
 @@ -0,0 +1,445 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -3337,455 +3605,124 @@
 + <resources/>
 + <connections/>
 +</ui>
---- psi.orig/src/options/opt_status.h
-+++ psi/src/options/opt_status.h
-@@ -1,43 +1,13 @@
- #ifndef OPT_STATUS_H
- #define OPT_STATUS_H
+diff --git a/src/options/options.pri b/src/options/options.pri
+index 49dc872..f26b85f 100644
+--- a/src/options/options.pri
++++ b/src/options/options.pri
+@@ -17,6 +17,8 @@ HEADERS += \
+ 	$$PWD/opt_events.h \
+ 	$$PWD/opt_popups.h \
+ 	$$PWD/opt_status.h \
++	$$PWD/opt_statusgeneral.h \
++	$$PWD/opt_statusauto.h \
+ 	$$PWD/opt_appearance.h \
+ 	$$PWD/opt_iconset.h \
+ 	$$PWD/opt_theme.h \
+@@ -36,6 +38,8 @@ SOURCES += \
+ 	$$PWD/opt_events.cpp \
+ 	$$PWD/opt_popups.cpp \
+ 	$$PWD/opt_status.cpp \
++	$$PWD/opt_statusgeneral.cpp \
++	$$PWD/opt_statusauto.cpp \
+ 	$$PWD/opt_appearance.cpp \
+ 	$$PWD/opt_iconset.cpp \
+ 	$$PWD/opt_theme.cpp \
+@@ -54,7 +58,8 @@ FORMS += \
+ 	$$PWD/opt_chat.ui \
+ 	$$PWD/opt_events.ui \
+ 	$$PWD/opt_popups.ui \
+-	$$PWD/opt_status.ui \
++	$$PWD/opt_statusgeneral.ui \
++	$$PWD/opt_statusauto.ui \
+ 	$$PWD/opt_appearance.ui \
+ 	$$PWD/opt_appearance_misc.ui \
+ 	$$PWD/opt_theme.ui \
+diff --git a/src/options/optionsdlg.cpp b/src/options/optionsdlg.cpp
+index 44ae93c..1e2f048 100644
+--- a/src/options/optionsdlg.cpp
++++ b/src/options/optionsdlg.cpp
+@@ -176,6 +176,7 @@ public:
+ public slots:
+ 	void doApply();
+ 	void openTab(QString id);
++	void enableCommonWidgets(bool enable);
  
--#include <QMap>
--#include <QSet>
--#include <QStringList>
--
- #include "optionstab.h"
--#include "statuspreset.h"
--
--class QWidget;
+ private slots:
+ 	void currentItemChanged(QListWidgetItem* current, QListWidgetItem* previous);
+@@ -425,6 +426,13 @@ void OptionsDlg::Private::openTab(QString id)
+ 	}
+ }
  
--class OptionsTabStatus : public OptionsTab
-+class OptionsTabStatus : public MetaOptionsTab
++// enable/disable list widget and dialog buttons
++void OptionsDlg::Private::enableCommonWidgets(bool enable)
++{
++	dlg->buttonBox->setEnabled(enable);
++	dlg->lv_tabs->setEnabled(enable);
++}
++
+ void OptionsDlg::Private::connectDataChanged(QWidget *widget)
  {
- 	Q_OBJECT
- public:
- 	OptionsTabStatus(QObject *parent);
--	~OptionsTabStatus();
--
--	QWidget *widget();
--	void applyOptions();
--	void restoreOptions();
--
--	void setData(PsiCon *, QWidget *parentDialog);
--	//bool stretchable() const { return true; }
--
--private slots:
--	void selectStatusPreset(int x);
--	void newStatusPreset();
--	void removeStatusPreset();
--	void changeStatusPreset();
--
--private:
--	void setStatusPresetWidgetsEnabled(bool);
--	
--	QWidget *w, *parentWidget;
--	QMap<QString, StatusPreset> presets;
--	QSet<QString> dirtyPresets;
--	QStringList deletedPresets;
--	QMap<QString, StatusPreset> newPresets;
- };
+ 	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
+diff --git a/src/options/optionstab.cpp b/src/options/optionstab.cpp
+index ed15ddd..5265e1f 100644
+--- a/src/options/optionstab.cpp
++++ b/src/options/optionstab.cpp
+@@ -109,6 +109,7 @@ public:
+ 	OptionsTabWidget(QWidget *parent);
+ 	void addTab(OptionsTab *);
+ 	void restoreOptions();
++	void enableOtherTabs(bool);
  
- #endif
---- psi.orig/src/options/opt_status.ui
-+++ psi/src/options/opt_status.ui
-@@ -1,397 +0,0 @@
--<?xml version="1.0" encoding="UTF-8"?>
--<ui version="4.0">
-- <class>OptStatus</class>
-- <widget class="QWidget" name="OptStatus">
--  <property name="geometry">
--   <rect>
--    <x>0</x>
--    <y>0</y>
--    <width>407</width>
--    <height>559</height>
--   </rect>
--  </property>
--  <property name="windowTitle">
--   <string>OptStatusUI</string>
--  </property>
--  <layout class="QVBoxLayout">
--   <property name="spacing">
--    <number>6</number>
--   </property>
--   <property name="margin">
--    <number>9</number>
--   </property>
--   <item>
--    <widget class="QGroupBox" name="groupBox1">
--     <property name="title">
--      <string>Prompt for status message when choosing</string>
--     </property>
--     <layout class="QHBoxLayout">
--      <property name="spacing">
--       <number>0</number>
--      </property>
--      <property name="margin">
--       <number>9</number>
--      </property>
--      <item>
--       <widget class="QCheckBox" name="ck_askOnline">
--        <property name="text">
--         <string>Online</string>
--        </property>
--       </widget>
--      </item>
--      <item>
--       <widget class="QCheckBox" name="ck_askOffline">
--        <property name="text">
--         <string>Offline</string>
--        </property>
--       </widget>
--      </item>
--     </layout>
--    </widget>
--   </item>
--   <item>
--    <widget class="QGroupBox" name="groupBox">
--     <property name="title">
--      <string>Auto status</string>
--     </property>
--     <layout class="QVBoxLayout" name="verticalLayout">
--      <property name="margin">
--       <number>9</number>
--      </property>
--      <item>
--       <layout class="QGridLayout">
--        <property name="margin">
--         <number>0</number>
--        </property>
--        <property name="spacing">
--         <number>6</number>
--        </property>
--        <item row="2" column="1">
--         <widget class="QSpinBox" name="sb_asOffline">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--         </widget>
--        </item>
--        <item row="2" column="2">
--         <widget class="QLabel" name="lb_asOffline">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--          <property name="text">
--           <string>Minutes</string>
--          </property>
--         </widget>
--        </item>
--        <item row="1" column="2">
--         <widget class="QLabel" name="lb_asXa">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--          <property name="text">
--           <string>Minutes</string>
--          </property>
--         </widget>
--        </item>
--        <item row="1" column="1">
--         <widget class="QSpinBox" name="sb_asXa">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--         </widget>
--        </item>
--        <item row="0" column="2">
--         <widget class="QLabel" name="lb_asAway">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--          <property name="text">
--           <string>Minutes</string>
--          </property>
--         </widget>
--        </item>
--        <item row="2" column="0">
--         <widget class="QCheckBox" name="ck_asOffline">
--          <property name="text">
--           <string>Auto offline after:</string>
--          </property>
--         </widget>
--        </item>
--        <item row="1" column="0">
--         <widget class="QCheckBox" name="ck_asXa">
--          <property name="text">
--           <string>Auto XA after:</string>
--          </property>
--         </widget>
--        </item>
--        <item row="0" column="0">
--         <widget class="QCheckBox" name="ck_asAway">
--          <property name="text">
--           <string>Auto away after:</string>
--          </property>
--         </widget>
--        </item>
--        <item row="0" column="1">
--         <widget class="QSpinBox" name="sb_asAway">
--          <property name="enabled">
--           <bool>false</bool>
--          </property>
--         </widget>
--        </item>
--       </layout>
--      </item>
--      <item>
--       <widget class="QLabel" name="TextLabel1_8">
--        <property name="text">
--         <string>Status message:</string>
--        </property>
--       </widget>
--      </item>
--      <item>
--       <widget class="QTextEdit" name="te_asMessage">
--        <property name="maximumSize">
--         <size>
--          <width>32767</width>
--          <height>50</height>
--         </size>
--        </property>
--        <property name="tabChangesFocus">
--         <bool>true</bool>
--        </property>
--       </widget>
--      </item>
--      <item>
--       <layout class="QHBoxLayout" name="horizontalLayout">
--        <item>
--         <widget class="QLabel" name="label_4">
--          <property name="text">
--           <string>Priority:</string>
--          </property>
--         </widget>
--        </item>
--        <item>
--         <widget class="QLineEdit" name="le_asPriority"/>
--        </item>
--       </layout>
--      </item>
--     </layout>
--    </widget>
--   </item>
--   <item>
--    <widget class="QGroupBox" name="groupBox10">
--     <property name="title">
--      <string>Presets</string>
--     </property>
--     <layout class="QVBoxLayout">
--      <property name="spacing">
--       <number>6</number>
--      </property>
--      <property name="margin">
--       <number>9</number>
--      </property>
--      <item>
--       <layout class="QHBoxLayout">
--        <property name="spacing">
--         <number>6</number>
--        </property>
--        <property name="margin">
--         <number>0</number>
--        </property>
--        <item>
--         <widget class="QLabel" name="label_3">
--          <property name="text">
--           <string>Preset:</string>
--          </property>
--         </widget>
--        </item>
--        <item>
--         <widget class="QComboBox" name="cb_preset"/>
--        </item>
--        <item>
--         <spacer>
--          <property name="orientation">
--           <enum>Qt::Horizontal</enum>
--          </property>
--          <property name="sizeHint" stdset="0">
--           <size>
--            <width>40</width>
--            <height>20</height>
--           </size>
--          </property>
--         </spacer>
--        </item>
--        <item>
--         <widget class="QPushButton" name="pb_spNew">
--          <property name="text">
--           <string>New</string>
--          </property>
--         </widget>
--        </item>
--        <item>
--         <widget class="QPushButton" name="pb_spDelete">
--          <property name="text">
--           <string>Delete</string>
--          </property>
--         </widget>
--        </item>
--       </layout>
--      </item>
--      <item>
--       <layout class="QHBoxLayout">
--        <property name="spacing">
--         <number>6</number>
--        </property>
--        <property name="margin">
--         <number>0</number>
--        </property>
--        <item>
--         <widget class="QLabel" name="label_2">
--          <property name="text">
--           <string>Status:</string>
--          </property>
--         </widget>
--        </item>
--        <item>
--         <widget class="StatusComboBox" name="cb_sp_status"/>
--        </item>
--        <item>
--         <spacer>
--          <property name="orientation">
--           <enum>Qt::Horizontal</enum>
--          </property>
--          <property name="sizeHint" stdset="0">
--           <size>
--            <width>97</width>
--            <height>20</height>
--           </size>
--          </property>
--         </spacer>
--        </item>
--        <item>
--         <widget class="QLabel" name="label">
--          <property name="text">
--           <string>Priority:</string>
--          </property>
--         </widget>
--        </item>
--        <item>
--         <widget class="QLineEdit" name="le_sp_priority">
--          <property name="maximumSize">
--           <size>
--            <width>50</width>
--            <height>16777215</height>
--           </size>
--          </property>
--         </widget>
--        </item>
--       </layout>
--      </item>
--      <item>
--       <widget class="QLabel" name="TextLabel2_2">
--        <property name="text">
--         <string>Content:</string>
--        </property>
--       </widget>
--      </item>
--      <item>
--       <widget class="QTextEdit" name="te_sp">
--        <property name="sizePolicy">
--         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
--          <horstretch>0</horstretch>
--          <verstretch>0</verstretch>
--         </sizepolicy>
--        </property>
--        <property name="maximumSize">
--         <size>
--          <width>32767</width>
--          <height>90</height>
--         </size>
--        </property>
--        <property name="tabChangesFocus">
--         <bool>true</bool>
--        </property>
--       </widget>
--      </item>
--     </layout>
--    </widget>
--   </item>
--  </layout>
-- </widget>
-- <layoutdefault spacing="6" margin="11"/>
-- <customwidgets>
--  <customwidget>
--   <class>StatusComboBox</class>
--   <extends>QComboBox</extends>
--   <header>statuscombobox.h</header>
--  </customwidget>
-- </customwidgets>
-- <tabstops>
--  <tabstop>ck_askOnline</tabstop>
--  <tabstop>ck_askOffline</tabstop>
--  <tabstop>ck_asAway</tabstop>
--  <tabstop>sb_asAway</tabstop>
--  <tabstop>ck_asXa</tabstop>
--  <tabstop>sb_asXa</tabstop>
--  <tabstop>ck_asOffline</tabstop>
--  <tabstop>sb_asOffline</tabstop>
--  <tabstop>te_asMessage</tabstop>
--  <tabstop>le_asPriority</tabstop>
--  <tabstop>cb_preset</tabstop>
--  <tabstop>pb_spNew</tabstop>
--  <tabstop>pb_spDelete</tabstop>
--  <tabstop>cb_sp_status</tabstop>
--  <tabstop>le_sp_priority</tabstop>
--  <tabstop>te_sp</tabstop>
-- </tabstops>
-- <resources/>
-- <connections>
--  <connection>
--   <sender>ck_asOffline</sender>
--   <signal>toggled(bool)</signal>
--   <receiver>sb_asOffline</receiver>
--   <slot>setEnabled(bool)</slot>
--   <hints>
--    <hint type="sourcelabel">
--     <x>65</x>
--     <y>109</y>
--    </hint>
--    <hint type="destinationlabel">
--     <x>171</x>
--     <y>112</y>
--    </hint>
--   </hints>
--  </connection>
--  <connection>
--   <sender>ck_asXa</sender>
--   <signal>toggled(bool)</signal>
--   <receiver>sb_asXa</receiver>
--   <slot>setEnabled(bool)</slot>
--   <hints>
--    <hint type="sourcelabel">
--     <x>95</x>
--     <y>77</y>
--    </hint>
--    <hint type="destinationlabel">
--     <x>172</x>
--     <y>78</y>
--    </hint>
--   </hints>
--  </connection>
--  <connection>
--   <sender>ck_asAway</sender>
--   <signal>toggled(bool)</signal>
--   <receiver>sb_asAway</receiver>
--   <slot>setEnabled(bool)</slot>
--   <hints>
--    <hint type="sourcelabel">
--     <x>61</x>
--     <y>46</y>
--    </hint>
--    <hint type="destinationlabel">
--     <x>180</x>
--     <y>42</y>
--    </hint>
--   </hints>
--  </connection>
-- </connections>
--</ui>
---- psi.orig/src/profiles.h
-+++ psi/src/profiles.h
+ signals:
+ 	void connectDataChanged(QWidget *);
+@@ -196,6 +197,15 @@ void OptionsTabWidget::restoreOptions()
+ 	emit noDirty(false);
+ }
+ 
++void OptionsTabWidget::enableOtherTabs(bool enable)
++{
++	for (int i = 0; i < count(); i++)
++	{
++		if (i != currentIndex())
++			setTabEnabled(i, enable);
++	}
++}
++
+ //----------------------------------------------------------------------------
+ // MetaOptionsTab
+ //----------------------------------------------------------------------------
+@@ -235,6 +245,13 @@ void MetaOptionsTab::addTab(OptionsTab *tab)
+ 	tabs.append(tab);
+ }
+ 
++void MetaOptionsTab::enableOtherTabs(bool enable)
++{
++	if (!w)
++		return;
++	static_cast<OptionsTabWidget*>(w)->enableOtherTabs(enable);
++}
++
+ QWidget *MetaOptionsTab::widget()
+ {
+ 	if ( w )
+diff --git a/src/options/optionstab.h b/src/options/optionstab.h
+index 4414c01..f711e8e 100644
+--- a/src/options/optionstab.h
++++ b/src/options/optionstab.h
+@@ -65,6 +65,9 @@ public:
+ 
+ 	void addTab(OptionsTab *);
+ 
++public slots:
++	void enableOtherTabs(bool);
++
+ private:
+ 	void init();
+ 	QWidget *w;
+diff --git a/src/profiles.h b/src/profiles.h
+index 0e45f98..e6f55c7 100644
+--- a/src/profiles.h
++++ b/src/profiles.h
 @@ -49,23 +49,27 @@ public:
  	
  	void fromOptions(OptionsTree *o, QString base);
@@ -3816,9 +3753,141 @@
  
  	struct GroupData {
  		bool open;
---- psi.orig/src/psiaccount.cpp
-+++ psi/src/psiaccount.cpp
-@@ -407,6 +407,7 @@ public:
+diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
+index a0b25ab..66a2b73 100644
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -104,6 +104,7 @@ void migrateRectEntry(const QDomElement& element, const QString &entry, const QS
+ 
+ 
+ UserAccount::UserAccount()
++	: lastStatus(XMPP::Status::Online)
+ {
+ 	reset();
+ }
+@@ -131,6 +132,7 @@ void UserAccount::reset()
+ 	opt_host = false;
+ 	host = "";
+ 	opt_automatic_resource = false;
++	priority_dep_on_status = true;
+ 	resource = ApplicationInfo::name();
+ 	priority = 55;
+ 	ibbOnly = false;
+@@ -140,6 +142,8 @@ void UserAccount::reset()
+ 	opt_log = true;
+ 	opt_reconn = true;
+ 	opt_connectAfterSleep = false;
++	opt_autoSameStatus = true;
++	lastStatusWithPriority = false;
+ 	opt_ignoreSSLWarnings = true;
+ 
+ 	proxy_index = 0;
+@@ -179,6 +183,7 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
+ 	req_mutual_auth = o->getOption(base + ".require-mutual-auth").toBool();
+ 	legacy_ssl_probe = o->getOption(base + ".legacy-ssl-probe").toBool();
+ 	opt_automatic_resource = o->getOption(base + ".automatic-resource").toBool();
++	priority_dep_on_status = o->getOption(base + ".priority-depends-on-status").toBool();
+ 	opt_log = o->getOption(base + ".log").toBool();
+ 	opt_reconn = o->getOption(base + ".reconn").toBool();
+ 	opt_ignoreSSLWarnings = o->getOption(base + ".ignore-SSL-warnings").toBool();
+@@ -231,6 +236,19 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
+ 	resource = o->getOption(base + ".resource").toString();
+ 	priority = o->getOption(base + ".priority").toInt();
+ 
++	if (allSetOptions.contains(base + ".auto-same-status")) {
++		opt_autoSameStatus = o->getOption(base + ".auto-same-status").toBool();
++		lastStatus.setType(o->getOption(base + ".last-status").toString());
++		lastStatus.setStatus(o->getOption(base + ".last-status-message").toString());
++		lastStatusWithPriority = o->getOption(base + ".last-with-priority").toBool();
++		if (lastStatusWithPriority) {
++			lastStatus.setPriority(o->getOption(base + ".last-priority").toInt());
++		}
++		else {
++			lastStatus.setPriority(defaultPriority(lastStatus));
++		}
++	}
++
+ #ifdef HAVE_PGPUTIL
+ 	QString pgpSecretKeyID = o->getOption(base + ".pgp-secret-key-id").toString();
+ 	if (!pgpSecretKeyID.isEmpty()) {
+@@ -320,9 +338,11 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
+ 	o->setOption(base + ".require-mutual-auth", req_mutual_auth);
+ 	o->setOption(base + ".legacy-ssl-probe", legacy_ssl_probe);
+ 	o->setOption(base + ".automatic-resource", opt_automatic_resource);
++	o->setOption(base + ".priority-depends-on-status", priority_dep_on_status);
+ 	o->setOption(base + ".log", opt_log);
+ 	o->setOption(base + ".reconn", opt_reconn);
+ 	o->setOption(base + ".connect-after-sleep", opt_connectAfterSleep);
++	o->setOption(base + ".auto-same-status", opt_autoSameStatus);
+ 	o->setOption(base + ".ignore-SSL-warnings", opt_ignoreSSLWarnings);
+ 
+ 	o->setOption(base + ".id", id);
+@@ -435,6 +455,7 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
+ 
+ 	o->setOption(base + ".tls.override-certificate", tlsOverrideCert);
+ 	o->setOption(base + ".tls.override-domain", tlsOverrideDomain);
++	saveLastStatus(o, base);
+ }
+ 
+ void UserAccount::fromXml(const QDomElement &a)
+@@ -460,12 +481,8 @@ void UserAccount::fromXml(const QDomElement &a)
+ 	readBoolAttribute(a, "reconn", &opt_reconn);
+ 	readBoolAttribute(a, "ignoreSSLWarnings", &opt_ignoreSSLWarnings);
+ 	//readBoolAttribute(a, "gpg", &opt_gpg);
+-	if (a.hasAttribute("automatic-resource")) {
+-		readBoolAttribute(a, "automatic-resource", &opt_automatic_resource);
+-	}
+-	else {
+-		opt_automatic_resource = false;
+-	}
++	readBoolAttribute(a, "automatic-resource", &opt_automatic_resource);
++	readBoolAttribute(a, "priority-depends-on-status", &priority_dep_on_status);
+ 
+ 	// Will be overwritten if there is a new option
+ 	bool opt_plain = false;
+@@ -591,6 +608,37 @@ void UserAccount::fromXml(const QDomElement &a)
+ 	dtProxy = str;
+ }
+ 
++int UserAccount::defaultPriority(const XMPP::Status &s)
++{
++	if (priority_dep_on_status) {
++		if (s.isAvailable()) {
++			return PsiOptions::instance()->getOption("options.status.default-priority." + s.typeString()).toInt();
++		}
++		else {
++			return 0; //Priority for Offline status, it is not used
++		}
++	}
++	else {
++		return priority;
++	}
++}
++
++void UserAccount::saveLastStatus(OptionsTree *o, QString base=QString())
++{
++	if (base.isEmpty()) {
++		base = optionsBase;
++	}
++
++	o->setOption(base + ".last-status", lastStatus.typeString());
++	o->setOption(base + ".last-status-message", lastStatus.status());
++	o->setOption(base + ".last-with-priority", lastStatusWithPriority);
++	if (lastStatusWithPriority) {
++		o->setOption(base + ".last-priority", lastStatus.priority());
++	}
++	else {
++		o->removeOption(base + ".last-priority");
++	}
++}
+ 
+ static ToolbarPrefs loadToolbarData( const QDomElement &e )
+ {
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index 99d3086..8bde041 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -418,6 +418,7 @@ public:
  	Jid jid, nextJid;
  	Status loginStatus;
  	bool loginWithPriority;
@@ -3826,13 +3895,13 @@
  	EventQueue *eventQueue;
  	XmlConsole *xmlConsole;
  	UserList userList;
-@@ -858,11 +859,9 @@ public:
+@@ -869,11 +870,9 @@ public:
  	{
  		if (!account->isAvailable())
  			return;
 -		Status status = autoAwayStatus(autoAway);
 -		if (status.type() != loginStatus.type() ||
--		    status.status() != loginStatus.status())
+-			status.status() != loginStatus.status())
 -		{
 -			bool withPriority = autoAway == AutoAway_Away || autoAway == AutoAway_XA;
 +		bool withPriority = false;
@@ -3841,7 +3910,7 @@
  			account->setStatusDirect(status, withPriority);
  		}
  	}
-@@ -887,14 +886,26 @@ public:
+@@ -898,14 +897,26 @@ public:
  private:
  	Status lastManualStatus_;
  
@@ -3871,7 +3940,7 @@
  			}
  
  			switch (autoAway) {
-@@ -1545,13 +1556,35 @@ void PsiAccount::autoLogin()
+@@ -1556,16 +1567,38 @@ void PsiAccount::autoLogin()
  	if (enabled()) {
  		bool autoLogin = d->acc.opt_auto;
  		if (autoLogin) {
@@ -3887,17 +3956,17 @@
 +			else {
 +				setStatus(makeStatus(XMPP::Status::Online, ""), false, true);
 +			}
-+		}
-+	}
-+}
-+
+ 		}
+ 	}
+ }
+ 
 +void PsiAccount::reconnectOnce()
 +{
 +	if (isActive()) {
 +		if (d->reconnectingOnce) {
 +			//To be sure phase2 will be called just once
 +			QObject::disconnect(this, SIGNAL(disconnected()), this, SLOT(reconnectOncePhase2()));
- 		}
++		}
 +		d->reconnectingOnce = true;
 +		connect(this, SIGNAL(disconnected()), this, SLOT(reconnectOncePhase2()));
 +		logout(false, Status(Status::Offline, tr("Reconnecting"), 0));
@@ -3910,10 +3979,13 @@
 +		d->reconnectingOnce = false;
 +		QObject::disconnect(this, SIGNAL(disconnected()), this, SLOT(reconnectOncePhase2()));
 +		setStatus(d->lastManualStatus(), d->loginWithPriority, false);
- 	}
- }
- 
-@@ -1680,7 +1713,7 @@ void PsiAccount::forceDisconnect(bool fa
++	}
++}
++
+ // logs on with the active account settings
+ void PsiAccount::login()
+ {
+@@ -1691,7 +1724,7 @@ void PsiAccount::forceDisconnect(bool fast, const XMPP::Status &s)
  		d->client->removeExtension("pep");
  
  		// send logout status
@@ -3922,7 +3994,7 @@
  		d->client->setPresence(s);
  	}
  
-@@ -2775,7 +2808,7 @@ Status PsiAccount::loggedOutStatus()
+@@ -2786,7 +2819,7 @@ Status PsiAccount::loggedOutStatus()
  #ifdef YAPSI
  	return Status(Status::Offline);
  #else
@@ -3931,7 +4003,7 @@
  #endif
  }
  
-@@ -2783,10 +2816,16 @@ void PsiAccount::setStatus(const Status
+@@ -2794,10 +2827,16 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
  {
  	Status s = _s;
  	if (!withPriority)
@@ -3949,7 +4021,7 @@
  	}
  
  	// Block all transports' contacts' status change popups from popping
-@@ -2854,18 +2893,37 @@ void PsiAccount::setStatus(const Status
+@@ -2865,18 +2904,37 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
  	}
  }
  
@@ -3989,7 +4061,7 @@
  
  	// using pgp?
  	if(!d->cur_pgpSecretKey.isNull()) {
-@@ -3647,25 +3705,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const
+@@ -3658,25 +3716,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  	return c;
  }
  
@@ -4039,11 +4111,6 @@
 -			Status s("","",0,true);
 -			s.setIsInvisible(true);
 -			setStatus(s, false, true);
--		}
--		else {
--			StatusSetDlg *w = new StatusSetDlg(this, makeStatus(x, ""));
--			connect(w, SIGNAL(set(const XMPP::Status &, bool, bool)), SLOT(setStatus(const XMPP::Status &, bool, bool)));
--			w->show();
 +		Status status;
 +		switch (x) {
 +		case STATUS_OFFLINE:
@@ -4056,7 +4123,11 @@
 +		default:
 +			status = Status((XMPP::Status::Type)x, "", 0);
 +			break;
-+		}
+ 		}
+-		else {
+-			StatusSetDlg *w = new StatusSetDlg(this, makeStatus(x, ""));
+-			connect(w, SIGNAL(set(const XMPP::Status &, bool, bool)), SLOT(setStatus(const XMPP::Status &, bool, bool)));
+-			w->show();
 +		if (o->getOption("options.status.last-overwrite.by-status").toBool()) {
 +			o->setOption("options.status.last-priority", "");
 +			o->setOption("options.status.last-message", "");
@@ -4066,7 +4137,7 @@
  	}
  }
  
-@@ -5401,7 +5495,7 @@ void PsiAccount::groupChatLeave(const QS
+@@ -5415,7 +5509,7 @@ void PsiAccount::groupChatLeave(const QString &host, const QString &room)
  {
  	Jid j(room + '@' + host);
  	d->groupchats.removeAll(j.bare());
@@ -4075,8 +4146,10 @@
  	UserListItem *u = find(j);
  	if (u) {
  		d->removeEntry(j);
---- psi.orig/src/psiaccount.h
-+++ psi/src/psiaccount.h
+diff --git a/src/psiaccount.h b/src/psiaccount.h
+index df7a136..d4ff565 100644
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
 @@ -136,6 +136,7 @@ public:
  	VoiceCaller* voiceCaller() const;
  	Status status() const;
@@ -4118,9 +4191,11 @@
  	void reconnect();
  	void disconnect();
  	void enableNotifyOnline();
---- psi.orig/src/psiactionlist.cpp
-+++ psi/src/psiactionlist.cpp
-@@ -299,10 +299,11 @@ void PsiActionList::Private::createMainW
+diff --git a/src/psiactionlist.cpp b/src/psiactionlist.cpp
+index 730c1df..3b86d20 100644
+--- a/src/psiactionlist.cpp
++++ b/src/psiactionlist.cpp
+@@ -299,10 +299,11 @@ void PsiActionList::Private::createMainWin()
  	{
  		// status actions
  		IconActionGroup *statusGroup = new IconActionGroup ( this );
@@ -4136,7 +4211,7 @@
  
  		QString setStatusStr = tr("Changes your global status to '%1'");
  
-@@ -326,6 +327,14 @@ void PsiActionList::Private::createMainW
+@@ -326,6 +327,14 @@ void PsiActionList::Private::createMainWin()
  
  		statusGroup->addSeparator();
  
@@ -4151,7 +4226,7 @@
  		IconAction *statusInvisible = new IconAction (status2txt(STATUS_INVISIBLE), "status/invisible", status2txt(STATUS_INVISIBLE), 0, statusGroup, QString::number(STATUS_INVISIBLE), statusExl);
  		statusInvisible->setWhatsThis (setStatusStr.arg(tr("Invisible")));
  
-@@ -335,7 +344,8 @@ void PsiActionList::Private::createMainW
+@@ -335,7 +344,8 @@ void PsiActionList::Private::createMainWin()
  		statusOffline->setWhatsThis (setStatusStr.arg(tr("Offline")));
  
  		ActionNames actions[] = {
@@ -4161,7 +4236,7 @@
  			{ "status_chat",      statusChat      },
  			{ "status_online",    statusOnline    },
  			{ "status_away",      statusAway      },
-@@ -343,6 +353,8 @@ void PsiActionList::Private::createMainW
+@@ -343,6 +353,8 @@ void PsiActionList::Private::createMainWin()
  			{ "status_dnd",       statusDnd       },
  			{ "status_invisible", statusInvisible },
  			{ "status_offline",   statusOffline   },
@@ -4170,8 +4245,10 @@
  			{ "", 0 }
  		};
  
---- psi.orig/src/psicon.cpp
-+++ psi/src/psicon.cpp
+diff --git a/src/psicon.cpp b/src/psicon.cpp
+index 7db2be3..3556bad 100644
+--- a/src/psicon.cpp
++++ b/src/psicon.cpp
 @@ -547,7 +547,7 @@ bool PsiCon::init()
  	connect(d->mainwin, SIGNAL(doManageAccounts()), SLOT(doManageAccounts()));
  	connect(d->mainwin, SIGNAL(doGroupChat()), SLOT(doGroupChat()));
@@ -4181,7 +4258,7 @@
  	connect(d->mainwin, SIGNAL(statusMessageChanged(QString)), SLOT(setStatusMessage(QString)));
  	connect(d->mainwin, SIGNAL(doOptions()), SLOT(doOptions()));
  	connect(d->mainwin, SIGNAL(doToolbars()), SLOT(doToolbars()));
-@@ -727,6 +727,11 @@ bool PsiCon::haveAutoUpdater() const
+@@ -728,6 +728,11 @@ bool PsiCon::haveAutoUpdater() const
  	return d->autoUpdater != 0;
  }
  
@@ -4193,7 +4270,7 @@
  void PsiCon::registerCaps(const QString& ext, const QStringList& features)
  {
  	DiscoItem::Identity identity = { "client", ApplicationInfo::name(), "pc" };
-@@ -849,7 +854,7 @@ void PsiCon::changeProfile()
+@@ -850,7 +855,7 @@ void PsiCon::changeProfile()
  		if (messageBox.clickedButton() == cancel)
  			return;
  
@@ -4202,7 +4279,7 @@
  	}
  
  	doQuit(QuitProfile);
-@@ -1007,37 +1012,67 @@ void PsiCon::removeAccount(PsiAccount *p
+@@ -1008,37 +1013,67 @@ void PsiCon::removeAccount(PsiAccount *pa)
  	d->contactList->removeAccount(pa);
  }
  
@@ -4255,13 +4332,6 @@
 -			setGlobalStatus(Status(), false, true);
 -			if(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() == true)
 -				d->mainwin->setTrayToolTip(Status());
--		}
--		else if(x == STATUS_INVISIBLE){
--			Status s("","",0,true);
--			s.setIsInvisible(true);
--			setGlobalStatus(s, false, true);
--			if(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() == true)
--				d->mainwin->setTrayToolTip(s);
 +		Status status;
 +		switch (x) {
 +		case STATUS_OFFLINE:
@@ -4275,6 +4345,13 @@
 +			status = Status((XMPP::Status::Type)x, "", 0);
 +			break;
  		}
+-		else if(x == STATUS_INVISIBLE){
+-			Status s("","",0,true);
+-			s.setIsInvisible(true);
+-			setGlobalStatus(s, false, true);
+-			if(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() == true)
+-				d->mainwin->setTrayToolTip(s);
+-		}
 -		else {
 -			// Create a dialog with the last status message
 -			StatusSetDlg *w = new StatusSetDlg(this, makeStatus(x, currentStatusMessage()));
@@ -4294,7 +4371,7 @@
  #else
  	setGlobalStatus(makeStatus(x, currentStatusMessage()), false, true);
  #endif
-@@ -1070,16 +1105,6 @@ XMPP::Status::Type PsiCon::currentStatus
+@@ -1071,16 +1106,6 @@ XMPP::Status::Type PsiCon::currentStatusType() const
  #endif
  }
  
@@ -4311,7 +4388,7 @@
  QString PsiCon::currentStatusMessage() const
  {
  #ifdef YAPSI
-@@ -1087,16 +1112,15 @@ QString PsiCon::currentStatusMessage() c
+@@ -1088,16 +1113,15 @@ QString PsiCon::currentStatusMessage() const
  		return QString();
  	return d->mainwin->statusMessage();
  #else
@@ -4336,7 +4413,7 @@
  }
  
  void PsiCon::setStatusFromCommandline(const QString &status, const QString &message)
-@@ -1132,6 +1156,20 @@ void PsiCon::setGlobalStatus(const Statu
+@@ -1133,6 +1157,20 @@ void PsiCon::setGlobalStatus(const Status &s, bool withPriority, bool isManualSt
  	emit statusMessageChanged(s.status());
  }
  
@@ -4357,7 +4434,7 @@
  void PsiCon::setStatusMessage(QString message)
  {
  	XMPP::Status s;
-@@ -1314,6 +1352,21 @@ void PsiCon::doToolbars()
+@@ -1319,6 +1357,21 @@ void PsiCon::doToolbars()
  	}
  }
  
@@ -4378,8 +4455,8 @@
 +
  void PsiCon::optionChanged(const QString& option)
  {
- 	bool notifyRestart = true;
-@@ -1781,7 +1834,14 @@ void PsiCon::doWakeup()
+ 	//bool notifyRestart = true;
+@@ -1786,7 +1839,14 @@ void PsiCon::doWakeup()
  	foreach(PsiAccount* account, d->contactList->enabledAccounts()) {
  		if (account->userAccount().opt_connectAfterSleep) {
  			// Should we do this when the network comes up ?
@@ -4395,8 +4472,10 @@
  		}
  	}
  }
---- psi.orig/src/psicon.h
-+++ psi/src/psicon.h
+diff --git a/src/psicon.h b/src/psicon.h
+index 03633cc..1fce1e6 100644
+--- a/src/psicon.h
++++ b/src/psicon.h
 @@ -123,10 +123,10 @@ public:
  	void removeEvent(PsiEvent* e);
  
@@ -4440,8 +4519,10 @@
  	void setStatusFromCommandline(const QString &status, const QString &message);
  	void proxy_settingsChanged();
  	void updateMainwinStatus();
---- psi.orig/src/psicontactmenu.cpp
-+++ psi/src/psicontactmenu.cpp
+diff --git a/src/psicontactmenu.cpp b/src/psicontactmenu.cpp
+index 4e6903b..2f10d0a 100644
+--- a/src/psicontactmenu.cpp
++++ b/src/psicontactmenu.cpp
 @@ -734,7 +734,7 @@ private slots:
  		if (!contact_)
  			return;
@@ -4451,9 +4532,11 @@
  		w->setJid(contact_->jid());
  		connect(w, SIGNAL(setJid(const Jid &, const Status &)), SLOT(setStatusFromDialog(const Jid &, const Status &)));
  		w->show();
---- psi.orig/src/psiiconset.cpp
-+++ psi/src/psiiconset.cpp
-@@ -623,7 +623,7 @@ PsiIcon *PsiIconset::event2icon(PsiEvent
+diff --git a/src/psiiconset.cpp b/src/psiiconset.cpp
+index a740209..963c81c 100644
+--- a/src/psiiconset.cpp
++++ b/src/psiiconset.cpp
+@@ -623,7 +623,7 @@ PsiIcon *PsiIconset::event2icon(PsiEvent *e)
  	return d->jid2icon(e->from(), icon);
  }
  
@@ -4462,8 +4545,10 @@
  {
  	QString name;
  	switch ( s ) {
---- psi.orig/src/psiiconset.h
-+++ psi/src/psiiconset.h
+diff --git a/src/psiiconset.h b/src/psiiconset.h
+index 3172d27..1d988d6 100644
+--- a/src/psiiconset.h
++++ b/src/psiiconset.h
 @@ -103,4 +103,6 @@ private:
  	bool loadClients();
  };
@@ -4471,137 +4556,11 @@
 +QString status2name(int s);
 +
  #endif
---- psi.orig/src/psi_profiles.cpp
-+++ psi/src/psi_profiles.cpp
-@@ -104,6 +104,7 @@ void migrateRectEntry(const QDomElement&
- 
- 
- UserAccount::UserAccount()
-+	: lastStatus(XMPP::Status::Online)
- {
- 	reset();
- }
-@@ -132,6 +133,7 @@ void UserAccount::reset()
- 	host = "";
- 	ibbOnly = false;
- 	opt_automatic_resource = false;
-+	priority_dep_on_status = true;
- 	resource = "Psi+";
- 	priority = 55;
- 	opt_keepAlive = true;
-@@ -140,6 +142,8 @@ void UserAccount::reset()
- 	opt_log = true;
- 	opt_reconn = true;
- 	opt_connectAfterSleep = false;
-+	opt_autoSameStatus = true;
-+	lastStatusWithPriority = false;
- 	opt_ignoreSSLWarnings = true;
- 
- 	proxy_index = 0;
-@@ -179,6 +183,7 @@ void UserAccount::fromOptions(OptionsTre
- 	req_mutual_auth = o->getOption(base + ".require-mutual-auth").toBool();
- 	legacy_ssl_probe = o->getOption(base + ".legacy-ssl-probe").toBool();
- 	opt_automatic_resource = o->getOption(base + ".automatic-resource").toBool();
-+	priority_dep_on_status = o->getOption(base + ".priority-depends-on-status").toBool();
- 	opt_log = o->getOption(base + ".log").toBool();
- 	opt_reconn = o->getOption(base + ".reconn").toBool();
- 	opt_ignoreSSLWarnings = o->getOption(base + ".ignore-SSL-warnings").toBool();
-@@ -231,6 +236,19 @@ void UserAccount::fromOptions(OptionsTre
- 	resource = o->getOption(base + ".resource").toString();
- 	priority = o->getOption(base + ".priority").toInt();
- 
-+	if (allSetOptions.contains(base + ".auto-same-status")) {
-+		opt_autoSameStatus = o->getOption(base + ".auto-same-status").toBool();
-+		lastStatus.setType(o->getOption(base + ".last-status").toString());
-+		lastStatus.setStatus(o->getOption(base + ".last-status-message").toString());
-+		lastStatusWithPriority = o->getOption(base + ".last-with-priority").toBool();
-+		if (lastStatusWithPriority) {
-+			lastStatus.setPriority(o->getOption(base + ".last-priority").toInt());
-+		}
-+		else {
-+			lastStatus.setPriority(defaultPriority(lastStatus));
-+		}
-+	}
-+
- #ifdef HAVE_PGPUTIL
- 	QString pgpSecretKeyID = o->getOption(base + ".pgp-secret-key-id").toString();
- 	if (!pgpSecretKeyID.isEmpty()) {
-@@ -320,9 +338,11 @@ void UserAccount::toOptions(OptionsTree
- 	o->setOption(base + ".require-mutual-auth", req_mutual_auth);
- 	o->setOption(base + ".legacy-ssl-probe", legacy_ssl_probe);
- 	o->setOption(base + ".automatic-resource", opt_automatic_resource);
-+	o->setOption(base + ".priority-depends-on-status", priority_dep_on_status);
- 	o->setOption(base + ".log", opt_log);
- 	o->setOption(base + ".reconn", opt_reconn);
- 	o->setOption(base + ".connect-after-sleep", opt_connectAfterSleep);
-+	o->setOption(base + ".auto-same-status", opt_autoSameStatus);
- 	o->setOption(base + ".ignore-SSL-warnings", opt_ignoreSSLWarnings);
- 
- 	o->setOption(base + ".id", id);
-@@ -435,6 +455,7 @@ void UserAccount::toOptions(OptionsTree
- 
- 	o->setOption(base + ".tls.override-certificate", tlsOverrideCert);
- 	o->setOption(base + ".tls.override-domain", tlsOverrideDomain);
-+	saveLastStatus(o, base);
- }
- 
- void UserAccount::fromXml(const QDomElement &a)
-@@ -460,12 +481,8 @@ void UserAccount::fromXml(const QDomElem
- 	readBoolAttribute(a, "reconn", &opt_reconn);
- 	readBoolAttribute(a, "ignoreSSLWarnings", &opt_ignoreSSLWarnings);
- 	//readBoolAttribute(a, "gpg", &opt_gpg);
--	if (a.hasAttribute("automatic-resource")) {
--		readBoolAttribute(a, "automatic-resource", &opt_automatic_resource);
--	}
--	else {
--		opt_automatic_resource = false;
--	}
-+	readBoolAttribute(a, "automatic-resource", &opt_automatic_resource);
-+	readBoolAttribute(a, "priority-depends-on-status", &priority_dep_on_status);
- 	
- 	// Will be overwritten if there is a new option
- 	bool opt_plain = false;
-@@ -591,6 +608,37 @@ void UserAccount::fromXml(const QDomElem
- 	dtProxy = str;
- }
- 
-+int UserAccount::defaultPriority(const XMPP::Status &s)
-+{
-+	if (priority_dep_on_status) {
-+		if (s.isAvailable()) {
-+			return PsiOptions::instance()->getOption("options.status.default-priority." + s.typeString()).toInt();
-+		}
-+		else {
-+			return 0; //Priority for Offline status, it is not used
-+		}
-+	}
-+	else {
-+		return priority;
-+	}
-+}
-+
-+void UserAccount::saveLastStatus(OptionsTree *o, QString base=QString())
-+{
-+	if (base.isEmpty()) {
-+		base = optionsBase;
-+	}
-+
-+	o->setOption(base + ".last-status", lastStatus.typeString());
-+	o->setOption(base + ".last-status-message", lastStatus.status());
-+	o->setOption(base + ".last-with-priority", lastStatusWithPriority);
-+	if (lastStatusWithPriority) {
-+		o->setOption(base + ".last-priority", lastStatus.priority());
-+	}
-+	else {
-+		o->removeOption(base + ".last-priority");
-+	}
-+}
- 
- static ToolbarPrefs loadToolbarData( const QDomElement &e )
- {
---- psi.orig/src/src.pri
-+++ psi/src/src.pri
-@@ -462,6 +462,8 @@ newcontactlist {
+diff --git a/src/src.pri b/src/src.pri
+index 5595813..bde3a3b 100644
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -470,6 +470,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.h \
  		$$PWD/contactupdatesmanager.h \
  		$$PWD/statusmenu.h \
@@ -4610,7 +4569,7 @@
  		$$PWD/psirosterwidget.h \
  		$$PWD/psifilteredcontactlistview.h
  
-@@ -492,6 +494,8 @@ newcontactlist {
+@@ -500,6 +502,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.cpp \
  		$$PWD/contactupdatesmanager.cpp \
  		$$PWD/statusmenu.cpp \
@@ -4619,8 +4578,10 @@
  		$$PWD/psirosterwidget.cpp \
  		$$PWD/psifilteredcontactlistview.cpp
  
---- psi.orig/src/statuscombobox.cpp
-+++ psi/src/statuscombobox.cpp
+diff --git a/src/statuscombobox.cpp b/src/statuscombobox.cpp
+index cac4481..25d38c3 100644
+--- a/src/statuscombobox.cpp
++++ b/src/statuscombobox.cpp
 @@ -21,6 +21,7 @@
  #include "statuscombobox.h"
  
@@ -4641,7 +4602,7 @@
  	addStatus(XMPP::Status::Away);
  	if (PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool()) {
  		addStatus(XMPP::Status::XA);
-@@ -81,7 +82,11 @@ XMPP::Status::Type StatusComboBox::statu
+@@ -81,7 +82,11 @@ XMPP::Status::Type StatusComboBox::status() const
  // private
  
  void StatusComboBox::addStatus(XMPP::Status::Type status){
@@ -4653,8 +4614,10 @@
  }
  
  void StatusComboBox::onCurrentIndexChanged(int index)
---- psi.orig/src/statusdlg.cpp
-+++ psi/src/statusdlg.cpp
+diff --git a/src/statusdlg.cpp b/src/statusdlg.cpp
+index 42dc083..4fe6d26 100644
+--- a/src/statusdlg.cpp
++++ b/src/statusdlg.cpp
 @@ -34,6 +34,7 @@
  #include "jidutil.h"
  #include "psicon.h"
@@ -4689,7 +4652,7 @@
  	: QDialog(0)
  {
  	setAttribute(Qt::WA_DeleteOnClose);
-@@ -107,13 +109,14 @@ StatusSetDlg::StatusSetDlg(PsiCon *psi,
+@@ -107,13 +109,14 @@ StatusSetDlg::StatusSetDlg(PsiCon *psi, const Status &s)
  	d->pa = 0;
  	d->psi->dialogRegister(this);
  	d->s = s;
@@ -4705,7 +4668,7 @@
  	: QDialog(0)
  {
  	setAttribute(Qt::WA_DeleteOnClose);
-@@ -122,6 +125,7 @@ StatusSetDlg::StatusSetDlg(PsiAccount *p
+@@ -122,6 +125,7 @@ StatusSetDlg::StatusSetDlg(PsiAccount *pa, const Status &s)
  	d->pa = pa;
  	d->pa->dialogRegister(this);
  	d->s = s;
@@ -4807,8 +4770,10 @@
  	close();
  }
  
---- psi.orig/src/statusdlg.h
-+++ psi/src/statusdlg.h
+diff --git a/src/statusdlg.h b/src/statusdlg.h
+index 7dd1663..1a9300b 100644
+--- a/src/statusdlg.h
++++ b/src/statusdlg.h
 @@ -49,8 +49,8 @@ class StatusSetDlg : public QDialog
  {
  	Q_OBJECT
@@ -4820,8 +4785,10 @@
  	~StatusSetDlg();
  
  	void setJid(const Jid &);
---- psi.orig/src/statusmenu.cpp
-+++ psi/src/statusmenu.cpp
+diff --git a/src/statusmenu.cpp b/src/statusmenu.cpp
+index 610c1d0..cff1cbe 100755
+--- a/src/statusmenu.cpp
++++ b/src/statusmenu.cpp
 @@ -26,62 +26,223 @@
  #include "xmpp_status.h"
  #include "common.h"
@@ -4911,19 +4878,16 @@
  
 -void StatusMenu::setStatus(XMPP::Status::Type status)
 +void StatusMenu::clear()
- {
--	if (currentStatus_ == status)
--		return;
++{
 +	statusActs.clear();
 +	presetActs.clear();
 +	QMenu::clear();
 +}
- 
--	currentStatus_ = status;
--	foreach(QAction* action, actions())
--		action->setChecked(actionStatus(action) == status);
++
 +void StatusMenu::addPresets(IconActionGroup* parent)
-+{
+ {
+-	if (currentStatus_ == status)
+-		return;
 +	QObject* parentMenu = parent ? parent : static_cast<QObject*>(this);
 +	PsiOptions* o = PsiOptions::instance();
 +	QVariantList presets = o->mapKeyList("options.status.presets", true);
@@ -4935,7 +4899,10 @@
 +			StatusPreset preset;
 +			preset.fromOptions(o,name.toString());
 +			preset.filterStatus();
-+
+ 
+-	currentStatus_ = status;
+-	foreach(QAction* action, actions())
+-		action->setChecked(actionStatus(action) == status);
 +			IconAction* action = new IconAction(name.toString().replace("&", "&&"), parentMenu, status2name(preset.status()));
 +			action->setCheckable(true);
 +			action->setProperty("preset", name);
@@ -5032,15 +4999,15 @@
 -	addAction(action);
 +	connect(action, SIGNAL(triggered()), SLOT(statusActivated()));
 +	statusActs.append(action);
- }
- 
--void StatusMenu::actionActivated()
++}
++
 +XMPP::Status::Type StatusMenu::actionStatus(const QAction* action) const
 +{
 +	Q_ASSERT(action);
 +	return static_cast<XMPP::Status::Type>(action->property("type").toInt());
-+}
-+
+ }
+ 
+-void StatusMenu::actionActivated()
 +void StatusMenu::statusActivated()
  {
  	QAction* action = static_cast<QAction*>(sender());
@@ -5076,8 +5043,10 @@
 +	}
 +	return false;
  }
---- psi.orig/src/statusmenu.h
-+++ psi/src/statusmenu.h
+diff --git a/src/statusmenu.h b/src/statusmenu.h
+index 3913920..48b1098 100755
+--- a/src/statusmenu.h
++++ b/src/statusmenu.h
 @@ -22,30 +22,48 @@
  #define STATUSMENU_H
  
@@ -5091,20 +5060,19 @@
  class StatusMenu : public QMenu
  {
  	Q_OBJECT
--public:
--	StatusMenu(QWidget* parent);
 +protected:
 +	PsiCon* psi;
 +	QList<IconAction*> statusActs, presetActs;
 +
 +	bool eventFilter(QObject *obj, QEvent *event);
- 
--	void setStatus(XMPP::Status::Type);
-+public:
++
+ public:
+-	StatusMenu(QWidget* parent);
 +	StatusMenu(QWidget* parent, PsiCon* _psi );
 +	void fill();
 +	void clear();
-+
+ 
+-	void setStatus(XMPP::Status::Type);
 +public slots:
 +	void presetsChanged();
 +	void statusChanged(const XMPP::Status& status);
@@ -5137,8 +5105,10 @@
  };
  
  #endif
---- psi.orig/src/statuspreset.cpp
-+++ psi/src/statuspreset.cpp
+diff --git a/src/statuspreset.cpp b/src/statuspreset.cpp
+index fd84d4a..0b19ba1 100644
+--- a/src/statuspreset.cpp
++++ b/src/statuspreset.cpp
 @@ -22,6 +22,7 @@
  
  #include "maybe.h"
@@ -5147,7 +5117,7 @@
  
  //-----------------------------------------------------------------------------
  // StatusPreset
-@@ -88,6 +89,16 @@ void StatusPreset::setPriority(int prior
+@@ -88,6 +89,16 @@ void StatusPreset::setPriority(int priority)
  	priority_ = Maybe<int>(priority);
  }
  
@@ -5164,7 +5134,7 @@
  void StatusPreset::clearPriority() 
  {
  	priority_ = Maybe<int>();
-@@ -128,6 +139,30 @@ void StatusPreset::fromXml(const QDomEle
+@@ -128,6 +139,30 @@ void StatusPreset::fromXml(const QDomElement &el)
  	setStatus(status.type());
  }
  
@@ -5195,7 +5165,7 @@
  void StatusPreset::toOptions(OptionsTree *o)
  {
  	QString base = o->mapPut("options.status.presets", name());
-@@ -138,3 +173,14 @@ void StatusPreset::toOptions(OptionsTree
+@@ -138,3 +173,14 @@ void StatusPreset::toOptions(OptionsTree *o)
  		o->setOption(base + ".priority", priority().value());
  	}
  }
@@ -5210,8 +5180,10 @@
 +	if (forcePriority)
 +		priority_ = o->getOption(path + ".priority").toInt();
 +}
---- psi.orig/src/statuspreset.h
-+++ psi/src/statuspreset.h
+diff --git a/src/statuspreset.h b/src/statuspreset.h
+index 9aeb75e..20c9160 100644
+--- a/src/statuspreset.h
++++ b/src/statuspreset.h
 @@ -46,9 +46,12 @@ public:
  	void setStatus(XMPP::Status::Type);
  	Maybe<int> priority() const;
@@ -5225,9 +5197,11 @@
  	QDomElement toXml(QDomDocument&) const;
  	void fromXml(const QDomElement&);
  
---- psi.orig/src/tools/optionstree/optionstree.cpp
-+++ psi/src/tools/optionstree/optionstree.cpp
-@@ -205,10 +205,34 @@ void OptionsTree::mapPut(const QString &
+diff --git a/src/tools/optionstree/optionstree.cpp b/src/tools/optionstree/optionstree.cpp
+index 11250ba..ad6f325 100644
+--- a/src/tools/optionstree/optionstree.cpp
++++ b/src/tools/optionstree/optionstree.cpp
+@@ -205,10 +205,34 @@ void OptionsTree::mapPut(const QString &basename, const QVariant &key, const QSt
  	setOption(mapPut(basename, key) + '.' + node, value);
  }
  
@@ -5263,8 +5237,10 @@
  	foreach (QString path, children) {
  		ret << getOption(path+".key");
  	}
---- psi.orig/src/tools/optionstree/optionstree.h
-+++ psi/src/tools/optionstree/optionstree.h
+diff --git a/src/tools/optionstree/optionstree.h b/src/tools/optionstree/optionstree.h
+index 3af77e4..7ca6796 100644
+--- a/src/tools/optionstree/optionstree.h
++++ b/src/tools/optionstree/optionstree.h
 @@ -54,7 +54,7 @@ public:
  	void mapPut(const QString &basename, const QVariant &key, const QString &node, const QVariant &value);
  	QVariant mapGet(const QString &basename, const QVariant &key, const QString &node) const;
@@ -5274,9 +5250,11 @@
  
  
  	bool saveOptions(const QString& fileName, const QString& configName, const QString& configNS, const QString& configVersion, bool streamWriter = false) const;
---- psi.orig/src/widgets/iconaction.cpp
-+++ psi/src/widgets/iconaction.cpp
-@@ -511,4 +511,9 @@ void IconActionGroup::addingToolButton(I
+diff --git a/src/widgets/iconaction.cpp b/src/widgets/iconaction.cpp
+index 6dc36ba..808a310 100644
+--- a/src/widgets/iconaction.cpp
++++ b/src/widgets/iconaction.cpp
+@@ -511,4 +511,9 @@ void IconActionGroup::addingToolButton(IconToolButton *btn)
  	btn->setPopupMode( QToolButton::MenuButtonPopup );
  }
  
@@ -5286,8 +5264,10 @@
 +}
 +
  #include "iconaction.moc"
---- psi.orig/src/widgets/iconaction.h
-+++ psi/src/widgets/iconaction.h
+diff --git a/src/widgets/iconaction.h b/src/widgets/iconaction.h
+index 400a4e7..b0a6d79 100644
+--- a/src/widgets/iconaction.h
++++ b/src/widgets/iconaction.h
 @@ -107,6 +107,8 @@ public:
  
  	IconAction *copy() const;

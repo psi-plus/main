@@ -1,6 +1,10 @@
---- psi.orig/src/mainwin.cpp
-+++ psi/src/mainwin.cpp
-@@ -55,6 +55,8 @@
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/src/mainwin.cpp b/src/mainwin.cpp
+index 09e033e..18940f5 100644
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
+@@ -54,6 +54,8 @@
  #include "serverinfomanager.h"
  #include "applicationinfo.h"
  #include "psiaccount.h"
@@ -9,7 +13,7 @@
  #include "psitrayicon.h"
  #include "psitoolbar.h"
  #include "aboutdlg.h"
-@@ -144,6 +146,8 @@ public:
+@@ -142,6 +144,8 @@ public:
  	void registerActions();
  	IconAction* getAction( QString name );
  	void updateMenu(QStringList actions, QMenu* menu);
@@ -18,7 +22,7 @@
  };
  
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
-@@ -714,7 +718,8 @@ void MainWin::setUseDock(bool use)
+@@ -710,7 +714,8 @@ void MainWin::setUseDock(bool use)
  		connect(d->tray, SIGNAL(clicked(const QPoint &, int)), SLOT(trayClicked(const QPoint &, int)));
  		connect(d->tray, SIGNAL(doubleClicked(const QPoint &)), SLOT(trayDoubleClicked()));
  		d->tray->setIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
@@ -28,7 +32,7 @@
  
  		updateReadNext(d->nextAnim, d->nextAmount);
  
-@@ -1097,12 +1102,87 @@ void MainWin::buildTrayMenu()
+@@ -1093,12 +1098,87 @@ void MainWin::buildTrayMenu()
  #endif
  }
  
@@ -118,7 +122,7 @@
  }
  
  void MainWin::decorateButton(int status)
-@@ -1113,6 +1193,8 @@ void MainWin::decorateButton(int status)
+@@ -1109,6 +1189,8 @@ void MainWin::decorateButton(int status)
  		action->setChecked ( d->statusActions[action] == status );
  	}
  
@@ -127,19 +131,13 @@
  	if(d->lastStatus == status) {
  		return;
  	}
-@@ -1294,25 +1376,13 @@ void MainWin::toggleVisible()
- 	}
- }
- 
--void MainWin::setTrayToolTip(const Status& status, bool, bool)
-+void MainWin::setTrayToolTip(const Status&, bool, bool)
- {
+@@ -1295,20 +1377,7 @@ void MainWin::setTrayToolTip(const Status& status, bool, bool)
  	if (!d->tray) {
  		return;
  	}
--	QString s = "Psi";
- 
-- 	QString show = status.show();
+-	QString s = ApplicationInfo::name();
+-
+-	QString show = status.show();
 -	if(!show.isEmpty()) {
 -		show[0] = show[0].toUpper();
 -		s += " - "+show;
@@ -155,7 +153,7 @@
  }
  
  void MainWin::trayClicked(const QPoint &, int button)
-@@ -1387,6 +1457,7 @@ void MainWin::updateReadNext(PsiIcon* an
+@@ -1383,6 +1452,7 @@ void MainWin::updateReadNext(PsiIcon* anim, int amount)
  
  	updateTray();
  	updateCaption();
@@ -163,8 +161,8 @@
  }
  
  QString MainWin::numEventsString(int x) const
-@@ -1423,6 +1494,8 @@ void MainWin::updateTray()
- 	
+@@ -1419,6 +1489,8 @@ void MainWin::updateTray()
+ 
  	buildTrayMenu();
  	d->tray->setContextMenu(d->trayMenu);
 +
@@ -172,7 +170,7 @@
  }
  
  void MainWin::doRecvNextEvent()
-@@ -1445,6 +1518,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
+@@ -1441,6 +1513,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
  void MainWin::numAccountsChanged()
  {
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
@@ -180,8 +178,10 @@
  }
  
  void MainWin::accountFeaturesChanged()
---- psi.orig/src/mainwin.h
-+++ psi/src/mainwin.h
+diff --git a/src/mainwin.h b/src/mainwin.h
+index d4bc36e..81d5962 100644
+--- a/src/mainwin.h
++++ b/src/mainwin.h
 @@ -101,7 +101,7 @@ private slots:
  	void buildMainMenu();
  	void buildToolsMenu();
@@ -200,8 +200,10 @@
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
---- psi.orig/src/psitrayicon.cpp
-+++ psi/src/psitrayicon.cpp
+diff --git a/src/psitrayicon.cpp b/src/psitrayicon.cpp
+index 2b7a574..b04766a 100644
+--- a/src/psitrayicon.cpp
++++ b/src/psitrayicon.cpp
 @@ -2,6 +2,7 @@
  #include <QPixmapCache>
  #include <QApplication> // old
@@ -230,7 +232,7 @@
  }
  
  PsiTrayIcon::~PsiTrayIcon()
-@@ -35,7 +39,11 @@ void PsiTrayIcon::setContextMenu(QMenu*
+@@ -35,7 +39,11 @@ void PsiTrayIcon::setContextMenu(QMenu* menu)
  
  void PsiTrayIcon::setToolTip(const QString &str)
  {
@@ -276,8 +278,10 @@
 +	}
 +	return QObject::eventFilter(obj, event);
 +}
---- psi.orig/src/psitrayicon.h
-+++ psi/src/psitrayicon.h
+diff --git a/src/psitrayicon.h b/src/psitrayicon.h
+index fed0f47..2a2044b 100644
+--- a/src/psitrayicon.h
++++ b/src/psitrayicon.h
 @@ -25,10 +25,13 @@ public:
  
  	bool isWMDock();

@@ -1,6 +1,10 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -586,6 +586,8 @@ QLineEdit#le_status_text {
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/options/default.xml b/options/default.xml
+index 0f648f7..0d3d841 100644
+--- a/options/default.xml
++++ b/options/default.xml
+@@ -598,6 +598,8 @@ QLineEdit#le_status_text {
  			<hide-on-start type="bool">false</hide-on-start>
  			<resolve-nicks-on-contact-add type="bool">true</resolve-nicks-on-contact-add>
  			<use-toolwindow type="bool">false</use-toolwindow>
@@ -9,9 +13,11 @@
  		</contactlist>
  		<external-control>
  			<adhoc-remote-control>
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
-@@ -136,6 +136,10 @@ public:
+diff --git a/src/mainwin.cpp b/src/mainwin.cpp
+index 8b747fd..f70b730 100644
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
+@@ -134,6 +134,10 @@ public:
  	QToolButton* searchPb;
  	QWidget* searchWidget;
  
@@ -22,7 +28,7 @@
  	QSignalMapper* statusMapper;
  
  	PsiIcon* nextAnim;
-@@ -181,10 +185,13 @@ MainWin::Private::Private(PsiCon* _psi, 
+@@ -179,10 +183,13 @@ MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTa
  
  	char* squishStr = getenv("SQUISH_ENABLED");
  	squishEnabled = squishStr != 0;
@@ -36,7 +42,7 @@
  }
  
  void MainWin::Private::registerActions()
-@@ -533,6 +540,7 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -531,6 +538,7 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  	// setUnifiedTitleAndToolBarOnMac(true);
  
  	connect(qApp, SIGNAL(dockActivated()), SLOT(dockActivated()));
@@ -44,9 +50,9 @@
  
  	connect(psi, SIGNAL(emitOptionsUpdate()), SLOT(optionsUpdate()));
  	optionsUpdate();
-@@ -541,6 +549,11 @@ MainWin::MainWin(bool _onTop, bool _asTo
-         connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
- 
+@@ -538,6 +546,11 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
+ 		/*QShortcut *sp_ss = new QShortcut(QKeySequence(tr("Ctrl+Shift+N")), this);
+ 		connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
  	optionChanged("options.ui.contactlist.css");
 +
 +	connect(d->hideTimer, SIGNAL(timeout()), SLOT(hideTimerTimeout()));
@@ -56,7 +62,7 @@
  }
  
  MainWin::~MainWin()
-@@ -584,6 +597,28 @@ void MainWin::optionChanged(const QStrin
+@@ -579,6 +592,28 @@ void MainWin::optionChanged(const QString& option)
  	else if (option == "options.ui.contactlist.show-roster-avatar-frame") {
  		d->rosterAvatar->setVisible(PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool());
  	}
@@ -85,7 +91,7 @@
  }
  
  void MainWin::registerAction( IconAction* action )
-@@ -1423,6 +1458,31 @@ void MainWin::keyPressEvent(QKeyEvent* e
+@@ -1418,6 +1453,31 @@ void MainWin::keyPressEvent(QKeyEvent* e)
  	QWidget::keyPressEvent(e);
  }
  
@@ -117,7 +123,7 @@
  #ifdef Q_OS_WIN
  #include <windows.h>
  bool MainWin::winEvent(MSG* msg, long* result)
-@@ -1542,6 +1602,8 @@ void MainWin::trayDoubleClicked()
+@@ -1536,6 +1596,8 @@ void MainWin::trayDoubleClicked()
  void MainWin::trayShow()
  {
  	bringToFront(this);
@@ -126,7 +132,7 @@
  }
  
  void MainWin::trayHide()
-@@ -1841,6 +1903,8 @@ void MainWin::showNoFocus()
+@@ -1837,6 +1899,8 @@ void MainWin::showNoFocus()
  void MainWin::showNoFocus()
  {
  	bringToFront(this);
@@ -135,8 +141,10 @@
  }
  
  void MainWin::avcallConfig()
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+diff --git a/src/mainwin.h b/src/mainwin.h
+index 6cdb55f..d296d13 100644
+--- a/src/mainwin.h
++++ b/src/mainwin.h
 @@ -72,9 +72,12 @@ public:
  
  protected:
@@ -159,8 +167,10 @@
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
---- git.orig/src/options/opt_roster.cpp
-+++ git/src/options/opt_roster.cpp
+diff --git a/src/options/opt_roster.cpp b/src/options/opt_roster.cpp
+index 9a04627..0c141c9 100644
+--- a/src/options/opt_roster.cpp
++++ b/src/options/opt_roster.cpp
 @@ -66,6 +66,8 @@ void OptionsTabRoster::applyOptions()
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-menubar", d->ck_showMenubar->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.disable-scrollbar", d->ck_disableScrollbar->isChecked());
@@ -170,7 +180,7 @@
  
  	//enabled icons
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
-@@ -94,6 +96,9 @@ void OptionsTabRoster::restoreOptions()
+@@ -95,6 +97,9 @@ void OptionsTabRoster::restoreOptions()
  	d->ck_showMenubar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool() );
  	d->ck_disableScrollbar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.disable-scrollbar").toBool() );
  	d->ck_roster_avatar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool() );
@@ -180,8 +190,10 @@
  
  	//enabled icons
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
---- git.orig/src/options/opt_roster.ui
-+++ git/src/options/opt_roster.ui
+diff --git a/src/options/opt_roster.ui b/src/options/opt_roster.ui
+index 37b57d1..ecc8db7 100644
+--- a/src/options/opt_roster.ui
++++ b/src/options/opt_roster.ui
 @@ -72,6 +72,47 @@
      </widget>
     </item>
