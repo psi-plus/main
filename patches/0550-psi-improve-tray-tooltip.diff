@@ -1,10 +1,18 @@
 Entering 'iris'
 Entering 'src/libpsi'
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index 09e033e..18940f5 100644
+index 09e033e..602eb7b 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
-@@ -54,6 +54,8 @@
+@@ -47,6 +47,7 @@
+ #include "common.h"
+ #include "showtextdlg.h"
+ #include "psicon.h"
++#include "textutil.h"
+ #ifndef NEWCONTACTLIST
+ #include "contactview.h"
+ #endif
+@@ -54,6 +55,8 @@
  #include "serverinfomanager.h"
  #include "applicationinfo.h"
  #include "psiaccount.h"
@@ -13,7 +21,7 @@ index 09e033e..18940f5 100644
  #include "psitrayicon.h"
  #include "psitoolbar.h"
  #include "aboutdlg.h"
-@@ -142,6 +144,8 @@ public:
+@@ -142,6 +145,8 @@ public:
  	void registerActions();
  	IconAction* getAction( QString name );
  	void updateMenu(QStringList actions, QMenu* menu);
@@ -22,7 +30,7 @@ index 09e033e..18940f5 100644
  };
  
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
-@@ -710,7 +714,8 @@ void MainWin::setUseDock(bool use)
+@@ -710,7 +715,8 @@ void MainWin::setUseDock(bool use)
  		connect(d->tray, SIGNAL(clicked(const QPoint &, int)), SLOT(trayClicked(const QPoint &, int)));
  		connect(d->tray, SIGNAL(doubleClicked(const QPoint &)), SLOT(trayDoubleClicked()));
  		d->tray->setIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
@@ -32,7 +40,7 @@ index 09e033e..18940f5 100644
  
  		updateReadNext(d->nextAnim, d->nextAmount);
  
-@@ -1093,12 +1098,87 @@ void MainWin::buildTrayMenu()
+@@ -1093,12 +1099,87 @@ void MainWin::buildTrayMenu()
  #endif
  }
  
@@ -122,7 +130,7 @@ index 09e033e..18940f5 100644
  }
  
  void MainWin::decorateButton(int status)
-@@ -1109,6 +1189,8 @@ void MainWin::decorateButton(int status)
+@@ -1109,6 +1190,8 @@ void MainWin::decorateButton(int status)
  		action->setChecked ( d->statusActions[action] == status );
  	}
  
@@ -131,7 +139,7 @@ index 09e033e..18940f5 100644
  	if(d->lastStatus == status) {
  		return;
  	}
-@@ -1295,20 +1377,7 @@ void MainWin::setTrayToolTip(const Status& status, bool, bool)
+@@ -1295,20 +1378,7 @@ void MainWin::setTrayToolTip(const Status& status, bool, bool)
  	if (!d->tray) {
  		return;
  	}
@@ -153,7 +161,7 @@ index 09e033e..18940f5 100644
  }
  
  void MainWin::trayClicked(const QPoint &, int button)
-@@ -1383,6 +1452,7 @@ void MainWin::updateReadNext(PsiIcon* anim, int amount)
+@@ -1383,6 +1453,7 @@ void MainWin::updateReadNext(PsiIcon* anim, int amount)
  
  	updateTray();
  	updateCaption();
@@ -161,7 +169,7 @@ index 09e033e..18940f5 100644
  }
  
  QString MainWin::numEventsString(int x) const
-@@ -1419,6 +1489,8 @@ void MainWin::updateTray()
+@@ -1419,6 +1490,8 @@ void MainWin::updateTray()
  
  	buildTrayMenu();
  	d->tray->setContextMenu(d->trayMenu);
@@ -170,7 +178,7 @@ index 09e033e..18940f5 100644
  }
  
  void MainWin::doRecvNextEvent()
-@@ -1441,6 +1513,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
+@@ -1441,6 +1514,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
  void MainWin::numAccountsChanged()
  {
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
