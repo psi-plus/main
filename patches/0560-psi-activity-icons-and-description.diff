@@ -1,5 +1,7 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+Index: psi/options/default.xml
+===================================================================
+--- psi.orig/options/default.xml	2013-01-15 14:04:11.160826416 +0400
++++ psi/options/default.xml	2013-01-15 14:04:11.148826416 +0400
 @@ -169,6 +169,7 @@
  					<radius type="int">5</radius>
  				</avatars>
@@ -8,9 +10,11 @@
  				<show-tune-icons type="bool">true</show-tune-icons>
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
---- git.orig/src/activity.cpp
-+++ git/src/activity.cpp
-@@ -67,6 +67,16 @@ const QString& Activity::text() const
+Index: psi/src/activity.cpp
+===================================================================
+--- psi.orig/src/activity.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/activity.cpp	2013-01-15 14:04:11.148826416 +0400
+@@ -67,6 +67,16 @@
  	return text_;
  }
  
@@ -27,8 +31,10 @@
  bool Activity::isNull() const
  {
  	return type_ == Unknown && text().isEmpty();
---- git.orig/src/activitydlg.cpp
-+++ git/src/activitydlg.cpp
+Index: psi/src/activitydlg.cpp
+===================================================================
+--- psi.orig/src/activitydlg.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/activitydlg.cpp	2013-01-15 14:04:11.148826416 +0400
 @@ -25,6 +25,7 @@
  #include "activitycatalog.h"
  #include "psiaccount.h"
@@ -37,7 +43,7 @@
  
  ActivityDlg::ActivityDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
  {
-@@ -36,12 +37,20 @@ ActivityDlg::ActivityDlg(PsiAccount* pa)
+@@ -36,12 +37,20 @@
  	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setActivity()));
  
  	ui_.cb_general_type->addItem(tr("<unset>"));
@@ -59,7 +65,7 @@
  }
  
  void ActivityDlg::loadSpecificActivities(const QString& generalActivityStr)
-@@ -53,13 +62,19 @@ void ActivityDlg::loadSpecificActivities
+@@ -53,13 +62,19 @@
  	}
  	else {
  		ui_.cb_specific_type->addItem(tr("<unset>"));
@@ -80,9 +86,11 @@
  				}
  			}
  		}
---- git.orig/src/activity.h
-+++ git/src/activity.h
-@@ -75,6 +75,8 @@ public:
+Index: psi/src/activity.h
+===================================================================
+--- psi.orig/src/activity.h	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/activity.h	2013-01-15 14:04:11.148826416 +0400
+@@ -75,6 +75,8 @@
  
  	Type type() const;
  	QString typeText() const;
@@ -91,9 +99,11 @@
  	SpecificType specificType() const;
  	QString specificTypeText() const;
  	const QString& text() const;
---- git.orig/src/options/opt_appearance.cpp
-+++ git/src/options/opt_appearance.cpp
-@@ -95,6 +95,7 @@ OptionsTabIconset::OptionsTabIconset(QOb
+Index: psi/src/options/opt_appearance.cpp
+===================================================================
+--- psi.orig/src/options/opt_appearance.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/opt_appearance.cpp	2013-01-15 14:04:11.148826416 +0400
+@@ -95,6 +95,7 @@
  {
  	addTab( new OptionsTabIconsetEmoticons(this) );
  	addTab( new OptionsTabIconsetMoods(this) );
@@ -101,8 +111,10 @@
  	addTab( new OptionsTabIconsetClients(this) );
  	addTab( new OptionsTabIconsetRoster(this) );
  	addTab( new OptionsTabIconsetSystem(this) );
---- /dev/null
-+++ git/src/options/opt_iconset_activity.ui
+Index: psi/src/options/opt_iconset_activity.ui
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ psi/src/options/opt_iconset_activity.ui	2013-01-15 14:04:11.148826416 +0400
 @@ -0,0 +1,88 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -192,8 +204,10 @@
 + <resources/>
 + <connections/>
 +</ui>
---- git.orig/src/options/opt_iconset.cpp
-+++ git/src/options/opt_iconset.cpp
+Index: psi/src/options/opt_iconset.cpp
+===================================================================
+--- psi.orig/src/options/opt_iconset.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/opt_iconset.cpp	2013-01-15 14:04:11.152826416 +0400
 @@ -24,6 +24,7 @@
  
  #include "ui_opt_iconset_emo.h"
@@ -202,7 +216,7 @@
  #include "ui_opt_iconset_client.h"
  #include "ui_opt_iconset_system.h"
  #include "ui_opt_iconset_roster.h"
-@@ -47,6 +48,12 @@ public:
+@@ -47,6 +48,12 @@
  	IconsetClientUI() : QWidget() { setupUi(this); }
  };
  
@@ -215,10 +229,16 @@
  class IconsetSystemUI : public QWidget, public Ui::IconsetSystem
  {
  public:
-@@ -809,6 +816,153 @@ void OptionsTabIconsetMoods::cancelThrea
- 		thread = 0;
- 	}
- }
+@@ -803,6 +810,153 @@
+ {
+ 	if ( thread ) {
+ 		threadCancelled.lock();
++		thread->cancelled = true;
++		threadCancelled.unlock();
++
++		thread = 0;
++	}
++}
 +//----------------------------------------------------------------------------
 +// OptionsTabIconsetActivity
 +//----------------------------------------------------------------------------
@@ -360,18 +380,14 @@
 +{
 +	if ( thread ) {
 +		threadCancelled.lock();
-+		thread->cancelled = true;
-+		threadCancelled.unlock();
-+
-+		thread = 0;
-+	}
-+}
+ 		thread->cancelled = true;
+ 		threadCancelled.unlock();
  
- //----------------------------------------------------------------------------
- // OptionsTabIconsetClients
---- git.orig/src/options/opt_iconset.h
-+++ git/src/options/opt_iconset.h
-@@ -93,6 +93,34 @@ private:
+Index: psi/src/options/opt_iconset.h
+===================================================================
+--- psi.orig/src/options/opt_iconset.h	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/opt_iconset.h	2013-01-15 14:04:11.152826416 +0400
+@@ -93,6 +93,34 @@
  	IconsetLoadThread *thread;
  };
  
@@ -406,9 +422,11 @@
  class OptionsTabIconsetClients : public OptionsTab
  {
  	Q_OBJECT
---- git.orig/src/options/options.pri
-+++ git/src/options/options.pri
-@@ -62,6 +62,7 @@ FORMS += \
+Index: psi/src/options/options.pri
+===================================================================
+--- psi.orig/src/options/options.pri	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/options.pri	2013-01-15 14:04:11.152826416 +0400
+@@ -65,6 +65,7 @@
  	$$PWD/ui_isdetails.ui \
  	$$PWD/opt_iconset_emo.ui \
  	$$PWD/opt_iconset_mood.ui \
@@ -416,9 +434,11 @@
  	$$PWD/opt_iconset_client.ui \
  	$$PWD/opt_iconset_system.ui \
  	$$PWD/opt_iconset_roster.ui \
---- git.orig/src/options/opt_roster.cpp
-+++ git/src/options/opt_roster.cpp
-@@ -69,6 +69,7 @@ void OptionsTabRoster::applyOptions()
+Index: psi/src/options/opt_roster.cpp
+===================================================================
+--- psi.orig/src/options/opt_roster.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/opt_roster.cpp	2013-01-15 14:04:11.152826416 +0400
+@@ -69,6 +69,7 @@
  	//enabled icons
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-mood-icons", d->ck_showMoodIcons->isChecked());
@@ -426,7 +446,7 @@
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-tune-icons", d->ck_showTuneIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-client-icons", d->ck_showClientIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-all-client-icons", (d->cb_showAllClientIcons->currentIndex() == 0)?true:false);
-@@ -94,6 +95,7 @@ void OptionsTabRoster::restoreOptions()
+@@ -95,6 +96,7 @@
  	//enabled icons
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
  	d->ck_showMoodIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-mood-icons").toBool() );
@@ -434,8 +454,10 @@
  	d->ck_showTuneIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-tune-icons").toBool() );
  	d->ck_showClientIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool() );
  	d->cb_showAllClientIcons->setEnabled(PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool());
---- git.orig/src/options/opt_roster.ui
-+++ git/src/options/opt_roster.ui
+Index: psi/src/options/opt_roster.ui
+===================================================================
+--- psi.orig/src/options/opt_roster.ui	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/options/opt_roster.ui	2013-01-15 14:04:11.152826416 +0400
 @@ -1,3 +1,4 @@
 +<?xml version="1.0" encoding="UTF-8"?>
  <ui version="4.0">
@@ -525,9 +547,11 @@
   <resources/>
 + <connections/>
  </ui>
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -5505,6 +5505,11 @@ QString PsiAccount::nick() const
+Index: psi/src/psiaccount.cpp
+===================================================================
+--- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/psiaccount.cpp	2013-01-15 14:04:11.152826416 +0400
+@@ -5545,6 +5545,11 @@
  	return d->self.name();
  }
  
@@ -539,8 +563,10 @@
  const Mood &PsiAccount::mood() const
  {
  	return d->self.mood();
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+Index: psi/src/psiaccount.h
+===================================================================
+--- psi.orig/src/psiaccount.h	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/psiaccount.h	2013-01-15 14:04:11.152826416 +0400
 @@ -33,6 +33,7 @@
  #include "xmpp_status.h"
  #include "psiactions.h"
@@ -549,7 +575,7 @@
  
  namespace XMPP
  {
-@@ -140,6 +141,7 @@ public:
+@@ -151,6 +152,7 @@
  	void setNick(const QString &);
  	QString nick() const;
  	const Mood &mood() const;
@@ -557,9 +583,11 @@
  	void forceDisconnect(bool fast, const XMPP::Status &s);
  	bool hasPGP() const;
  	QHostAddress *localAddress() const;
---- git.orig/src/psiiconset.cpp
-+++ git/src/psiiconset.cpp
-@@ -42,8 +42,8 @@ class PsiIconset::Private
+Index: psi/src/psiiconset.cpp
+===================================================================
+--- psi.orig/src/psiiconset.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/psiiconset.cpp	2013-01-15 14:04:11.156826416 +0400
+@@ -42,8 +42,8 @@
  private:
  	PsiIconset *psi;
  public:
@@ -570,7 +598,7 @@
  	QStringList cur_emoticons;
  	QMap<QString, QString> cur_service_status;
  	QMap<QString, QString> cur_custom_status;
-@@ -245,6 +245,23 @@ public:
+@@ -245,6 +245,23 @@
  		return def;
  	}
  
@@ -594,7 +622,7 @@
  	Iconset clientsIconset(bool *ok)
  	{
  		Iconset def;
-@@ -401,6 +418,21 @@ bool PsiIconset::loadMoods()
+@@ -401,6 +418,21 @@
  	return ok;
  }
  
@@ -616,7 +644,7 @@
  bool PsiIconset::loadClients()
  {
  	bool ok = true;
-@@ -423,6 +455,7 @@ bool PsiIconset::loadAll()
+@@ -423,6 +455,7 @@
  
  	loadEmoticons();
  	loadMoods();
@@ -624,7 +652,7 @@
  	loadClients();
  	return true;
  }
-@@ -438,6 +471,9 @@ void PsiIconset::optionChanged(const QSt
+@@ -438,6 +471,9 @@
  	else if (option == "options.iconsets.moods") {
  		loadMoods();
  	}
@@ -634,9 +662,11 @@
  	else if (option == "options.iconsets.clients") {
  		loadClients();
  	}
---- git.orig/src/psiiconset.h
-+++ git/src/psiiconset.h
-@@ -45,6 +45,7 @@ public:
+Index: psi/src/psiiconset.h
+===================================================================
+--- psi.orig/src/psiiconset.h	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/psiiconset.h	2013-01-15 14:04:11.156826416 +0400
+@@ -45,6 +45,7 @@
  	QHash<QString, Iconset*> roster;
  	QList<Iconset*> emoticons;
  	Iconset moods;
@@ -644,7 +674,7 @@
  	Iconset clients;
  	const Iconset &system() const;
  	void stripFirstAnimFrame(Iconset *);
-@@ -98,6 +99,7 @@ private:
+@@ -98,6 +99,7 @@
  	bool loadRoster();
  	void loadEmoticons();
  	bool loadMoods();
@@ -652,9 +682,11 @@
  	bool loadClients();
  };
  
---- git.orig/src/userlist.cpp
-+++ git/src/userlist.cpp
-@@ -751,12 +751,17 @@ QString UserListItem::makeBareTip(bool t
+Index: psi/src/userlist.cpp
+===================================================================
+--- psi.orig/src/userlist.cpp	2013-01-15 14:04:11.160826416 +0400
++++ psi/src/userlist.cpp	2013-01-15 14:04:11.156826416 +0400
+@@ -751,12 +751,17 @@
  
  	// User Activity
  	if (!activity().isNull()) {
