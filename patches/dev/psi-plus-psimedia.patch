@@ -1,0 +1,81 @@
+diff --git a/psi.qc b/psi.qc
+index 1f74092..70c99a6 100644
+--- a/psi.qc
++++ b/psi.qc
+@@ -42,6 +42,7 @@
+   <dep type='conf'>
+     <required/>
+   </dep>
++  <dep type='psimedia'/>
+   <dep type='recursiveprl'>
+     <required/>
+   </dep>
+diff --git a/qcm/psimedia.qcm b/qcm/psimedia.qcm
+new file mode 100644
+index 0000000..cae88b6
+--- /dev/null
++++ b/qcm/psimedia.qcm
+@@ -0,0 +1,34 @@
++/*
++-----BEGIN QCMOD-----
++name: psimedia
++arg: with-psimedia-path=[path],Extra search path to libgstprovider.so
++-----END QCMOD-----
++*/
++
++//----------------------------------------------------------------------------
++// qc_psimedia
++//----------------------------------------------------------------------------
++class qc_psimedia : public ConfObj
++{
++public:
++	qc_psimedia(Conf *c) : ConfObj(c) {}
++	QString name() const { return "psimedia"; }
++	QString shortname() const { return "psimedia"; }
++
++	bool exec()
++	{
++		QString path = conf->getenv("QC_WITH_PSIMEDIA_PATH");
++		if (path.isEmpty()) {
++			return false;
++		}
++
++		conf->addDefine("HAVE_GSTPROVIDER_PATH");
++		QFile file("src/config.h");
++		if ( file.open(QIODevice::Append | QIODevice::Text) ) {
++			QTextStream stream( &file );
++			stream << "#define GSTPROVIDER_PATH \"" << path << "\"" << endl;
++		}
++
++		return true;
++	}
++};
+diff --git a/src/avcall/avcall.cpp b/src/avcall/avcall.cpp
+index 38fff17..320a4b3 100644
+--- a/src/avcall/avcall.cpp
++++ b/src/avcall/avcall.cpp
+@@ -30,6 +30,7 @@
+ #include "applicationinfo.h"
+ #include "psiaccount.h"
+ #include "psioptions.h"
++#include "../config.h"
+ 
+ #define USE_THREAD
+ 
+@@ -108,6 +109,16 @@ static void ensureLoaded()
+ 		QString resourcePath;
+ 
+ 		pluginFile = qgetenv("PSI_MEDIA_PLUGIN");
++
++#ifdef HAVE_GSTPROVIDER_PATH
++		if(pluginFile.isEmpty())
++		{
++			QFileInfo fi(GSTPROVIDER_PATH);
++			if(fi.exists())
++				pluginFile = GSTPROVIDER_PATH;
++		}
++#endif
++
+ 		if(pluginFile.isEmpty())
+ 		{
+ #if defined(Q_OS_WIN)
