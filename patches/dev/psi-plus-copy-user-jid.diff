@@ -1,0 +1,49 @@
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+index d3a9624..d8b1df0 100644
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
+@@ -19,6 +19,7 @@
+ #include <QMessageBox>
+ #include <QDebug>
+ #include <QTimer>
++#include <QClipboard>
+ 
+ #include "psicon.h"
+ #include "psiaccount.h"
+@@ -204,7 +205,12 @@ void PsiChatDlg::initUi()
+ 	ui_.setupUi(this);
+ 
+ 	le_autojid = new ActionLineEdit(ui_.le_jid);
++
++	QAction *act_copy_user_jid = new QAction(tr("Copy user JID"), this);
++	le_autojid->addAction(act_copy_user_jid);
++	connect(act_copy_user_jid, SIGNAL(triggered()), SLOT(copyUserJid()));
++
+ 	ui_.le_jid->setLineEdit(le_autojid);
+ 	ui_.le_jid->lineEdit()->setReadOnly(true);
+ 	if (autoSelectContact_) {
+ 		QStringList excl = PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode-ignorelist").toString().toLower().split(",", QString::SkipEmptyParts);
+@@ -426,6 +433,11 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
+ 	}
+ }
+ 
++void PsiChatDlg::copyUserJid()
++{
++	QApplication::clipboard()->setText(jid().bare());
++}
++
+ void PsiChatDlg::updateContactAdding(const Jid &j)
+ {
+ 	if (realJid().compare(j, false)) {
+diff --git a/src/psichatdlg.h b/src/psichatdlg.h
+index 0cc64bb..7732ff6 100644
+--- a/src/psichatdlg.h
++++ b/src/psichatdlg.h
+@@ -47,6 +47,7 @@ private slots:
+ 	void updateCountVisibility();
+ 	void updateContactAdding(PsiContact* c = 0);
+ 	void updateContactAdding(const Jid &j);
++	void copyUserJid();
+ 
+ 	// reimplemented
+ 	void chatEditCreated();
