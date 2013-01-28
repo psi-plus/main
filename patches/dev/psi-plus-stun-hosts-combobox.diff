@@ -1,0 +1,262 @@
+diff --git a/src/accountmodify.ui b/src/accountmodify.ui
+index d6350eb..59822c2 100644
+--- a/src/accountmodify.ui
++++ b/src/accountmodify.ui
+@@ -6,8 +6,8 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>498</width>
+-    <height>455</height>
++    <width>500</width>
++    <height>473</height>
+    </rect>
+   </property>
+   <property name="windowTitle">
+@@ -915,28 +915,18 @@
+              </widget>
+             </item>
+             <item>
+-             <widget class="QLineEdit" name="le_stunHost"/>
+-            </item>
+-            <item>
+-             <widget class="QLabel" name="lb_stunPort">
+-              <property name="text">
+-               <string>Port:</string>
++             <widget class="QComboBox" name="cb_stunHost">
++              <property name="sizePolicy">
++               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
++                <horstretch>0</horstretch>
++                <verstretch>0</verstretch>
++               </sizepolicy>
+               </property>
+-             </widget>
+-            </item>
+-            <item>
+-             <widget class="QLineEdit" name="le_stunPort">
+-              <property name="minimumSize">
+-               <size>
+-                <width>56</width>
+-                <height>0</height>
+-               </size>
++              <property name="editable">
++               <bool>true</bool>
+               </property>
+-              <property name="maximumSize">
+-               <size>
+-                <width>56</width>
+-                <height>16777215</height>
+-               </size>
++              <property name="insertPolicy">
++               <enum>QComboBox::NoInsert</enum>
+               </property>
+              </widget>
+             </item>
+@@ -972,19 +962,6 @@
+               </property>
+              </widget>
+             </item>
+-            <item>
+-             <spacer name="horizontalSpacer">
+-              <property name="orientation">
+-               <enum>Qt::Horizontal</enum>
+-              </property>
+-              <property name="sizeHint" stdset="0">
+-               <size>
+-                <width>40</width>
+-                <height>20</height>
+-               </size>
+-              </property>
+-             </spacer>
+-            </item>
+            </layout>
+           </item>
+          </layout>
+@@ -1118,8 +1095,6 @@
+   <tabstop>ck_req_mutual</tabstop>
+   <tabstop>cb_security_level</tabstop>
+   <tabstop>le_dtProxy</tabstop>
+-  <tabstop>le_stunHost</tabstop>
+-  <tabstop>le_stunPort</tabstop>
+   <tabstop>le_stunUser</tabstop>
+   <tabstop>le_stunPass</tabstop>
+   <tabstop>ck_custom_auth</tabstop>
+diff --git a/src/accountmodifydlg.cpp b/src/accountmodifydlg.cpp
+index 7b76e6f..0162ab4 100644
+--- a/src/accountmodifydlg.cpp
++++ b/src/accountmodifydlg.cpp
+@@ -33,6 +33,8 @@
+ #include "privacydlg.h"
+ #include "pgpkeydlg.h"
+ #include "psicontactlist.h"
++#include "iconaction.h"
++#include "actionlineedit.h"
+ 
+ AccountModifyDlg::AccountModifyDlg(PsiCon *_psi, QWidget *parent)
+ :QDialog(parent)
+@@ -152,8 +154,16 @@ void AccountModifyDlg::init()
+ 	ck_keepAlive->setChecked(acc.opt_keepAlive);
+ 	ck_ibbOnly->setChecked(acc.ibbOnly);
+ 	le_dtProxy->setText(acc.dtProxy.full());
+-	le_stunHost->setText(acc.stunHost);
+-	le_stunPort->setText(QString::number(acc.stunPort));
++
++	ActionLineEdit *ale_delStunHost = new ActionLineEdit(cb_stunHost);
++	cb_stunHost->setLineEdit(ale_delStunHost);
++	IconAction *ia_delStunHost = new IconAction(this);
++	ia_delStunHost->setIcon(QIcon(":/iconsets/system/default/chatclear.png"));
++	connect(ia_delStunHost, SIGNAL(triggered()), SLOT(removeStunHost()));
++	ale_delStunHost->addAction(ia_delStunHost);
++
++	cb_stunHost->addItems(acc.stunHosts);
++	cb_stunHost->setEditText(acc.stunHost);
+ 	le_stunUser->setText(acc.stunUser);
+ 	le_stunPass->setText(acc.stunPass);
+ 	autoconnectCksChanged();
+@@ -472,6 +484,15 @@ void AccountModifyDlg::detailsChangePW()
+ 	}
+ }
+ 
++void AccountModifyDlg::removeStunHost()
++{
++	QString host = cb_stunHost->currentText();
++	int item = cb_stunHost->findText(host);
++	if (item > -1) {
++		cb_stunHost->removeItem(item);
++	}
++}
++
+ void AccountModifyDlg::save()
+ {
+ 	/*if(pa && le_name->text().isEmpty()) {
+@@ -539,8 +560,14 @@ void AccountModifyDlg::save()
+ 	acc.opt_keepAlive = ck_keepAlive->isChecked();
+ 	acc.ibbOnly = ck_ibbOnly->isChecked();
+ 	acc.dtProxy = le_dtProxy->text();
+-	acc.stunHost = le_stunHost->text();
+-	acc.stunPort = le_stunPort->text().toInt();
++	acc.stunHost = cb_stunHost->currentText().trimmed();
++	acc.stunHosts.clear();
++	for (int i = 0; i < cb_stunHost->count(); i++) {
++		acc.stunHosts << cb_stunHost->itemText(i);
++	}
++	if (acc.stunHosts.indexOf(acc.stunHost) == -1) {
++		acc.stunHosts << acc.stunHost;
++	}
+ 	acc.stunUser = le_stunUser->text();
+ 	acc.stunPass = le_stunPass->text();
+ 
+diff --git a/src/accountmodifydlg.h b/src/accountmodifydlg.h
+index f838c9c..fa4e738 100644
+--- a/src/accountmodifydlg.h
++++ b/src/accountmodifydlg.h
+@@ -56,6 +56,8 @@ private slots:
+ 	void detailsVCard();
+ 	void detailsChangePW();
+ 
++	void removeStunHost();
++
+ 	void save();
+ 
+ 	//void pgpToggled(bool);
+@@ -83,7 +85,7 @@ private:
+ 	ProxyChooser *pc;
+ 	QCA::PGPKey key;
+ 	UserAccount acc;
+-	
++
+ 	// Privacy
+  	PrivacyListModel privacyModel;
+  	PrivacyListBlockedModel privacyBlockedModel;
+diff --git a/src/profiles.h b/src/profiles.h
+index ee1b986..48cf90a 100644
+--- a/src/profiles.h
++++ b/src/profiles.h
+@@ -89,8 +89,8 @@ public:
+ 
+ 	QString optionsBase;
+ 
++	QStringList stunHosts;
+ 	QString stunHost;
+-	int stunPort;
+ 	QString stunUser;
+ 	QString stunPass;
+ 
+diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
+index dfe9a1f..30be747 100644
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -154,7 +154,11 @@ void UserAccount::reset()
+ 	proxy_user = "";
+ 	proxy_pass = "";
+ 
+-	stunPort = 3478;
++	stunHosts.clear();
++	stunHosts << "stun.jabber.ru:5249"
++			  << "stun.habahaba.im"
++			  << "stun.ekiga.net";
++	stunHost = stunHosts[0];
+ 
+ 	keybind.clear();
+ 
+@@ -307,16 +311,12 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
+ 	ibbOnly = o->getOption(base + ".ibb-only").toBool();
+ 
+ 
++	if (allSetOptions.contains(base + ".stun-hosts")) {
++		stunHosts = o->getOption(base + ".stun-hosts").toStringList();
++	}
+ 	if (allSetOptions.contains(base + ".stun-host")) {
+ 		stunHost = o->getOption(base + ".stun-host").toString();
+ 	}
+-	if (allSetOptions.contains(base + ".stun-port")) {
+-		int tmpPort = o->getOption(base + ".stun-port").toInt();
+-		// a few days in the 0.13-dev development cycle the code set
+-		// 0 as port when first adding this option. Ignore 0 for now
+-		// and use default
+-		if (tmpPort != 0) stunPort = tmpPort;
+-	}
+ 	if (allSetOptions.contains(base + ".stun-username")) {
+ 		stunUser = o->getOption(base + ".stun-username").toString();
+ 	}
+@@ -460,8 +460,8 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
+ 	o->setOption(base + ".bytestreams-proxy", dtProxy.full());
+ 	o->setOption(base + ".ibb-only", ibbOnly);
+ 
++	o->setOption(base + ".stun-hosts", stunHosts);
+ 	o->setOption(base + ".stun-host", stunHost);
+-	o->setOption(base + ".stun-port", QString::number(stunPort));
+ 	o->setOption(base + ".stun-username", stunUser);
+ 	o->setOption(base + ".stun-password", stunPass);
+ 
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index b185d1b..f229b3b 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -949,9 +949,14 @@ public:
+ 
+ 	void updateAvCallSettings(const UserAccount &acc)
+ 	{
+-		avCallManager->setStunBindService(acc.stunHost, acc.stunPort);
+-		avCallManager->setStunRelayUdpService(acc.stunHost, acc.stunPort, acc.stunUser, acc.stunPass);
+-		avCallManager->setStunRelayTcpService(acc.stunHost, acc.stunPort, convert_proxy(acc, jid), acc.stunUser, acc.stunPass);
++		QString stunHost = acc.stunHost.section(":", 0, 0);
++		int stunPort = acc.stunHost.section(":", 1, 1).toInt();
++		if (!stunPort) {
++			stunPort = 3478; // STUN default port
++		}
++		avCallManager->setStunBindService(stunHost, stunPort);
++		avCallManager->setStunRelayUdpService(stunHost, stunPort, acc.stunUser, acc.stunPass);
++		avCallManager->setStunRelayTcpService(stunHost, stunPort, convert_proxy(acc, jid), acc.stunUser, acc.stunPass);
+ 	}
+ 
+ 	bool isAlwaysVisibleContact(const Jid& jid) const
+@@ -4081,7 +4086,7 @@ void PsiAccount::queryVersionFinished()
+ 	text += tr("Name:\t") + j->name();
+ 	text += "\n" + tr("Version:\t") + j->version();
+ 	text += "\n" + tr("Os:\t") + j->os();
+-	
++
+ 	QMessageBox::information(NULL, QString(tr("Version Query Information")), text);
+ }
+ 
