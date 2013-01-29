@@ -82,7 +82,7 @@ index d6350eb..59822c2 100644
    <tabstop>le_stunPass</tabstop>
    <tabstop>ck_custom_auth</tabstop>
 diff --git a/src/accountmodifydlg.cpp b/src/accountmodifydlg.cpp
-index 7b76e6f..a143654 100644
+index 7b76e6f..028170d 100644
 --- a/src/accountmodifydlg.cpp
 +++ b/src/accountmodifydlg.cpp
 @@ -33,6 +33,8 @@
@@ -94,7 +94,7 @@ index 7b76e6f..a143654 100644
  
  AccountModifyDlg::AccountModifyDlg(PsiCon *_psi, QWidget *parent)
  :QDialog(parent)
-@@ -152,8 +154,16 @@ void AccountModifyDlg::init()
+@@ -152,8 +154,21 @@ void AccountModifyDlg::init()
  	ck_keepAlive->setChecked(acc.opt_keepAlive);
  	ck_ibbOnly->setChecked(acc.ibbOnly);
  	le_dtProxy->setText(acc.dtProxy.full());
@@ -103,33 +103,44 @@ index 7b76e6f..a143654 100644
 +
 +	ActionLineEdit *ale_delStunHost = new ActionLineEdit(cb_stunHost);
 +	cb_stunHost->setLineEdit(ale_delStunHost);
-+	IconAction *ia_delStunHost = new IconAction(this);
-+	ia_delStunHost->setIcon(QIcon(":/iconsets/system/default/chatclear.png"));
++	IconAction *ia_delStunHost = new IconAction(tr("Delete current host from the list"), this, "psi/remove");
 +	connect(ia_delStunHost, SIGNAL(triggered()), SLOT(removeStunHost()));
 +	ale_delStunHost->addAction(ia_delStunHost);
 +
++	cb_stunHost->addItem(tr("<don't use>"));
 +	cb_stunHost->addItems(acc.stunHosts);
-+	cb_stunHost->setEditText(acc.stunHost);
++	if (acc.stunHost.isEmpty()) {
++		cb_stunHost->setCurrentIndex(0);
++	}
++	else {
++		cb_stunHost->setCurrentIndex(cb_stunHost->findText(acc.stunHost));
++	}
  	le_stunUser->setText(acc.stunUser);
  	le_stunPass->setText(acc.stunPass);
  	autoconnectCksChanged();
-@@ -472,6 +482,15 @@ void AccountModifyDlg::detailsChangePW()
+@@ -472,6 +487,21 @@ void AccountModifyDlg::detailsChangePW()
  	}
  }
  
 +void AccountModifyDlg::removeStunHost()
 +{
++	// Don't remove no host
++	if (!cb_stunHost->currentIndex()) {
++		return;
++	}
++
 +	QString host = cb_stunHost->currentText();
 +	int item = cb_stunHost->findText(host);
 +	if (item > -1) {
 +		cb_stunHost->removeItem(item);
 +	}
++	cb_stunHost->setCurrentIndex(0);
 +}
 +
  void AccountModifyDlg::save()
  {
  	/*if(pa && le_name->text().isEmpty()) {
-@@ -539,8 +558,14 @@ void AccountModifyDlg::save()
+@@ -539,8 +569,15 @@ void AccountModifyDlg::save()
  	acc.opt_keepAlive = ck_keepAlive->isChecked();
  	acc.ibbOnly = ck_ibbOnly->isChecked();
  	acc.dtProxy = le_dtProxy->text();
@@ -137,7 +148,8 @@ index 7b76e6f..a143654 100644
 -	acc.stunPort = le_stunPort->text().toInt();
 +	acc.stunHost = cb_stunHost->currentText().trimmed();
 +	acc.stunHosts.clear();
-+	for (int i = 0; i < cb_stunHost->count(); i++) {
++	// first item is no host
++	for (int i = 1; i < cb_stunHost->count(); i++) {
 +		acc.stunHosts << cb_stunHost->itemText(i);
 +	}
 +	if (acc.stunHosts.indexOf(acc.stunHost) == -1) {
