@@ -195,7 +195,7 @@ index ee1b986..0fee29f 100644
  	QString stunPass;
  
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
-index dfe9a1f..bb0b6e2 100644
+index dfe9a1f..55c0f72 100644
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
 @@ -154,7 +154,29 @@ void UserAccount::reset()
@@ -229,15 +229,17 @@ index dfe9a1f..bb0b6e2 100644
  
  	keybind.clear();
  
-@@ -307,16 +329,12 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
+@@ -307,15 +329,14 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
  	ibbOnly = o->getOption(base + ".ibb-only").toBool();
  
  
+-	if (allSetOptions.contains(base + ".stun-host")) {
+-		stunHost = o->getOption(base + ".stun-host").toString();
 +	if (allSetOptions.contains(base + ".stun-hosts")) {
 +		stunHosts = o->getOption(base + ".stun-hosts").toStringList();
-+	}
- 	if (allSetOptions.contains(base + ".stun-host")) {
- 		stunHost = o->getOption(base + ".stun-host").toString();
++		if (allSetOptions.contains(base + ".stun-host")) {
++			stunHost = o->getOption(base + ".stun-host").toString();
++		}
  	}
 -	if (allSetOptions.contains(base + ".stun-port")) {
 -		int tmpPort = o->getOption(base + ".stun-port").toInt();
@@ -245,11 +247,12 @@ index dfe9a1f..bb0b6e2 100644
 -		// 0 as port when first adding this option. Ignore 0 for now
 -		// and use default
 -		if (tmpPort != 0) stunPort = tmpPort;
--	}
++	else if (!o->getOption(base + ".stun-host").toString().isEmpty()) {
++		stunHost = o->getOption(base + ".stun-host").toString();
+ 	}
  	if (allSetOptions.contains(base + ".stun-username")) {
  		stunUser = o->getOption(base + ".stun-username").toString();
- 	}
-@@ -460,8 +478,8 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
+@@ -460,8 +481,8 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
  	o->setOption(base + ".bytestreams-proxy", dtProxy.full());
  	o->setOption(base + ".ibb-only", ibbOnly);
  
