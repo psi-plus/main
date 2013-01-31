@@ -1,6 +1,6 @@
 Index: examples/cmssigner/certitem.cpp
 ===================================================================
---- examples/cmssigner/certitem.cpp	(revision 1329650)
+--- examples/cmssigner/certitem.cpp	(revision 1336453)
 +++ examples/cmssigner/certitem.cpp	(working copy)
 @@ -24,6 +24,7 @@
  #include <QtCore>
@@ -12,7 +12,7 @@ Index: examples/cmssigner/certitem.cpp
  typedef QMap<CertItemStore::IconType,QPixmap> CertItemIconset;
 Index: examples/cmssigner/cmssigner.pro
 ===================================================================
---- examples/cmssigner/cmssigner.pro	(revision 1329650)
+--- examples/cmssigner/cmssigner.pro	(revision 1336453)
 +++ examples/cmssigner/cmssigner.pro	(working copy)
 @@ -2,6 +2,9 @@
  CONFIG -= console
@@ -26,7 +26,7 @@ Index: examples/cmssigner/cmssigner.pro
  
 Index: examples/cmssigner/keyselectdlg.cpp
 ===================================================================
---- examples/cmssigner/keyselectdlg.cpp	(revision 1329650)
+--- examples/cmssigner/keyselectdlg.cpp	(revision 1336453)
 +++ examples/cmssigner/keyselectdlg.cpp	(working copy)
 @@ -24,6 +24,9 @@
  #include <QtCore>
@@ -40,7 +40,7 @@ Index: examples/cmssigner/keyselectdlg.cpp
  #define ONLY_SHOW_KEYBUNDLE
 Index: examples/cmssigner/main.cpp
 ===================================================================
---- examples/cmssigner/main.cpp	(revision 1329650)
+--- examples/cmssigner/main.cpp	(revision 1336453)
 +++ examples/cmssigner/main.cpp	(working copy)
 @@ -22,6 +22,8 @@
  #include <QtCore>
@@ -53,7 +53,7 @@ Index: examples/cmssigner/main.cpp
  #include "certviewdlg.h"
 Index: examples/cmssigner/pkcs11configdlg/pkcs11configdlg.cpp
 ===================================================================
---- examples/cmssigner/pkcs11configdlg/pkcs11configdlg.cpp	(revision 1329650)
+--- examples/cmssigner/pkcs11configdlg/pkcs11configdlg.cpp	(revision 1336453)
 +++ examples/cmssigner/pkcs11configdlg/pkcs11configdlg.cpp	(working copy)
 @@ -24,6 +24,8 @@
  #include <QtCore>
@@ -66,7 +66,7 @@ Index: examples/cmssigner/pkcs11configdlg/pkcs11configdlg.cpp
  //----------------------------------------------------------------------------
 Index: examples/cmssigner/prompter.cpp
 ===================================================================
---- examples/cmssigner/prompter.cpp	(revision 1329650)
+--- examples/cmssigner/prompter.cpp	(revision 1336453)
 +++ examples/cmssigner/prompter.cpp	(working copy)
 @@ -24,6 +24,9 @@
  #include <QtCore>
@@ -80,7 +80,7 @@ Index: examples/cmssigner/prompter.cpp
  {
 Index: examples/hashtest/hashtest.cpp
 ===================================================================
---- examples/hashtest/hashtest.cpp	(revision 1329650)
+--- examples/hashtest/hashtest.cpp	(revision 1336453)
 +++ examples/hashtest/hashtest.cpp	(working copy)
 @@ -44,7 +44,7 @@
  	else {
@@ -102,7 +102,7 @@ Index: examples/hashtest/hashtest.cpp
  	return 0;
 Index: examples/randomtest/randomtest.cpp
 ===================================================================
---- examples/randomtest/randomtest.cpp	(revision 1329650)
+--- examples/randomtest/randomtest.cpp	(revision 1336453)
 +++ examples/randomtest/randomtest.cpp	(working copy)
 @@ -56,7 +56,7 @@
  
@@ -113,9 +113,32 @@ Index: examples/randomtest/randomtest.cpp
  
  	// Under some circumstances, you may want to create a
  	// Random object, rather than a static public member function.
+Index: plugins/qca-wingss/qca-wingss.cpp
+===================================================================
+--- plugins/qca-wingss/qca-wingss.cpp	(revision 1336453)
++++ plugins/qca-wingss/qca-wingss.cpp	(working copy)
+@@ -337,6 +337,10 @@
+ 	pInitSecurityInterface.ptr = 0;
+ 
+ 	QString securityEntrypoint;
++#if QT_VERSION >= 0x050000
++	securityEntrypoint = QString::fromUtf16((const ushort *)SECURITY_ENTRYPOINTW);
++	pInitSecurityInterface.W = (INIT_SECURITY_INTERFACE_W)(sspi_lib->resolve(securityEntrypoint.toLatin1().data()));
++#else
+ 	QT_WA(
+ 		securityEntrypoint = QString::fromUtf16((const ushort *)SECURITY_ENTRYPOINTW);
+ 		pInitSecurityInterface.W = (INIT_SECURITY_INTERFACE_W)(sspi_lib->resolve(securityEntrypoint.toLatin1().data()));
+@@ -344,6 +348,7 @@
+ 		securityEntrypoint = QString::fromLatin1(SECURITY_ENTRYPOINT_ANSIA);
+ 		pInitSecurityInterface.A = (INIT_SECURITY_INTERFACE_A)(sspi_lib->resolve(securityEntrypoint.toLatin1().data()));
+ 	)
++#endif
+ 	if(!pInitSecurityInterface.ptr)
+ 	{
+ 		sspi_lib->unload();
 Index: src/qca_keystore.cpp
 ===================================================================
---- src/qca_keystore.cpp	(revision 1329650)
+--- src/qca_keystore.cpp	(revision 1336453)
 +++ src/qca_keystore.cpp	(working copy)
 @@ -308,6 +308,16 @@
  		if(at == -1)
@@ -238,7 +261,7 @@ Index: src/qca_keystore.cpp
  	return false;
 Index: src/support/console.cpp
 ===================================================================
---- src/support/console.cpp	(revision 1329650)
+--- src/support/console.cpp	(revision 1336453)
 +++ src/support/console.cpp	(working copy)
 @@ -278,7 +278,11 @@
  
@@ -252,9 +275,29 @@ Index: src/support/console.cpp
  	}
  
  	void writeSecure(const SecureArray &a)
+Index: src/support/qpipe.cpp
+===================================================================
+--- src/support/qpipe.cpp	(revision 1336453)
++++ src/support/qpipe.cpp	(working copy)
+@@ -293,11 +293,15 @@
+ 	// peek them all
+ 	rec = (INPUT_RECORD *)malloc(count * sizeof(INPUT_RECORD));
+ 	BOOL ret;
++#if QT_VERSION >= 0x050000
++	ret = PeekConsoleInputW(pipe, rec, count, &i);
++#else
+ 	QT_WA(
+ 		ret = PeekConsoleInputW(pipe, rec, count, &i);
+ 	,
+ 		ret = PeekConsoleInputA(pipe, rec, count, &i);
+ 	)
++#endif
+ 	if(!ret)
+ 	{
+ 		free(rec);
 Index: src/support/synchronizer.cpp
 ===================================================================
---- src/support/synchronizer.cpp	(revision 1329650)
+--- src/support/synchronizer.cpp	(revision 1336453)
 +++ src/support/synchronizer.cpp	(working copy)
 @@ -58,7 +58,7 @@
  
@@ -327,7 +370,7 @@ Index: src/support/synchronizer.cpp
  #ifdef TIMERFIXER_DEBUG
 Index: src/support/syncthread.cpp
 ===================================================================
---- src/support/syncthread.cpp	(revision 1329650)
+--- src/support/syncthread.cpp	(revision 1336453)
 +++ src/support/syncthread.cpp	(working copy)
 @@ -32,11 +32,15 @@
  	for(int n = 0; n < obj->methodCount(); ++n)
@@ -357,7 +400,7 @@ Index: src/support/syncthread.cpp
  		retarg = QGenericReturnArgument(retval.typeName(), retval.data());
 Index: tools/qcatool/main.cpp
 ===================================================================
---- tools/qcatool/main.cpp	(revision 1329650)
+--- tools/qcatool/main.cpp	(revision 1336453)
 +++ tools/qcatool/main.cpp	(working copy)
 @@ -1301,14 +1301,22 @@
  
@@ -396,7 +439,7 @@ Index: tools/qcatool/main.cpp
  			continue; // skip bogus fields
 Index: unittest/certunittest/certunittest.cpp
 ===================================================================
---- unittest/certunittest/certunittest.cpp	(revision 1329650)
+--- unittest/certunittest/certunittest.cpp	(revision 1336453)
 +++ unittest/certunittest/certunittest.cpp	(working copy)
 @@ -129,24 +129,24 @@
  	    QCOMPARE( ca1.notValidBefore().toString(), QDateTime( QDate( 2001, 8, 17 ), QTime( 8, 30, 39 ), Qt::UTC ).toString() );
@@ -829,7 +872,7 @@ Index: unittest/certunittest/certunittest.cpp
  	    QCOMPARE( server1.policies().count(), 0 );
 Index: unittest/hashunittest/hashunittest.cpp
 ===================================================================
---- unittest/hashunittest/hashunittest.cpp	(revision 1329650)
+--- unittest/hashunittest/hashunittest.cpp	(revision 1336453)
 +++ unittest/hashunittest/hashunittest.cpp	(working copy)
 @@ -114,7 +114,11 @@
  
@@ -845,7 +888,7 @@ Index: unittest/hashunittest/hashunittest.cpp
      }
 Index: unittest/keygenunittest/keygenunittest.cpp
 ===================================================================
---- unittest/keygenunittest/keygenunittest.cpp	(revision 1329650)
+--- unittest/keygenunittest/keygenunittest.cpp	(revision 1336453)
 +++ unittest/keygenunittest/keygenunittest.cpp	(working copy)
 @@ -61,7 +61,11 @@
      if(!QCA::isSupported("pkey") ||
