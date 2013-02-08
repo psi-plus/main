@@ -1,8 +1,6 @@
-Index: psi/src/contactlistnestedgroup.cpp
-===================================================================
---- psi.orig/src/contactlistnestedgroup.cpp	2013-01-15 14:04:37.400827483 +0400
-+++ psi/src/contactlistnestedgroup.cpp	2013-01-15 14:04:37.396827483 +0400
-@@ -55,7 +55,10 @@
+--- psi.orig/src/contactlistnestedgroup.cpp
++++ psi/src/contactlistnestedgroup.cpp
+@@ -55,7 +55,10 @@ void ContactListNestedGroup::addContact(
  	if (canContainSpecialGroups()) {
  		ContactListGroup* group = specialGroupFor(contact);
  		if (group) {
@@ -14,13 +12,27 @@ Index: psi/src/contactlistnestedgroup.cpp
  			return;
  		}
  	}
-@@ -113,6 +116,9 @@
+@@ -127,6 +130,23 @@ void ContactListNestedGroup::contactGrou
  
- void ContactListNestedGroup::contactGroupsChanged(PsiContact* contact, QStringList contactGroups)
- {
-+	if (contact->isAgent())
-+		return;
-+
- 	bool restrictContactAdd = false;
- 	if (canContainSpecialGroups()) {
- 		ContactListGroup* specialGroup = specialGroupFor(contact);
+ 		restrictContactAdd = specialGroup != 0;
+ 	}
++	else if (!isSpecial() && contact->isAgent() && model()->groupsEnabled())
++	{
++		ContactListNestedGroup *rootGroup = this;
++		while (rootGroup->parent())
++		{
++			rootGroup = static_cast<ContactListNestedGroup *>(rootGroup->parent());
++			if (rootGroup->canContainSpecialGroups())
++			{
++				ContactListGroup* specialGroup = rootGroup->specialGroupFor(contact);
++				if (specialGroup && specialGroup != this)
++				{
++					specialGroup->contactGroupsChanged(contact, QStringList() << QString());
++					return;
++				}
++			}
++		}
++	}
+ 
+ #ifdef CONTACTLISTNESTEDGROUP_OLD_CONTACTGROUPSCHANGED
+ 	bool addToSelf = false;
