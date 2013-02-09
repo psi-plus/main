@@ -1,0 +1,113 @@
+--- psi.orig/iris/src/irisnet/corelib/objectsession.cpp
++++ psi/iris/src/irisnet/corelib/objectsession.cpp
+@@ -211,7 +211,8 @@ ObjectSessionWatcher::ObjectSessionWatch
+ ObjectSessionWatcher::~ObjectSessionWatcher()
+ {
+ 	if(d->sess)
+-		d->sess->d->watchers.removeAll(d);
++		while (!d->sess->d->watchers.isEmpty())
++			delete d->sess->d->watchers.takeFirst();
+ 	delete d;
+ }
+ 
+--- psi.orig/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
++++ psi/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
+@@ -137,6 +137,8 @@ BSocket::BSocket(QObject *parent)
+ BSocket::~BSocket()
+ {
+ 	reset(true);
++	if (d->resolver)
++		delete d->resolver;
+ 	delete d;
+ }
+ 
+--- psi.orig/iris/src/xmpp/xmpp-core/securestream.cpp
++++ psi/iris/src/xmpp/xmpp-core/securestream.cpp
+@@ -382,6 +382,13 @@ public:
+ 		}
+ 		return false;
+ 	}
++
++	void deleteLayers()
++	{
++		while (!layers.isEmpty()) {
++			delete layers.takeFirst();
++		}
++	}
+ };
+ 
+ SecureStream::SecureStream(ByteStream *s)
+@@ -401,6 +408,7 @@ SecureStream::SecureStream(ByteStream *s
+ 
+ SecureStream::~SecureStream()
+ {
++	d->deleteLayers();
+ 	delete d;
+ }
+ 
+@@ -573,9 +581,7 @@ void SecureStream::layer_tlsClosed(const
+ {
+ 	setOpenMode(QIODevice::NotOpen);
+ 	d->active = false;
+-	while (!d->layers.isEmpty()) {
+-		delete d->layers.takeFirst();
+-	}
++	d->deleteLayers();
+ 	tlsClosed();
+ }
+ 
+@@ -628,9 +634,7 @@ void SecureStream::layer_error(int x)
+ 	d->errorCode = x;
+ 	setOpenMode(QIODevice::NotOpen);
+ 	d->active = false;
+-	while (!d->layers.isEmpty()) {
+-		delete d->layers.takeFirst();
+-	}
++	d->deleteLayers();
+ 	if(type == SecureLayer::TLS)
+ 		setError(ErrTLS);
+ 	else if(type == SecureLayer::SASL)
+--- psi.orig/src/contactlistnestedgroup.cpp
++++ psi/src/contactlistnestedgroup.cpp
+@@ -47,6 +47,20 @@ CL_DEBUG("~ContactListNextedGroup(%x): %
+ 	qDeleteAll(groups_);
+ 	groups_.clear();
+ 
++	QHashIterator<ContactListGroup::SpecialType, QPointer<ContactListGroup> > it(specialGroups_);
++	while (it.hasNext())
++	{
++		it.next();
++		ContactListGroup* group = it.value().data();
++		if (group)
++		{
++CL_DEBUG("~ContactListNextedGroup(%x): %s", this, qPrintable(group->fullName()));
++			removeItem(ContactListGroup::findGroup(group));
++			delete group;
++		}
++	}
++	specialGroups_.clear();
++
+ 	ContactListGroup::clearGroup();
+ }
+ 
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -1382,6 +1382,8 @@ PsiAccount::~PsiAccount()
+ {
+ 	logout(true, loggedOutStatus());
+ 
++	setRCEnabled(false);
++
+ 	emit accountDestroyed();
+ 	// nuke all related dialogs
+ 	deleteAllDialogs();
+@@ -1418,6 +1420,9 @@ PsiAccount::~PsiAccount()
+ 
+ 	delete d->blockTransportPopupList;
+ 
++	while(!d->userList.isEmpty())
++		delete d->userList.takeFirst();
++
+ 	d->contactList->unlink(this);
+ 	delete d;
+ 
