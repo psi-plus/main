@@ -1,3 +1,22 @@
+--- psi.orig/iris/src/irisnet/corelib/objectsession.cpp
++++ psi/iris/src/irisnet/corelib/objectsession.cpp
+@@ -148,6 +148,8 @@ public:
+ 		callTrigger->disconnect(this);
+ 		callTrigger->setParent(0);
+ 		callTrigger->deleteLater();
++		qDeleteAll(pendingCalls);
++		pendingCalls.clear();
+ 	}
+ 
+ 	void addPendingCall(MethodCall *call)
+@@ -240,6 +242,7 @@ void ObjectSession::reset()
+ 	d->invalidateWatchers();
+ 	if(d->callTrigger->isActive())
+ 		d->callTrigger->stop();
++	qDeleteAll(d->pendingCalls);
+ 	d->pendingCalls.clear();
+ }
+ 
 --- psi.orig/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
 +++ psi/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
 @@ -137,6 +137,8 @@ BSocket::BSocket(QObject *parent)
@@ -11,21 +30,20 @@
  
 --- psi.orig/iris/src/xmpp/xmpp-core/securestream.cpp
 +++ psi/iris/src/xmpp/xmpp-core/securestream.cpp
-@@ -382,6 +382,13 @@ public:
+@@ -382,6 +382,12 @@ public:
  		}
  		return false;
  	}
 +
 +	void deleteLayers()
 +	{
-+		while (!layers.isEmpty()) {
-+			delete layers.takeFirst();
-+		}
++		qDeleteAll(layers);
++		layers.clear();
 +	}
  };
  
  SecureStream::SecureStream(ByteStream *s)
-@@ -401,6 +408,7 @@ SecureStream::SecureStream(ByteStream *s
+@@ -401,6 +407,7 @@ SecureStream::SecureStream(ByteStream *s
  
  SecureStream::~SecureStream()
  {
@@ -33,7 +51,7 @@
  	delete d;
  }
  
-@@ -573,9 +581,7 @@ void SecureStream::layer_tlsClosed(const
+@@ -573,9 +580,7 @@ void SecureStream::layer_tlsClosed(const
  {
  	setOpenMode(QIODevice::NotOpen);
  	d->active = false;
@@ -44,7 +62,7 @@
  	tlsClosed();
  }
  
-@@ -628,9 +634,7 @@ void SecureStream::layer_error(int x)
+@@ -628,9 +633,7 @@ void SecureStream::layer_error(int x)
  	d->errorCode = x;
  	setOpenMode(QIODevice::NotOpen);
  	d->active = false;
@@ -93,8 +111,8 @@
  
  	delete d->blockTransportPopupList;
  
-+	while(!d->userList.isEmpty())
-+		delete d->userList.takeFirst();
++	qDeleteAll(d->userList);
++	d->userList.clear();
 +
  	d->contactList->unlink(this);
  	delete d;
