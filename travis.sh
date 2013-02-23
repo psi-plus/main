@@ -11,4 +11,7 @@ quilt push -a || exit 1
 qt-qconf || exit 1
 ./configure --enable-plugins --enable-whiteboarding --debug --no-separate-debug-info || exit 1
 make || exit 1
+./configure --enable-plugins --enable-whiteboarding --debug --no-separate-debug-info --enable-webkit || exit 1
+make || exit 1
+
 
