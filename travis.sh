@@ -3,6 +3,7 @@ git clone --depth=10 --quiet git://github.com/psi-im/psi psi || exit 1
 cd psi
 git submodule update --init --recursive || exit 1
 ln -s ../patches .
+cp -r ../iconsets/* iconsets
 cd patches
 ls -1 *.diff > series
 cd ..
