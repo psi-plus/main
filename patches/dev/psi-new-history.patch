@@ -4265,3 +4265,57 @@ index 0000000..f42f381
 +		return false;
 +	}
 +};
+diff --git a/admin/build/build_package.sh b/admin/build/build_package.sh
+index 5f2e36d..5567f31 100755
+--- a/admin/build/build_package.sh
++++ b/admin/build/build_package.sh
+@@ -82,10 +82,13 @@ build_package_psi() {
+ 		cp $mqtdir/bin/QtNetwork4.dll $arch_prefix
+ 		cp $mqtdir/bin/QtXml4.dll $arch_prefix
+ 		cp $mqtdir/bin/QtGui4.dll $arch_prefix
++		cp $mqtdir/bin/QtSql4.dll $arch_prefix
+ 		mkdir -p $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qgif4.dll $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qjpeg4.dll $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qmng4.dll $arch_prefix/imageformats
++		mkdir -p $arch_prefix/sqldrivers
++		cp $mqtdir/plugins/sqldrivers/qsqlite4.dll
+ 		cp $deps_base/$qca_win_dir/$target_arch/bin/qca2.dll $arch_prefix
+ 		mkdir -p $arch_prefix/crypto
+ 		cp $deps_base/$qca_win_dir/$target_arch/plugins/crypto/qca-gnupg2.dll $arch_prefix/crypto
+diff --git a/admin/build/prep_dist.sh b/admin/build/prep_dist.sh
+index 5e7b000..e3824c7 100755
+--- a/admin/build/prep_dist.sh
++++ b/admin/build/prep_dist.sh
+@@ -45,8 +45,8 @@ if [ "$platform" == "mac" ]; then
+ 
+ 	mkdir -p $target_dist_base
+ 
+-	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui"
+-	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib"
++	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui QtSql"
++	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib sqldrivers/libqsqlite.dylib"
+ 	QCA_PLUGINS="crypto/libqca-ossl.dylib crypto/libqca-gnupg.dylib"
+ 
+ 	cp -a $psi_base/psi.app $target_dist_base/Psi.app
+@@ -71,6 +71,7 @@ if [ "$platform" == "mac" ]; then
+ 
+ 	mkdir -p $contentsdir/Plugins
+ 	mkdir -p $contentsdir/Plugins/imageformats
++	mkdir -p $contentsdir/Plugins/sqldrivers
+ 	for p in $QT_PLUGINS; do
+ 		cp -a $QTDIR/plugins/$p $contentsdir/Plugins/$p
+ 		for g in $QT_FRAMEWORKS; do
+diff --git a/mac/Makefile b/mac/Makefile
+index 11bfe90..9671059 100644
+--- a/mac/Makefile
++++ b/mac/Makefile
+@@ -41,7 +41,7 @@ MASTER_DMG=$(NAME)-$(VERSION).dmg
+ # Other variables
+ QT_FRAMEWORK_VERSION=4
+ QT_FRAMEWORKS=QtCore QtXml QtNetwork QtGui QtSql QtSvg
+-QT_PLUGINS=imageformats/libqjpeg.dylib imageformats/libqgif.dylib
++QT_PLUGINS=imageformats/libqjpeg.dylib imageformats/libqgif.dylib sqldrivers/libqsqlite.dylib
+ 
+ # The rules
+ .PHONY: buildall
