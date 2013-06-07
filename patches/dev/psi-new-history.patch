@@ -1,40 +1,936 @@
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -129,6 +129,9 @@
+ 				<chatedit-height type="int">10</chatedit-height>
+ 				<default-jid-mode comment="Default jid mode: barejid | auto" type="QString">barejid</default-jid-mode>
+ 				<default-jid-mode-ignorelist comment="Default autojid mode ignore list: jid1,jid2,..." type="QString"></default-jid-mode-ignorelist>
++				<history comment="Message history options">
++					<preload-history-size comment="The number of preloaded messages" type="int">5</preload-history-size>
++				</history>
+ 			</chat>
+ 			<save>
+ 				<toolbars-state type="QByteArray"/>
+@@ -740,6 +743,9 @@ QLineEdit#le_status_text {
+ 				<video-input type="QString"/>
+ 			</devices>
+ 		</media>
++		<history comment="General history options">
++			<store-muc-private comment="Keep a history of correspondence for MUC private" type="bool">false</store-muc-private>
++		</history>
+ 	</options>
+ 	<accounts comment="Account definitions and options"/>
+ 	<plugins comment="Plugin options"/>
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -77,6 +77,7 @@
+ #include "messageview.h"
+ #include "chatview.h"
+ #include "urlobject.h"
++#include "eventdb.h"
+ 
+ #ifdef Q_OS_WIN
+ #include <windows.h>
+@@ -108,6 +109,8 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
+ 
+ 	status_ = -1;
+ 
++	preloadHistory();
++
+ 	autoSelectContact_ = false;
+ 	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
+ 		UserListItem *uli = account()->findFirstRelevant(jid);
+@@ -447,6 +450,42 @@ UserStatus ChatDlg::userStatusFor(const
+ 	return u;
+ }
+ 
++void ChatDlg::preloadHistory()
++{
++	int cnt =PsiOptions::instance()->getOption("options.ui.chat.history.preload-history-size").toInt();
++	if (cnt > 0) {
++		if (cnt > 100)
++			cnt = 100;
++		EDBHandle *h = new EDBHandle(account()->edb());
++		connect(h, SIGNAL(finished()), this, SLOT(getHistory()));
++		Jid j = jid();
++		if (!account()->findGCContact(j))
++			j = jid().bare();
++		int start = account()->eventQueue()->count(jid(), false);
++		h->get(account()->id(), j, QDateTime(), EDB::Backward, start, cnt);
++	}
++}
++
++void ChatDlg::getHistory()
++{
++	EDBHandle *h = qobject_cast<EDBHandle *>(sender());
++	if (!h)
++		return;
++
++	const EDBResult &r = h->result();
++	for (int i = r.count() - 1; i >= 0; --i)
++	{
++		const EDBItemPtr &item = r.at(i);
++		PsiEvent *e = item->event();
++		if (e->type() == PsiEvent::Message)
++		{
++			MessageEvent *me = static_cast<MessageEvent *> (e);
++			appendMessage(me->message(), me->originLocal(), true);
++		}
++	}
++	delete h;
++}
++
+ void ChatDlg::ensureTabbedCorrectly()
+ {
+ 	TabbableWidget::ensureTabbedCorrectly();
+@@ -869,7 +908,7 @@ QString ChatDlg::whoNick(bool local) con
+ 	return result;
+ }
+ 
+-void ChatDlg::appendMessage(const Message &m, bool local)
++void ChatDlg::appendMessage(const Message &m, bool local, bool history)
+ {
+ 	if(trackBar_)
+ 		doTrackBar();
+@@ -900,7 +939,9 @@ void ChatDlg::appendMessage(const Messag
+ 	}
+ 
+ 	if (!m.subject().isEmpty()) {
+-		chatView()->dispatchMessage(MessageView::subjectMessage(m.subject()));
++		MessageView smv = MessageView::subjectMessage(m.subject());
++		smv.setHistory(history);
++		chatView()->dispatchMessage(smv);
+ 	}
+  
+ 	MessageView mv(MessageView::Message);
+@@ -916,6 +957,7 @@ void ChatDlg::appendMessage(const Messag
+ 	mv.setDateTime(m.timeStamp());
+ 	mv.setSpooled(m.spooled());
+ 	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
++	mv.setHistory(history);
+ 	chatView()->dispatchMessage(mv);
+ 
+ 	if (!m.urlList().isEmpty()) {
+@@ -924,11 +966,13 @@ void ChatDlg::appendMessage(const Messag
+ 		foreach (const Url &u, urls) {
+ 			urlsMap.insert(u.url(), u.desc());
+ 		}
+-		chatView()->dispatchMessage(MessageView::urlsMessage(urlsMap));
++		MessageView umv = MessageView::urlsMessage(urlsMap);
++		umv.setHistory(history);
++		chatView()->dispatchMessage(umv);
+  	}
+ 
+ 	// if we're not active, notify the user by changing the title
+-	if (!isActiveTab()) {
++	if (!history && !isActiveTab()) {
+ 		++pending_;
+ 		invalidateTab();
+ 		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
+--- psi.orig/src/chatdlg.h
++++ psi/src/chatdlg.h
+@@ -87,6 +87,7 @@ public:
+ 	Jid realJid() const;
+ 	bool autoSelectContact() const {return autoSelectContact_;};
+ 	static UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource);
++	void preloadHistory();
+ 
+ signals:
+ 	void aInfo(const Jid &);
+@@ -149,6 +150,7 @@ private slots:
+ 	void addEmoticon(QString text);
+ 	void initComposing();
+ 	void setComposing();
++	void getHistory();
+ 
+ protected slots:
+ 	void checkComposing();
+@@ -169,7 +171,7 @@ protected:
+ 	virtual void updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence);
+ 	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
+ 
+-	void appendMessage(const Message &, bool local = false);
++	void appendMessage(const Message &, bool local = false, bool history = false);
+ 	virtual bool isEncryptionEnabled() const;
+ 
+ public:
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -296,14 +296,34 @@ void ChatView::appendText(const QString
+ 		verticalScrollBar()->setValue(scrollbarValue);
+ }
+ 
++void ChatView::appendHistoryText(const QString &text)
++{
++	bool doScrollToBottom = atBottom();
++
++	// prevent scrolling back to selected text when
++	// restoring selection
++	int scrollbarValue = verticalScrollBar()->value();
++
++	PsiTextView::appendHistoryText(text);
++
++	if (doScrollToBottom)
++		scrollToBottom();
++	else
++		verticalScrollBar()->setValue(scrollbarValue);
++}
++
+ void ChatView::dispatchMessage(const MessageView &mv)
+ {
+ 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
+ 			&& ChatViewCommon::updateLastMsgTime(mv.dateTime()))
+ 	{
+ 		QString color = ColorOpt::instance()->color(infomrationalColorOpt).name();
+-		appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
+-				   QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
++		QString str = QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
++				   QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate));
++		if (mv.isHistory())
++			appendHistoryText(str);
++		else
++			appendText(str);
+ 	}
+ 	switch (mv.type()) {
+ 		case MessageView::Message:
+@@ -379,16 +399,21 @@ void ChatView::renderMessage(const Messa
+ 		(mv.isAwaitingReceipt() ? QString("icon:delivery") + mv.messageId()
+ 			: isEncryptionEnabled_ ? "icon:log_icon_send_pgp" : "icon:log_icon_send")
+ 		: isEncryptionEnabled_ ? "icon:log_icon_receive_pgp" : "icon:log_icon_receive")) : "";
++	QString str;
+ 	if (mv.isEmote()) {
+-		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>");
++		str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>";
+ 	} else {
+ 		if (PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
+-			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</span><br>" + mv.formattedText());
++			str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</span><br>" + mv.formattedText();
+ 		}
+ 		else {
+-			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
++			str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText();
+ 		}
+ 	}
++	if (mv.isHistory())
++		appendHistoryText(str);
++	else
++		appendText(str);
+ 
+ 	if (mv.isLocal() && PsiOptions::instance()->getOption("options.ui.chat.auto-scroll-to-bottom").toBool() ) {
+ 		deferredScroll();
+@@ -413,7 +438,11 @@ void ChatView::renderSysMessage(const Me
+ 
+ void ChatView::renderSubject(const MessageView &mv)
+ {
+-	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") + "<b>" + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText()));
++	QString text = QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") + "<b>" + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText());
++	if (!mv.isHistory())
++		appendText(text);
++	else
++		appendHistoryText(text);
+ }
+ 
+ void ChatView::renderMucSubject(const MessageView &mv)
+@@ -432,9 +461,17 @@ void ChatView::renderUrls(const MessageV
+ {
+ 	QMap<QString, QString> urls = mv.urls();
+ 	foreach (const QString &key, urls.keys()) {
+-		appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(key))));
++		QString urlStr = QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(key)));
++		if (!mv.isHistory())
++			appendText(urlStr);
++		else
++			appendHistoryText(urlStr);
+ 		if (!urls.value(key).isEmpty()) {
+-			appendText(QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(urls.value(key)));
++			urlStr = QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(urls.value(key));
++			if (!mv.isHistory())
++				appendText(urlStr);
++			else
++				appendHistoryText(urlStr);
+ 		}
+ 	}
+ }
+--- psi.orig/src/chatview_te.h
++++ psi/src/chatview_te.h
+@@ -54,6 +54,7 @@ public:
+ 	void setSessionData(bool isMuc, const QString &jid, const QString name);
+ 
+ 	void appendText(const QString &text);
++	void appendHistoryText(const QString &text);
+ 	void dispatchMessage(const MessageView &);
+ 	bool handleCopyEvent(QObject *object, QEvent *event, ChatEdit *chatEdit);
+ 
+--- psi.orig/src/chatview_webkit.cpp
++++ psi/src/chatview_webkit.cpp
+@@ -309,6 +309,8 @@ bool ChatView::handleCopyEvent(QObject *
+ // input point of all messages
+ void ChatView::dispatchMessage(const MessageView &mv)
+ {
++	if (mv.isHistory())
++		return;
+ 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
+ 			&& updateLastMsgTime(mv.dateTime()))
+ 	{
 --- psi.orig/src/eventdb.cpp
 +++ psi/src/eventdb.cpp
-@@ -28,6 +28,9 @@
+@@ -28,23 +28,27 @@
  #include <QTimer>
  #include <QTextStream>
  #include <QDateTime>
 +#include <QSqlError>
-+#include <QSqlQuery>
 +#include <QSqlDriver>
++#include <qjson/parser.h>
++#include "qjson/serializer.h"
  
  #include "common.h"
  #include "applicationinfo.h"
-@@ -72,6 +75,15 @@ const QString & EDBItem::prevId() const
- 	return v_prevId;
- }
+ #include "psievent.h"
++#include "psicontactlist.h"
+ #include "jidutil.h"
++#include "historyimp.h"
  
-+void EDBItem::setNextId(const QString &id)
-+{
-+	v_nextId = id;
-+}
-+
-+void EDBItem::setPrevId(const QString &id)
-+{
-+	v_prevId = id;
-+}
+ using namespace XMPP;
  
  //----------------------------------------------------------------------------
+ // EDBItem
+ //----------------------------------------------------------------------------
+-EDBItem::EDBItem(PsiEvent *event, const QString &id, const QString &prevId, const QString &nextId)
++EDBItem::EDBItem(PsiEvent *event, const QString &id)
+ {
+ 	e = event;
+ 	v_id = id;
+-	v_prevId = prevId;
+-	v_nextId = nextId;
+ }
+ 
+ EDBItem::~EDBItem()
+@@ -62,17 +66,6 @@ const QString & EDBItem::id() const
+ 	return v_id;
+ }
+ 
+-const QString & EDBItem::nextId() const
+-{
+-	return v_nextId;
+-}
+-
+-const QString & EDBItem::prevId() const
+-{
+-	return v_prevId;
+-}
+-
+-
+ //----------------------------------------------------------------------------
  // EDBHandle
-@@ -436,6 +448,7 @@ int EDBFlatFile::append(const Jid &j, Ps
+ //----------------------------------------------------------------------------
+@@ -82,6 +75,7 @@ public:
+ 	Private() {}
+ 
+ 	EDB *edb;
++	int beginRow_;
+ 	EDBResult r;
+ 	bool busy;
+ 	bool writeSuccess;
+@@ -94,6 +88,7 @@ EDBHandle::EDBHandle(EDB *edb)
+ {
+ 	d = new Private;
+ 	d->edb = edb;
++	d->beginRow_ = 0;
+ 	d->busy = false;
+ 	d->writeSuccess = false;
+ 	d->listeningFor = -1;
+@@ -109,53 +104,32 @@ EDBHandle::~EDBHandle()
+ 	delete d;
+ }
+ 
+-void EDBHandle::getLatest(const Jid &j, int len)
++void EDBHandle::get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int begin, int len)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getLatest(j, len);
++	d->listeningFor = d->edb->op_get(accId, jid, date, direction, begin, len);
+ }
+ 
+-void EDBHandle::getOldest(const Jid &j, int len)
++void EDBHandle::find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getOldest(j, len);
++	d->listeningFor = d->edb->op_find(accId, str, jid, date, direction);
+ }
+ 
+-void EDBHandle::get(const Jid &j, const QString &id, int direction, int len)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_get(j, id, direction, len);
+-}
+-
+-void EDBHandle::getByDate(const Jid &j, QDateTime first, QDateTime last)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getByDate(j, first, last);
+-}
+-
+-void EDBHandle::find(const QString &str, const Jid &j, const QString &id, int direction)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_find(str, j, id, direction);
+-}
+-
+-void EDBHandle::append(const Jid &j, PsiEvent *e)
++void EDBHandle::append(const QString &accId, const Jid &j, PsiEvent *e, int type)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Write;
+-	d->listeningFor = d->edb->op_append(j, e);
++	d->listeningFor = d->edb->op_append(accId, j, e, type);
+ }
+ 
+-void EDBHandle::erase(const Jid &j)
++void EDBHandle::erase(const QString &accId, const Jid &j)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Erase;
+-	d->listeningFor = d->edb->op_erase(j);
++	d->listeningFor = d->edb->op_erase(accId, j);
+ }
+ 
+ bool EDBHandle::busy() const
+@@ -199,6 +173,11 @@ int EDBHandle::lastRequestType() const
+ 	return d->lastRequestType;
+ }
+ 
++int EDBHandle::beginRow() const
++{
++	return d->beginRow_;
++}
++
+ 
+ //----------------------------------------------------------------------------
+ // EDB
+@@ -210,12 +189,14 @@ public:
+ 
+ 	QList<EDBHandle*> list;
+ 	int reqid_base;
++	PsiCon *psi;
+ };
+ 
+-EDB::EDB()
++EDB::EDB(PsiCon *psi)
+ {
+ 	d = new Private;
+ 	d->reqid_base = 0;
++	d->psi = psi;
+ }
+ 
+ EDB::~EDB()
+@@ -240,46 +221,32 @@ void EDB::unreg(EDBHandle *h)
+ 	d->list.removeAll(h);
+ }
+ 
+-int EDB::op_getLatest(const Jid &j, int len)
++int EDB::op_get(const QString &accId, const Jid &jid, const QDateTime date, int direction, int start, int len)
+ {
+-	return getLatest(j, len);
++	return get(accId, jid, date, direction, start, len);
+ }
+ 
+-int EDB::op_getOldest(const Jid &j, int len)
++int EDB::op_find(const QString &accId, const QString &str, const Jid &j, const QDateTime date, int direction)
+ {
+-	return getOldest(j, len);
++	return find(accId, str, j, date, direction);
+ }
+ 
+-int EDB::op_get(const Jid &jid, const QString &id, int direction, int len)
++int EDB::op_append(const QString &accId, const Jid &j, PsiEvent *e, int type)
+ {
+-	return get(jid, id, direction, len);
++	return append(accId, j, e, type);
+ }
+ 
+-int EDB::op_getByDate(const Jid &j, QDateTime first, QDateTime last)
++int EDB::op_erase(const QString &accId, const Jid &j)
+ {
+-	return getByDate(j, first, last);
++	return erase(accId, j);
+ }
+ 
+-int EDB::op_find(const QString &str, const Jid &j, const QString &id, int direction)
+-{
+-	return find(str, j, id, direction);
+-}
+-
+-int EDB::op_append(const Jid &j, PsiEvent *e)
+-{
+-	return append(j, e);
+-}
+-
+-int EDB::op_erase(const Jid &j)
+-{
+-	return erase(j);
+-}
+-
+-void EDB::resultReady(int req, EDBResult r)
++void EDB::resultReady(int req, EDBResult r, int begin_row)
+ {
+ 	// deliver
+ 	foreach(EDBHandle* h, d->list) {
+ 		if(h->listeningFor() == req) {
++			h->d->beginRow_ = begin_row;
+ 			h->edb_resultReady(r);
+ 			return;
+ 		}
+@@ -297,6 +264,11 @@ void EDB::writeFinished(int req, bool b)
+ 	}
+ }
+ 
++inline PsiCon *EDB::psi()
++{
++	return d->psi;
++}
++
+ 
+ //----------------------------------------------------------------------------
+ // EDBFlatFile
+@@ -305,21 +277,18 @@ struct item_file_req
+ {
+ 	Jid j;
+ 	int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
++	int start;
+ 	int len;
+ 	int dir;
+ 	int id;
+-	int eventId;
++	QDateTime date;
+ 	QString findStr;
+ 	PsiEvent *event;
+ 
+-	QDateTime first, last;
+ 	enum Type {
+-		Type_getLatest = 0,
+-		Type_getOldest,
+ 		Type_get,
+ 		Type_append,
+ 		Type_find,
+-		Type_getByDate,
+ 		Type_erase
+ 	};
+ };
+@@ -333,8 +302,8 @@ public:
+ 	QList<item_file_req*> rlist;
+ };
+ 
+-EDBFlatFile::EDBFlatFile()
+-:EDB()
++EDBFlatFile::EDBFlatFile(PsiCon *psi)
++:EDB(psi)
+ {
+ 	d = new Private;
+ }
+@@ -348,40 +317,15 @@ EDBFlatFile::~EDBFlatFile()
+ 	delete d;
+ }
+ 
+-int EDBFlatFile::getLatest(const Jid &j, int len)
+-{
+-	item_file_req *r = new item_file_req;
+-	r->j = j;
+-	r->type = item_file_req::Type_getLatest;
+-	r->len = len < 1 ? 1: len;
+-	r->id = genUniqueId();
+-	d->rlist.append(r);
+-
+-	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
+-	return r->id;
+-}
+-
+-int EDBFlatFile::getOldest(const Jid &j, int len)
+-{
+-	item_file_req *r = new item_file_req;
+-	r->j = j;
+-	r->type = item_file_req::Type_getOldest;
+-	r->len = len < 1 ? 1: len;
+-	r->id = genUniqueId();
+-	d->rlist.append(r);
+-
+-	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
+-	return r->id;
+-}
+-
+-int EDBFlatFile::get(const Jid &j, const QString &id, int direction, int len)
++int EDBFlatFile::get(const QString &/*accId*/, const Jid &j, const QDateTime date, int direction, int start, int len)
+ {
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+ 	r->type = item_file_req::Type_get;
++	r->start = start;
+ 	r->len = len < 1 ? 1: len;
+ 	r->dir = direction;
+-	r->eventId = id.toInt();
++	r->date = date;
+ 	r->id = genUniqueId();
  	d->rlist.append(r);
  
- 	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
-+
+@@ -389,23 +333,7 @@ int EDBFlatFile::get(const Jid &j, const
  	return r->id;
  }
  
-@@ -968,3 +981,689 @@ QString EDBFlatFile::File::eventToLine(P
+-
+-int EDBFlatFile::getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last)
+-{
+-	item_file_req *r = new item_file_req;
+-	r->j = jid;
+-	r->type = item_file_req::Type_getByDate;
+-	r->len = 1;
+-	r->id = genUniqueId();
+-	d->rlist.append(r);
+-	r->first = first;
+-	r->last = last;
+-
+-	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
+-	return r->id;
+-}
+-
+-int EDBFlatFile::find(const QString &str, const Jid &j, const QString &id, int direction)
++int EDBFlatFile::find(const QString &/*accId*/, const QString &str, const Jid &j, const QDateTime date, int direction)
+ {
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+@@ -413,7 +341,7 @@ int EDBFlatFile::find(const QString &str
+ 	r->len = 1;
+ 	r->dir = direction;
+ 	r->findStr = str;
+-	r->eventId = id.toInt();
++	r->date = date;
+ 	r->id = genUniqueId();
+ 	d->rlist.append(r);
+ 
+@@ -421,8 +349,10 @@ int EDBFlatFile::find(const QString &str
+ 	return r->id;
+ }
+ 
+-int EDBFlatFile::append(const Jid &j, PsiEvent *e)
++int EDBFlatFile::append(const QString &/*accId*/, const Jid &j, PsiEvent *e, int type)
+ {
++	if (type != EDB::Contact)
++		return 0;
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+ 	r->type = item_file_req::Type_append;
+@@ -439,7 +369,7 @@ int EDBFlatFile::append(const Jid &j, Ps
+ 	return r->id;
+ }
+ 
+-int EDBFlatFile::erase(const Jid &j)
++int EDBFlatFile::erase(const QString &/*accId*/, const Jid &j)
+ {
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+@@ -452,6 +382,22 @@ int EDBFlatFile::erase(const Jid &j)
+ 	return r->id;
+ }
+ 
++QList<EDB::ContactItem> EDBFlatFile::contacts(const QString &/*accId*/, int type)
++{
++	return File::contacts(type);
++}
++
++quint64 EDBFlatFile::eventsCount(const QString &accId, const XMPP::Jid &jid)
++{
++	quint64 res = 0;
++	if (!jid.isEmpty())
++		res = ensureFile(jid)->total();
++	else
++		foreach (const ContactItem &ci, contacts(accId, Contact))
++			res += ensureFile(ci.jid)->total();
++	return res;
++}
++
+ EDBFlatFile::File *EDBFlatFile::findFile(const Jid &j) const
+ {
+ 	foreach(File* i, d->flist) {
+@@ -505,25 +451,10 @@ void EDBFlatFile::performRequests()
+ 
+ 	File *f = ensureFile(r->j);
+ 	int type = r->type;
+-	if(type >= item_file_req::Type_getLatest && type <= item_file_req::Type_get) {
+-		int id, direction;
++	if(type == item_file_req::Type_get) {
+ 
+-		if(type == item_file_req::Type_getLatest) {
+-			direction = Backward;
+-			id = f->total()-1;
+-		}
+-		else if(type == item_file_req::Type_getOldest) {
+-			direction = Forward;
+-			id = 0;
+-		}
+-		else if(type == item_file_req::Type_get) {
+-			direction = r->dir;
+-			id = r->eventId;
+-		}
+-		else {
+-			qWarning("EDBFlatFile::performRequests(): Invalid type.");
+-			return;
+-		}
++		int direction = r->dir;
++		int id = f->getId(r->date, direction, r->start);
+ 
+ 		int len;
+ 		if(direction == Forward) {
+@@ -540,15 +471,11 @@ void EDBFlatFile::performRequests()
+ 		}
+ 
+ 		EDBResult result;
++		int startId = id;
+ 		for(int n = 0; n < len; ++n) {
+ 			PsiEvent *e = f->get(id);
+ 			if(e) {
+-				QString prevId, nextId;
+-				if(id > 0)
+-					prevId = QString::number(id-1);
+-				if(id < f->total()-1)
+-					nextId = QString::number(id+1);
+-				EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
++				EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
+ 				result.append(ei);
+ 			}
+ 
+@@ -557,32 +484,30 @@ void EDBFlatFile::performRequests()
+ 			else
+ 				--id;
+ 		}
+-		resultReady(r->id, result);
++		if (direction == Backward)
++			startId = id + 1;
++		resultReady(r->id, result, startId);
+ 	}
++
+ 	else if(type == item_file_req::Type_append) {
+ 		writeFinished(r->id, f->append(r->event));
+ 		delete r->event;
+ 	}
++
+ 	else if(type == item_file_req::Type_find) {
+-		int id = r->eventId;
++		int id = f->getId(r->date, r->dir, r->start);
+ 		EDBResult result;
+ 		while(1) {
+ 			PsiEvent *e = f->get(id);
+ 			if(!e)
+ 				break;
+ 
+-			QString prevId, nextId;
+-			if(id > 0)
+-				prevId = QString::number(id-1);
+-			if(id < f->total()-1)
+-				nextId = QString::number(id+1);
+-
+ 			bool matched = false;
+ 			if(e->type() == PsiEvent::Message) {
+ 				MessageEvent *me = (MessageEvent *)e;
+ 				const Message &m = me->message();
+ 				if(m.body().indexOf(r->findStr, 0, Qt::CaseInsensitive) != -1) {
+-					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
++					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
+ 					result.append(ei);
+ 					matched = true;
+ 					//commented line below to return ALL(instead of just first) messages that contain findStr
+@@ -597,44 +522,17 @@ void EDBFlatFile::performRequests()
+ 			else
+ 				--id;
+ 		}
+-		resultReady(r->id, result);
+-	}
+-	else if(type == item_file_req::Type_getByDate ) {
+-		int id = 0;
+-		EDBResult result;
+-		for (int i=0; i < f->total(); ++i) {
+-			PsiEvent *e = f->get(id);
+-			if(!e)
+-				continue;
+-
+-			QString prevId, nextId;
+-			if(id > 0)
+-				prevId = QString::number(id-1);
+-			if(id < f->total()-1)
+-				nextId = QString::number(id+1);
+-
+-			bool matched = false;
+-			if(e->type() == PsiEvent::Message) {
+-				MessageEvent *me = (MessageEvent *)e;
+-				const Message &m = me->message();
+-				if(m.timeStamp() > r->first && m.timeStamp() < r->last ) {
+-					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
+-					result.append(ei);
+-					matched = true;
+-				}
+-			}
+-			if (!matched)
+-				delete e;
+-
+-			++id;
+-		}
+-		resultReady(r->id, result);
++		resultReady(r->id, result, 0);
+ 	}
+ 
+ 	else if(type == item_file_req::Type_erase) {
+ 		writeFinished(r->id, deleteFile(f->j));
+ 	}
+ 
++	else {
++		qWarning("EDBFlatFile::performRequests(): Invalid type.");
++	}
++
+ 	delete r;
+ }
+ 
+@@ -687,7 +585,28 @@ EDBFlatFile::File::~File()
+ 
+ QString EDBFlatFile::File::jidToFileName(const XMPP::Jid &j)
+ {
+-	return ApplicationInfo::historyDir() + "/" + JIDUtil::encode(j.bare()).toLower() + ".history";
++	return ApplicationInfo::historyDir() + "/" + strToFileName(JIDUtil::encode(j.bare()).toLower());
++}
++
++QString EDBFlatFile::File::strToFileName(const QString &s)
++{
++	QFileInfo fi(s);
++	return fi.fileName() + ".history";
++}
++
++QList<EDB::ContactItem> EDBFlatFile::File::contacts(int type)
++{
++	QList<ContactItem> res;
++	if (type == EDB::Contact) {
++		QDir dir(ApplicationInfo::historyDir() + "/");
++		QFileInfoList flist = dir.entryInfoList(QStringList(strToFileName("*")), QDir::Files);
++		foreach (const QFileInfo &fi, flist) {
++			XMPP::Jid jid(JIDUtil::decode(fi.completeBaseName()));
++			if (jid.isValid())
++				res.append(ContactItem("", jid));
++		}
++	}
++	return res;
+ }
+ 
+ void EDBFlatFile::File::ensureIndex()
+@@ -739,6 +658,59 @@ int EDBFlatFile::File::total() const
+ 	return d->index.size();
+ }
+ 
++int EDBFlatFile::File::getId(QDateTime &date, int dir, int offset)
++{
++	if (date.isNull()) {
++		if (dir == EDBFlatFile::Forward)
++			return offset;
++		if (offset >= total())
++			return 0;
++		return total() - offset - 1;
++	}
++	ensureIndex();
++	int id = findIdByNearDate(date, 0, total()-1);
++	if (id != -1) {
++		QDateTime fDate = getLineDate(getLine(id));
++		if (dir == EDBFlatFile::Forward) {
++			if (fDate < date)
++				++id;
++			id += offset;
++		} else {
++			if (fDate > date)
++				--id;
++			id -= offset;
++		}
++		if (id >= total())
++			id = total() - 1;
++		else if (id < 0)
++			id = 0;
++	}
++	return id;
++}
++
++int EDBFlatFile::File::findIdByNearDate(QDateTime &date, int start, int end)
++{
++	if (start == end)
++		return start;
++
++	int middle = (end - start) / 2;
++	const QDateTime mDate = getLineDate(getLine(start + middle));
++	if (!mDate.isValid())
++		return -1;
++
++	if (mDate == date)
++		return start + middle;
++	if (middle == 0) {
++		const QDateTime mDate2 = getLineDate(getLine(end));
++		if (!mDate2.isValid())
++			return -1;
++		return (abs(date.secsTo(mDate)) < abs(date.secsTo(mDate2))) ? start : end;
++	}
++	if (mDate > date)
++		return findIdByNearDate(date, start, start + middle);
++	return findIdByNearDate(date, start + middle, end);
++}
++
+ void EDBFlatFile::File::touch()
+ {
+ 	t->start(30000);
+@@ -749,24 +721,30 @@ void EDBFlatFile::File::timer_timeout()
+ 	timeout();
+ }
+ 
+-PsiEvent *EDBFlatFile::File::get(int id)
++QString EDBFlatFile::File::getLine(int id)
+ {
+ 	touch();
+ 
+ 	if(!valid)
+-		return 0;
++		return QString();
+ 
+ 	ensureIndex();
+ 	if(id < 0 || id >= (int)d->index.size())
+-		return 0;
++		return QString();
+ 
+ 	f.seek(d->index[id]);
+ 
+ 	QTextStream t;
+ 	t.setDevice(&f);
+ 	t.setCodec("UTF-8");
+-	QString line = t.readLine();
++	return t.readLine();
++}
+ 
++PsiEvent *EDBFlatFile::File::get(int id)
++{
++	QString line = getLine(id);
++	if (line.isEmpty())
++		return 0;
+ 	return lineToEvent(line);
+ }
+ 
+@@ -799,6 +777,13 @@ bool EDBFlatFile::File::append(PsiEvent
+ 	return true;
+ }
+ 
++QDateTime EDBFlatFile::File::getLineDate(const QString &line) const
++{
++	int x1 = line.indexOf('|') + 1;
++	int x2 = line.indexOf('|', x1);
++	return QDateTime::fromString(line.mid(x1, x2 - x1), Qt::ISODate);
++}
++
+ PsiEvent *EDBFlatFile::File::lineToEvent(const QString &line)
+ {
+ 	// -- read the line --
+@@ -977,3 +962,798 @@ QString EDBFlatFile::File::eventToLine(P
  	
  	return "";
  }
@@ -43,7 +939,7 @@
 +// EDBSqLite
 +//----------------------------------------------------------------------------
 +
-+EDBSqLite::EDBSqLite() : EDB(),
++EDBSqLite::EDBSqLite(PsiCon *psi) : EDB(psi),
 +	transactionsCounter(0),
 +	lastCommitTime(QDateTime::currentDateTime()),
 +	commitTimer(NULL),
@@ -54,7 +950,7 @@
 +	QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
 +	db.setDatabaseName(path);
 +	if (!db.open()) {
-+		qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toAscii());
++		qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toLatin1());
 +		return;
 +	}
 +	setInsertingMode(Normal);
@@ -62,20 +958,46 @@
 +		// no tables found.
 +		if (db.transaction()) {
 +			QSqlQuery query(db);
-+			query.exec("CREATE TABLE `jids` (`id` INTEGER PRIMARY KEY ASC, `type` INTEGER, `jid` TEXT);");
-+			query.exec("CREATE TABLE `events` (`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, `jid_id` INTEGER, `date` TEXT, `type` INTEGER, `direction` INTEGER,  `flags` INTEGER, `subject` TEXT, `m_text` TEXT, `lang` TEXT);");
-+			query.exec("CREATE TABLE `urls` (`event_id` INTEGER, `url` TEXT, `desc` TEXT);");
-+			query.exec("CREATE INDEX `jid` ON `jids` (`jid`);");
-+			query.exec("CREATE INDEX `jid_id` ON `events` (`jid_id`);");
++			query.exec("CREATE TABLE `system` ("
++				"`key` TEXT, "
++				"`value` TEXT"
++				");");
++			query.exec("CREATE TABLE `accounts` ("
++				"`id` TEXT, "
++				"`lifetime` INTEGER"
++				");");
++			query.exec("CREATE TABLE `contacts` ("
++				"`id` INTEGER PRIMARY KEY ASC, "
++				"`acc_id` TEXT, "
++				"`type` INTEGER, "
++				"`jid` TEXT, "
++				"`lifetime` INTEGER"
++				");");
++			query.exec("CREATE TABLE `events` ("
++				"`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, "
++				"`contact_id` INTEGER, "
++				"`resource` TEXT, "
++				"`date` TEXT, "
++				"`type` INTEGER, "
++				"`direction` INTEGER, "
++				"`subject` TEXT, "
++				"`m_text` TEXT, "
++				"`lang` TEXT, "
++				"`extra_data` TEXT"
++				");");
++			query.exec("CREATE INDEX `key` ON `system` (`key`);");
++			query.exec("CREATE INDEX `jid` ON `contacts` (`jid`);");
++			query.exec("CREATE INDEX `contact_id` ON `events` (`contact_id`);");
 +			query.exec("CREATE INDEX `date` ON `events` (`date`);");
-+			query.exec("CREATE INDEX `event_id` ON `urls` (`event_id`);");
 +			if (db.commit()) {
 +				status = Commited;
++				setStorageParam("version", "0.1");
++				setStorageParam("import_start", "yes");
 +			}
 +		}
-+	} else {
-+		status = Commited;
 +	}
++	else
++		status = Commited;
 +}
 +
 +EDBSqLite::~EDBSqLite()
@@ -89,110 +1011,164 @@
 +	QSqlDatabase::removeDatabase("history");
 +}
 +
-+int EDBSqLite::getLatest(const XMPP::Jid & jid, int len)
++bool EDBSqLite::init()
++{
++	if (status == NotActive)
++		return false;
++
++	if (!getStorageParam("import_start").isEmpty()) {
++		if (!importExecute()) {
++			status = NotActive;
++			return false;
++		}
++	}
++
++	setMirror(new EDBFlatFile(psi()));
++	return true;
++}
++
++int EDBSqLite::get(const QString &accId, const XMPP::Jid &jid, QDateTime date, int direction, int start, int len)
 +{
 +	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_getLatest;
-+	r->len = len < 1 ? 1 : len;
-+	r->id = genUniqueId();
++	r->accId = accId;
++	r->j     = jid;
++	r->type  = item_query_req::Type_get;
++	r->start = start;
++	r->len   = len < 1 ? 1 : len;
++	r->dir   = direction;
++	r->date  = date;
++	r->id    = genUniqueId();
 +	rlist.append(r);
 +
 +	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
 +	return r->id;
 +}
 +
-+int EDBSqLite::getOldest(const XMPP::Jid &jid, int len)
++int EDBSqLite::find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction)
 +{
 +	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_getOldest;
-+	r->len = len < 1 ? 1 : len;
-+	r->id = genUniqueId();
-+	rlist.append(r);
-+
-+	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
-+	return r->id;
-+}
-+
-+int EDBSqLite::get(const XMPP::Jid &jid, const QString &id, int direction, int len)
-+{
-+	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_get;
-+	r->len = len < 1 ? 1 : len;
-+	r->dir = direction;
-+	r->eventId = id;
-+	r->id = genUniqueId();
-+	rlist.append(r);
-+
-+	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
-+	return r->id;
-+}
-+
-+int EDBSqLite::getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last)
-+{
-+	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_getByDate;
-+	r->len = 1;
-+	r->id = genUniqueId();
-+	r->first = first;
-+	r->last = last;
-+	rlist.append(r);
-+
-+	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
-+	return r->id;
-+}
-+
-+int EDBSqLite::find(const QString &str, const XMPP::Jid &jid, const QString &id, int direction)
-+{
-+	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_find;
-+	r->len = 1;
-+	r->dir = direction;
++	r->accId   = accId;
++	r->j       = jid;
++	r->type    = item_query_req::Type_find;
++	r->len     = 1;
++	r->dir     = direction;
 +	r->findStr = str;
-+	r->eventId = id;
-+	r->id = genUniqueId();
++	r->date    = date;
++	r->id      = genUniqueId();
 +	rlist.append(r);
 +
 +	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
 +	return r->id;
 +}
 +
-+int EDBSqLite::append(const XMPP::Jid &jid, PsiEvent *e)
++int EDBSqLite::append(const QString &accId, const XMPP::Jid &jid, PsiEvent *e, int type)
 +{
 +	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_file_req::Type_append;
-+	r->event = e->copy();
++	r->accId   = accId;
++	r->j       = jid;
++	r->jidType = type;
++	r->type    = item_file_req::Type_append;
++	r->event   = e->copy();
 +	if ( !r->event ) {
 +		qWarning("EDBSqLite::append(): Attempted to append incompatible type.");
 +		delete r;
 +		return 0;
 +	}
-+	r->id = genUniqueId();
++	r->id      = genUniqueId();
 +	rlist.append(r);
 +
 +	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
 +
 +	if (mirror_)
-+		mirror_->append(jid, e);
++		mirror_->append(accId, jid, e, type);
 +
 +	return r->id;
 +}
 +
-+int EDBSqLite::erase(const XMPP::Jid &jid)
++int EDBSqLite::erase(const QString &accId, const XMPP::Jid &jid)
 +{
 +	item_query_req *r = new item_query_req;
-+	r->j = jid;
-+	r->type = item_query_req::Type_erase;
-+	r->id = genUniqueId();
++	r->accId = accId;
++	r->j     = jid;
++	r->type  = item_query_req::Type_erase;
++	r->id    = genUniqueId();
 +	rlist.append(r);
 +
 +	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
 +	return r->id;
++}
++
++QList<EDB::ContactItem> EDBSqLite::contacts(const QString &accId, int type)
++{
++	QList<ContactItem> res;
++	EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(QueryContactsList, accId.isEmpty(), true);
++	query->bindValue(":type", type);
++	if (!accId.isEmpty())
++		query->bindValue(":acc_id", accId);
++	if (query->exec()) {
++		while (query->next()) {
++			const QSqlRecord &rec = query->record();
++			res.append(ContactItem(rec.value("acc_id").toString(), XMPP::Jid(rec.value("jid").toString())));
++		}
++		query->freeResult();
++	}
++	return res;
++}
++
++quint64 EDBSqLite::eventsCount(const QString &accId, const XMPP::Jid &jid)
++{
++	quint64 res = 0;
++	bool fAccAll  = accId.isEmpty();
++	bool fContAll = jid.isEmpty();
++	EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(QueryRowCount, fAccAll, fContAll);
++	if (!fAccAll)
++		query->bindValue(":acc_id", accId);
++	if (!fContAll)
++		query->bindValue(":jid", jid.full());
++	if (query->exec()) {
++		if (query->next())
++			res = query->record().value("count").toULongLong();
++		query->freeResult();
++	}
++	return res;
++}
++
++QString EDBSqLite::getStorageParam(const QString &key)
++{
++	QSqlQuery query(QSqlDatabase::database("history"));
++	query.prepare("SELECT `value` FROM `system` WHERE `key` = :key;");
++	query.bindValue(":key", key);
++	if (query.exec() && query.next())
++		return query.record().value("value").toString();
++	return QString();
++}
++
++void EDBSqLite::setStorageParam(const QString &key, const QString &val)
++{
++	transaction(true);
++	QSqlQuery query(QSqlDatabase::database("history"));
++	if (val.isEmpty()) {
++		query.prepare("DELETE FROM `system` WHERE `key` = :key;");
++		query.bindValue(":key", key);
++		query.exec();
++	}
++	else {
++		query.prepare("SELECT COUNT(*) AS `count` FROM `system` WHERE `key` = :key;");
++		query.bindValue(":key", key);
++		if (query.exec() && query.next() && query.record().value("count").toULongLong() != 0) {
++			query.prepare("UPDATE `system` SET `value` = :val WHERE `key` = :key;");
++			query.bindValue(":key", key);
++			query.bindValue(":val", val);
++			query.exec();
++		}
++		else {
++			query.prepare("INSERT INTO `system` (`key`, `value`) VALUES (:key, :val);");
++			query.bindValue(":key", key);
++			query.bindValue(":val", val);
++			query.exec();
++		}
++	}
++	commit();
 +}
 +
 +void EDBSqLite::setInsertingMode(InsertMode mode)
@@ -231,185 +1207,122 @@
 +{
 +	if (rlist.isEmpty())
 +		return;
++
 +	item_query_req *r = rlist.takeFirst();
 +	const int type = r->type;
++
 +	if (type == item_query_req::Type_append) {
-+		bool b = appendEvent(r->j, r->event);
++		bool b = appendEvent(r->accId, r->j, r->event, r->jidType);
 +		writeFinished(r->id, b);
 +		delete r->event;
 +	}
-+	else if (type >= item_query_req::Type_getLatest && type <= item_query_req::Type_get) {
-+		commit();
-+		PreparedQueryes::QueryType queryType;
-+		if (type == item_query_req::Type_getLatest) {
-+			queryType = PreparedQueryes::QueryLatest;
-+		} else if (type == item_query_req::Type_getOldest) {
-+			queryType = PreparedQueryes::QueryOldest;
-+		} else if (type == item_query_req::Type_get) {
-+			if (r->dir == Backward)
-+				queryType = PreparedQueryes::QueryIdBackward;
-+			else
-+				queryType = PreparedQueryes::QueryIdForward;
-+		}
-+		EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(queryType);
-+		QString sJid = r->j.bare();
-+		const int len = r->len + 1;
-+		query->bindValue(":jid", sJid);
-+		if (type == item_query_req::Type_get)
-+			query->bindValue(":id", r->eventId);
-+		query->bindValue(":cnt", len);
-+		EDBResult result;
-+		if (query->exec()) {
-+			EDBItem *ei = NULL;
-+			int i = 0;
-+			const bool fForward = (queryType == PreparedQueryes::QueryOldest
-+					       || queryType == PreparedQueryes::QueryIdForward);
-+			while (query->next()) {
-+				++i;
-+				QString id = query->value(0).toString();
-+				if (i == len) {
-+					if (ei) {
-+						if (fForward)
-+							ei->setNextId(id);
-+						else
-+							ei->setPrevId(id);
-+					}
-+					break;
 +
-+				}
-+				PsiEvent *e = getEvent(query);
-+				if (e) {
-+					QString prevId, nextId;
-+					if (ei) {
-+						if (fForward) {
-+							ei->setNextId(id);
-+							prevId = ei->id();
-+						} else {
-+							ei->setPrevId(id);
-+							nextId = ei->id();
-+						}
-+					}
-+					ei = new EDBItem(e, id, prevId, nextId);
-+					result.append(EDBItemPtr(ei));
-+				}
-+			}
-+			query->freeResult();
-+			if (type == item_query_req::Type_get && !result.isEmpty()) {
-+				query = queryes.getPreparedQuery(fForward ? PreparedQueryes::QueryId2Forward : PreparedQueryes::QueryId2Backward);
-+				query->bindValue(":jid", sJid);
-+				query->bindValue(":id", r->eventId);
-+				if (query->exec() && query->next()) {
-+					if (fForward)
-+						result.first()->setPrevId(query->value(0).toString());
-+					else
-+						result.first()->setNextId(query->value(0).toString());
-+					query->freeResult();
-+				}
-+			}
-+		}
-+		resultReady(r->id, result);
-+	} else if(type == item_file_req::Type_getByDate ) {
++	else if (type == item_query_req::Type_get) {
 +		commit();
-+		EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(PreparedQueryes::QueryDate1);
-+		QString jidStr = r->j.bare();
-+		query->bindValue(":jid", jidStr);
-+		query->bindValue(":date1", r->first);
-+		query->bindValue(":date2", r->last);
++		bool fContAll = r->j.isEmpty();
++		bool fAccAll  = r->accId.isEmpty();
++		QueryType queryType;
++		if (r->date.isNull()) {
++			if (r->dir == Forward)
++				queryType = QueryOldest;
++			else
++				queryType = QueryLatest;
++		} else {
++			if (r->dir == Backward)
++				queryType = QueryDateBackward;
++			else
++				queryType = QueryDateForward;
++		}
++		EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(queryType, fAccAll, fContAll);
++		if (!fContAll)
++			query->bindValue(":jid", r->j.full());
++		if (!fAccAll)
++			query->bindValue(":acc_id", r->accId);
++		if (!r->date.isNull())
++			query->bindValue(":date", r->date);
++		query->bindValue(":start", r->start);
++		query->bindValue(":cnt", r->len);
 +		EDBResult result;
 +		if (query->exec()) {
-+			EDBItem *ei = NULL;
 +			while (query->next()) {
-+				QString id = query->value(0).toString();
-+				PsiEvent *e = getEvent(query);
++				PsiEvent *e = getEvent(query->record());
 +				if (e) {
-+					QString prevId;
-+					if (ei) {
-+						prevId = ei->id();
-+						ei->setNextId(id);
-+					}
-+					ei = new EDBItem(e, id, prevId, QString());
-+					EDBItemPtr eip = EDBItemPtr(ei);
-+					result.append(eip);
++					QString id = query->record().value("id").toString();
++					result.append(EDBItemPtr(new EDBItem(e, id)));
 +				}
 +			}
 +			query->freeResult();
-+			if (!result.isEmpty()) {
-+				query = queryes.getPreparedQuery(PreparedQueryes::QueryDate2);
-+				query->bindValue(":jid", jidStr);
-+				query->bindValue(":date", r->first);
-+				if (query->exec()) {
-+					if (query->next()) {
-+						result.first()->setPrevId(query->value(0).toString());
-+					}
-+				}
-+				query->freeResult();
-+				query = queryes.getPreparedQuery(PreparedQueryes::QueryDate3);
-+				query->bindValue(":jid", jidStr);
-+				query->bindValue(":date", r->last);
-+				if (query->exec() && query->next()) {
-+					result.last()->setNextId(query->value(0).toString());
-+				}
-+				query->freeResult();
++		}
++		int beginRow;
++		if (r->dir == Forward && r->date.isNull()) {
++			beginRow = r->start;
++		} else {
++			int cnt = rowCount(r->accId, r->j, r->date);
++			if (r->dir == Backward) {
++				beginRow = cnt - r->len + 1;
++				if (beginRow < 0)
++					beginRow = 0;
++			} else {
++				beginRow = cnt + 1;
 +			}
 +		}
-+		resultReady(r->id, result);
++		resultReady(r->id, result, beginRow);
++
 +	} else if(type == item_file_req::Type_find) {
 +		commit();
-+		EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(PreparedQueryes::QueryFindText);
-+		query->bindValue(":jid", r->j.bare());
++		bool fContAll = r->j.isEmpty();
++		bool fAccAll  = r->accId.isEmpty();
++		EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(QueryFindText, fAccAll, fContAll);
++		if (!fContAll)
++			query->bindValue(":jid", r->j.bare());
++		if (!fAccAll)
++			query->bindValue(":acc_id", r->accId);
 +		EDBResult result;
 +		if (query->exec()) {
-+			EDBItem *ei = NULL;
 +			QString str = r->findStr.toLower();
 +			while (query->next()) {
-+				QString id = query->value(0).toString();
-+				if (!query->value(7).toString().toLower().contains(str, Qt::CaseSensitive))
++				const QSqlRecord rec = query->record();
++				if (!rec.value("m_text").toString().toLower().contains(str, Qt::CaseSensitive))
 +					continue;
-+				PsiEvent *e = getEvent(query);
++				PsiEvent *e = getEvent(rec);
 +				if (e) {
-+					QString prevId;
-+					if (ei) {
-+						prevId = ei->id();
-+						ei->setNextId(id);
-+					}
-+					ei = new EDBItem(e, id, prevId, QString());
-+					EDBItemPtr eip = EDBItemPtr(ei);
++					QString id = rec.value("id").toString();
++					EDBItemPtr eip = EDBItemPtr(new EDBItem(e, id));
 +					result.append(eip);
 +				}
 +			}
 +			query->freeResult();
 +		}
-+		resultReady(r->id, result);
++		resultReady(r->id, result, 0);
 +
 +	} else if(type == item_file_req::Type_erase) {
-+		writeFinished(r->id, eraseHistory(r->j));
++		writeFinished(r->id, eraseHistory(r->accId, r->j));
 +	}
++
 +	delete r;
 +}
 +
-+bool EDBSqLite::appendEvent(const XMPP::Jid &jid, PsiEvent *e)
++bool EDBSqLite::appendEvent(const QString &accId, const XMPP::Jid &jid, PsiEvent *e, int jidType)
 +{
 +	QSqlDatabase db = QSqlDatabase::database("history");
-+	const qint64 jidId = ensureJidRowId(jid);
-+	if (jidId == 0)
++	const qint64 contactId = ensureJidRowId(accId, jid, jidType);
++	if (contactId == 0)
 +		return false;
++
 +	QDateTime dTime;
 +	int nType = 0;
-+	int nFlags = 0;
++
 +	if (e->type() == PsiEvent::Message) {
 +		MessageEvent *me = (MessageEvent *)e;
 +		const Message &m = me->message();
 +		dTime = m.timeStamp();
-+		if (!m.subject().isEmpty() || !m.body().isEmpty())
-+			nFlags |= 1;
-+		if (!m.urlList().isEmpty())
-+			nFlags |= 2;
 +		if (m.type() == "chat")
 +			nType = 1;
 +		else if(m.type() == "error")
 +			nType = 4;
 +		else if(m.type() == "headline")
 +			nType = 5;
++
 +	} else if (e->type() == PsiEvent::Auth) {
 +		AuthEvent *ae = (AuthEvent *)e;
 +		dTime = ae->timeStamp();
@@ -422,67 +1335,68 @@
 +			nType = 7;
 +		else if(subType == "unsubscribed")
 +			nType = 8;
-+	} else {
++	} else
 +		return false;
-+	}
++
 +	int nDirection = e->originLocal() ? 1 : 2;
 +	if (!transaction(false))
 +		return false;
++
 +	QSqlQuery query(db);
-+	query.prepare("INSERT INTO `events` (`jid_id`, `date`, `type`, `direction`, `flags`, `subject`, `m_text`, `lang`) VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
-+	query.bindValue(0, jidId);
-+	query.bindValue(1, dTime);
-+	query.bindValue(2, nType);
-+	query.bindValue(3, nDirection);
-+	query.bindValue(4, nFlags);
-+	if (nFlags == 0) {
++	query.prepare("INSERT INTO `events` ("
++		"`contact_id`, `resource`, `date`, `type`, `direction`, `subject`, `m_text`, `lang`, `extra_data`"
++		") VALUES ("
++		"?, ?, ?, ?, ?, ?, ?, ?, ?"
++		");");
++	query.bindValue(0, contactId);
++	query.bindValue(1, (jidType != GroupChatContact) ? jid.resource() : "");
++	query.bindValue(2, dTime);
++	query.bindValue(3, nType);
++	query.bindValue(4, nDirection);
++	if (nType == 0 || nType == 1 || nType == 4 || nType == 5) {
++		MessageEvent *me = (MessageEvent *)e;
++		const Message &m = me->message();
++		QString lang = m.lang();
++		query.bindValue(5, m.subject(lang));
++		query.bindValue(6, m.body(lang));
++		query.bindValue(7, lang);
++		QString extraData;
++		const UrlList &urls = m.urlList();
++		if (!urls.isEmpty()) {
++			QVariantMap xepList;
++			QVariantList urlList;
++			foreach (const Url &url, urls)
++				if (!url.url().isEmpty()) {
++					QVariantList urlItem;
++					urlItem.append(QVariant(url.url()));
++					if (!url.desc().isEmpty())
++						urlItem.append(QVariant(url.desc()));
++					urlList.append(QVariant(urlItem));
++				}
++			xepList["jabber:x:oob"] = QVariant(urlList);
++			QJson::Serializer serializer;
++			extraData = QString::fromUtf8(serializer.serialize(xepList));
++		}
++		query.bindValue(8, extraData);
++	}
++	else {
 +		query.bindValue(5, QVariant(QVariant::String));
 +		query.bindValue(6, QVariant(QVariant::String));
 +		query.bindValue(7, QVariant(QVariant::String));
-+	} else {
-+		MessageEvent *me = (MessageEvent *)e;
-+		const Message &m = me->message();
-+		if (nFlags & 1) {
-+			QString lang = m.lang();
-+			query.bindValue(5, m.subject(lang));
-+			query.bindValue(6, m.body(lang));
-+			query.bindValue(7, lang);
-+		}
-+		if (!query.exec())
-+			return false;
-+		if (nFlags & 2) {
-+			// Getting last record id
-+			qint64 eventId = query.lastInsertId().toLongLong();
-+			// insert into urls table
-+			const UrlList &urls = m.urlList();
-+			foreach (const Url &url, urls) {
-+				query.prepare("INSERT INTO `urls` (`event_id`, `url`, `desc`) VALUES (?, ?, ?);");
-+				query.addBindValue(eventId);
-+				query.addBindValue(url.url());
-+				query.addBindValue(url.desc());
-+				if (!query.exec())
-+					return false;
-+			}
-+		}
++		query.bindValue(8, QVariant(QVariant::String));
 +	}
-+	return true;
++	return query.exec();
 +}
 +
-+PsiEvent *EDBSqLite::getEvent(PreparedQuery *q)
++PsiEvent *EDBSqLite::getEvent(const QSqlRecord &record)
 +{
-+	// `events`.`id`       - 0
-+	// `jid`               - 1
-+	// `data`              - 2
-+	// `type`              - 3
-+	// `direction`         - 4
-+	// `flags`             - 5
-+	// `subject`           - 6
-+	// `m_text`            - 7
-+	// `lang`              - 8
-+	int type = q->value(3).toInt();
++	PsiAccount *pa = psi()->contactList()->getAccount(record.value("acc_id").toString());
++
++	int type = record.value("type").toInt();
++
 +	if(type == 0 || type == 1 || type == 4 || type == 5) {
 +		Message m;
-+		m.setTimeStamp(q->value(2).toDateTime());
++		m.setTimeStamp(record.value("date").toDateTime());
 +		if(type == 1)
 +			m.setType("chat");
 +		else if(type == 4)
@@ -491,28 +1405,37 @@
 +			m.setType("headline");
 +		else
 +			m.setType("");
-+		m.setFrom(Jid(q->value(1).toString()));
-+		QVariant text = q->value(7);
++		m.setFrom(Jid(record.value("jid").toString()));
++		QVariant text = record.value("m_text");
 +		if (!text.isNull()) {
 +			m.setBody(text.toString());
-+			m.setLang(q->value(8).toString());
-+			m.setSubject(q->value(6).toString());
++			m.setLang(record.value("lang").toString());
++			m.setSubject(record.value("subject").toString());
 +		}
 +		m.setSpooled(true);
-+		if (q->value(5).toInt() & 2) {
-+			EDBSqLite::PreparedQuery *urlQuery = queryes.getPreparedQuery(PreparedQueryes::QueryUrls);
-+			urlQuery->bindValue(":id", q->value(0));
-+			if (urlQuery->exec()) {
-+				while (urlQuery->next()) {
-+					m.urlAdd(Url(urlQuery->value(0).toString(), urlQuery->value(1).toString()));
++		QString extraStr = record.value("extra_data").toString();
++		if (!extraStr.isEmpty()) {
++			QJson::Parser parser;
++			bool fOk;
++			QVariantMap extraData = parser.parse(extraStr.toUtf8(), &fOk).toMap();
++			if (fOk) {
++				foreach (const QVariant &urlItem, extraData["jabber:x:oob"].toList()) {
++					QVariantList itemList = urlItem.toList();
++					if (!itemList.isEmpty()) {
++						QString url = itemList.at(0).toString();
++						QString desc;
++						if (itemList.size() > 1)
++							desc = itemList.at(1).toString();
++						m.urlAdd(Url(url, desc));
++					}
 +				}
-+				urlQuery->freeResult();
 +			}
 +		}
-+		MessageEvent *me = new MessageEvent(m, 0);
-+		me->setOriginLocal((q->value(4).toInt() == 1));
++		MessageEvent *me = new MessageEvent(m, pa);
++		me->setOriginLocal((record.value("direction").toInt() == 1));
 +		return me;
 +	}
++
 +	if(type == 2 || type == 3 || type == 6 || type == 7 || type == 8) {
 +		QString subType = "subscribe";
 +		// if(type == 2) { // Not used (stupid "system message" from Psi <= 0.8.6)
@@ -525,60 +1448,97 @@
 +		else if(type == 8)
 +			subType = "unsubscribed";
 +
-+		AuthEvent *ae = new AuthEvent(Jid(q->value(1).toString()), subType, 0);
-+		ae->setTimeStamp(q->value(2).toDateTime());
++		AuthEvent *ae = new AuthEvent(Jid(record.value("jid").toString()), subType, pa);
++		ae->setTimeStamp(record.value("date").toDateTime());
 +		return ae;
 +	}
 +	return NULL;
 +}
 +
-+qint64 EDBSqLite::ensureJidRowId(const XMPP::Jid &jid)
++qint64 EDBSqLite::ensureJidRowId(const QString &accId, const XMPP::Jid &jid, int type)
 +{
-+	QString sJid = jid.bare();
-+	if (sJid.isEmpty())
++	if (jid.isEmpty())
 +		return 0;
-+	qint64 id = jidsHash.value(sJid, 0);
++	QString sJid = (type == GroupChatContact) ? jid.full() : jid.bare();
++	QString sKey = accId + "|" + sJid;
++	qint64 id = jidsCache.value(sKey, 0);
 +	if (id != 0)
 +		return id;
 +
-+	EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(PreparedQueryes::QueryJidRowId);
++	EDBSqLite::PreparedQuery *query = queryes.getPreparedQuery(QueryJidRowId, false, false);
 +	query->bindValue(":jid", sJid);
++	query->bindValue(":acc_id", accId);
 +	if (query->exec()) {
 +		if (query->first()) {
-+			id = query->value(0).toLongLong();
++			id = query->record().value("id").toLongLong();
 +		} else {
++			//
 +			QSqlQuery queryIns(QSqlDatabase::database("history"));
-+			queryIns.prepare("INSERT INTO `jids` (`type`, `jid`) VALUES (:type, :jid);");
-+			queryIns.bindValue(":type", 1);  // contact jid
++			queryIns.prepare("INSERT INTO `contacts` (`acc_id`, `type`, `jid`, `lifetime`)"
++				" VALUES (:acc_id, :type, :jid, -1);");
++			queryIns.bindValue(":acc_id", accId);
++			queryIns.bindValue(":type", type);
 +			queryIns.bindValue(":jid", sJid);
 +			if (queryIns.exec()) {
 +				id  = queryIns.lastInsertId().toLongLong();
 +			}
 +		}
 +		query->freeResult();
++		if (id != 0)
++			jidsCache[sKey] = id;
 +	}
 +	return id;
 +}
 +
-+bool EDBSqLite::eraseHistory(const XMPP::Jid &jid)
++int EDBSqLite::rowCount(const QString &accId, const XMPP::Jid &jid, QDateTime before)
++{
++	bool fAccAll  = accId.isEmpty();
++	bool fContAll = jid.isEmpty();
++	QueryType type;
++	if (before.isNull())
++		type = QueryRowCount;
++	else
++		type = QueryRowCountBefore;
++	PreparedQuery *query = queryes.getPreparedQuery(type, fAccAll, fContAll);
++	if (!fContAll)
++		query->bindValue(":jid", jid.full());
++	if (!fAccAll)
++		query->bindValue(":acc_id", accId);
++	if (!before.isNull())
++		query->bindValue(":date", before);
++	int res = 0;
++	if (query->exec()) {
++		if (query->next()) {
++			res = query->record().value("count").toInt();
++		}
++		query->freeResult();
++	}
++	return res;
++}
++
++bool EDBSqLite::eraseHistory(const QString &accId, const XMPP::Jid &jid)
 +{
 +	bool res = false;
 +	if (!transaction(true))
 +		return false;
-+	QSqlQuery query(QSqlDatabase::database("history"));
-+	query.prepare("SELECT `id` FROM `jids` WHERE `jid` = :jid;");
-+	query.bindValue(":jid", jid.bare());
-+	if (query.exec() && query.first()) {
-+		const qint64 id = query.value(0).toLongLong();
-+		QString queryStr = QString("DELETE FROM `urls` WHERE `event_id` IN (SELECT `id` FROM `events` WHERE `jid_id` = :id);");
-+		query.prepare(queryStr);
-+		query.bindValue(":id", id);
-+		if (query.exec()) {
-+			query.prepare("DELETE FROM `events` WHERE `jid_id` = :id;");
-+			query.bindValue(":id", id);
-+			if (query.exec()) {
++
++	if (accId.isEmpty() && jid.isEmpty()) {
++		QSqlQuery query(QSqlDatabase::database("history"));
++		if (query.exec("DELETE FROM `events`;"))
++			if (query.exec("DELETE FROM `contacts`;"))
 +				res = true;
-+			}
++	}
++	else {
++		PreparedQuery *query = queryes.getPreparedQuery(QueryJidRowId, false, false);
++		query->bindValue(":jid", jid.bare());
++		query->bindValue(":acc_id", accId);
++		if (query->exec() && query->next()) {
++			const qint64 id = query->record().value("id").toLongLong();
++			QSqlQuery query2(QSqlDatabase::database("history"));
++			query2.prepare("DELETE FROM `events` WHERE `contact_id` = :id;");
++			query2.bindValue(":id", id);
++			if (query2.exec())
++				res = true;
 +		}
 +	}
 +	if (res)
@@ -592,10 +1552,10 @@
 +{
 +	if (status == NotActive)
 +		return false;
-+	if (now || transactionsCounter >= maxUncommitedRecs || lastCommitTime.secsTo(QDateTime::currentDateTime()) >= maxUncommitedSecs) {
++	if (now || transactionsCounter >= maxUncommitedRecs
++			|| lastCommitTime.secsTo(QDateTime::currentDateTime()) >= maxUncommitedSecs)
 +		if (!commit())
 +			return false;
-+	}
 +
 +	if (status == Commited) {
 +		if (!QSqlDatabase::database("history").transaction())
@@ -652,13 +1612,26 @@
 +		commitTimer->stop();
 +}
 +
++bool EDBSqLite::importExecute()
++{
++	bool res = true;
++	HistoryImport *imp = new HistoryImport(psi());
++	if (imp->isNeeded()) {
++		if (imp->exec() != HistoryImport::ResultNormal) {
++			res = false;
++		}
++	}
++	delete imp;
++	return res;
++}
++
 +// ****************** class PreparedQueryes ********************
 +
-+EDBSqLite::PreparedQueryes::PreparedQueryes()
++EDBSqLite::QueryStorage::QueryStorage()
 +{
 +}
 +
-+EDBSqLite::PreparedQueryes::~PreparedQueryes()
++EDBSqLite::QueryStorage::~QueryStorage()
 +{
 +	foreach (EDBSqLite::PreparedQuery *q, queryList.values()) {
 +		if (q)
@@ -666,152 +1639,344 @@
 +	}
 +}
 +
-+EDBSqLite::PreparedQuery *EDBSqLite::PreparedQueryes::getPreparedQuery(QueryType type)
++EDBSqLite::PreparedQuery *EDBSqLite::QueryStorage::getPreparedQuery(QueryType type, bool allAccounts, bool allContacts)
 +{
-+	EDBSqLite::PreparedQuery *q = queryList.value(type, NULL);
++	QueryProperty queryProp(type, allAccounts, allContacts);
++	EDBSqLite::PreparedQuery *q = queryList.value(queryProp, NULL);
 +	if (q != NULL)
 +		return q;
 +
 +	q = new EDBSqLite::PreparedQuery(QSqlDatabase::database("history"));
 +	q->setForwardOnly(true);
-+	QString queryStr;
-+	if (type == QueryDate1) {
-+		queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`"
-+			   " FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid  AND `jids`.`id` = `jid_id` AND `date` >= :date1 AND `date` <= :date2 ORDER BY `date` ASC;";
-+	} else if (type == QueryDate2) {
-+		queryStr = "SELECT `events`.`id` FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid AND `jids`.`id` = `jid_id` AND `date` < :date ORDER BY `date` DESC LIMIT 1;";
-+	} else if (type == QueryDate3) {
-+		queryStr = "SELECT `events`.`id` FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid AND `jids`.`id` = `jid_id`  AND `date` > :date ORDER BY `date` ASC LIMIT 1;";
-+	} else if (type == QueryFindText) {
-+		queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`"
-+			   " FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid  AND `jids`.`id` = `jid_id` AND `m_text` IS NOT NULL ORDER BY `date`;";
-+	} else if (type == QueryLatest || type == QueryOldest || type == QueryIdBackward || type == QueryIdForward) {
-+		queryStr = "SELECT `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `flags`, `subject`, `m_text`, `lang`"
-+			   " FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid AND `jids`.`id` = `jid_id`";
-+		if (type == QueryIdBackward) {
-+			queryStr.append(" AND `events`.`id` <= :id");
-+		} else if (type == QueryIdForward) {
-+			queryStr.append(" AND `events`.`id` >= :id");
-+		}
-+		if (type == QueryLatest || type == QueryIdBackward) {
-+			queryStr.append(" ORDER BY `events`.`id` DESC");
-+		} else {
-+			queryStr.append(" ORDER BY `events`.`id` ASC");
-+		}
-+		queryStr.append(" LIMIT :cnt;");
-+	} else if (type == QueryId2Backward || type == QueryId2Forward) {
-+		queryStr = "SELECT `events`.`id` FROM `events`, `jids`"
-+			   " WHERE `jid` = :jid AND `jids`.`id` = `jid_id`";
-+		queryStr.append(QString(" AND `events`.`id` %1 :id").arg((type == QueryId2Forward) ? "<" : ">"));
-+		queryStr.append(QString(" ORDER BY `events`.`id` %1").arg((type == QueryId2Forward) ? "DESC" : "ASC"));
-+		queryStr.append(" LIMIT 1;");
-+	} else if (type == QueryUrls) {
-+		queryStr = "SELECT `url`, `desc` FROM `urls` WHERE `event_id` = :id;";
-+	} else if (type == QueryJidRowId) {
-+		queryStr = "SELECT `id` FROM `jids` WHERE `jid` = :jid;";
-+	}
-+	q->prepare(queryStr);
-+
-+	queryList[type] = q;
++	q->prepare(getQueryString(type, allAccounts, allContacts));
++	queryList[queryProp] = q;
 +	return q;
 +}
 +
 +EDBSqLite::PreparedQuery::PreparedQuery(QSqlDatabase db) : QSqlQuery(db)
 +{
 +}
++
++QString EDBSqLite::QueryStorage::getQueryString(QueryType type, bool allAccounts, bool allContacts)
++{
++	QString queryStr;
++	switch (type)
++	{
++		case QueryContactsList:
++			queryStr = "SELECT `acc_id`, `jid` FROM `contacts` WHERE `type` = :type";
++			if (!allAccounts)
++				queryStr.append(" AND `acc_id` = :acc_id");
++			queryStr.append(" ORDER BY `jid`;");
++			break;
++		case QueryLatest:
++		case QueryOldest:
++		case QueryDateBackward:
++		case QueryDateForward:
++			queryStr = "SELECT `acc_id`, `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `subject`, `m_text`, `lang`, `extra_data`"
++				" FROM `events`, `contacts`"
++				" WHERE `contacts`.`id` = `contact_id`";
++			if (!allContacts)
++				queryStr.append(" AND `jid` = :jid");
++			if (!allAccounts)
++				queryStr.append(" AND `acc_id` = :acc_id");
++			if (type == QueryDateBackward)
++				queryStr.append(" AND `date` < :date");
++			else if (type == QueryDateForward)
++				queryStr.append(" AND `date` >= :date");
++			if (type == QueryLatest || type == QueryDateBackward)
++				queryStr.append(" ORDER BY `date` DESC");
++			else
++				queryStr.append(" ORDER BY `date` ASC");
++			queryStr.append(" LIMIT :start, :cnt;");
++			break;
++		case QueryRowCount:
++		case QueryRowCountBefore:
++			queryStr = "SELECT count(*) AS `count`"
++				" FROM `events`, `contacts`"
++				" WHERE `contacts`.`id` = `contact_id`";
++			if (!allContacts)
++				queryStr.append(" AND `jid` = :jid");
++			if (!allAccounts)
++				queryStr.append(" AND `acc_id` = :acc_id");
++			if (type == QueryRowCountBefore)
++				queryStr.append(" AND `date` < :date");
++			queryStr.append(";");
++			break;
++		case QueryJidRowId:
++			queryStr = "SELECT `id` FROM `contacts` WHERE `jid` = :jid AND acc_id = :acc_id;";
++			break;
++		case QueryFindText:
++			queryStr = "SELECT `acc_id`, `events`.`id`, `jid`, `date`, `events`.`type`, `direction`, `subject`, `m_text`, `lang`, `extra_data`"
++				" FROM `events`, `contacts`"
++				" WHERE `contacts`.`id` = `contact_id`";
++			if (!allContacts)
++				queryStr.append(" AND `jid` = :jid");
++			if (!allAccounts)
++				queryStr.append(" AND `acc_id` = :acc_id");
++			queryStr.append(" AND `m_text` IS NOT NULL");
++			queryStr.append(" ORDER BY `date`;");
++			break;
++	}
++	return queryStr;
++}
++
++uint qHash(const QueryProperty &struc)
++{
++	uint res = struc.type;
++	res <<= 8;
++	res |=  struc.allAccounts;
++	res <<= 8;
++	res |=  struc.allContacts;
++	return res;
++}
 --- psi.orig/src/eventdb.h
 +++ psi/src/eventdb.h
-@@ -26,6 +26,10 @@
+@@ -26,24 +26,28 @@
  #include <QFile>
  #include <QSharedPointer>
  #include <QDateTime>
 +#include <QSqlDatabase>
 +#include <QSqlQuery>
++#include <QSqlRecord>
 +#include <QHash>
 +#include <QVariant>
  
  #include "xmpp_jid.h"
++#include "psicon.h"
  
-@@ -34,13 +38,15 @@ class PsiEvent;
+ class PsiEvent;
+ 
  class EDBItem
  {
  public:
 -	EDBItem(PsiEvent *, const QString &id, const QString &nextId, const QString &prevId);
-+	EDBItem(PsiEvent *, const QString &id, const QString &prevId, const QString &nextId);
++	EDBItem(PsiEvent *, const QString &id);
  	~EDBItem();
  
  	PsiEvent *event() const;
  	const QString & id() const;
- 	const QString & nextId() const;
- 	const QString & prevId() const;
-+	void setNextId(const QString &id);
-+	void setPrevId(const QString &id);
+-	const QString & nextId() const;
+-	const QString & prevId() const;
  
  private:
- 	QString v_id, v_prevId, v_nextId;
-@@ -189,4 +195,114 @@ private:
- 	void ensureIndex();
+-	QString v_id, v_prevId, v_nextId;
++	QString v_id;
+ 	PsiEvent *e;
  };
  
+@@ -60,18 +64,16 @@ public:
+ 	~EDBHandle();
+ 
+ 	// operations
+-	void getLatest(const XMPP::Jid &, int len);
+-	void getOldest(const XMPP::Jid &, int len);
+-	void get(const XMPP::Jid &jid, const QString &id, int direction, int len);
+-	void getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+-	void find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	void append(const XMPP::Jid &, PsiEvent *);
+-	void erase(const XMPP::Jid &);
+-
++	void get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int begin, int len);
++	void find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
++	void append(const QString &accId, const XMPP::Jid &, PsiEvent *, int);
++	void erase(const QString &accId, const XMPP::Jid &);
++	
+ 	bool busy() const;
+ 	const EDBResult result() const;
+ 	bool writeSuccess() const;
+ 	int lastRequestType() const;
++	int beginRow() const;
+ 
+ signals:
+ 	void finished();
+@@ -91,52 +93,61 @@ class EDB : public QObject
+ 	Q_OBJECT
+ public:
+ 	enum { Forward, Backward };
+-	EDB();
++	enum { Contact = 1, GroupChatContact = 2 };
++	struct ContactItem
++	{
++		QString   accId;
++		XMPP::Jid jid;
++		ContactItem(const QString &aId, XMPP::Jid j) { accId = aId; jid = j; }
++	};
++
++	EDB(PsiCon *psi);
+ 	virtual ~EDB()=0;
++	virtual QList<ContactItem> contacts(const QString &accId, int type) = 0;
++	virtual quint64 eventsCount(const QString &accId, const XMPP::Jid &jid) = 0;
++	virtual QString getStorageParam(const QString &key) = 0;
++	virtual void setStorageParam(const QString &key, const QString &val) = 0;
+ 
+ protected:
+ 	int genUniqueId() const;
+-	virtual int getLatest(const XMPP::Jid &, int len)=0;
+-	virtual int getOldest(const XMPP::Jid &, int len)=0;
+-	virtual int get(const XMPP::Jid &jid, const QString &id, int direction, int len)=0;
+-	virtual int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last) = 0;
+-	virtual int append(const XMPP::Jid &, PsiEvent *)=0;
+-	virtual int find(const QString &, const XMPP::Jid &, const QString &id, int direction)=0;
+-	virtual int erase(const XMPP::Jid &)=0;
+-	void resultReady(int, EDBResult);
++	virtual int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len)=0;
++	virtual int append(const QString &accId, const XMPP::Jid &, PsiEvent *, int)=0;
++	virtual int find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction)=0;
++	virtual int erase(const QString &accId, const XMPP::Jid &)=0;
++	void resultReady(int, EDBResult, int);
+ 	void writeFinished(int, bool);
++	inline PsiCon *psi();
+ 
+ private:
+ 	class Private;
+ 	Private *d;
+ 
++
+ 	friend class EDBHandle;
+ 	void reg(EDBHandle *);
+ 	void unreg(EDBHandle *);
+ 
+-	int op_getLatest(const XMPP::Jid &, int len);
+-	int op_getOldest(const XMPP::Jid &, int len);
+-	int op_get(const XMPP::Jid &, const QString &id, int direction, int len);
+-	int op_getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+-	int op_find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	int op_append(const XMPP::Jid &, PsiEvent *);
+-	int op_erase(const XMPP::Jid &);
++	int op_get(const QString &accId, const XMPP::Jid &, const QDateTime date, int direction, int start, int len);
++	int op_find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
++	int op_append(const QString &accId, const XMPP::Jid &, PsiEvent *, int);
++	int op_erase(const QString &accId, const XMPP::Jid &);
+ };
+ 
+ class EDBFlatFile : public EDB
+ {
+ 	Q_OBJECT
+ public:
+-	EDBFlatFile();
++	EDBFlatFile(PsiCon *psi);
+ 	~EDBFlatFile();
+ 
+-	int getLatest(const XMPP::Jid &, int len);
+-	int getOldest(const XMPP::Jid &, int len);
+-	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
+-	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+-	int find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	int append(const XMPP::Jid &, PsiEvent *);
+-	int erase(const XMPP::Jid &);
++	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
++	int find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
++	int append(const QString &accId, const XMPP::Jid &, PsiEvent *, int);
++	int erase(const QString &accId, const XMPP::Jid &);
++	QList<ContactItem> contacts(const QString &accId, int type);
++	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
++	QString getStorageParam(const QString &) {return QString();}
++	void setStorageParam(const QString &, const QString &) {}
+ 
+ 	class File;
+ 
+@@ -161,11 +172,14 @@ public:
+ 	~File();
+ 
+ 	int total() const;
++	int getId(QDateTime &date, int dir, int offset);
+ 	void touch();
+ 	PsiEvent *get(int);
+ 	bool append(PsiEvent *);
+ 
+ 	static QString jidToFileName(const XMPP::Jid &);
++	static QString strToFileName(const QString &);
++	static QList<EDB::ContactItem> contacts(int type);
+ 
+ signals:
+ 	void timeout();
+@@ -187,6 +201,144 @@ private:
+ 	PsiEvent *lineToEvent(const QString &);
+ 	QString eventToLine(PsiEvent *);
+ 	void ensureIndex();
++	int findIdByNearDate(QDateTime &date, int start, int end);
++	QString getLine(int);
++	QDateTime getLineDate(const QString &line) const;
++};
++
++enum QueryType {
++	QueryContactsList,
++	QueryLatest, QueryOldest,
++	QueryDateForward, QueryDateBackward,
++	QueryFindText,
++	QueryRowCount, QueryRowCountBefore,
++	QueryJidRowId
++};
++
++struct QueryProperty
++{
++	QueryType type;
++	bool      allAccounts;
++	bool      allContacts;
++	QueryProperty(QueryType tp, bool allAcc, bool allCont) {
++		type        = tp;
++		allAccounts = allAcc;
++		allContacts = allCont;
++	}
++	bool operator==(const QueryProperty &other) const {
++		return (type        == other.type &&
++				allAccounts == other.allAccounts &&
++				allContacts == other.allContacts);
++	}
++};
++uint qHash(const QueryProperty &struc);
++
 +class EDBSqLite : public EDB
 +{
 +	Q_OBJECT
 +
-+	class PreparedQueryes;
++	class QueryStorage;
 +	//--------
 +	class PreparedQuery : private QSqlQuery
 +	{
 +	public:
-+		void bindValue(const QString &placeholder, const QVariant &val) {QSqlQuery::bindValue(placeholder, val);};
-+		bool exec() {return QSqlQuery::exec();};
-+		bool first() {return QSqlQuery::first();};
-+		bool next() {return QSqlQuery::next();};
-+		QVariant value(int i) const {return QSqlQuery::value(i);};
-+		void freeResult() {QSqlQuery::finish();};
++		void bindValue(const QString &placeholder, const QVariant &val) {QSqlQuery::bindValue(placeholder, val);}
++		bool exec() {return QSqlQuery::exec();}
++		bool first() {return QSqlQuery::first();}
++		bool next() {return QSqlQuery::next();}
++		QSqlRecord record() const {return QSqlQuery::record();}
++		void freeResult() {QSqlQuery::finish();}
 +	private:
-+		friend class PreparedQueryes;
++		friend class QueryStorage;
 +		PreparedQuery(QSqlDatabase db);
-+		~PreparedQuery() {};
++		~PreparedQuery() {}
 +
 +	};
 +	//--------
-+	class PreparedQueryes
++	class QueryStorage
 +	{
 +	public:
-+		enum QueryType {
-+			QueryLatest, QueryOldest, QueryIdForward, QueryIdBackward,
-+			QueryId2Forward, QueryId2Backward,
-+			QueryDate1, QueryDate2, QueryDate3,
-+			QueryFindText,
-+			QueryUrls,
-+			QueryJidRowId
-+		};
-+		PreparedQueryes();
-+		~PreparedQueryes();
-+		PreparedQuery *getPreparedQuery(QueryType);
++		QueryStorage();
++		~QueryStorage();
++		PreparedQuery *getPreparedQuery(QueryType type, bool allAccounts, bool allContacts);
 +	private:
-+		QHash<QueryType, PreparedQuery *> queryList;
++		QString getQueryString(QueryType type, bool allAccounts, bool allContacts);
++	private:
++		QHash<QueryProperty, PreparedQuery *> queryList;
 +	};
 +	//--------
 +
 +public:
 +	enum InsertMode {Normal, Import};
 +
-+	EDBSqLite();
++	EDBSqLite(PsiCon *psi);
 +	~EDBSqLite();
++	bool init();
 +
-+	int getLatest(const XMPP::Jid &, int len);
-+	int getOldest(const XMPP::Jid &, int len);
-+	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
-+	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
-+	int find(const QString &str, const XMPP::Jid &jid, const QString &id, int direction);
-+	int append(const XMPP::Jid &jid, PsiEvent *e);
-+	int erase(const XMPP::Jid &jid);
++	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
++	int find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction);
++	int append(const QString &accId, const XMPP::Jid &jid, PsiEvent *e, int type);
++	int erase(const QString &accId, const XMPP::Jid &jid);
++	QList<ContactItem> contacts(const QString &accId, int type);
++	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
++	QString getStorageParam(const QString &key);
++	void setStorageParam(const QString &key, const QString &val);
++
 +	void setInsertingMode(InsertMode mode);
 +	void setMirror(EDBFlatFile *mirr);
 +	EDBFlatFile *mirror() const;
@@ -820,23 +1985,22 @@
 +	enum {NotActive, NotCommited, Commited};
 +	struct item_query_req
 +	{
++		QString accId;
 +		XMPP::Jid j;
++		int jidType;
 +		int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
++		int start;
 +		int len;
 +		int dir;
 +		int id;
-+		QString eventId;
++		QDateTime date;
 +		QString findStr;
 +		PsiEvent *event;
 +
-+		QDateTime first, last;
 +		enum Type {
-+			Type_getLatest = 0,
-+			Type_getOldest,
 +			Type_get,
 +			Type_append,
 +			Type_find,
-+			Type_getByDate,
 +			Type_erase
 +		};
 +	};
@@ -849,88 +2013,844 @@
 +	QTimer *commitTimer;
 +	EDBFlatFile *mirror_;
 +	QList<item_query_req*> rlist;
-+	QHash<QString, qint64>jidsHash;
-+	PreparedQueryes queryes;
++	QHash<QString, qint64>jidsCache;
++	QueryStorage queryes;
 +
 +private:
-+	bool appendEvent(const XMPP::Jid &, PsiEvent *);
-+	PsiEvent *getEvent(PreparedQuery *q);
-+	qint64 ensureJidRowId(const XMPP::Jid &);
-+	bool eraseHistory(const XMPP::Jid &);
++	bool appendEvent(const QString &accId, const XMPP::Jid &, PsiEvent *, int);
++	PsiEvent *getEvent(const QSqlRecord &record);
++	qint64 ensureJidRowId(const QString &accId, const XMPP::Jid &jid, int type);
++	int  rowCount(const QString &accId, const XMPP::Jid &jid, const QDateTime before);
++	bool eraseHistory(const QString &accId, const XMPP::Jid &);
 +	bool transaction(bool now);
 +	bool rollback();
 +	void startAutocommitTimer();
 +	void stopAutocommitTimer();
++	bool importExecute();
 +
 +private slots:
 +	void performRequests();
 +	bool commit();
 +
-+};
-+
+ };
+ 
  #endif
 --- psi.orig/src/historydlg.cpp
 +++ psi/src/historydlg.cpp
-@@ -36,6 +36,7 @@
- #include "fileutil.h"
- #include "userlist.h"
- #include "common.h"
-+#include "historyimp.h"
+@@ -101,7 +101,8 @@ public:
+ 	Jid jid;
+ 	PsiAccount *pa;
+ 	PsiCon *psi;
+-	QString id_prev, id_begin, id_end, id_next;
++	int begin_row, end_row;
++	bool can_backward, can_forward;
+ 	HistoryDlg::RequestType reqType;
+ 	QString findStr;
+ 	QDate date;
+@@ -115,10 +116,12 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	setModal(false);
+ 	d = new Private;
+ 	d->reqType = TypeNone;
+-	d->pa = pa;
++	d->begin_row = 0;
++	d->end_row = -1;
+ 	d->psi = pa->psi();
+ 	d->jid = jid;
+-	d->pa->dialogRegister(this, d->jid);
++	d->pa = pa;
++	pa->dialogRegister(this, d->jid);
  
- static const QString geometryOption = "options.ui.history.size";
+ #ifndef Q_OS_MAC
+ 	setWindowIcon(IconsetFactory::icon("psi/history").icon());
+@@ -126,7 +129,11 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	ui_.tb_find->setIcon(IconsetFactory::icon("psi/search").icon());
  
-@@ -400,6 +401,8 @@ void HistoryDlg::doMenu()
- 	m->addAction(IconsetFactory::icon("psi/chat").icon(), tr("&Open chat"), this, SLOT(openChat()));
- 	m->addAction(IconsetFactory::icon("psi/save").icon(), tr("&Export history"), this, SLOT(exportHistory()));
- 	m->addAction(IconsetFactory::icon("psi/clearChat").icon(), tr("&Delete history"), this, SLOT(removeHistory()));
-+	m->addSeparator();
-+	m->addAction(tr("&Import all history"), this, SLOT(importHistory()));
- 	m->exec(QCursor::pos());
+ 	ui_.msgLog->setFont(fontForOption("options.ui.look.font.chat"));
+-	ui_.jidList->setFont(fontForOption("options.ui.look.font.contactlist"));
++	QFont f = fontForOption("options.ui.look.font.contactlist");
++	ui_.jidList->setFont(f);
++	ui_.jidList2->setFont(f);
++	ui_.privList->setFont(f);
++	ui_.advList->setFont(f);
+ 
+ 	ui_.calendar->setFirstDayOfWeek(firstDayOfWeekFromLocale());
+ 
+@@ -135,23 +142,29 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	connect(ui_.buttonPrevious, SIGNAL(released()), SLOT(getPrevious()));
+ 	connect(ui_.buttonNext, SIGNAL(released()), SLOT(getNext()));
+ 	connect(ui_.buttonRefresh, SIGNAL(released()), SLOT(refresh()));
+-	connect(ui_.jidList, SIGNAL(itemSelectionChanged()), SLOT(openSelectedContact()));
++	connect(ui_.jidList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
++	connect(ui_.jidList2, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
++	connect(ui_.privList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
++	connect(ui_.advList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
+ 	connect(ui_.tb_find, SIGNAL(clicked()), SLOT(findMessages()));
+ 	connect(ui_.buttonLastest, SIGNAL(released()), SLOT(getLatest()));
+ 	connect(ui_.buttonEarliest, SIGNAL(released()), SLOT(getEarliest()));
+ 	connect(ui_.calendar, SIGNAL(selectionChanged()), SLOT(getDate()));
+ 	connect(ui_.calendar, SIGNAL(activated(QDate)), SLOT(getDate()));
+ 
+-	connect(d->pa, SIGNAL(removedContact(PsiContact*)), SLOT(removedContact(PsiContact*)));
++	connect(pa, SIGNAL(removedContact(PsiContact*)), SLOT(removedContact(PsiContact*)));
+ 
+ 	ui_.jidList->installEventFilter(this);
++	ui_.jidList2->installEventFilter(this);
++	ui_.privList->installEventFilter(this);
++	ui_.advList->installEventFilter(this);
+ 
+ 	listAccounts();
+ 	loadContacts();
+ 
+ 	setGeometryOptionPath(geometryOption);
+ 
+-	ui_.jidList->setFocus();
++	openSelectedContact();
  }
  
-@@ -626,3 +629,25 @@ EDBHandle* HistoryDlg::getEDBHandle()
+ HistoryDlg::~HistoryDlg()
+@@ -161,7 +174,7 @@ HistoryDlg::~HistoryDlg()
+ 
+ bool HistoryDlg::eventFilter(QObject *obj, QEvent *e)
+ {
+-	if(obj == ui_.jidList && e->type() == QEvent::ContextMenu) {
++	if((obj == ui_.jidList || obj == ui_.jidList2 || obj == ui_.privList || obj == ui_.advList) && e->type() == QEvent::ContextMenu) {
+ 		e->accept();
+ 		QTimer::singleShot(0, this, SLOT(doMenu()));
+ 		return true;
+@@ -182,72 +195,189 @@ void HistoryDlg::changeAccount(const QSt
+ 	ui_.msgLog->clear();
+ 	setButtons(false);
+ 	d->jid = QString();
+-	d->pa = d->psi->contactList()->getAccountByJid(ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString());
+ 	loadContacts();
+-	ui_.jidList->setCurrentRow(0);
++	setCurrentUserListItem();
+ 	openSelectedContact();
+ }
+ 
++void HistoryDlg::setCurrentUserListItem()
++{
++	switch (ui_.contactToolBox->currentIndex()) {
++	case 0:
++		ui_.jidList->setCurrentRow(0);
++		break;
++	case 1:
++		ui_.jidList2->setCurrentRow(0);
++		break;
++	case 2:
++		ui_.privList->setCurrentRow(0);
++		break;
++	case 3:
++		ui_.advList->setCurrentRow(0);
++		break;
++	}
++}
++
+ void HistoryDlg::listAccounts()
+ {
++	ui_.accountsBox->addItem(IconsetFactory::icon("psi/account").icon(), tr("All accounts"), QVariant());
+ 	if (d->psi)
+ 	{
+ 		foreach (PsiAccount* account, d->psi->contactList()->enabledAccounts())
+-			ui_.accountsBox->addItem(IconsetFactory::icon("psi/account").icon(), account->nameWithJid(), QVariant(account->jid().full()));
++			ui_.accountsBox->addItem(IconsetFactory::icon("psi/account").icon(), account->nameWithJid(), QVariant(account->id()));
+ 	}
+ 	//select active account
+-	ui_.accountsBox->setCurrentIndex(ui_.accountsBox->findData(d->pa->jid().full()));
++	ui_.accountsBox->setCurrentIndex(ui_.accountsBox->findData(getCurrentAccountId()));
+ 	//connect signal after the list is populated to prevent execution in the middle of the loop
+ 	connect(ui_.accountsBox, SIGNAL(currentIndexChanged(const QString)), SLOT(changeAccount(const QString)));
+ }
+ 
+ void HistoryDlg::loadContacts()
+ {
+-	jids_.clear();
++	QStringList jids;
+ 	ui_.jidList->clear();
++	ui_.jidList2->clear();
++	ui_.privList->clear();
++	ui_.advList->clear();
+ 	ui_.msgLog->clear();
+-	foreach (PsiContact* contact, d->pa->contactList())
+-	{
++	QList<PsiContact*> contactList;
++	QString pa_id = ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString();
++	if (pa_id.isEmpty())
++		contactList = d->psi->contactList()->contacts();
++	else
++		contactList = d->psi->contactList()->getAccount(pa_id)->contactList();
++	// Roster contacts
++	foreach (PsiContact* contact, contactList) {
+ 		if(contact->isConference()
+-		|| contact->isPrivate()
+-		|| jids_.contains(contact->jid().bare()))
++		|| contact->isPrivate())
++			continue;
++		QString contactId = contact->account()->id() + "|" + contact->jid().bare();
++		if (jids.contains(contactId))
+ 			continue;
+ 
+ 		QListWidgetItem *item = new QListWidgetItem(contact->name(), ui_.jidList);
+-		item->setToolTip(contact->jid().bare());
++		item->setToolTip(makeContactToolTip(contact, true));
+ 		item->setIcon(PsiIconset::instance()->statusPtr(contact->jid(),Status(Status::Online))->icon());
+ 		//item->setIcon(PsiIconset::instance()->status(contact->status()).icon());
++		item->setStatusTip(contactId);
+ 		ui_.jidList->addItem(item);
+-		jids_.append(item->toolTip());
++		jids.append(contactId);
++		if (contact->jid().bare() == d->jid.bare()) {
++			ui_.contactToolBox->setCurrentIndex(0);
++			ui_.jidList->setCurrentItem(item);
++		}
+ 	}
+-	PsiContact* self = d->pa->selfContact();
+-	if(!jids_.contains(self->jid().bare())) {
+-		QListWidgetItem *item = new QListWidgetItem(self->name(), ui_.jidList);
+-		item->setToolTip(self->jid().bare());
+-		//item->setIcon(PsiIconset::instance()->status(self->status()).icon());
+-		item->setIcon(PsiIconset::instance()->statusPtr(self->jid(),Status(Status::Online))->icon());
+-		ui_.jidList->addItem(item);
+-		jids_.append(item->toolTip());
++	// Self contact
++	QString currentAccountId = ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString();
++	foreach (PsiAccount *pa, d->psi->contactList()->accounts()) {
++		if (currentAccountId.isEmpty() || pa->id() == currentAccountId)
++		{
++			PsiContact* self = pa->selfContact();
++			QString contactId = pa->id() + "|" + self->jid().bare();
++			if(!jids.contains(contactId)) {
++				QListWidgetItem *item = new QListWidgetItem(self->name(), ui_.jidList);
++				item->setToolTip(makeContactToolTip(self, true));
++				item->setIcon(PsiIconset::instance()->statusPtr(self->jid(),Status(Status::Online))->icon());
++				item->setStatusTip(contactId);
++				ui_.jidList->addItem(item);
++				jids.append(contactId);
++				if (self->jid().bare() == d->jid.bare()) {
++					ui_.contactToolBox->setCurrentIndex(0);
++					ui_.jidList->setCurrentItem(item);
++				}
++			}
++			if (!currentAccountId.isEmpty())
++				break;
++		}
+ 	}
+-
+-	ui_.jidList->sortItems();
+-	//set contact in jidList to selected jid
+-	for (int i = 0; i < ui_.jidList->count(); i++)
++	// Not in roster list
++	foreach (const EDB::ContactItem &ci, d->psi->edb()->contacts(pa_id, EDB::Contact)) {
++		QString contactId = ci.accId + "|" + ci.jid.bare();
++		if (!jids.contains(contactId)) {
++			QListWidgetItem *item = new QListWidgetItem(ci.jid.bare(), ui_.jidList2);
++			item->setToolTip(makeContactToolTip(ci.accId, ci.jid, true));
++			item->setIcon(PsiIconset::instance()->statusPtr(ci.jid, Status(Status::Offline))->icon());
++			item->setStatusTip(contactId);
++			ui_.jidList2->addItem(item);
++			if (ci.jid.bare() == d->jid.bare()) {
++				ui_.contactToolBox->setCurrentIndex(1);
++				ui_.jidList2->setCurrentItem(item);
++			}
++		}
++	}
++	// Private
++	foreach (const EDB::ContactItem &ci, d->psi->edb()->contacts(pa_id, EDB::GroupChatContact)) {
++		QString contactId = ci.accId + "|" + ci.jid.full();
++		QListWidgetItem *item = new QListWidgetItem(ci.jid.resource(), ui_.privList);
++		item->setToolTip(makeContactToolTip(ci.accId, ci.jid, false));
++		item->setIcon(PsiIconset::instance()->statusPtr(ci.jid, Status(Status::Offline))->icon());
++		item->setStatusTip(contactId);
++		ui_.privList->addItem(item);
++		if (ci.jid == d->jid) {
++			ui_.contactToolBox->setCurrentIndex(2);
++			ui_.privList->setCurrentItem(item);
++		}
++	}
++	// Advanced
+ 	{
+-		if (ui_.jidList->item(i)->toolTip() == d->jid.bare().toLower())
+-			ui_.jidList->setCurrentRow(i);  //triggers openSelectedContact()
++		QListWidgetItem *item = new QListWidgetItem(tr("All contacts"), ui_.advList);
++		item->setToolTip(tr("All contacts"));
++		item->setStatusTip(QString());
++		ui_.advList->addItem(item);
+ 	}
++
++	ui_.jidList->sortItems();
++	ui_.jidList2->sortItems();
++	ui_.privList->sortItems();
+ }
+ 
+ void HistoryDlg::openSelectedContact()
+ {
+ 	ui_.msgLog->clear();
+-	UserListItem *u = currentUserListItem();
+-	if (!u)
+-		return;
+ 
+-	setWindowTitle(u->name() + " (" + u->jid().full() + ")");
+-	d->jid = u->jid();
++	QListWidget *contactList = NULL;
++	switch (ui_.contactToolBox->currentIndex()) {
++		case 0:
++			contactList = ui_.jidList;
++			break;
++		case 1:
++			contactList = ui_.jidList2;
++			break;
++		case 2:
++			contactList = ui_.privList;
++			break;
++	}
++	d->pa = 0;
++	d->jid = XMPP::Jid();
++	if (contactList) {
++		QListWidgetItem *item = contactList->currentItem();
++		if (item) {
++			QString sId = item->statusTip();
++			if (!sId.isEmpty())
++			{
++				d->pa = d->psi->contactList()->getAccount(sId.section('|', 0, 0));
++				d->jid = XMPP::Jid(sId.section('|', 1, -1));
++			}
++		}
++	}
++
++	QString sTitle;
++	if (!d->jid.isEmpty()) {
++		UserListItem *u = currentUserListItem();
++		if (u) {
++			sTitle = u->name() + " (" + u->jid().full() + ")";
++		}
++		else {
++			sTitle = d->jid.full();
++		}
++	}
++	else {
++		QString paId = ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString();
++		if (!paId.isEmpty())
++			d->pa = d->psi->contactList()->getAccount(paId);
++		sTitle = tr("All contacts");
++	}
++	setWindowTitle(sTitle);
+ 	getLatest();
+ }
+ 
+@@ -284,7 +414,7 @@ void HistoryDlg::findMessages()
+ 	//get the oldest event as a starting point
+ 	startRequest();
+ 	d->reqType = TypeFindOldest;
+-	getEDBHandle()->getOldest(d->jid, 1);
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, 0, 1);
+ }
+ 
+ void HistoryDlg::removeHistory()
+@@ -293,26 +423,29 @@ void HistoryDlg::removeHistory()
+ 					tr("Are you sure you want to completely remove history for a contact %1?").arg(d->jid.bare())
+ 					,QMessageBox::Ok | QMessageBox::Cancel);
+ 	if(res == QMessageBox::Ok) {
+-		getEDBHandle()->erase(d->jid);
++		getEDBHandle()->erase(getCurrentAccountId(), d->jid);
+ 		openSelectedContact();
+ 	}
+ }
+ 
+ void HistoryDlg::openChat()
+ {
+-	UserListItem *u = currentUserListItem();
+-	if(u) {
+-		d->pa->actionOpenChat2(u->jid().bare());
+-	}
++	if (d->pa && !d->jid.isEmpty())
++		d->pa->actionOpenChat2(d->jid);
+ }
+ 
+ void HistoryDlg::exportHistory()
+ {
+ 	UserListItem *u = currentUserListItem();
+-	if(!u)
+-		return;
+-	QString them = JIDUtil::nickOrJid(u->name(), u->jid().full());
+-	QString s = JIDUtil::encode(them).toLower();
++	QString them;
++	if(u) {
++		them = JIDUtil::nickOrJid(u->name(), u->jid().full());
++	} else {
++		//if (d->jid.isEmpty())
++		//	return;
++		them = d->jid.full();
++	}
++	QString s = (!them.isEmpty()) ? JIDUtil::encode(them).toLower() : "all_contacts";
+ 	QString fname = FileUtil::getSaveFileName(this,
+ 						  tr("Export message history"),
+ 						  s + ".txt",
+@@ -327,19 +460,23 @@ void HistoryDlg::exportHistory()
+ 	}
+ 	QTextStream stream(&f);
+ 
+-	QString us = d->pa->nick();
+-
+-	EDBHandle* h;
+-	QString id;
++	int start = 0;
+ 	startRequest();
+-	while(1) {
+-		h = new EDBHandle(d->pa->edb());
+-		if(id.isEmpty()) {
+-			h->getOldest(d->jid, 1000);
+-		}
+-		else {
+-			h->get(d->jid, id, EDB::Forward, 1000);
++	QString paId = getCurrentAccountId();
++	int max = 0;
++	{
++		quint64 edbCnt = d->psi->edb()->eventsCount(paId, d->jid);
++		if (edbCnt > 1000)
++		{
++			max = edbCnt / 1000;
++			if ((edbCnt % 1000) != 0)
++				++max;
++			showProgress(max);
+ 		}
++	}
++	while(1) {
++		EDBHandle *h = new EDBHandle(d->psi->edb());
++		h->get(paId, d->jid, QDateTime(), EDB::Forward, start, 1000);
+ 		while(h->busy()) {
+ 			qApp->processEvents();
+ 		}
+@@ -350,7 +487,6 @@ void HistoryDlg::exportHistory()
+ 		// events are in forward order
+ 		for(int i = 0; i < cnt; ++i) {
+ 			EDBItemPtr item = r.value(i);
+-			id = item->nextId();
+ 			PsiEvent *e = item->event();
+ 			QString txt;
+ 
+@@ -358,10 +494,16 @@ void HistoryDlg::exportHistory()
+ 
+ 			QString nick;
+ 			if(e->originLocal()) {
+-				nick = us;
++				if (e->account())
++					nick = e->account()->nick();
++				else
++					nick = tr("deleted");
+ 			}
+ 			else {
+-				nick = them;
++				if (!them.isEmpty())
++					nick = them;
++				else
++					nick = e->from().full();
+ 			}
+ 
+ 			if(e->type() == PsiEvent::Message) {
+@@ -384,10 +526,14 @@ void HistoryDlg::exportHistory()
+ 		}
+ 		delete h;
+ 
++		if (max > 0)
++			incrementProgress();
++
+ 		// done!
+-		if(cnt == 0 || id.isEmpty()) {
++		if(cnt == 0)
+ 			break;
+-		}
++
++		start += 1000;
+ 	}
+ 	f.close();
+ 	stopRequest();
+@@ -395,11 +541,16 @@ void HistoryDlg::exportHistory()
+ 
+ void HistoryDlg::doMenu()
+ {
+-	QMenu *m = new QMenu(ui_.jidList);
+-	m->addAction(IconsetFactory::icon("psi/chat").icon(), tr("&Open chat"), this, SLOT(openChat()));
++	openSelectedContact();
++	bool fAll = (!d->pa || d->jid.isEmpty());
++	QMenu *m = new QMenu();
++	if (!fAll)
++		m->addAction(IconsetFactory::icon("psi/chat").icon(), tr("&Open chat"), this, SLOT(openChat()));
+ 	m->addAction(IconsetFactory::icon("psi/save").icon(), tr("&Export history"), this, SLOT(exportHistory()));
+-	m->addAction(IconsetFactory::icon("psi/clearChat").icon(), tr("&Delete history"), this, SLOT(removeHistory()));
++	if (!fAll)
++		m->addAction(IconsetFactory::icon("psi/clearChat").icon(), tr("&Delete history"), this, SLOT(removeHistory()));
+ 	m->exec(QCursor::pos());
++	delete m;
+ }
+ 
+ void HistoryDlg::edb_finished()
+@@ -420,28 +571,22 @@ void HistoryDlg::edb_finished()
+ 			if (d->reqType == TypeLatest || d->reqType == TypePrevious)
+ 			{
+ 				// events are in backward order
+-				// first entry is the end event
+-				EDBItemPtr it = r.first();
+-				d->id_end = it->id();
+-				d->id_next = it->nextId();
+-				// last entry is the begin event
+-				it = r.last();
+-				d->id_begin = it->id();
+-				d->id_prev = it->prevId();
+-				displayResult(r, EDB::Forward);
++				d->begin_row = h->beginRow();
++				d->end_row = d->begin_row + r.count() - 1;
++
++				d->can_backward = (d->begin_row > 0);
++				d->can_forward = (d->reqType != TypeLatest);
++				displayResult(r, (d->reqType == TypeLatest) ? EDB::Forward : EDB::Backward);
+ 				setButtons();
+ 			}
+ 			else if (d->reqType == TypeEarliest || d->reqType == TypeNext || d->reqType == TypeDate)
+ 			{
+ 				// events are in forward order
+-				// last entry is the end event
+-				EDBItemPtr it = r.last();
+-				d->id_end = it->id();
+-				d->id_next = it->nextId();
+-				// first entry is the begin event
+-				it = r.first();
+-				d->id_begin = it->id();
+-				d->id_prev = it->prevId();
++				d->begin_row = h->beginRow();
++				d->end_row = d->begin_row + r.count() - 1;
++
++				d->can_backward = (d->begin_row > 0);
++				d->can_forward = true;
+ 				displayResult(r, EDB::Backward);
+ 				setButtons();
+ 			}
+@@ -456,14 +601,15 @@ void HistoryDlg::edb_finished()
+ 				{
+ 					d->reqType = TypeFind;
+ 					d->findStr = str;
+-					EDBItemPtr ei = r.first();
+ 					startRequest();
+-					getEDBHandle()->find(str, d->jid, ei->id(), EDB::Forward);
++					getEDBHandle()->find(getCurrentAccountId(), str, d->jid, QDateTime(), EDB::Forward);
+ 					setButtons();
+ 				}
+ 			}
+ 			else if (d->reqType == TypeFind)
+ 			{
++				d->begin_row = 0;
++				d->end_row = r.count() - 1;
+ 				displayResult(r, EDB::Forward);
+ 				highlightBlocks(ui_.searchField->text());
+ 			}
+@@ -471,7 +617,29 @@ void HistoryDlg::edb_finished()
+ 		}
+ 		else
+ 		{
+-			ui_.msgLog->clear();
++			// no more data. TODO: visualization is needed.
++			bool buttons_updated = false;
++			if (d->reqType == TypePrevious)
++			{
++				d->can_backward = false;
++				buttons_updated = true;
++			}
++			else if (d->reqType == TypeLatest || d->reqType == TypeEarliest)
++			{
++				d->can_backward = false;
++				d->can_forward = false;
++				buttons_updated = true;
++			}
++			else if (d->reqType == TypeNext || d->reqType == TypeDate)
++			{
++				d->can_forward = false;
++				buttons_updated = true;
++			}
++			if (d->reqType == TypeFind)
++				ui_.msgLog->clear();
++
++			if (buttons_updated)
++				setButtons();
+ 		}
+ 	}
+ 	delete h;
+@@ -479,10 +647,10 @@ void HistoryDlg::edb_finished()
+ 
+ void HistoryDlg::setButtons()
+ {
+-	ui_.buttonPrevious->setEnabled(!d->id_prev.isEmpty());
+-	ui_.buttonNext->setEnabled(!d->id_next.isEmpty());
+-	ui_.buttonEarliest->setEnabled(!d->id_prev.isEmpty());
+-	ui_.buttonLastest->setEnabled(!d->id_next.isEmpty());
++	ui_.buttonPrevious->setEnabled(d->can_backward);
++	ui_.buttonNext->setEnabled(d->can_forward);
++	ui_.buttonEarliest->setEnabled(d->can_backward);
++	ui_.buttonLastest->setEnabled(d->can_forward);
+ }
+ 
+ void HistoryDlg::setButtons(bool act)
+@@ -504,28 +672,29 @@ void HistoryDlg::getLatest()
+ {
+ 	d->reqType = TypeLatest;
+ 	startRequest();
+-	getEDBHandle()->getLatest(d->jid, 50);
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Backward, 0, 50);
+ }
+ 
+ void HistoryDlg::getEarliest()
+ {
+ 	d->reqType = TypeEarliest;
+ 	startRequest();
+-	getEDBHandle()->getOldest(d->jid, 50);
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, 0, 50);
+ }
+ 
+ void HistoryDlg::getPrevious()
+ {
+ 	d->reqType = TypePrevious;
+ 	ui_.buttonPrevious->setEnabled(false);
+-	getEDBHandle()->get(d->jid, d->id_prev, EDB::Backward, 50);
++	int begin = (d->begin_row < 50) ? 0 : d->begin_row - 50;
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, begin, 50);
+ }
+ 
+ void HistoryDlg::getNext()
+ {
+ 	d->reqType = TypeNext;
+ 	ui_.buttonNext->setEnabled(false);
+-	getEDBHandle()->get(d->jid, d->id_next, EDB::Forward, 50);
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, d->end_row + 1, 50);
+ }
+ 
+ void HistoryDlg::getDate()
+@@ -533,30 +702,40 @@ void HistoryDlg::getDate()
+ 	const QDate date = ui_.calendar->selectedDate();
+ 	d->reqType = TypeDate;
+ 	d->date = date;
+-	QDateTime first (d->date);
+-	QDateTime last = first.addDays(1);
++	QDateTime first(d->date);
+ 	startRequest();
+-	getEDBHandle()->getByDate(d->jid, first, last);
++	getEDBHandle()->get(getCurrentAccountId(), d->jid, first, EDB::Forward, 0, 50);
+ }
+ 
+ void HistoryDlg::removedContact(PsiContact *pc)
+ {
+-	QString jid = pc->jid().bare().toLower();
+-	QString curJid  = ui_.jidList->currentItem()->toolTip();
++	QString contactId = pc->account()->id() + "|" + pc->jid().bare().toLower();
++	QString curId;
++	QListWidgetItem *lwi = ui_.jidList->currentItem();
++	if (lwi)
++		curId = lwi->statusTip();
+ 	for(int i = 0; i < ui_.jidList->count(); i++) {
+ 		QListWidgetItem *it = ui_.jidList->item(i);
+-		if(it && it->toolTip() == jid) {
++		if(it && it->statusTip() == contactId) {
+ 			ui_.jidList->removeItemWidget(it);
+-			if(jid == curJid) {
++			it = new QListWidgetItem(pc->jid().bare(), ui_.jidList2);
++			it->setToolTip(makeContactToolTip(pc, true));
++			it->setIcon(PsiIconset::instance()->statusPtr(pc->jid().bare(), Status(Status::Offline))->icon());
++			it->setStatusTip(contactId);
++			ui_.jidList2->addItem(it);
++			if(contactId == curId) {
+ 				ui_.jidList->setCurrentRow(0);
+-				openSelectedContact();
++				if (ui_.contactToolBox->currentIndex() == 0) {
++					ui_.jidList2->setCurrentItem(it);
++					ui_.contactToolBox->setCurrentIndex(1);
++				}
+ 			}
+ 			break;
+ 		}
+ 	}
+ }
+ 
+-void HistoryDlg::displayResult(const EDBResult r, int direction, int max)
++void HistoryDlg::displayResult(const EDBResult &r, int direction, int max)
+ {
+ 	int i  = (direction == EDB::Forward) ? r.count() - 1 : 0;
+ 	int at = 0;
+@@ -566,35 +745,49 @@ void HistoryDlg::displayResult(const EDB
+ 	received_color=PsiOptions::instance()->getOption("options.ui.look.colors.messages.received").toString();
+ 	bool emoticons  = PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool();
+ 	bool formatting = PsiOptions::instance()->getOption("options.ui.chat.legacy-formatting").toBool();
+-	QString nick    = TextUtil::plain2rich(d->pa->nick());
++	bool fAll = d->jid.isEmpty();
+ 	while (i >= 0 && i <= r.count() - 1 && (max == -1 ? true : at < max))
+ 	{
+ 		EDBItemPtr item = r.value(i);
+ 		PsiEvent* e = item->event();
+-		UserListItem *u = d->pa->findFirstRelevant(e->from().full());
+-		if(u) {
+-			QString from = JIDUtil::nickOrJid(u->name(), u->jid().full());
+-			if (e->type() == PsiEvent::Message)
+-			{
+-				MessageEvent *me = (MessageEvent *) e;
+-				QString msg = me->message().body();
+-				msg = TextUtil::linkify(TextUtil::plain2rich(msg));
+-
+-				if (emoticons)
+-					msg = TextUtil::emoticonify(msg);
+-				if (formatting)
+-					msg = TextUtil::legacyFormat(msg);
+-
+-				if (me->originLocal())
+-					msg = "<span style='color:"+sent_color+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]")+" &lt;"+ nick +"&gt; " + msg + "</span>";
+-				else
+-					msg = "<span style='color:"+received_color+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
+-				
+-				ui_.msgLog->appendText(msg);
++		if (e->type() == PsiEvent::Message) {
++			PsiAccount *pa = e->account();
++			QString from;
++			if (pa)
++			{
++				UserListItem *u = pa->findFirstRelevant(e->from().full());
++				if(u) {
++					if (!u->name().trimmed().isEmpty())
++						from = u->name().trimmed();
++				}
++			}
++			if (from.isEmpty())
++			{
++				from = e->from().resource().trimmed(); // for offline conferences
++				if (from.isEmpty())
++						from = e->from().node();
++			}
++			MessageEvent *me = (MessageEvent *) e;
++			QString msg = me->message().body();
++			msg = TextUtil::linkify(TextUtil::plain2rich(msg));
++
++			if (emoticons)
++				msg = TextUtil::emoticonify(msg);
++			if (formatting)
++				msg = TextUtil::legacyFormat(msg);
+ 
++			if (me->originLocal())
++			{
++				QString nick = (pa) ? TextUtil::plain2rich(pa->nick()) : tr("deleted");
++				msg = "<span style='color:" + sent_color + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" + nick
++					+ ((fAll) ? QString(" -> %1").arg(TextUtil::plain2rich(from)) : QString())
++					+ "&gt; " + msg + "</span>";
+ 			}
+-		}
++			else
++				msg = "<span style='color:" + received_color + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
+ 
++			ui_.msgLog->appendText(msg);
++		}
+ 		++at;
+ 		i += (direction == EDB::Forward) ? -1 : +1;
+ 	}
+@@ -605,11 +798,9 @@ void HistoryDlg::displayResult(const EDB
+ UserListItem* HistoryDlg::currentUserListItem()
+ {
+ 	UserListItem* u = 0;
+-	QListWidgetItem *i = ui_.jidList->currentItem();
+-	if(!i)
+-		return u;
+-
+-	u = d->pa->findFirstRelevant(i->toolTip());
++	if (d->pa && !d->jid.isEmpty()) {
++		u = d->pa->findFirstRelevant(d->jid);
++	}
+ 	return u;
+ }
+ 
+@@ -626,6 +817,7 @@ void HistoryDlg::stopRequest()
+ 	if(ui_.busy->isActive()) {
+ 		ui_.busy->stop();
+ 	}
++	ui_.progressBar->setVisible(false);
+ 	setEnabled(true);
+ #ifdef Q_OS_MAC
+ 	// To workaround a Qt bug
+@@ -634,9 +826,47 @@ void HistoryDlg::stopRequest()
+ #endif
+ }
+ 
++void HistoryDlg::showProgress(int max)
++{
++	ui_.progressBar->setValue(0);
++	ui_.progressBar->setMaximum(max);
++	ui_.progressBar->setVisible(true);
++}
++
++void HistoryDlg::incrementProgress()
++{
++	ui_.progressBar->setValue(ui_.progressBar->value() + 1);
++}
++
+ EDBHandle* HistoryDlg::getEDBHandle()
+ {
+-	EDBHandle* h = new EDBHandle(d->pa->edb());
++	EDBHandle* h = new EDBHandle(d->psi->edb());
  	connect(h, SIGNAL(finished()), SLOT(edb_finished()));
  	return h;
  }
 +
-+void HistoryDlg::importHistory()
++QString HistoryDlg::makeContactToolTip(const PsiContact *contact, bool bare) const
 +{
-+	startRequest();
-+	HistoryImp *imp = new HistoryImp(d->psi);
-+	connect(imp, SIGNAL(finished(int)), this, SLOT(importFinished(int)));
-+	imp->start();
++	QString jidStr = JIDUtil::toString(contact->jid(), !bare);
++	if (ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).isNull())
++		jidStr.append(QString(" [%1]").arg(contact->account()->name()));
++	return jidStr;
 +}
 +
-+void HistoryDlg::importFinished(int result)
++QString HistoryDlg::makeContactToolTip(const QString &accId, const XMPP::Jid &jid, bool bare) const
 +{
-+	stopRequest();
-+	HistoryImp *imp = (HistoryImp *)sender();
-+	if (result == HistoryImp::Normal) {
-+		int sec = imp->importDuration();
-+		int min = sec / 60;
-+		sec = sec % 60;
-+		QMessageBox::information(this, tr("Import"), tr("Imports is finished.\nDuration is %1 min. %2 sec.").arg(min).arg(sec));
-+	} else if (result == HistoryImp::Error)
-+		QMessageBox::critical(this, tr("Import"), tr("Import error."));
-+	imp->deleteLater();
++	QString jidStr = JIDUtil::toString(jid, !bare);
++	if (ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).isNull())
++	{
++		PsiAccount *pa = d->psi->contactList()->getAccount(accId);
++		jidStr.append(QString(" [%1]").arg((pa) ? pa->name() : tr("deleted")));
++	}
++	return jidStr;
++}
++
++QString HistoryDlg::getCurrentAccountId() const
++{
++	if (d->pa)
++		return d->pa->id();
++	return QString();
 +}
 --- psi.orig/src/historydlg.h
 +++ psi/src/historydlg.h
-@@ -69,6 +69,8 @@ private slots:
- 	void openChat();
- 	void doMenu();
- 	void removedContact(PsiContact*);
-+	void importHistory();
-+	void importFinished(int);
+@@ -77,19 +77,23 @@ private:
+ 	void setButtons();
+ 	void setButtons(bool act);
+ 	void loadContacts();
+-	void displayResult(const EDBResult , int, int max=-1);
++	void displayResult(const EDBResult &, int, int max=-1);
+ 	QFont fontForOption(const QString& option);
+ 	void listAccounts();
+ 	UserListItem* currentUserListItem();
+ 	void startRequest();
+ 	void stopRequest();
+-
++	void showProgress(int max);
++	void incrementProgress();
++	void setCurrentUserListItem();
++	QString makeContactToolTip(const PsiContact *contact, bool bare) const;
++	QString makeContactToolTip(const QString &accId, const Jid &jid, bool bare) const;
+ 	EDBHandle* getEDBHandle();
++	QString getCurrentAccountId() const;
  
- protected:
- 	bool eventFilter(QObject *, QEvent *);
+ 	class Private;
+ 	Private *d;
+ 	Ui::HistoryDlg ui_;
+-	QStringList jids_;
+ };
+ 
+ #endif
 --- psi.orig/src/historyimp.cpp
 +++ psi/src/historyimp.cpp
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,299 @@
 +/*
 + * historyimp.cpp
-+ * Copyright (C) 20011   Aleksey Andreev
++ * Copyright (C) 2011   Aleksey Andreev
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License
@@ -944,159 +2864,295 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 + *
 + */
 +
 +#include <QDir>
 +#include <QTimer>
 +#include <QMessageBox>
++#include <QLayout>
 +
 +#include "historyimp.h"
 +#include "applicationinfo.h"
++#include "psicontactlist.h"
++#include "psiaccount.h"
++#include "psicontact.h"
 +
-+HistoryImp::HistoryImp(PsiCon *psi) : QObject(),
++HistoryImport::HistoryImport(PsiCon *psi) : QObject(),
 +	psi_(psi),
-+	prompt(true),
++	srcEdb(NULL),
++	dstEdb(NULL),
++	hErase(NULL),
 +	hRead(NULL),
 +	hWrite(NULL),
-+	active(false)
++	active(false),
++	result_(ResultNone),
++	recordsCount(0),
++	dlg(NULL)
 +{
 +}
 +
-+HistoryImp::~HistoryImp()
++HistoryImport::~HistoryImport()
 +{
 +	clear();
 +}
 +
-+void HistoryImp::clear()
++bool HistoryImport::isNeeded()
 +{
-+	if (desEdb) {
-+		((EDBSqLite *)desEdb)->setInsertingMode(EDBSqLite::Normal);
-+		((EDBSqLite *)desEdb)->setMirror((EDBFlatFile *)souEdb);
++	bool res = false;
++	EDBSqLite *stor = static_cast<EDBSqLite *>(psi_->edb());
++	if (!stor->getStorageParam("import_start").isEmpty()) {
++		EDB *src = stor->mirror();
++		if (!src)
++			src = new EDBFlatFile(psi_);
++		//if (sou && sou->eventsCount(QString(), XMPP::Jid()) != 0)
++		if (!src->contacts(QString(), EDB::Contact).isEmpty())
++			res = true;
++		if (src != stor->mirror())
++			delete src;
++	}
++	return res;
++}
++
++void HistoryImport::clear()
++{
++	if (dstEdb) {
++		((EDBSqLite *)dstEdb)->setInsertingMode(EDBSqLite::Normal);
++		((EDBSqLite *)dstEdb)->setMirror(new EDBFlatFile(psi_));
++	}
++	if (hErase) {
++		delete hErase;
++		hErase = NULL;
 +	}
 +	if (hRead) {
 +		delete hRead;
 +		hRead = NULL;
 +	}
++	if (srcEdb) {
++		delete srcEdb;
++		srcEdb = NULL;
++	}
 +	if (hWrite) {
 +		delete hWrite;
 +		hWrite = NULL;
 +	}
++	if (dlg) {
++		delete dlg;
++		dlg = NULL;
++	}
 +}
 +
-+void HistoryImp::start()
++int HistoryImport::exec()
 +{
 +	active = true;
-+	startTime = QDateTime::currentDateTime();
-+	QString impDirStr = ApplicationInfo::historyDir() + "/";
-+	QDir impDir(impDirStr);
-+	QFileInfoList fl = impDir.entryInfoList(QStringList("*.history"), QDir::Files);
-+	impSize = 0;
-+	foreach (const QFileInfo &fi, fl) {
-+		XMPP::Jid jid(JIDUtil::decode(fi.completeBaseName()));
-+		if (jid.isValid()) {
-+			importList.append(QPair<XMPP::Jid, QString>(jid, QString()));
-+			impSize += fi.size();
++
++	dstEdb = psi_->edb();
++	((EDBSqLite *)dstEdb)->setMirror(NULL);
++	((EDBSqLite *)dstEdb)->setInsertingMode(EDBSqLite::Import);
++
++	dstEdb->setStorageParam("import_start", "yes");
++
++	if (!srcEdb)
++		srcEdb = new EDBFlatFile(psi_);
++
++	foreach (const EDB::ContactItem &ci, srcEdb->contacts(QString(), EDB::Contact)) {
++		const XMPP::Jid &jid = ci.jid;
++		QStringList accIds;
++		foreach (PsiAccount *acc, psi_->contactList()->accounts()) {
++			foreach (PsiContact *contact, acc->contactList()) {
++				if (contact->jid() == jid)
++					accIds.append(acc->id());
++			}
 +		}
++		if (accIds.isEmpty())
++		{
++			PsiAccount *pa = psi_->contactList()->defaultAccount();
++			if (pa)
++				accIds.append(pa->id());
++			else
++				accIds.append(psi_->contactList()->accounts().first()->id());
++		}
++		importList.append(ImportItem(accIds, jid));
 +	}
-+	if (importList.isEmpty()) {
-+		stop(Normal);
-+		return;
-+	}
-+	desEdb = psi_->edb();
-+	((EDBSqLite *)desEdb)->setMirror(NULL);
-+	((EDBSqLite *)desEdb)->setInsertingMode(EDBSqLite::Import);
 +
-+	souEdb = new EDBFlatFile;
++	if (importList.isEmpty())
++		stop(ResultNormal);
++	else
++		showDialog();
 +
-+	QTimer::singleShot(0, this, SLOT(readFromFiles()));
++	return result_;
 +}
 +
-+void HistoryImp::stop(int reason)
++void HistoryImport::stop(int reason)
 +{
-+	active = false;
 +	stopTime = QDateTime::currentDateTime();
-+	clear();
++	result_ = reason;
++	if (reason == ResultNormal) {
++		dstEdb->setStorageParam("import_start", QString());
++		int sec = importDuration();
++		int min = sec / 60;
++		sec = sec % 60;
++		qWarning(QString("Import is finished. Duration is %1 min. %2 sec.").arg(min).arg(sec).toLatin1());
++	}
++	else if (reason == ResultCancel)
++		qWarning("Import canceled");
++	else
++		qWarning("Import error");
++
++	active = false;
 +	emit finished(reason);
 +}
 +
-+int HistoryImp::importDuration()
++int HistoryImport::importDuration()
 +{
-+	int duration = 0;
-+	if (startTime.isValid() && stopTime.isValid()) {
-+		duration = startTime.secsTo(stopTime);
-+		if (duration < 0)
-+			duration = 0;
-+	}
-+	return duration;
++	return startTime.secsTo(stopTime);
 +}
 +
-+void HistoryImp::readFromFiles()
++void HistoryImport::readFromFiles()
 +{
 +	if (!active)
 +		return;
-+	if (prompt) {
-+		prompt = false;
-+		QString text = tr("Found %1 files. Common size is %2 bytes.\nContinue?").arg(importList.size()).arg(impSize);
-+		if (QMessageBox::question(NULL, tr("Import history"), text, QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes) {
-+			stop(Cancel);
++	if (hWrite != NULL) {
++		if (!hWrite->writeSuccess()) {
++			stop(ResultError); // Write error
 +			return;
 +		}
 +	}
-+	if (importList.isEmpty()) {
-+		stop(Normal);
++	else if (hErase != NULL && !hErase->writeSuccess()) {
++		stop(ResultError);
 +		return;
 +	}
-+	if (hWrite != NULL && !hWrite->writeSuccess()) {
-+		stop(Error); // Write error
++	if (importList.isEmpty()) {
++		stop(ResultNormal);
 +		return;
 +	}
 +	if (hRead == NULL) {
-+		hRead = new EDBHandle(souEdb);
++		hRead = new EDBHandle(srcEdb);
 +		connect(hRead, SIGNAL(finished()), this, SLOT(writeToSqlite()));
 +	}
-+	QPair<XMPP::Jid, QString> &rec = importList.first();
-+	QString nextId = rec.second;
-+	if (nextId.isEmpty()) {
-+		qWarning(QString("Importing %1").arg(JIDUtil::toString(rec.first, true)).toAscii());
-+		hRead->getOldest(rec.first, 1);
-+	} else {
-+		hRead->get(rec.first, nextId, EDB::Forward, 1);
-+	}
++
++	const ImportItem &item = importList.first();
++	int start = item.startNum;
++	if (start == 0)
++		qWarning(QString("Importing %1").arg(JIDUtil::toString(item.jid, true)).toLatin1());
++	--recordsCount;
++	if (dlg && (recordsCount % 100) == 0)
++		progressBar->setValue(progressBar->value() + 1);
++	hRead->get(item.accIds.first(), item.jid, QDateTime(), EDB::Forward, start, 1);
 +}
 +
-+void HistoryImp::writeToSqlite()
++void HistoryImport::writeToSqlite()
 +{
 +	if (!active)
 +		return;
 +	const EDBResult r = hRead->result();
 +	if (hRead->lastRequestType() != EDBHandle::Read || r.size() > 1) {
-+		stop(Error);
++		stop(ResultError);
 +		return;
 +	}
 +	if (r.isEmpty()) {
-+		importList.removeFirst();
++		importList.first().accIds.removeFirst();
++		if (importList.first().accIds.isEmpty())
++			importList.removeFirst();
 +		QTimer::singleShot(0, this, SLOT(readFromFiles()));
 +		return;
 +	}
 +	if (hWrite == NULL) {
-+		hWrite = new EDBHandle(desEdb);
++		hWrite = new EDBHandle(dstEdb);
 +		connect(hWrite, SIGNAL(finished()), this, SLOT(readFromFiles()));
 +	}
 +	EDBItemPtr it = r.first();
-+	hWrite->append(importList.first().first, it->event());
-+	if (!it->nextId().isEmpty())
-+		importList.first().second = it->nextId();
-+	else
-+		importList.removeFirst();
++	ImportItem &item = importList.first();
++	hWrite->append(item.accIds.first(), item.jid, it->event(), EDB::Contact);
++	item.startNum += 1;
++}
++
++void HistoryImport::showDialog()
++{
++	dlg = new QDialog();
++	dlg->setModal(true);
++	dlg->setWindowTitle(tr("Psi+ Import history"));
++	QVBoxLayout *mainLayout = new QVBoxLayout(dlg);
++	stackedWidget = new QStackedWidget(dlg);
++
++	QWidget *page1 = new QWidget();
++	QGridLayout *page1Layout = new QGridLayout(page1);
++	QLabel *lbMessage = new QLabel(page1);
++	lbMessage->setWordWrap(true);
++	lbMessage->setText(tr("Found %1 files for import.\nContinue?").arg(importList.size()));
++	page1Layout->addWidget(lbMessage, 0, 0, 1, 1);
++	stackedWidget->addWidget(page1);
++
++	QWidget *page2 = new QWidget();
++	QHBoxLayout *page2Layout = new QHBoxLayout(page2);
++	QGridLayout *page2GridLayout = new QGridLayout();
++	page2GridLayout->addWidget(new QLabel(tr("Status:"), page2), 0, 0, 1, 1);
++	lbStatus = new QLabel(page2);
++	page2GridLayout->addWidget(lbStatus, 0, 1, 1, 1);
++	page2GridLayout->addWidget(new QLabel(tr("Progress:"), page2), 1, 0, 1, 1);
++	progressBar = new QProgressBar(page2);
++	progressBar->setMaximum(1);
++	progressBar->setValue(0);
++	page2GridLayout->addWidget(progressBar, 1, 1, 1, 1);
++	page2Layout->addLayout(page2GridLayout);
++	stackedWidget->addWidget(page2);
++
++	mainLayout->addWidget(stackedWidget);
++	QHBoxLayout *buttonsLayout = new QHBoxLayout();
++	QSpacerItem *buttonsSpacer = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
++	buttonsLayout->addItem(buttonsSpacer);
++	btnOk = new QPushButton(dlg);
++	connect(btnOk, SIGNAL(clicked()), this, SLOT(start()));
++	btnOk->setText(tr("Ok"));
++	buttonsLayout->addWidget(btnOk);
++	QPushButton *btnCancel = new QPushButton(dlg);
++	connect(btnCancel, SIGNAL(clicked()), this, SLOT(cancel()));
++	btnCancel->setText(tr("Exit"));
++	buttonsLayout->addWidget(btnCancel);
++	mainLayout->addLayout(buttonsLayout);
++
++	dlg->adjustSize();
++	dlg->exec();
++}
++
++void HistoryImport::start()
++{
++	qWarning("Import start");
++	startTime = QDateTime::currentDateTime();
++	btnOk->setEnabled(false);
++	stackedWidget->setCurrentIndex(1);
++
++	lbStatus->setText(tr("Counting records"));
++	qApp->processEvents();
++	recordsCount = srcEdb->eventsCount(QString(), XMPP::Jid());
++	int max = recordsCount / 100;
++	if ((recordsCount % 100) != 0)
++		++max;
++	progressBar->setMaximum(max);
++	progressBar->setValue(0);
++
++	lbStatus->setText(tr("Import"));
++	hErase = new EDBHandle(dstEdb);
++	connect(hErase, SIGNAL(finished()), this, SLOT(readFromFiles()));
++	hErase->erase(QString(), QString());
++	while (active)
++		qApp->processEvents();
++	if (result_ == ResultNormal)
++		dlg->accept();
++}
++
++void HistoryImport::cancel()
++{
++	stop();
++	dlg->reject();
 +}
 --- psi.orig/src/historyimp.h
 +++ psi/src/historyimp.h
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,91 @@
 +/*
 + * historyimp.h
-+ * Copyright (C) 20011   Aleksey Andreev
++ * Copyright (C) 2011   Aleksey Andreev
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License
@@ -1110,7 +3166,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 + *
 + */
 +
@@ -1118,44 +3174,66 @@
 +#define HISTORYIMP_H
 +
 +#include <QObject>
-+#include <QPair>
++#include <QDialog>
++#include <QLabel>
++#include <QProgressBar>
++#include <QStackedWidget>
++#include <QPushButton>
 +
 +#include "xmpp/jid/jid.h"
 +#include "jidutil.h"
 +#include "psicon.h"
 +#include "eventdb.h"
 +
-+class HistoryImp : public QObject
++struct ImportItem
++{
++	QStringList   accIds;
++	XMPP::Jid     jid;
++	int           startNum;
++	ImportItem(const QStringList &ids, const XMPP::Jid &j) { accIds = ids; jid = j; startNum = 0; }
++};
++
++class HistoryImport : public QObject
 +{
 +	Q_OBJECT
 +
 +public:
-+	enum {Normal, Cancel, Error};
-+	HistoryImp(PsiCon *psi);
-+	~HistoryImp();
-+	void start();
-+	void stop(int reason = Cancel);
++	enum {ResultNone, ResultNormal, ResultCancel, ResultError};
++	HistoryImport(PsiCon *psi);
++	~HistoryImport();
++	bool isNeeded();
++	int exec();
 +	int importDuration();
 +
 +private:
 +	PsiCon *psi_;
-+	bool prompt;
-+	qint64 impSize;
-+	QList< QPair<XMPP::Jid, QString> > importList;
-+	EDB *souEdb;
-+	EDB *desEdb;
++	QList<ImportItem> importList;
++	EDB *srcEdb;
++	EDB *dstEdb;
++	EDBHandle *hErase;
 +	EDBHandle *hRead;
 +	EDBHandle *hWrite;
 +	QDateTime startTime;
 +	QDateTime stopTime;
 +	bool active;
++	int result_;
++	quint64 recordsCount;
++	QDialog *dlg;
++	QLabel *lbStatus;
++	QProgressBar *progressBar;
++	QStackedWidget *stackedWidget;
++	QPushButton *btnOk;
 +
 +private:
 +	void clear();
++	void showDialog();
 +
 +private slots:
 +	void readFromFiles();
 +	void writeToSqlite();
++	void start();
++	void stop(int reason = ResultCancel);
++	void cancel();
 +
 +signals:
 +	void finished(int);
@@ -1163,29 +3241,740 @@
 +};
 +
 +#endif
+--- psi.orig/src/history.ui
++++ psi/src/history.ui
+@@ -9,7 +9,7 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>672</width>
++    <width>670</width>
+     <height>680</height>
+    </rect>
+   </property>
+@@ -34,207 +34,377 @@
+   <property name="modal">
+    <bool>true</bool>
+   </property>
+-  <layout class="QGridLayout" name="gridLayout">
+-   <item row="0" column="0">
+-    <widget class="QComboBox" name="accountsBox">
+-     <property name="maximumSize">
+-      <size>
+-       <width>220</width>
+-       <height>16777215</height>
+-      </size>
+-     </property>
+-    </widget>
+-   </item>
+-   <item row="0" column="1">
+-    <layout class="QHBoxLayout" name="horizontalLayout_2">
++  <layout class="QVBoxLayout" name="verticalLayout_2">
++   <item>
++    <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="0,0,1">
+      <item>
+-      <widget class="QLineEdit" name="searchField">
+-       <property name="sizePolicy">
+-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+-         <horstretch>0</horstretch>
+-         <verstretch>0</verstretch>
+-        </sizepolicy>
+-       </property>
+-      </widget>
++      <layout class="QVBoxLayout" name="verticalLayout">
++       <item>
++        <widget class="QComboBox" name="accountsBox">
++         <property name="maximumSize">
++          <size>
++           <width>220</width>
++           <height>16777215</height>
++          </size>
++         </property>
++        </widget>
++       </item>
++       <item>
++        <widget class="QToolBox" name="contactToolBox">
++         <property name="maximumSize">
++          <size>
++           <width>220</width>
++           <height>16777215</height>
++          </size>
++         </property>
++         <property name="currentIndex">
++          <number>0</number>
++         </property>
++         <widget class="QWidget" name="page_1">
++          <property name="geometry">
++           <rect>
++            <x>0</x>
++            <y>0</y>
++            <width>220</width>
++            <height>233</height>
++           </rect>
++          </property>
++          <attribute name="label">
++           <string>Roster contacts</string>
++          </attribute>
++          <layout class="QGridLayout" name="gridLayout">
++           <property name="margin">
++            <number>0</number>
++           </property>
++           <item row="1" column="0">
++            <widget class="QListWidget" name="jidList">
++             <property name="sizePolicy">
++              <sizepolicy hsizetype="Maximum" vsizetype="Expanding">
++               <horstretch>0</horstretch>
++               <verstretch>0</verstretch>
++              </sizepolicy>
++             </property>
++             <property name="maximumSize">
++              <size>
++               <width>220</width>
++               <height>16777215</height>
++              </size>
++             </property>
++            </widget>
++           </item>
++          </layout>
++         </widget>
++         <widget class="QWidget" name="page_3">
++          <property name="geometry">
++           <rect>
++            <x>0</x>
++            <y>0</y>
++            <width>220</width>
++            <height>233</height>
++           </rect>
++          </property>
++          <attribute name="label">
++           <string>Not in roster</string>
++          </attribute>
++          <layout class="QGridLayout" name="gridLayout_2">
++           <property name="margin">
++            <number>0</number>
++           </property>
++           <item row="0" column="0">
++            <widget class="QListWidget" name="jidList2">
++             <property name="maximumSize">
++              <size>
++               <width>220</width>
++               <height>16777215</height>
++              </size>
++             </property>
++            </widget>
++           </item>
++          </layout>
++         </widget>
++         <widget class="QWidget" name="page_4">
++          <property name="geometry">
++           <rect>
++            <x>0</x>
++            <y>0</y>
++            <width>220</width>
++            <height>233</height>
++           </rect>
++          </property>
++          <attribute name="label">
++           <string>Private</string>
++          </attribute>
++          <layout class="QGridLayout" name="gridLayout_3">
++           <property name="margin">
++            <number>0</number>
++           </property>
++           <item row="0" column="0">
++            <widget class="QListWidget" name="privList">
++             <property name="maximumSize">
++              <size>
++               <width>220</width>
++               <height>16777215</height>
++              </size>
++             </property>
++            </widget>
++           </item>
++          </layout>
++         </widget>
++         <widget class="QWidget" name="page_5">
++          <property name="geometry">
++           <rect>
++            <x>0</x>
++            <y>0</y>
++            <width>220</width>
++            <height>233</height>
++           </rect>
++          </property>
++          <attribute name="label">
++           <string>Advanced</string>
++          </attribute>
++          <layout class="QGridLayout" name="gridLayout_4">
++           <property name="margin">
++            <number>0</number>
++           </property>
++           <item row="0" column="0">
++            <widget class="QListWidget" name="advList">
++             <property name="maximumSize">
++              <size>
++               <width>220</width>
++               <height>16777215</height>
++              </size>
++             </property>
++            </widget>
++           </item>
++          </layout>
++         </widget>
++        </widget>
++       </item>
++       <item>
++        <widget class="QCalendarWidget" name="calendar">
++         <property name="minimumSize">
++          <size>
++           <width>220</width>
++           <height>0</height>
++          </size>
++         </property>
++         <property name="maximumSize">
++          <size>
++           <width>220</width>
++           <height>220</height>
++          </size>
++         </property>
++         <property name="firstDayOfWeek">
++          <enum>Qt::Sunday</enum>
++         </property>
++         <property name="gridVisible">
++          <bool>true</bool>
++         </property>
++         <property name="horizontalHeaderFormat">
++          <enum>QCalendarWidget::ShortDayNames</enum>
++         </property>
++         <property name="verticalHeaderFormat">
++          <enum>QCalendarWidget::NoVerticalHeader</enum>
++         </property>
++        </widget>
++       </item>
++       <item>
++        <widget class="QPushButton" name="buttonRefresh">
++         <property name="sizePolicy">
++          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
++           <horstretch>0</horstretch>
++           <verstretch>0</verstretch>
++          </sizepolicy>
++         </property>
++         <property name="maximumSize">
++          <size>
++           <width>220</width>
++           <height>16777215</height>
++          </size>
++         </property>
++         <property name="focusPolicy">
++          <enum>Qt::NoFocus</enum>
++         </property>
++         <property name="toolTip">
++          <string>Refresh history</string>
++         </property>
++         <property name="text">
++          <string>&amp;Refresh</string>
++         </property>
++         <property name="autoDefault">
++          <bool>false</bool>
++         </property>
++        </widget>
++       </item>
++      </layout>
+      </item>
+      <item>
+-      <widget class="QToolButton" name="tb_find">
+-       <property name="sizePolicy">
+-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+-         <horstretch>0</horstretch>
+-         <verstretch>0</verstretch>
+-        </sizepolicy>
+-       </property>
+-       <property name="maximumSize">
+-        <size>
+-         <width>27</width>
+-         <height>27</height>
+-        </size>
+-       </property>
+-       <property name="text">
+-        <string/>
++      <widget class="Line" name="line">
++       <property name="orientation">
++        <enum>Qt::Vertical</enum>
+        </property>
+       </widget>
+      </item>
+-    </layout>
+-   </item>
+-   <item row="1" column="0">
+-    <widget class="QListWidget" name="jidList">
+-     <property name="maximumSize">
+-      <size>
+-       <width>220</width>
+-       <height>16777215</height>
+-      </size>
+-     </property>
+-     <property name="sortingEnabled">
+-      <bool>true</bool>
+-     </property>
+-    </widget>
+-   </item>
+-   <item row="1" column="1" rowspan="2">
+-    <widget class="PsiTextView" name="msgLog">
+-     <property name="sizePolicy">
+-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+-       <horstretch>0</horstretch>
+-       <verstretch>0</verstretch>
+-      </sizepolicy>
+-     </property>
+-     <property name="maximumSize">
+-      <size>
+-       <width>16777215</width>
+-       <height>16777215</height>
+-      </size>
+-     </property>
+-     <property name="focusPolicy">
+-      <enum>Qt::ClickFocus</enum>
+-     </property>
+-     <property name="readOnly">
+-      <bool>true</bool>
+-     </property>
+-    </widget>
+-   </item>
+-   <item row="2" column="0">
+-    <widget class="QCalendarWidget" name="calendar">
+-     <property name="maximumSize">
+-      <size>
+-       <width>220</width>
+-       <height>220</height>
+-      </size>
+-     </property>
+-     <property name="firstDayOfWeek">
+-      <enum>Qt::Sunday</enum>
+-     </property>
+-     <property name="gridVisible">
+-      <bool>true</bool>
+-     </property>
+-     <property name="horizontalHeaderFormat">
+-      <enum>QCalendarWidget::ShortDayNames</enum>
+-     </property>
+-     <property name="verticalHeaderFormat">
+-      <enum>QCalendarWidget::NoVerticalHeader</enum>
+-     </property>
+-    </widget>
+-   </item>
+-   <item row="3" column="0">
+-    <widget class="QPushButton" name="buttonRefresh">
+-     <property name="sizePolicy">
+-      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+-       <horstretch>0</horstretch>
+-       <verstretch>0</verstretch>
+-      </sizepolicy>
+-     </property>
+-     <property name="maximumSize">
+-      <size>
+-       <width>220</width>
+-       <height>16777215</height>
+-      </size>
+-     </property>
+-     <property name="focusPolicy">
+-      <enum>Qt::NoFocus</enum>
+-     </property>
+-     <property name="toolTip">
+-      <string>Refresh history</string>
+-     </property>
+-     <property name="text">
+-      <string>&amp;Refresh</string>
+-     </property>
+-     <property name="autoDefault">
+-      <bool>false</bool>
+-     </property>
+-    </widget>
+-   </item>
+-   <item row="3" column="1">
+-    <layout class="QHBoxLayout" name="horizontalLayout">
+-     <property name="sizeConstraint">
+-      <enum>QLayout::SetDefaultConstraint</enum>
+-     </property>
+      <item>
+-      <widget class="QPushButton" name="buttonEarliest">
+-       <property name="focusPolicy">
+-        <enum>Qt::NoFocus</enum>
+-       </property>
+-       <property name="text">
+-        <string>&amp;Earliest</string>
+-       </property>
+-      </widget>
++      <layout class="QVBoxLayout" name="verticalLayout_3">
++       <item>
++        <layout class="QHBoxLayout" name="horizontalLayout_2">
++         <item>
++          <widget class="QLineEdit" name="searchField">
++           <property name="sizePolicy">
++            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
++             <horstretch>0</horstretch>
++             <verstretch>0</verstretch>
++            </sizepolicy>
++           </property>
++          </widget>
++         </item>
++         <item>
++          <widget class="QToolButton" name="tb_find">
++           <property name="sizePolicy">
++            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
++             <horstretch>0</horstretch>
++             <verstretch>0</verstretch>
++            </sizepolicy>
++           </property>
++           <property name="maximumSize">
++            <size>
++             <width>27</width>
++             <height>27</height>
++            </size>
++           </property>
++           <property name="text">
++            <string/>
++           </property>
++          </widget>
++         </item>
++        </layout>
++       </item>
++       <item>
++        <widget class="PsiTextView" name="msgLog">
++         <property name="sizePolicy">
++          <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
++           <horstretch>0</horstretch>
++           <verstretch>0</verstretch>
++          </sizepolicy>
++         </property>
++         <property name="maximumSize">
++          <size>
++           <width>16777215</width>
++           <height>16777215</height>
++          </size>
++         </property>
++         <property name="focusPolicy">
++          <enum>Qt::ClickFocus</enum>
++         </property>
++         <property name="readOnly">
++          <bool>true</bool>
++         </property>
++        </widget>
++       </item>
++       <item>
++        <layout class="QHBoxLayout" name="horizontalLayout">
++         <property name="sizeConstraint">
++          <enum>QLayout::SetDefaultConstraint</enum>
++         </property>
++         <item>
++          <widget class="QPushButton" name="buttonEarliest">
++           <property name="focusPolicy">
++            <enum>Qt::NoFocus</enum>
++           </property>
++           <property name="text">
++            <string>&amp;Earliest</string>
++           </property>
++          </widget>
++         </item>
++         <item>
++          <widget class="QPushButton" name="buttonPrevious">
++           <property name="focusPolicy">
++            <enum>Qt::NoFocus</enum>
++           </property>
++           <property name="text">
++            <string>&amp;Previous</string>
++           </property>
++           <property name="autoDefault">
++            <bool>false</bool>
++           </property>
++          </widget>
++         </item>
++         <item>
++          <spacer name="horizontalSpacer_2">
++           <property name="orientation">
++            <enum>Qt::Horizontal</enum>
++           </property>
++           <property name="sizeType">
++            <enum>QSizePolicy::Expanding</enum>
++           </property>
++           <property name="sizeHint" stdset="0">
++            <size>
++             <width>13</width>
++             <height>13</height>
++            </size>
++           </property>
++          </spacer>
++         </item>
++         <item>
++          <widget class="QPushButton" name="buttonNext">
++           <property name="focusPolicy">
++            <enum>Qt::NoFocus</enum>
++           </property>
++           <property name="text">
++            <string>&amp;Next</string>
++           </property>
++           <property name="autoDefault">
++            <bool>false</bool>
++           </property>
++          </widget>
++         </item>
++         <item>
++          <widget class="QPushButton" name="buttonLastest">
++           <property name="focusPolicy">
++            <enum>Qt::NoFocus</enum>
++           </property>
++           <property name="text">
++            <string>&amp;Lastest</string>
++           </property>
++          </widget>
++         </item>
++        </layout>
++       </item>
++      </layout>
+      </item>
++    </layout>
++   </item>
++   <item>
++    <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <item>
+-      <widget class="QPushButton" name="buttonPrevious">
+-       <property name="focusPolicy">
+-        <enum>Qt::NoFocus</enum>
+-       </property>
+-       <property name="text">
+-        <string>&amp;Previous</string>
+-       </property>
+-       <property name="autoDefault">
+-        <bool>false</bool>
+-       </property>
+-      </widget>
++      <widget class="BusyWidget" name="busy" native="true"/>
+      </item>
+      <item>
+-      <spacer name="horizontalSpacer_2">
++      <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+-       <property name="sizeType">
+-        <enum>QSizePolicy::Expanding</enum>
+-       </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+-         <width>13</width>
+-         <height>13</height>
++         <width>20</width>
++         <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+-      <widget class="QPushButton" name="buttonNext">
+-       <property name="focusPolicy">
+-        <enum>Qt::NoFocus</enum>
+-       </property>
+-       <property name="text">
+-        <string>&amp;Next</string>
+-       </property>
+-       <property name="autoDefault">
+-        <bool>false</bool>
+-       </property>
+-      </widget>
+-     </item>
+-     <item>
+-      <widget class="QPushButton" name="buttonLastest">
+-       <property name="focusPolicy">
+-        <enum>Qt::NoFocus</enum>
+-       </property>
+-       <property name="text">
+-        <string>&amp;Lastest</string>
++      <widget class="QProgressBar" name="progressBar">
++       <property name="sizePolicy">
++        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
++         <horstretch>1</horstretch>
++         <verstretch>0</verstretch>
++        </sizepolicy>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+-   <item row="4" column="0">
+-    <widget class="BusyWidget" name="busy" native="true"/>
+-   </item>
+   </layout>
+  </widget>
+  <customwidgets>
+@@ -251,14 +421,13 @@
+   </customwidget>
+  </customwidgets>
+  <tabstops>
++  <tabstop>accountsBox</tabstop>
+   <tabstop>jidList</tabstop>
++  <tabstop>jidList2</tabstop>
++  <tabstop>privList</tabstop>
++  <tabstop>advList</tabstop>
+   <tabstop>calendar</tabstop>
+   <tabstop>searchField</tabstop>
+-  <tabstop>buttonEarliest</tabstop>
+-  <tabstop>buttonPrevious</tabstop>
+-  <tabstop>buttonNext</tabstop>
+-  <tabstop>buttonLastest</tabstop>
+-  <tabstop>accountsBox</tabstop>
+   <tabstop>tb_find</tabstop>
+   <tabstop>msgLog</tabstop>
+  </tabstops>
+--- psi.orig/src/messageview.h
++++ psi/src/messageview.h
+@@ -89,6 +89,8 @@ public:
+ 	inline void setDateTime(const QDateTime &dt) { _dateTime = dt; }
+ 	inline const QDateTime &dateTime() const { return _dateTime; }
+ 	inline QMap<QString, QString> urls() const { return _urls; }
++	inline void setHistory(bool history) { _history = history; }
++	inline bool isHistory() const { return _history; }
+ 
+ 	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
+ 
+@@ -108,6 +110,7 @@ private:
+ 	QString _userText; // rich
+ 	QDateTime _dateTime;
+ 	QMap<QString, QString> _urls;
++	bool _history;
+ };
+ 
+ #endif
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -4731,11 +4731,12 @@ void PsiAccount::dj_sendMessage(const Me
+ 
+ 	// don't log groupchat, private messages, or encrypted messages
+ 	if(log) {
+-		if(m.type() != "groupchat" && m.xencrypted().isEmpty() && !findGCContact(m.to())) {
++		if(m.type() != "groupchat" && m.xencrypted().isEmpty()/* && !findGCContact(m.to())*/) {
++			int type = findGCContact(m.to()) ? EDB::GroupChatContact : EDB::Contact;
+ 			MessageEvent *me = new MessageEvent(m, this);
+ 			me->setOriginLocal(true);
+ 			me->setTimeStamp(QDateTime::currentDateTime());
+-			logEvent(m.to(), me);
++			logEvent(m.to(), me, type);
+ 			delete me;
+ 		}
+ 	}
+@@ -5083,11 +5084,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 
+ 			// don't log private messages
+ 			if (!found &&
+-				!findGCContact(e->from()) &&
++				//!findGCContact(e->from()) &&
+ 				!(e->type() == PsiEvent::Message &&
+ 				  ((MessageEvent *)e)->message().body().isEmpty()))
+ 			{
+-				logEvent(e->from(), e);
++				int type = findGCContact(e->from()) ? EDB::GroupChatContact : EDB::Contact;
++				logEvent(e->from(), e, type);
+ 			}
+ 		}
+ 	}
+@@ -5752,14 +5754,16 @@ void PsiAccount::chatMessagesRead(const
+ //	}
+ }
+ 
+-void PsiAccount::logEvent(const Jid &j, PsiEvent *e)
++void PsiAccount::logEvent(const Jid &j, PsiEvent *e, int type)
+ {
+ 	if (!d->acc.opt_log)
+ 		return;
++	if (type == EDB::GroupChatContact && !PsiOptions::instance()->getOption("options.history.store-muc-private").toBool())
++		return;
+ 
+ 	EDBHandle *h = new EDBHandle(d->psi->edb());
+ 	connect(h, SIGNAL(finished()), SLOT(edb_finished()));
+-	h->append(j, e);
++	h->append(id(), j, e, type);
+ }
+ 
+ void PsiAccount::edb_finished()
+@@ -6199,7 +6203,7 @@ void PsiAccount::pgp_encryptFinished()
+ 			MessageEvent *me = new MessageEvent(m, this);
+ 			me->setOriginLocal(true);
+ 			me->setTimeStamp(QDateTime::currentDateTime());
+-			logEvent(m.to(), me);
++			logEvent(m.to(), me, EDB::Contact);
+ 			delete me;
+ 		}
+ 
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
+@@ -525,7 +525,7 @@ private:
+ 	void simulateRosterOffline();
+ 	void cpUpdate(const UserListItem &, const QString &rname="", bool fromPresence=false);
+ 	UserListItem* addUserListItem(const Jid& jid, const QString& nick="");
+-	void logEvent(const Jid &, PsiEvent *);
++	void logEvent(const Jid &, PsiEvent *, int);
+ 	void queueEvent(PsiEvent* e, ActivationType activationType);
+ 	void openNextEvent(const UserListItem &, ActivationType activationType);
+ 	void updateReadNext(const Jid &);
+--- psi.orig/src/psiapplication.cpp
++++ psi/src/psiapplication.cpp
+@@ -40,6 +40,7 @@
+ #include <QEvent>
+ 
+ #include "x11info.h"
++
+ #ifdef HAVE_QT5
+ # include <xcb/xcb.h>
+ # include <QAbstractNativeEventFilter>
+@@ -237,7 +238,6 @@ private:
+ //----------------------------------------------------------------------------
+ // PsiApplication
+ //----------------------------------------------------------------------------
+-
+ PsiApplication::PsiApplication(int &argc, char **argv, bool GUIenabled)
+ :	QApplication(argc, argv, GUIenabled)
+ {
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -324,7 +324,10 @@ PsiCon::PsiCon()
+@@ -356,7 +356,7 @@ PsiCon::PsiCon()
  	d->ftwin = 0;
  #endif
  
 -	d->edb = new EDBFlatFile;
-+	//d->edb = new EDBFlatFile;
-+	EDBSqLite *esl = new EDBSqLite;
-+	esl->setMirror(new EDBFlatFile);
-+	d->edb = esl;
++	d->edb = 0;
  
  	d->s5bServer = 0;
  	d->tuneManager = 0;
+@@ -378,7 +378,8 @@ PsiCon::~PsiCon()
+ 
+ 	delete d->autoUpdater;
+ 	delete d->actionList;
+-	delete d->edb;
++	if (d->edb)
++		delete d->edb;
+ 	delete d->defaultMenuBar;
+ 	delete d->tabManager;
+ 	delete d->popupManager;
+@@ -704,6 +705,12 @@ bool PsiCon::init()
+ 
+ 	checkAccountsEmpty();
+ 
++	// Import for SQLite history
++	EDBSqLite *edb = new EDBSqLite(this);
++	d->edb = edb;
++	if (!edb->init())
++		return false;
++
+ 	// try autologin if needed
+ 	foreach(PsiAccount* account, d->contactList->accounts()) {
+ 		account->autoLogin();
 --- psi.orig/src/src.pri
 +++ psi/src/src.pri
 @@ -1,4 +1,4 @@
 -QT += xml network
 +QT += xml network sql
  
- # modules
- include($$PWD/protocol/protocol.pri)
-@@ -155,6 +155,7 @@ HEADERS += \
+ greaterThan(QT_MAJOR_VERSION, 4) {
+   QT += widgets multimedia
+@@ -140,6 +140,7 @@ HEADERS += \
  	$$PWD/translationmanager.h \
  	$$PWD/eventdb.h \
  	$$PWD/historydlg.h \
@@ -1193,7 +3982,7 @@
  	$$PWD/tipdlg.h \
  	$$PWD/searchdlg.h \
  	$$PWD/registrationdlg.h \
-@@ -303,6 +304,7 @@ SOURCES += \
+@@ -289,6 +290,7 @@ SOURCES += \
  	$$PWD/translationmanager.cpp \
  	$$PWD/eventdb.cpp \
  	$$PWD/historydlg.cpp \
@@ -1201,3 +3990,120 @@
  	$$PWD/searchdlg.cpp \
  	$$PWD/registrationdlg.cpp \
  	$$PWD/psitoolbar.cpp \
+@@ -671,3 +673,5 @@ mac {
+ 
+ INCLUDEPATH += $$PWD
+ DEPENDPATH += $$PWD
++
++LIBS += -lqjson
+--- psi.orig/src/widgets/psirichtext.cpp
++++ psi/src/widgets/psirichtext.cpp
+@@ -263,9 +263,10 @@ static QString convertIconsToObjectRepla
+ static void applyFormatToIcons(QTextDocument *doc, TextIconFormatQueue *queue, QTextCursor &cursor)
+ {
+ 	QTextCursor searchCursor = cursor;
++	int bn = cursor.block().blockNumber();
+ 	forever {
+ 		searchCursor = doc->find(QString(QChar::ObjectReplacementCharacter), searchCursor);
+-		if (searchCursor.isNull()) {
++		if (searchCursor.isNull() || searchCursor.block().blockNumber() != bn) {
+ 			break;
+ 		}
+ 
+@@ -396,6 +397,26 @@ void PsiRichText::appendText(QTextDocume
+ 
+ 	appendTextHelper(doc, text, cursor);
+ 
++	cursor.endEditBlock();
++}
++
++void PsiRichText::appendHistoryText(QTextDocument *doc, QTextCursor &cursor, const QString &text)
++{
++	cursor.beginEditBlock();
++	int pos = cursor.position();
++	cursor.insertBlock();
++	if (pos == 0)
++		cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 0);
++
++	// clear trackbar for new blocks
++	QTextBlockFormat blockFormat = cursor.blockFormat();
++	blockFormat.setTopMargin(0);
++	blockFormat.setBottomMargin(0);
++	blockFormat.clearProperty(QTextFormat::BlockTrailingHorizontalRulerWidth);
++	cursor.setBlockFormat(blockFormat);
++
++	appendTextHelper(doc, text, cursor);
++
+ 	cursor.endEditBlock();
+ }
+ 
+--- psi.orig/src/widgets/psirichtext.h
++++ psi/src/widgets/psirichtext.h
+@@ -31,6 +31,7 @@ public:
+ 	static void setText(QTextDocument *doc, const QString &text);
+ 	static void insertIcon(QTextCursor &cursor, const QString &iconName, const QString &iconText);
+ 	static void appendText(QTextDocument *doc, QTextCursor &cursor, const QString &text);
++	static void appendHistoryText(QTextDocument *doc, QTextCursor &cursor, const QString &text);
+ 	static QString convertToPlainText(const QTextDocument *doc);
+ 	static void addEmoticon(QTextEdit *textEdit, const QString &emoticon);
+ 	static void setAllowedImageDirs(const QStringList &);
+--- psi.orig/src/widgets/psitextview.cpp
++++ psi/src/widgets/psitextview.cpp
+@@ -46,11 +46,13 @@ public:
+ 	{
+ 		anchorOnMousePress = QString();
+ 		hadSelectionOnMousePress = false;
++		lastHistoryBlock = -1;
+ 	}
+ 
+ 	QString anchorOnMousePress;
+ 	bool hadSelectionOnMousePress;
+ 	bool rightClickSelection;
++	int lastHistoryBlock;
+ 
+ 	QString fragmentToPlainText(const QTextFragment &fragment);
+ 	QString blockToPlainText(const QTextBlock &block);
+@@ -159,6 +161,33 @@ void PsiTextView::appendText(const QStri
+ 	setTextCursor(cursor);
+ }
+ 
++void PsiTextView::appendHistoryText(const QString &text)
++{
++	QTextCursor cursor = textCursor();
++	PsiRichText::Selection selection = PsiRichText::saveSelection(this, cursor);
++
++	if (d->lastHistoryBlock != -1)
++	{
++		QTextBlock block = document()->findBlockByNumber(d->lastHistoryBlock);
++		if (block.isValid())
++			cursor.setPosition(block.position() + block.length() - 1, QTextCursor::MoveAnchor);
++		else
++		{
++			d->lastHistoryBlock = -1;
++		}
++	}
++	if (d->lastHistoryBlock == -1)
++		cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 0);
++
++	PsiRichText::appendHistoryText(document(), cursor, text);
++
++	d->lastHistoryBlock = cursor.block().blockNumber();
++
++	PsiRichText::restoreSelection(this, cursor, selection);
++	setTextCursor(cursor);
++
++}
++
+ QString PsiTextView::getTextHelper(bool html) const
+ {
+ 	PsiTextView *ptv = (PsiTextView *)this;
+--- psi.orig/src/widgets/psitextview.h
++++ psi/src/widgets/psitextview.h
+@@ -38,6 +38,7 @@ public:
+ 	bool atBottom();
+ 
+ 	virtual void appendText(const QString &text);	
++	virtual void appendHistoryText(const QString &text);
+ 
+ 	QString getHtml() const;
+ 	QString getPlainText() const;
