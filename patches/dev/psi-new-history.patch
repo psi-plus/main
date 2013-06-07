@@ -3914,24 +3914,6 @@
  	void queueEvent(PsiEvent* e, ActivationType activationType);
  	void openNextEvent(const UserListItem &, ActivationType activationType);
  	void updateReadNext(const Jid &);
---- psi.orig/src/psiapplication.cpp
-+++ psi/src/psiapplication.cpp
-@@ -40,6 +40,7 @@
- #include <QEvent>
- 
- #include "x11info.h"
-+
- #ifdef HAVE_QT5
- # include <xcb/xcb.h>
- # include <QAbstractNativeEventFilter>
-@@ -237,7 +238,6 @@ private:
- //----------------------------------------------------------------------------
- // PsiApplication
- //----------------------------------------------------------------------------
--
- PsiApplication::PsiApplication(int &argc, char **argv, bool GUIenabled)
- :	QApplication(argc, argv, GUIenabled)
- {
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -356,7 +356,7 @@ PsiCon::PsiCon()
@@ -3990,12 +3972,6 @@
  	$$PWD/searchdlg.cpp \
  	$$PWD/registrationdlg.cpp \
  	$$PWD/psitoolbar.cpp \
-@@ -671,3 +673,5 @@ mac {
- 
- INCLUDEPATH += $$PWD
- DEPENDPATH += $$PWD
-+
-+LIBS += -lqjson
 --- psi.orig/src/widgets/psirichtext.cpp
 +++ psi/src/widgets/psirichtext.cpp
 @@ -263,9 +263,10 @@ static QString convertIconsToObjectRepla
@@ -4107,3 +4083,185 @@
  
  	QString getHtml() const;
  	QString getPlainText() const;
+diff --git a/psi.qc b/psi.qc
+index 1f74092..60aca4a 100644
+--- a/psi.qc
++++ b/psi.qc
+@@ -14,6 +14,9 @@
+   <dep type='qca'>
+     <required/>
+   </dep>
++  <dep type='qjson'>
++    <required/>
++  </dep>
+   <dep type='zlib'>
+     <required/>
+   </dep>
+diff --git a/qcm/qjson.qcm b/qcm/qjson.qcm
+new file mode 100644
+index 0000000..f42f381
+--- /dev/null
++++ b/qcm/qjson.qcm
+@@ -0,0 +1,162 @@
++/*
++-----BEGIN QCMOD-----
++name: QJson
++arg: with-qjson-inc=[path],Path to QJson include files
++arg: with-qjson-lib=[path],Path to QJson library or framework files
++-----END QCMOD-----
++*/
++
++// adapted from json.prf
++static QString internal_json_prf(const QString &incdir, const QString &libdir, const QString &frameworkdir)
++{
++	QString out = QString(
++"QJSON_INCDIR = %1\n"
++"QJSON_LIBDIR = %2\n"
++"QJSON_FRAMEWORKDIR = %3\n"
++"\n"
++"CONFIG *= qt\n"
++"\n"
++"LINKAGE =\n"
++"\n"
++"!isEmpty(QJSON_FRAMEWORKDIR): {\n"
++"	framework_dir = $$QJSON_FRAMEWORKDIR\n"
++"	exists($$framework_dir/qjson.framework) {\n"
++"		#QMAKE_FRAMEWORKPATH *= $$framework_dir\n"
++"		LIBS *= -F$$framework_dir\n"
++"		INCLUDEPATH += $$framework_dir/qjson.framework/Headers\n"
++"		LINKAGE = -framework qjson\n"
++"	}\n"
++"}\n"
++"\n"
++"# else, link normally\n"
++"isEmpty(LINKAGE) {\n"
++"	!isEmpty(QJSON_INCDIR):INCLUDEPATH += $QJSON_INCDIR\n"
++"	!isEmpty(QJSON_LIBDIR):LIBS += -L$$QJSON_LIBDIR\n"
++"	LINKAGE = -lqjson\n"
++"	CONFIG(debug, debug|release) {\n"
++"		windows:LINKAGE = -lqjsond\n"
++"		mac:LINKAGE = -lqjson_debug\n"
++"	}\n"
++"}\n"
++"\n"
++"LIBS += $$LINKAGE\n"
++	).arg(incdir, libdir, frameworkdir);
++	return out;
++}
++
++// set either libdir or frameworkdir, but not both
++static bool qjson_try(Conf *conf, const QString &incdir, const QString &libdir, const QString &frameworkdir, bool release, bool debug, QString *_prf)
++{
++	QString proextra;
++	QString prf = internal_json_prf(incdir, libdir, frameworkdir);
++	proextra =
++	"CONFIG += qt\n"
++	"CONFIG -= debug_and_release debug release\n"
++	"QT -= gui\n";
++	proextra += prf;
++
++	QString str =
++	"#include <qjson/parser.h>\n"
++	"\n"
++	"int main()\n"
++	"{\n"
++	"	return 0;\n"
++	"}\n";
++
++	// test desired versions, potentially both release and debug
++
++	if(release)
++	{
++		int ret;
++		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += release\n", &ret) || ret != 0)
++			return false;
++	}
++
++	if(debug)
++	{
++		int ret;
++		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += debug\n", &ret) || ret != 0)
++			return false;
++	}
++
++	*_prf = prf;
++	return true;
++}
++
++static bool qjson_try_lib(Conf *conf, const QString &incdir, const QString &libdir, bool release, bool debug, QString *prf)
++{
++	return qjson_try(conf, incdir, libdir, QString(), release, debug, prf);
++}
++
++static bool qjson_try_framework(Conf *conf, const QString &frameworkdir, bool release, bool debug, QString *prf)
++{
++	return qjson_try(conf, QString(), QString(), frameworkdir, release, debug, prf);
++}
++
++//----------------------------------------------------------------------------
++// qc_qjson
++//----------------------------------------------------------------------------
++class qc_qjson : public ConfObj
++{
++public:
++	qc_qjson(Conf *c) : ConfObj(c) {}
++	QString name() const { return "QJson"; }
++	QString shortname() const { return "qjson"; }
++	bool exec()
++	{
++		// get the build mode
++#ifdef QC_BUILDMODE
++		bool release = qc_buildmode_release;
++		bool debug = qc_buildmode_debug;
++#else
++		// else, default to just release mode
++		bool release = true;
++		bool debug = false;
++#endif
++
++		QString qjson_incdir, qjson_libdir, qjson_json_prf;
++		qjson_incdir = conf->getenv("QC_WITH_QJSON_INC");
++		qjson_libdir = conf->getenv("QC_WITH_QJSON_LIB");
++
++#if defined(Q_OS_MAC)
++		if(!qjson_libdir.isEmpty() && qjson_try_framework(conf, qjson_libdir, release, debug, &qjson_json_prf))
++		{
++			conf->addExtra(qjson_json_prf);
++			return true;
++		}
++#endif
++
++		if(!qjson_incdir.isEmpty() && !qjson_libdir.isEmpty() && qjson_try_lib(conf, qjson_incdir, qjson_libdir, release, debug, &qjson_json_prf))
++		{
++			conf->addExtra(qjson_json_prf);
++			return true;
++		}
++
++		QStringList incs;
++		QString version, libs, other;
++		if(conf->findPkgConfig("QJson", VersionAny, QString(), &version, &incs, &libs, &other))
++		{
++			for(int n = 0; n < incs.count(); ++n)
++				conf->addIncludePath(incs[n]);
++			if(!libs.isEmpty())
++				conf->addLib(libs);
++			return true;
++		}
++
++		QStringList prefixes;
++		prefixes += "/usr";
++		prefixes += "/usr/local";
++
++		for(int n = 0; n < prefixes.count(); ++n)
++		{
++			const QString &prefix = prefixes[n];
++			if(qjson_try_lib(conf, prefix + "/include", prefix + "/lib", release, debug, &qjson_json_prf))
++			{
++				conf->addExtra(qjson_json_prf);
++				return true;
++			}
++		}
++
++		return false;
++	}
++};
