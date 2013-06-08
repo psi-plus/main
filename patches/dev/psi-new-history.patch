@@ -4319,3 +4319,155 @@ index 11bfe90..9671059 100644
  
  # The rules
  .PHONY: buildall
+diff --git a/admin/build/Makefile b/admin/build/Makefile
+index cf508cb..78313d7 100644
+--- a/admin/build/Makefile
++++ b/admin/build/Makefile
+@@ -36,9 +36,9 @@ dist-mac: apply-version Psi-$(VERSION).dmg
+ 
+ dist-mingw: apply-version psi-$(VERSION)-win64.zip psi-$(VERSION)-win32.zip
+ 
+-deps-mac: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file)
++deps-mac: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file) packages/$(qjson_mac_file)
+ 
+-deps-mingw: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
++deps-mingw: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
+ 
+ packages/$(zlib_win_file):
+ 	mkdir -p packages deps
+@@ -50,6 +50,11 @@ packages/$(qca_win_file):
+ 	../fetch.sh $(qca_win_url) packages/$(qca_win_file)
+ 	cd deps && unzip ../packages/$(qca_win_file) && cd ..
+ 
++packages/$(qjson_win_file):
++	mkdir -p packages deps
++	../fetch.sh $(qjson_win_url) packages/$(qjson_win_file)
++	cd deps && unzip ../packages/$(qjson_win_file) && cd ..
++
+ packages/$(openssl_win_file):
+ 	mkdir -p packages deps
+ 	../fetch.sh $(openssl_win_url) packages/$(openssl_win_file)
+@@ -75,6 +80,11 @@ packages/$(qca_mac_file):
+ 	../fetch.sh $(qca_mac_url) packages/$(qca_mac_file)
+ 	cd deps && tar jxvf ../packages/$(qca_mac_file) && cd ..
+ 
++packages/$(qjson_mac_file):
++	mkdir -p packages deps
++	../fetch.sh $(qjson_mac_url) packages/$(qjson_mac_file)
++	cd deps && tar jxvf ../packages/$(qjson_mac_file) && cd ..
++
+ packages/$(growl_file):
+ 	mkdir -p packages deps
+ 	../fetch.sh $(growl_url) packages/$(growl_file)
+@@ -93,17 +103,17 @@ packages/$(psimedia_mac_file):
+ apply-version:
+ 	test "$(VERSION)" != "" && echo "$(VERSION)" > ../../version
+ 
+-build/uni/psi/ok: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file)
++build/uni/psi/ok: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file) packages/$(qjson_mac_file)
+ 	mkdir -p build
+ 	./build_package.sh psi "" ""
+ 	touch build/uni/psi/ok
+ 
+-build/i386/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
++build/i386/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
+ 	mkdir -p build
+ 	./build_package.sh psi i386 $(PWD)/out
+ 	touch build/i386/psi/ok
+ 
+-build/x86_64/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
++build/x86_64/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
+ 	mkdir -p build
+ 	./build_package.sh psi x86_64 $(PWD)/out
+ 	touch build/x86_64/psi/ok
+diff --git a/admin/build/build_package.sh b/admin/build/build_package.sh
+index 5567f31..46f77a1 100755
+--- a/admin/build/build_package.sh
++++ b/admin/build/build_package.sh
+@@ -129,8 +129,8 @@ build_package_psi() {
+ 			QT_LIB_PATH=$QTDIR/lib
+ 		fi
+ 		cd $psi_base
+-		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
+-		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
++		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
++		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
+ 		make
+ 	fi
+ }
+diff --git a/admin/build/devconfig.sh b/admin/build/devconfig.sh
+index c1cb949..3187900 100755
+--- a/admin/build/devconfig.sh
++++ b/admin/build/devconfig.sh
+@@ -60,7 +60,7 @@ if [ "$platform" == "win" ]; then
+ 	fi
+ 	mqtdir=`get_msys_path $qtdir`
+ 
+-	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib
++	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib --with-qjson-inc=$deps_base/$qjson_win_dir/$target_arch/include --with-qjson-lib=$deps_base/$qjson_win_dir/$target_arch/lib
+ 
+ 	rm -f $build_base/devenv
+ 	touch $build_base/devenv
+@@ -79,8 +79,8 @@ else
+ 	if [ "$QT_PLUGIN_PATH" == "" ]; then
+ 		QT_PLUGIN_PATH=$QTDIR/plugins
+ 	fi
+-	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
+-	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
++	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
++	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
+ 
+ 	# remove some gstbundle problem files
+ 	rm -f $deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10/libgstximagesink.so
+@@ -91,7 +91,7 @@ else
+ 	rm -f $build_base/devenv
+ 	touch $build_base/devenv
+ 	echo "export DYLD_LIBRARY_PATH=$deps_base/$gstbundle_mac_dir/uni/lib:\$DYLD_LIBRARY_PATH" >> $build_base/devenv
+-	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
++	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
+ 	echo "export GST_PLUGIN_PATH=$deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10" >> $build_base/devenv
+ 	echo "export GST_REGISTRY_FORK=no" >> $build_base/devenv
+ 	echo "export QT_PLUGIN_PATH=$QT_PLUGIN_PATH:$deps_base/$qca_mac_dir/plugins" >> $build_base/devenv
+diff --git a/admin/build/package_info b/admin/build/package_info
+index fdea71b..7310eb6 100644
+--- a/admin/build/package_info
++++ b/admin/build/package_info
+@@ -39,3 +39,11 @@ psimedia_win_dir=psimedia-20120725-win
+ psimedia_mac_file=psimedia-20120725-mac.tar.bz2
+ psimedia_mac_url=http://psi-im.org/files/deps/psimedia-20120725-mac.tar.bz2
+ psimedia_mac_dir=psimedia-20120725-mac
++
++qjson_win_file=qjson-0.8.1-win.zip
++qjson_win_url=http://psi-im.org/files/deps/qjson-0.8.1-win.zip
++qjson_win_dir=qjson-0.8.1-win
++
++qjson_mac_file=qjson-0.8.1-mac.tar.bz2
++qjson_mac_url=http://psi-im.org/files/deps/qjson-0.8.1-mac.tar.bz2
++qjson_mac_dir=qjson-0.8.1-mac
+diff --git a/admin/build/prep_dist.sh b/admin/build/prep_dist.sh
+index e3824c7..8793ecc 100755
+--- a/admin/build/prep_dist.sh
++++ b/admin/build/prep_dist.sh
+@@ -57,6 +57,7 @@ if [ "$platform" == "mac" ]; then
+ 	done
+ 
+ 	install_name_tool -change qca.framework/Versions/2/qca @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/MacOS/psi
++	install_name_tool -change qjson.framework/Versions/0.8.1/qjson @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/MacOS/psi
+ 
+ 	mkdir -p $contentsdir/Frameworks
+ 	for f in $QT_FRAMEWORKS; do
+@@ -82,8 +83,14 @@ if [ "$platform" == "mac" ]; then
+ 	cp -a $deps_base/$qca_mac_dir/lib/qca.framework $contentsdir/Frameworks
+ 	cleanup_framework $contentsdir/Frameworks/qca.framework qca 2
+ 	install_name_tool -id @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/Frameworks/qca.framework/qca
++
++	cp -a $deps_base/$qjson_mac_dir/lib/qjson.framework $contentsdir/Frameworks
++	cleanup_framework $contentsdir/Frameworks/qjson.framework qjson 0.8.1
++	install_name_tool -id @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/Frameworks/qjson.framework/qjson
++
+ 	for g in $QT_FRAMEWORKS; do
+ 		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qca.framework/qca
++		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qjson.framework/qjson
+ 	done
+ 
+ 	mkdir -p $contentsdir/Plugins/crypto
