@@ -1,3 +1,119 @@
+--- psi.orig/admin/build/build_package.sh
++++ psi/admin/build/build_package.sh
+@@ -82,10 +82,13 @@ build_package_psi() {
+ 		cp $mqtdir/bin/QtNetwork4.dll $arch_prefix
+ 		cp $mqtdir/bin/QtXml4.dll $arch_prefix
+ 		cp $mqtdir/bin/QtGui4.dll $arch_prefix
++		cp $mqtdir/bin/QtSql4.dll $arch_prefix
+ 		mkdir -p $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qgif4.dll $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qjpeg4.dll $arch_prefix/imageformats
+ 		cp $mqtdir/plugins/imageformats/qmng4.dll $arch_prefix/imageformats
++		mkdir -p $arch_prefix/sqldrivers
++		cp $mqtdir/plugins/sqldrivers/qsqlite4.dll
+ 		cp $deps_base/$qca_win_dir/$target_arch/bin/qca2.dll $arch_prefix
+ 		mkdir -p $arch_prefix/crypto
+ 		cp $deps_base/$qca_win_dir/$target_arch/plugins/crypto/qca-gnupg2.dll $arch_prefix/crypto
+@@ -126,8 +129,8 @@ build_package_psi() {
+ 			QT_LIB_PATH=$QTDIR/lib
+ 		fi
+ 		cd $psi_base
+-		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
+-		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
++		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
++		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
+ 		make
+ 	fi
+ }
+--- psi.orig/admin/build/devconfig.sh
++++ psi/admin/build/devconfig.sh
+@@ -60,7 +60,7 @@ if [ "$platform" == "win" ]; then
+ 	fi
+ 	mqtdir=`get_msys_path $qtdir`
+ 
+-	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib
++	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib --with-qjson-inc=$deps_base/$qjson_win_dir/$target_arch/include --with-qjson-lib=$deps_base/$qjson_win_dir/$target_arch/lib
+ 
+ 	rm -f $build_base/devenv
+ 	touch $build_base/devenv
+@@ -79,8 +79,8 @@ else
+ 	if [ "$QT_PLUGIN_PATH" == "" ]; then
+ 		QT_PLUGIN_PATH=$QTDIR/plugins
+ 	fi
+-	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
+-	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
++	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
++	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
+ 
+ 	# remove some gstbundle problem files
+ 	rm -f $deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10/libgstximagesink.so
+@@ -91,7 +91,7 @@ else
+ 	rm -f $build_base/devenv
+ 	touch $build_base/devenv
+ 	echo "export DYLD_LIBRARY_PATH=$deps_base/$gstbundle_mac_dir/uni/lib:\$DYLD_LIBRARY_PATH" >> $build_base/devenv
+-	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
++	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
+ 	echo "export GST_PLUGIN_PATH=$deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10" >> $build_base/devenv
+ 	echo "export GST_REGISTRY_FORK=no" >> $build_base/devenv
+ 	echo "export QT_PLUGIN_PATH=$QT_PLUGIN_PATH:$deps_base/$qca_mac_dir/plugins" >> $build_base/devenv
+--- psi.orig/admin/build/package_info
++++ psi/admin/build/package_info
+@@ -39,3 +39,11 @@ psimedia_win_dir=psimedia-20120725-win
+ psimedia_mac_file=psimedia-20120725-mac.tar.bz2
+ psimedia_mac_url=http://psi-im.org/files/deps/psimedia-20120725-mac.tar.bz2
+ psimedia_mac_dir=psimedia-20120725-mac
++
++qjson_win_file=qjson-0.8.1-win.zip
++qjson_win_url=http://psi-im.org/files/deps/qjson-0.8.1-win.zip
++qjson_win_dir=qjson-0.8.1-win
++
++qjson_mac_file=qjson-0.8.1-mac.tar.bz2
++qjson_mac_url=http://psi-im.org/files/deps/qjson-0.8.1-mac.tar.bz2
++qjson_mac_dir=qjson-0.8.1-mac
+--- psi.orig/admin/build/prep_dist.sh
++++ psi/admin/build/prep_dist.sh
+@@ -45,8 +45,8 @@ if [ "$platform" == "mac" ]; then
+ 
+ 	mkdir -p $target_dist_base
+ 
+-	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui"
+-	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib"
++	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui QtSql"
++	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib sqldrivers/libqsqlite.dylib"
+ 	QCA_PLUGINS="crypto/libqca-ossl.dylib crypto/libqca-gnupg.dylib"
+ 
+ 	cp -a $psi_base/psi.app $target_dist_base/Psi.app
+@@ -57,6 +57,7 @@ if [ "$platform" == "mac" ]; then
+ 	done
+ 
+ 	install_name_tool -change qca.framework/Versions/2/qca @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/MacOS/psi
++	install_name_tool -change qjson.framework/Versions/0.8.1/qjson @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/MacOS/psi
+ 
+ 	mkdir -p $contentsdir/Frameworks
+ 	for f in $QT_FRAMEWORKS; do
+@@ -71,6 +72,7 @@ if [ "$platform" == "mac" ]; then
+ 
+ 	mkdir -p $contentsdir/Plugins
+ 	mkdir -p $contentsdir/Plugins/imageformats
++	mkdir -p $contentsdir/Plugins/sqldrivers
+ 	for p in $QT_PLUGINS; do
+ 		cp -a $QTDIR/plugins/$p $contentsdir/Plugins/$p
+ 		for g in $QT_FRAMEWORKS; do
+@@ -81,8 +83,14 @@ if [ "$platform" == "mac" ]; then
+ 	cp -a $deps_base/$qca_mac_dir/lib/qca.framework $contentsdir/Frameworks
+ 	cleanup_framework $contentsdir/Frameworks/qca.framework qca 2
+ 	install_name_tool -id @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/Frameworks/qca.framework/qca
++
++	cp -a $deps_base/$qjson_mac_dir/lib/qjson.framework $contentsdir/Frameworks
++	cleanup_framework $contentsdir/Frameworks/qjson.framework qjson 0.8.1
++	install_name_tool -id @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/Frameworks/qjson.framework/qjson
++
+ 	for g in $QT_FRAMEWORKS; do
+ 		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qca.framework/qca
++		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qjson.framework/qjson
+ 	done
+ 
+ 	mkdir -p $contentsdir/Plugins/crypto
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
 @@ -129,6 +129,9 @@
@@ -20,6 +136,183 @@
  	</options>
  	<accounts comment="Account definitions and options"/>
  	<plugins comment="Plugin options"/>
+--- psi.orig/psi.qc
++++ psi/psi.qc
+@@ -14,6 +14,9 @@
+   <dep type='qca'>
+     <required/>
+   </dep>
++  <dep type='qjson'>
++    <required/>
++  </dep>
+   <dep type='zlib'>
+     <required/>
+   </dep>
+--- psi.orig/qcm/qjson.qcm
++++ psi/qcm/qjson.qcm
+@@ -0,0 +1,162 @@
++/*
++-----BEGIN QCMOD-----
++name: QJson
++arg: with-qjson-inc=[path],Path to QJson include files
++arg: with-qjson-lib=[path],Path to QJson library or framework files
++-----END QCMOD-----
++*/
++
++// adapted from json.prf
++static QString internal_json_prf(const QString &incdir, const QString &libdir, const QString &frameworkdir)
++{
++	QString out = QString(
++"QJSON_INCDIR = %1\n"
++"QJSON_LIBDIR = %2\n"
++"QJSON_FRAMEWORKDIR = %3\n"
++"\n"
++"CONFIG *= qt\n"
++"\n"
++"LINKAGE =\n"
++"\n"
++"!isEmpty(QJSON_FRAMEWORKDIR): {\n"
++"	framework_dir = $$QJSON_FRAMEWORKDIR\n"
++"	exists($$framework_dir/qjson.framework) {\n"
++"		QMAKE_FRAMEWORKPATH *= $$framework_dir\n"
++"		LIBS *= -F$$framework_dir\n"
++"		INCLUDEPATH += $$framework_dir/qjson.framework\n"
++"		LINKAGE = -framework qjson\n"
++"	}\n"
++"}\n"
++"\n"
++"# else, link normally\n"
++"isEmpty(LINKAGE) {\n"
++"	!isEmpty(QJSON_INCDIR):INCLUDEPATH += $$QJSON_INCDIR\n"
++"	!isEmpty(QJSON_LIBDIR):LIBS += -L$$QJSON_LIBDIR\n"
++"	LINKAGE = -lqjson\n"
++"	CONFIG(debug, debug|release) {\n"
++"		windows:LINKAGE = -lqjsond\n"
++"		mac:LINKAGE = -lqjson_debug\n"
++"	}\n"
++"}\n"
++"\n"
++"LIBS += $$LINKAGE\n"
++	).arg(incdir, libdir, frameworkdir);
++	return out;
++}
++
++// set either libdir or frameworkdir, but not both
++static bool qjson_try(Conf *conf, const QString &incdir, const QString &libdir, const QString &frameworkdir, bool release, bool debug, QString *_prf)
++{
++	QString proextra;
++	QString prf = internal_json_prf(incdir, libdir, frameworkdir);
++	proextra =
++	"CONFIG += qt\n"
++	"CONFIG -= debug_and_release debug release\n"
++	"QT -= gui\n";
++	proextra += prf;
++
++	QString str =
++	"#include <qjson/parser.h>\n"
++	"\n"
++	"int main()\n"
++	"{\n"
++	"	return 0;\n"
++	"}\n";
++
++	// test desired versions, potentially both release and debug
++
++	if(release)
++	{
++		int ret;
++		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += release\n", &ret) || ret != 0)
++			return false;
++	}
++
++	if(debug)
++	{
++		int ret;
++		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += debug\n", &ret) || ret != 0)
++			return false;
++	}
++
++	*_prf = prf;
++	return true;
++}
++
++static bool qjson_try_lib(Conf *conf, const QString &incdir, const QString &libdir, bool release, bool debug, QString *prf)
++{
++	return qjson_try(conf, incdir, libdir, QString(), release, debug, prf);
++}
++
++static bool qjson_try_framework(Conf *conf, const QString &frameworkdir, bool release, bool debug, QString *prf)
++{
++	return qjson_try(conf, QString(), QString(), frameworkdir, release, debug, prf);
++}
++
++//----------------------------------------------------------------------------
++// qc_qjson
++//----------------------------------------------------------------------------
++class qc_qjson : public ConfObj
++{
++public:
++	qc_qjson(Conf *c) : ConfObj(c) {}
++	QString name() const { return "QJson"; }
++	QString shortname() const { return "qjson"; }
++	bool exec()
++	{
++		// get the build mode
++#ifdef QC_BUILDMODE
++		bool release = qc_buildmode_release;
++		bool debug = qc_buildmode_debug;
++#else
++		// else, default to just release mode
++		bool release = true;
++		bool debug = false;
++#endif
++
++		QString qjson_incdir, qjson_libdir, qjson_json_prf;
++		qjson_incdir = conf->getenv("QC_WITH_QJSON_INC");
++		qjson_libdir = conf->getenv("QC_WITH_QJSON_LIB");
++
++#if defined(Q_OS_MAC)
++		if(!qjson_libdir.isEmpty() && qjson_try_framework(conf, qjson_libdir, release, debug, &qjson_json_prf))
++		{
++			conf->addExtra(qjson_json_prf);
++			return true;
++		}
++#endif
++
++		if(!qjson_incdir.isEmpty() && !qjson_libdir.isEmpty() && qjson_try_lib(conf, qjson_incdir, qjson_libdir, release, debug, &qjson_json_prf))
++		{
++			conf->addExtra(qjson_json_prf);
++			return true;
++		}
++
++		QStringList incs;
++		QString version, libs, other;
++		if(conf->findPkgConfig("QJson", VersionAny, QString(), &version, &incs, &libs, &other))
++		{
++			for(int n = 0; n < incs.count(); ++n)
++				conf->addIncludePath(incs[n]);
++			if(!libs.isEmpty())
++				conf->addLib(libs);
++			return true;
++		}
++
++		QStringList prefixes;
++		prefixes += "/usr";
++		prefixes += "/usr/local";
++
++		for(int n = 0; n < prefixes.count(); ++n)
++		{
++			const QString &prefix = prefixes[n];
++			if(qjson_try_lib(conf, prefix + "/include", prefix + "/lib", release, debug, &qjson_json_prf))
++			{
++				conf->addExtra(qjson_json_prf);
++				return true;
++			}
++		}
++
++		return false;
++	}
++};
 --- psi.orig/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp
 @@ -77,6 +77,7 @@
@@ -930,7 +1223,7 @@
  PsiEvent *EDBFlatFile::File::lineToEvent(const QString &line)
  {
  	// -- read the line --
-@@ -977,3 +962,798 @@ QString EDBFlatFile::File::eventToLine(P
+@@ -977,3 +962,809 @@ QString EDBFlatFile::File::eventToLine(P
  	
  	return "";
  }
@@ -953,11 +1246,12 @@
 +		qWarning("EDBSqLite::EDBSqLite(): Can't open base.\n" + db.lastError().text().toLatin1());
 +		return;
 +	}
++	QSqlQuery query(db);
++	query.exec("PRAGMA foreign_keys = ON;");
 +	setInsertingMode(Normal);
 +	if (db.tables(QSql::Tables).size() == 0) {
 +		// no tables found.
 +		if (db.transaction()) {
-+			QSqlQuery query(db);
 +			query.exec("CREATE TABLE `system` ("
 +				"`key` TEXT, "
 +				"`value` TEXT"
@@ -967,15 +1261,15 @@
 +				"`lifetime` INTEGER"
 +				");");
 +			query.exec("CREATE TABLE `contacts` ("
-+				"`id` INTEGER PRIMARY KEY ASC, "
++				"`id` INTEGER NOT NULL PRIMARY KEY ASC, "
 +				"`acc_id` TEXT, "
 +				"`type` INTEGER, "
 +				"`jid` TEXT, "
 +				"`lifetime` INTEGER"
 +				");");
 +			query.exec("CREATE TABLE `events` ("
-+				"`id` INTEGER PRIMARY KEY ASC AUTOINCREMENT, "
-+				"`contact_id` INTEGER, "
++				"`id` INTEGER NOT NULL PRIMARY KEY ASC, "
++				"`contact_id` INTEGER NOT NULL REFERENCES `contacts`(`id`) ON DELETE CASCADE, "
 +				"`resource` TEXT, "
 +				"`date` TEXT, "
 +				"`type` INTEGER, "
@@ -1342,24 +1636,19 @@
 +	if (!transaction(false))
 +		return false;
 +
-+	QSqlQuery query(db);
-+	query.prepare("INSERT INTO `events` ("
-+		"`contact_id`, `resource`, `date`, `type`, `direction`, `subject`, `m_text`, `lang`, `extra_data`"
-+		") VALUES ("
-+		"?, ?, ?, ?, ?, ?, ?, ?, ?"
-+		");");
-+	query.bindValue(0, contactId);
-+	query.bindValue(1, (jidType != GroupChatContact) ? jid.resource() : "");
-+	query.bindValue(2, dTime);
-+	query.bindValue(3, nType);
-+	query.bindValue(4, nDirection);
++	PreparedQuery *query = queryes.getPreparedQuery(QueryInsertEvent, false, false);
++	query->bindValue(":contact_id", contactId);
++	query->bindValue(":resource", (jidType != GroupChatContact) ? jid.resource() : "");
++	query->bindValue(":date", dTime);
++	query->bindValue(":type", nType);
++	query->bindValue(":direction", nDirection);
 +	if (nType == 0 || nType == 1 || nType == 4 || nType == 5) {
 +		MessageEvent *me = (MessageEvent *)e;
 +		const Message &m = me->message();
 +		QString lang = m.lang();
-+		query.bindValue(5, m.subject(lang));
-+		query.bindValue(6, m.body(lang));
-+		query.bindValue(7, lang);
++		query->bindValue(":subject", m.subject(lang));
++		query->bindValue(":m_text", m.body(lang));
++		query->bindValue(":lang", lang);
 +		QString extraData;
 +		const UrlList &urls = m.urlList();
 +		if (!urls.isEmpty()) {
@@ -1377,15 +1666,16 @@
 +			QJson::Serializer serializer;
 +			extraData = QString::fromUtf8(serializer.serialize(xepList));
 +		}
-+		query.bindValue(8, extraData);
++		query->bindValue(":extra_data", extraData);
 +	}
 +	else {
-+		query.bindValue(5, QVariant(QVariant::String));
-+		query.bindValue(6, QVariant(QVariant::String));
-+		query.bindValue(7, QVariant(QVariant::String));
-+		query.bindValue(8, QVariant(QVariant::String));
++		query->bindValue(":subject", QVariant(QVariant::String));
++		query->bindValue(":m_text", QVariant(QVariant::String));
++		query->bindValue(":lang", QVariant(QVariant::String));
++		query->bindValue(":extra_data", QVariant(QVariant::String));
 +	}
-+	return query.exec();
++	bool res = query->exec();
++	return res;
 +}
 +
 +PsiEvent *EDBSqLite::getEvent(const QSqlRecord &record)
@@ -1524,9 +1814,11 @@
 +
 +	if (accId.isEmpty() && jid.isEmpty()) {
 +		QSqlQuery query(QSqlDatabase::database("history"));
-+		if (query.exec("DELETE FROM `events`;"))
-+			if (query.exec("DELETE FROM `contacts`;"))
++		//if (query.exec("DELETE FROM `events`;"))
++			if (query.exec("DELETE FROM `contacts`;")) {
++				jidsCache.clear();
 +				res = true;
++			}
 +	}
 +	else {
 +		PreparedQuery *query = queryes.getPreparedQuery(QueryJidRowId, false, false);
@@ -1537,8 +1829,13 @@
 +			QSqlQuery query2(QSqlDatabase::database("history"));
 +			query2.prepare("DELETE FROM `events` WHERE `contact_id` = :id;");
 +			query2.bindValue(":id", id);
-+			if (query2.exec())
++			if (query2.exec()) {
 +				res = true;
++				query2.prepare("DELETE FROM `contacts` WHERE `id` = :id AND `lifetime` = -1;");
++				query2.bindValue(":id", id);
++				if (!query2.exec())
++					res = false;
++			}
 +		}
 +	}
 +	if (res)
@@ -1716,6 +2013,13 @@
 +			queryStr.append(" AND `m_text` IS NOT NULL");
 +			queryStr.append(" ORDER BY `date`;");
 +			break;
++		case QueryInsertEvent:
++			queryStr = "INSERT INTO `events` ("
++				"`contact_id`, `resource`, `date`, `type`, `direction`, `subject`, `m_text`, `lang`, `extra_data`"
++				") VALUES ("
++				":contact_id, :resource, :date, :type, :direction, :subject, :m_text, :lang, :extra_data"
++				");";
++			break;
 +	}
 +	return queryStr;
 +}
@@ -1890,7 +2194,7 @@
  
  signals:
  	void timeout();
-@@ -187,6 +201,144 @@ private:
+@@ -187,6 +201,145 @@ private:
  	PsiEvent *lineToEvent(const QString &);
  	QString eventToLine(PsiEvent *);
  	void ensureIndex();
@@ -1905,7 +2209,8 @@
 +	QueryDateForward, QueryDateBackward,
 +	QueryFindText,
 +	QueryRowCount, QueryRowCountBefore,
-+	QueryJidRowId
++	QueryJidRowId,
++	QueryInsertEvent
 +};
 +
 +struct QueryProperty
@@ -2847,7 +3152,7 @@
  #endif
 --- psi.orig/src/historyimp.cpp
 +++ psi/src/historyimp.cpp
-@@ -0,0 +1,299 @@
+@@ -0,0 +1,301 @@
 +/*
 + * historyimp.cpp
 + * Copyright (C) 2011   Aleksey Andreev
@@ -3140,6 +3445,8 @@
 +		qApp->processEvents();
 +	if (result_ == ResultNormal)
 +		dlg->accept();
++	else
++		lbStatus->setText(tr("Error"));
 +}
 +
 +void HistoryImport::cancel()
@@ -4083,391 +4390,3 @@
  
  	QString getHtml() const;
  	QString getPlainText() const;
-diff --git a/psi.qc b/psi.qc
-index 1f74092..60aca4a 100644
---- a/psi.qc
-+++ b/psi.qc
-@@ -14,6 +14,9 @@
-   <dep type='qca'>
-     <required/>
-   </dep>
-+  <dep type='qjson'>
-+    <required/>
-+  </dep>
-   <dep type='zlib'>
-     <required/>
-   </dep>
-diff --git a/qcm/qjson.qcm b/qcm/qjson.qcm
-new file mode 100644
-index 0000000..f42f381
---- /dev/null
-+++ b/qcm/qjson.qcm
-@@ -0,0 +1,162 @@
-+/*
-+-----BEGIN QCMOD-----
-+name: QJson
-+arg: with-qjson-inc=[path],Path to QJson include files
-+arg: with-qjson-lib=[path],Path to QJson library or framework files
-+-----END QCMOD-----
-+*/
-+
-+// adapted from json.prf
-+static QString internal_json_prf(const QString &incdir, const QString &libdir, const QString &frameworkdir)
-+{
-+	QString out = QString(
-+"QJSON_INCDIR = %1\n"
-+"QJSON_LIBDIR = %2\n"
-+"QJSON_FRAMEWORKDIR = %3\n"
-+"\n"
-+"CONFIG *= qt\n"
-+"\n"
-+"LINKAGE =\n"
-+"\n"
-+"!isEmpty(QJSON_FRAMEWORKDIR): {\n"
-+"	framework_dir = $$QJSON_FRAMEWORKDIR\n"
-+"	exists($$framework_dir/qjson.framework) {\n"
-+"		QMAKE_FRAMEWORKPATH *= $$framework_dir\n"
-+"		LIBS *= -F$$framework_dir\n"
-+"		INCLUDEPATH += $$framework_dir/qjson.framework\n"
-+"		LINKAGE = -framework qjson\n"
-+"	}\n"
-+"}\n"
-+"\n"
-+"# else, link normally\n"
-+"isEmpty(LINKAGE) {\n"
-+"	!isEmpty(QJSON_INCDIR):INCLUDEPATH += $$QJSON_INCDIR\n"
-+"	!isEmpty(QJSON_LIBDIR):LIBS += -L$$QJSON_LIBDIR\n"
-+"	LINKAGE = -lqjson\n"
-+"	CONFIG(debug, debug|release) {\n"
-+"		windows:LINKAGE = -lqjsond\n"
-+"		mac:LINKAGE = -lqjson_debug\n"
-+"	}\n"
-+"}\n"
-+"\n"
-+"LIBS += $$LINKAGE\n"
-+	).arg(incdir, libdir, frameworkdir);
-+	return out;
-+}
-+
-+// set either libdir or frameworkdir, but not both
-+static bool qjson_try(Conf *conf, const QString &incdir, const QString &libdir, const QString &frameworkdir, bool release, bool debug, QString *_prf)
-+{
-+	QString proextra;
-+	QString prf = internal_json_prf(incdir, libdir, frameworkdir);
-+	proextra =
-+	"CONFIG += qt\n"
-+	"CONFIG -= debug_and_release debug release\n"
-+	"QT -= gui\n";
-+	proextra += prf;
-+
-+	QString str =
-+	"#include <qjson/parser.h>\n"
-+	"\n"
-+	"int main()\n"
-+	"{\n"
-+	"	return 0;\n"
-+	"}\n";
-+
-+	// test desired versions, potentially both release and debug
-+
-+	if(release)
-+	{
-+		int ret;
-+		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += release\n", &ret) || ret != 0)
-+			return false;
-+	}
-+
-+	if(debug)
-+	{
-+		int ret;
-+		if(!conf->doCompileAndLink(str, QStringList(), QString(), proextra + "CONFIG += debug\n", &ret) || ret != 0)
-+			return false;
-+	}
-+
-+	*_prf = prf;
-+	return true;
-+}
-+
-+static bool qjson_try_lib(Conf *conf, const QString &incdir, const QString &libdir, bool release, bool debug, QString *prf)
-+{
-+	return qjson_try(conf, incdir, libdir, QString(), release, debug, prf);
-+}
-+
-+static bool qjson_try_framework(Conf *conf, const QString &frameworkdir, bool release, bool debug, QString *prf)
-+{
-+	return qjson_try(conf, QString(), QString(), frameworkdir, release, debug, prf);
-+}
-+
-+//----------------------------------------------------------------------------
-+// qc_qjson
-+//----------------------------------------------------------------------------
-+class qc_qjson : public ConfObj
-+{
-+public:
-+	qc_qjson(Conf *c) : ConfObj(c) {}
-+	QString name() const { return "QJson"; }
-+	QString shortname() const { return "qjson"; }
-+	bool exec()
-+	{
-+		// get the build mode
-+#ifdef QC_BUILDMODE
-+		bool release = qc_buildmode_release;
-+		bool debug = qc_buildmode_debug;
-+#else
-+		// else, default to just release mode
-+		bool release = true;
-+		bool debug = false;
-+#endif
-+
-+		QString qjson_incdir, qjson_libdir, qjson_json_prf;
-+		qjson_incdir = conf->getenv("QC_WITH_QJSON_INC");
-+		qjson_libdir = conf->getenv("QC_WITH_QJSON_LIB");
-+
-+#if defined(Q_OS_MAC)
-+		if(!qjson_libdir.isEmpty() && qjson_try_framework(conf, qjson_libdir, release, debug, &qjson_json_prf))
-+		{
-+			conf->addExtra(qjson_json_prf);
-+			return true;
-+		}
-+#endif
-+
-+		if(!qjson_incdir.isEmpty() && !qjson_libdir.isEmpty() && qjson_try_lib(conf, qjson_incdir, qjson_libdir, release, debug, &qjson_json_prf))
-+		{
-+			conf->addExtra(qjson_json_prf);
-+			return true;
-+		}
-+
-+		QStringList incs;
-+		QString version, libs, other;
-+		if(conf->findPkgConfig("QJson", VersionAny, QString(), &version, &incs, &libs, &other))
-+		{
-+			for(int n = 0; n < incs.count(); ++n)
-+				conf->addIncludePath(incs[n]);
-+			if(!libs.isEmpty())
-+				conf->addLib(libs);
-+			return true;
-+		}
-+
-+		QStringList prefixes;
-+		prefixes += "/usr";
-+		prefixes += "/usr/local";
-+
-+		for(int n = 0; n < prefixes.count(); ++n)
-+		{
-+			const QString &prefix = prefixes[n];
-+			if(qjson_try_lib(conf, prefix + "/include", prefix + "/lib", release, debug, &qjson_json_prf))
-+			{
-+				conf->addExtra(qjson_json_prf);
-+				return true;
-+			}
-+		}
-+
-+		return false;
-+	}
-+};
-diff --git a/admin/build/build_package.sh b/admin/build/build_package.sh
-index 5f2e36d..5567f31 100755
---- a/admin/build/build_package.sh
-+++ b/admin/build/build_package.sh
-@@ -82,10 +82,13 @@ build_package_psi() {
- 		cp $mqtdir/bin/QtNetwork4.dll $arch_prefix
- 		cp $mqtdir/bin/QtXml4.dll $arch_prefix
- 		cp $mqtdir/bin/QtGui4.dll $arch_prefix
-+		cp $mqtdir/bin/QtSql4.dll $arch_prefix
- 		mkdir -p $arch_prefix/imageformats
- 		cp $mqtdir/plugins/imageformats/qgif4.dll $arch_prefix/imageformats
- 		cp $mqtdir/plugins/imageformats/qjpeg4.dll $arch_prefix/imageformats
- 		cp $mqtdir/plugins/imageformats/qmng4.dll $arch_prefix/imageformats
-+		mkdir -p $arch_prefix/sqldrivers
-+		cp $mqtdir/plugins/sqldrivers/qsqlite4.dll
- 		cp $deps_base/$qca_win_dir/$target_arch/bin/qca2.dll $arch_prefix
- 		mkdir -p $arch_prefix/crypto
- 		cp $deps_base/$qca_win_dir/$target_arch/plugins/crypto/qca-gnupg2.dll $arch_prefix/crypto
-diff --git a/admin/build/prep_dist.sh b/admin/build/prep_dist.sh
-index 5e7b000..e3824c7 100755
---- a/admin/build/prep_dist.sh
-+++ b/admin/build/prep_dist.sh
-@@ -45,8 +45,8 @@ if [ "$platform" == "mac" ]; then
- 
- 	mkdir -p $target_dist_base
- 
--	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui"
--	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib"
-+	QT_FRAMEWORKS="QtCore QtNetwork QtXml QtGui QtSql"
-+	QT_PLUGINS="imageformats/libqjpeg.dylib imageformats/libqgif.dylib imageformats/libqmng.dylib sqldrivers/libqsqlite.dylib"
- 	QCA_PLUGINS="crypto/libqca-ossl.dylib crypto/libqca-gnupg.dylib"
- 
- 	cp -a $psi_base/psi.app $target_dist_base/Psi.app
-@@ -71,6 +71,7 @@ if [ "$platform" == "mac" ]; then
- 
- 	mkdir -p $contentsdir/Plugins
- 	mkdir -p $contentsdir/Plugins/imageformats
-+	mkdir -p $contentsdir/Plugins/sqldrivers
- 	for p in $QT_PLUGINS; do
- 		cp -a $QTDIR/plugins/$p $contentsdir/Plugins/$p
- 		for g in $QT_FRAMEWORKS; do
-diff --git a/mac/Makefile b/mac/Makefile
-index 11bfe90..9671059 100644
---- a/mac/Makefile
-+++ b/mac/Makefile
-@@ -41,7 +41,7 @@ MASTER_DMG=$(NAME)-$(VERSION).dmg
- # Other variables
- QT_FRAMEWORK_VERSION=4
- QT_FRAMEWORKS=QtCore QtXml QtNetwork QtGui QtSql QtSvg
--QT_PLUGINS=imageformats/libqjpeg.dylib imageformats/libqgif.dylib
-+QT_PLUGINS=imageformats/libqjpeg.dylib imageformats/libqgif.dylib sqldrivers/libqsqlite.dylib
- 
- # The rules
- .PHONY: buildall
-diff --git a/admin/build/Makefile b/admin/build/Makefile
-index cf508cb..78313d7 100644
---- a/admin/build/Makefile
-+++ b/admin/build/Makefile
-@@ -36,9 +36,9 @@ dist-mac: apply-version Psi-$(VERSION).dmg
- 
- dist-mingw: apply-version psi-$(VERSION)-win64.zip psi-$(VERSION)-win32.zip
- 
--deps-mac: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file)
-+deps-mac: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file) packages/$(qjson_mac_file)
- 
--deps-mingw: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
-+deps-mingw: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
- 
- packages/$(zlib_win_file):
- 	mkdir -p packages deps
-@@ -50,6 +50,11 @@ packages/$(qca_win_file):
- 	../fetch.sh $(qca_win_url) packages/$(qca_win_file)
- 	cd deps && unzip ../packages/$(qca_win_file) && cd ..
- 
-+packages/$(qjson_win_file):
-+	mkdir -p packages deps
-+	../fetch.sh $(qjson_win_url) packages/$(qjson_win_file)
-+	cd deps && unzip ../packages/$(qjson_win_file) && cd ..
-+
- packages/$(openssl_win_file):
- 	mkdir -p packages deps
- 	../fetch.sh $(openssl_win_url) packages/$(openssl_win_file)
-@@ -75,6 +80,11 @@ packages/$(qca_mac_file):
- 	../fetch.sh $(qca_mac_url) packages/$(qca_mac_file)
- 	cd deps && tar jxvf ../packages/$(qca_mac_file) && cd ..
- 
-+packages/$(qjson_mac_file):
-+	mkdir -p packages deps
-+	../fetch.sh $(qjson_mac_url) packages/$(qjson_mac_file)
-+	cd deps && tar jxvf ../packages/$(qjson_mac_file) && cd ..
-+
- packages/$(growl_file):
- 	mkdir -p packages deps
- 	../fetch.sh $(growl_url) packages/$(growl_file)
-@@ -93,17 +103,17 @@ packages/$(psimedia_mac_file):
- apply-version:
- 	test "$(VERSION)" != "" && echo "$(VERSION)" > ../../version
- 
--build/uni/psi/ok: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file)
-+build/uni/psi/ok: packages/$(qca_mac_file) packages/$(growl_file) packages/$(gstbundle_mac_file) packages/$(psimedia_mac_file) packages/$(qjson_mac_file)
- 	mkdir -p build
- 	./build_package.sh psi "" ""
- 	touch build/uni/psi/ok
- 
--build/i386/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
-+build/i386/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
- 	mkdir -p build
- 	./build_package.sh psi i386 $(PWD)/out
- 	touch build/i386/psi/ok
- 
--build/x86_64/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file)
-+build/x86_64/psi/ok: packages/$(zlib_win_file) packages/$(qca_win_file) packages/$(openssl_win_file) packages/$(aspell_win_file) packages/$(gstbundle_win_file) packages/$(psimedia_win_file) packages/$(qjson_win_file)
- 	mkdir -p build
- 	./build_package.sh psi x86_64 $(PWD)/out
- 	touch build/x86_64/psi/ok
-diff --git a/admin/build/build_package.sh b/admin/build/build_package.sh
-index 5567f31..46f77a1 100755
---- a/admin/build/build_package.sh
-+++ b/admin/build/build_package.sh
-@@ -129,8 +129,8 @@ build_package_psi() {
- 			QT_LIB_PATH=$QTDIR/lib
- 		fi
- 		cd $psi_base
--		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
--		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
-+		export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
-+		./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
- 		make
- 	fi
- }
-diff --git a/admin/build/devconfig.sh b/admin/build/devconfig.sh
-index c1cb949..3187900 100755
---- a/admin/build/devconfig.sh
-+++ b/admin/build/devconfig.sh
-@@ -60,7 +60,7 @@ if [ "$platform" == "win" ]; then
- 	fi
- 	mqtdir=`get_msys_path $qtdir`
- 
--	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib
-+	PATH=$mqtdir/bin:$PATH ./configure.exe --qtdir=$qtdir --release --with-qca-inc=$deps_base/$qca_win_dir/$target_arch/include --with-qca-lib=$deps_base/$qca_win_dir/$target_arch/lib --with-zlib-inc=$deps_base/$zlib_win_dir/$target_arch/include --with-zlib-lib=$deps_base/$zlib_win_dir/$target_arch/lib --with-aspell-inc=$deps_base/$aspell_win_dir/$target_arch/include --with-aspell-lib=$deps_base/$aspell_win_dir/$target_arch/lib --with-qjson-inc=$deps_base/$qjson_win_dir/$target_arch/include --with-qjson-lib=$deps_base/$qjson_win_dir/$target_arch/lib
- 
- 	rm -f $build_base/devenv
- 	touch $build_base/devenv
-@@ -79,8 +79,8 @@ else
- 	if [ "$QT_PLUGIN_PATH" == "" ]; then
- 		QT_PLUGIN_PATH=$QTDIR/plugins
- 	fi
--	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework
--	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal
-+	export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib
-+	./configure --with-qca-inc=$deps_base/$qca_mac_dir/include --with-qca-lib=$deps_base/$qca_mac_dir/lib --with-growl=$deps_base/$growl_dir/Framework --enable-universal --with-qjson-lib=$deps_base/$qjson_mac_dir/lib
- 
- 	# remove some gstbundle problem files
- 	rm -f $deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10/libgstximagesink.so
-@@ -91,7 +91,7 @@ else
- 	rm -f $build_base/devenv
- 	touch $build_base/devenv
- 	echo "export DYLD_LIBRARY_PATH=$deps_base/$gstbundle_mac_dir/uni/lib:\$DYLD_LIBRARY_PATH" >> $build_base/devenv
--	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
-+	echo "export DYLD_FRAMEWORK_PATH=$QT_LIB_PATH:$deps_base/$qca_mac_dir/lib:$deps_base/$growl_dir/Framework:$deps_base/$qjson_mac_dir/lib:\$DYLD_FRAMEWORK_PATH" >> $build_base/devenv
- 	echo "export GST_PLUGIN_PATH=$deps_base/$gstbundle_mac_dir/uni/lib/gstreamer-0.10" >> $build_base/devenv
- 	echo "export GST_REGISTRY_FORK=no" >> $build_base/devenv
- 	echo "export QT_PLUGIN_PATH=$QT_PLUGIN_PATH:$deps_base/$qca_mac_dir/plugins" >> $build_base/devenv
-diff --git a/admin/build/package_info b/admin/build/package_info
-index fdea71b..7310eb6 100644
---- a/admin/build/package_info
-+++ b/admin/build/package_info
-@@ -39,3 +39,11 @@ psimedia_win_dir=psimedia-20120725-win
- psimedia_mac_file=psimedia-20120725-mac.tar.bz2
- psimedia_mac_url=http://psi-im.org/files/deps/psimedia-20120725-mac.tar.bz2
- psimedia_mac_dir=psimedia-20120725-mac
-+
-+qjson_win_file=qjson-0.8.1-win.zip
-+qjson_win_url=http://psi-im.org/files/deps/qjson-0.8.1-win.zip
-+qjson_win_dir=qjson-0.8.1-win
-+
-+qjson_mac_file=qjson-0.8.1-mac.tar.bz2
-+qjson_mac_url=http://psi-im.org/files/deps/qjson-0.8.1-mac.tar.bz2
-+qjson_mac_dir=qjson-0.8.1-mac
-diff --git a/admin/build/prep_dist.sh b/admin/build/prep_dist.sh
-index e3824c7..8793ecc 100755
---- a/admin/build/prep_dist.sh
-+++ b/admin/build/prep_dist.sh
-@@ -57,6 +57,7 @@ if [ "$platform" == "mac" ]; then
- 	done
- 
- 	install_name_tool -change qca.framework/Versions/2/qca @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/MacOS/psi
-+	install_name_tool -change qjson.framework/Versions/0.8.1/qjson @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/MacOS/psi
- 
- 	mkdir -p $contentsdir/Frameworks
- 	for f in $QT_FRAMEWORKS; do
-@@ -82,8 +83,14 @@ if [ "$platform" == "mac" ]; then
- 	cp -a $deps_base/$qca_mac_dir/lib/qca.framework $contentsdir/Frameworks
- 	cleanup_framework $contentsdir/Frameworks/qca.framework qca 2
- 	install_name_tool -id @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/Frameworks/qca.framework/qca
-+
-+	cp -a $deps_base/$qjson_mac_dir/lib/qjson.framework $contentsdir/Frameworks
-+	cleanup_framework $contentsdir/Frameworks/qjson.framework qjson 0.8.1
-+	install_name_tool -id @executable_path/../Frameworks/qjson.framework/Versions/0.8.1/qjson $contentsdir/Frameworks/qjson.framework/qjson
-+
- 	for g in $QT_FRAMEWORKS; do
- 		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qca.framework/qca
-+		install_name_tool -change $g.framework/Versions/4/$g @executable_path/../Frameworks/$g.framework/Versions/4/$g $contentsdir/Frameworks/qjson.framework/qjson
- 	done
- 
- 	mkdir -p $contentsdir/Plugins/crypto
