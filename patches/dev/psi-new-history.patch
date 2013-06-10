@@ -332,7 +332,7 @@
  	autoSelectContact_ = false;
  	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
  		UserListItem *uli = account()->findFirstRelevant(jid);
-@@ -447,6 +450,42 @@ UserStatus ChatDlg::userStatusFor(const
+@@ -447,6 +450,40 @@ UserStatus ChatDlg::userStatusFor(const
  	return u;
  }
  
@@ -359,12 +359,10 @@
 +		return;
 +
 +	const EDBResult &r = h->result();
-+	for (int i = r.count() - 1; i >= 0; --i)
-+	{
++	for (int i = r.count() - 1; i >= 0; --i) {
 +		const EDBItemPtr &item = r.at(i);
 +		PsiEvent *e = item->event();
-+		if (e->type() == PsiEvent::Message)
-+		{
++		if (e->type() == PsiEvent::Message) {
 +			MessageEvent *me = static_cast<MessageEvent *> (e);
 +			appendMessage(me->message(), me->originLocal(), true);
 +		}
@@ -375,7 +373,7 @@
  void ChatDlg::ensureTabbedCorrectly()
  {
  	TabbableWidget::ensureTabbedCorrectly();
-@@ -869,7 +908,7 @@ QString ChatDlg::whoNick(bool local) con
+@@ -869,7 +906,7 @@ QString ChatDlg::whoNick(bool local) con
  	return result;
  }
  
@@ -384,7 +382,7 @@
  {
  	if(trackBar_)
  		doTrackBar();
-@@ -900,7 +939,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -900,7 +937,9 @@ void ChatDlg::appendMessage(const Messag
  	}
  
  	if (!m.subject().isEmpty()) {
@@ -395,7 +393,7 @@
  	}
   
  	MessageView mv(MessageView::Message);
-@@ -916,6 +957,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -916,6 +955,7 @@ void ChatDlg::appendMessage(const Messag
  	mv.setDateTime(m.timeStamp());
  	mv.setSpooled(m.spooled());
  	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
@@ -403,7 +401,7 @@
  	chatView()->dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
-@@ -924,11 +966,13 @@ void ChatDlg::appendMessage(const Messag
+@@ -924,11 +964,13 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
@@ -1223,7 +1221,7 @@
  PsiEvent *EDBFlatFile::File::lineToEvent(const QString &line)
  {
  	// -- read the line --
-@@ -977,3 +962,809 @@ QString EDBFlatFile::File::eventToLine(P
+@@ -977,3 +962,812 @@ QString EDBFlatFile::File::eventToLine(P
  	
  	return "";
  }
@@ -1833,7 +1831,10 @@
 +				res = true;
 +				query2.prepare("DELETE FROM `contacts` WHERE `id` = :id AND `lifetime` = -1;");
 +				query2.bindValue(":id", id);
-+				if (!query2.exec())
++				if (query2.exec()) {
++					if (query2.numRowsAffected() > 0)
++							jidsCache.clear();
++				} else
 +					res = false;
 +			}
 +		}
@@ -2690,7 +2691,7 @@
  	QString fname = FileUtil::getSaveFileName(this,
  						  tr("Export message history"),
  						  s + ".txt",
-@@ -327,19 +460,23 @@ void HistoryDlg::exportHistory()
+@@ -327,19 +460,22 @@ void HistoryDlg::exportHistory()
  	}
  	QTextStream stream(&f);
  
@@ -2711,8 +2712,7 @@
 +	int max = 0;
 +	{
 +		quint64 edbCnt = d->psi->edb()->eventsCount(paId, d->jid);
-+		if (edbCnt > 1000)
-+		{
++		if (edbCnt > 1000) {
 +			max = edbCnt / 1000;
 +			if ((edbCnt % 1000) != 0)
 +				++max;
@@ -2725,7 +2725,7 @@
  		while(h->busy()) {
  			qApp->processEvents();
  		}
-@@ -350,7 +487,6 @@ void HistoryDlg::exportHistory()
+@@ -350,7 +486,6 @@ void HistoryDlg::exportHistory()
  		// events are in forward order
  		for(int i = 0; i < cnt; ++i) {
  			EDBItemPtr item = r.value(i);
@@ -2733,7 +2733,7 @@
  			PsiEvent *e = item->event();
  			QString txt;
  
-@@ -358,10 +494,16 @@ void HistoryDlg::exportHistory()
+@@ -358,10 +493,16 @@ void HistoryDlg::exportHistory()
  
  			QString nick;
  			if(e->originLocal()) {
@@ -2752,7 +2752,7 @@
  			}
  
  			if(e->type() == PsiEvent::Message) {
-@@ -384,10 +526,14 @@ void HistoryDlg::exportHistory()
+@@ -384,10 +525,14 @@ void HistoryDlg::exportHistory()
  		}
  		delete h;
  
@@ -2769,7 +2769,7 @@
  	}
  	f.close();
  	stopRequest();
-@@ -395,11 +541,16 @@ void HistoryDlg::exportHistory()
+@@ -395,11 +540,16 @@ void HistoryDlg::exportHistory()
  
  void HistoryDlg::doMenu()
  {
@@ -2789,7 +2789,7 @@
  }
  
  void HistoryDlg::edb_finished()
-@@ -420,28 +571,22 @@ void HistoryDlg::edb_finished()
+@@ -420,28 +570,22 @@ void HistoryDlg::edb_finished()
  			if (d->reqType == TypeLatest || d->reqType == TypePrevious)
  			{
  				// events are in backward order
@@ -2829,7 +2829,7 @@
  				displayResult(r, EDB::Backward);
  				setButtons();
  			}
-@@ -456,14 +601,15 @@ void HistoryDlg::edb_finished()
+@@ -456,14 +600,15 @@ void HistoryDlg::edb_finished()
  				{
  					d->reqType = TypeFind;
  					d->findStr = str;
@@ -2847,7 +2847,7 @@
  				displayResult(r, EDB::Forward);
  				highlightBlocks(ui_.searchField->text());
  			}
-@@ -471,7 +617,29 @@ void HistoryDlg::edb_finished()
+@@ -471,7 +616,29 @@ void HistoryDlg::edb_finished()
  		}
  		else
  		{
@@ -2878,7 +2878,7 @@
  		}
  	}
  	delete h;
-@@ -479,10 +647,10 @@ void HistoryDlg::edb_finished()
+@@ -479,10 +646,10 @@ void HistoryDlg::edb_finished()
  
  void HistoryDlg::setButtons()
  {
@@ -2893,7 +2893,7 @@
  }
  
  void HistoryDlg::setButtons(bool act)
-@@ -504,28 +672,29 @@ void HistoryDlg::getLatest()
+@@ -504,28 +671,29 @@ void HistoryDlg::getLatest()
  {
  	d->reqType = TypeLatest;
  	startRequest();
@@ -2927,7 +2927,7 @@
  }
  
  void HistoryDlg::getDate()
-@@ -533,30 +702,40 @@ void HistoryDlg::getDate()
+@@ -533,30 +701,40 @@ void HistoryDlg::getDate()
  	const QDate date = ui_.calendar->selectedDate();
  	d->reqType = TypeDate;
  	d->date = date;
@@ -2977,7 +2977,7 @@
  {
  	int i  = (direction == EDB::Forward) ? r.count() - 1 : 0;
  	int at = 0;
-@@ -566,35 +745,49 @@ void HistoryDlg::displayResult(const EDB
+@@ -566,35 +744,49 @@ void HistoryDlg::displayResult(const EDB
  	received_color=PsiOptions::instance()->getOption("options.ui.look.colors.messages.received").toString();
  	bool emoticons  = PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool();
  	bool formatting = PsiOptions::instance()->getOption("options.ui.chat.legacy-formatting").toBool();
@@ -3049,7 +3049,7 @@
  		++at;
  		i += (direction == EDB::Forward) ? -1 : +1;
  	}
-@@ -605,11 +798,9 @@ void HistoryDlg::displayResult(const EDB
+@@ -605,11 +797,9 @@ void HistoryDlg::displayResult(const EDB
  UserListItem* HistoryDlg::currentUserListItem()
  {
  	UserListItem* u = 0;
@@ -3064,7 +3064,7 @@
  	return u;
  }
  
-@@ -626,6 +817,7 @@ void HistoryDlg::stopRequest()
+@@ -626,6 +816,7 @@ void HistoryDlg::stopRequest()
  	if(ui_.busy->isActive()) {
  		ui_.busy->stop();
  	}
@@ -3072,7 +3072,7 @@
  	setEnabled(true);
  #ifdef Q_OS_MAC
  	// To workaround a Qt bug
-@@ -634,9 +826,47 @@ void HistoryDlg::stopRequest()
+@@ -634,9 +825,46 @@ void HistoryDlg::stopRequest()
  #endif
  }
  
@@ -3107,8 +3107,7 @@
 +QString HistoryDlg::makeContactToolTip(const QString &accId, const XMPP::Jid &jid, bool bare) const
 +{
 +	QString jidStr = JIDUtil::toString(jid, !bare);
-+	if (ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).isNull())
-+	{
++	if (ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).isNull()) {
 +		PsiAccount *pa = d->psi->contactList()->getAccount(accId);
 +		jidStr.append(QString(" [%1]").arg((pa) ? pa->name() : tr("deleted")));
 +	}
@@ -3152,7 +3151,7 @@
  #endif
 --- psi.orig/src/historyimp.cpp
 +++ psi/src/historyimp.cpp
-@@ -0,0 +1,301 @@
+@@ -0,0 +1,300 @@
 +/*
 + * historyimp.cpp
 + * Copyright (C) 2011   Aleksey Andreev
@@ -3270,8 +3269,7 @@
 +					accIds.append(acc->id());
 +			}
 +		}
-+		if (accIds.isEmpty())
-+		{
++		if (accIds.isEmpty()) {
 +			PsiAccount *pa = psi_->contactList()->defaultAccount();
 +			if (pa)
 +				accIds.append(pa->id());
@@ -4346,7 +4344,7 @@
  
  	QString fragmentToPlainText(const QTextFragment &fragment);
  	QString blockToPlainText(const QTextBlock &block);
-@@ -159,6 +161,33 @@ void PsiTextView::appendText(const QStri
+@@ -159,6 +161,31 @@ void PsiTextView::appendText(const QStri
  	setTextCursor(cursor);
  }
  
@@ -4355,13 +4353,11 @@
 +	QTextCursor cursor = textCursor();
 +	PsiRichText::Selection selection = PsiRichText::saveSelection(this, cursor);
 +
-+	if (d->lastHistoryBlock != -1)
-+	{
++	if (d->lastHistoryBlock != -1) {
 +		QTextBlock block = document()->findBlockByNumber(d->lastHistoryBlock);
 +		if (block.isValid())
 +			cursor.setPosition(block.position() + block.length() - 1, QTextCursor::MoveAnchor);
-+		else
-+		{
++		else {
 +			d->lastHistoryBlock = -1;
 +		}
 +	}
