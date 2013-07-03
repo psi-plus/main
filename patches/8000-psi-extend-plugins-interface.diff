@@ -1839,7 +1839,7 @@ index fd5ecb7..77a9ce3 100644
  	bool loadPlugin(QObject* pluginObject);
  
 diff --git a/src/pluginmanager.cpp b/src/pluginmanager.cpp
-index 5d3fea6..7b02fcd 100644
+index 5d3fea6..7b2898f 100644
 --- a/src/pluginmanager.cpp
 +++ b/src/pluginmanager.cpp
 @@ -8,7 +8,7 @@
@@ -2228,7 +2228,7 @@ index 5d3fea6..7b02fcd 100644
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -351,15 +485,289 @@ QString PluginManager::uniqueId(int account)
+@@ -351,15 +485,296 @@ QString PluginManager::uniqueId(int account)
  	return id;
  }
  
@@ -2364,7 +2364,14 @@ index 5d3fea6..7b02fcd 100644
 +
 +int PluginManager::findOnlineAccountForContact(const QString &jid) const
 +{
-+	return -1; // TODO implement
++	Jid j(jid);
++	QHash<PsiAccount*, int>::const_iterator it = accountIds_.constBegin();
++	for ( ; it != accountIds_.end(); it++) {
++		if (it.key()->isAvailable() && it.key()->findContact(j)) {
++			return it.value();
++		}
++	}
++	return -1;
 +}
 +
 +bool PluginManager::setActivity(int account, const QString& jid, QDomElement xml)
@@ -2519,7 +2526,7 @@ index 5d3fea6..7b02fcd 100644
  }
  
  /**
-@@ -372,6 +780,199 @@ bool PluginManager::verifyStanza(const QString& stanza)
+@@ -372,6 +787,199 @@ bool PluginManager::verifyStanza(const QString& stanza)
  	return true;
  }
  
