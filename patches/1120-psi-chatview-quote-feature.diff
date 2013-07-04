@@ -340,15 +340,7 @@ Index: psi/src/widgets/psitextview.cpp
  #include <QMimeData>
  
  #include "urlobject.h"
-@@ -49,6 +50,7 @@
- 
- 	QString anchorOnMousePress;
- 	bool hadSelectionOnMousePress;
-+	bool rightClickSelection;
- 
- 	QString fragmentToPlainText(const QTextFragment &fragment);
- 	QString blockToPlainText(const QTextBlock &block);
-@@ -79,6 +81,43 @@
+@@ -79,6 +80,54 @@
  	viewport()->setMouseTracking(true); // we want to get all mouseMoveEvents
  }
  
@@ -376,23 +368,34 @@ Index: psi/src/widgets/psitextview.cpp
 +		menu = URLObject::getInstance()->createPopupMenu(anc);
 +	}
 +	else {
-+		if (d->rightClickSelection || !textCursor().hasSelection()) { // only if no selection we select text block
++		if (isSelectedBlock() || !textCursor().hasSelection()) { // only if no selection we select text block
 +			int begin = textcursor.block().position();
 +			int end = begin + textcursor.block().length() - 1;
 +			textcursor.setPosition(begin);
 +			textcursor.setPosition(end, QTextCursor::KeepAnchor);
 +			setTextCursor(textcursor);
-+			d->rightClickSelection = true;
 +		}
 +		menu = QTextEdit::createStandardContextMenu();
 +	}
 +	return menu;
 +}
 +
++bool PsiTextView::isSelectedBlock()
++{
++	if (textCursor().hasSelection()) {
++		const QTextCursor &cursor = textCursor();
++		const QTextBlock  &block  = cursor.block();
++		int start = cursor.selectionStart();
++		if (block.position() == start && block.length() == cursor.selectionEnd() - start + 1)
++			return true;
++	}
++	return false;
++}
++
  /**
   * This function returns true if vertical scroll bar is
   * at its maximum position.
-@@ -175,11 +214,7 @@
+@@ -175,11 +224,7 @@
  
  void PsiTextView::contextMenuEvent(QContextMenuEvent *e)
  {
@@ -405,19 +408,6 @@ Index: psi/src/widgets/psitextview.cpp
  	menu->exec(e->globalPos());
  	e->accept();
  	delete menu;
-@@ -218,9 +253,11 @@
- {
- 	QTextEdit::mouseReleaseEvent(e);
- 
--	if (!(e->button() & Qt::LeftButton))
-+	if (!(e->button() & Qt::LeftButton)) {
- 		return;
-+	}
- 
-+	d->rightClickSelection = false;
- 	const QString anchor = anchorAt(e->pos());
- 
- 	if (anchor.isEmpty())
 Index: psi/src/widgets/psitextview.h
 ===================================================================
 --- psi.orig/src/widgets/psitextview.h	2013-01-15 14:04:22.844826891 +0400
@@ -432,3 +422,11 @@ Index: psi/src/widgets/psitextview.h
  	bool atBottom();
  
  	virtual void appendText(const QString &text);	
+@@ -72,6 +72,7 @@ protected:
+ 	class Private;
+ private:
+ 	Private *d;
++	bool isSelectedBlock();
+ };
+ 
+ #endif
