@@ -4221,16 +4221,17 @@
  	void updateReadNext(const Jid &);
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
-@@ -356,7 +356,7 @@ PsiCon::PsiCon()
+@@ -356,8 +356,7 @@ PsiCon::PsiCon()
  	d->ftwin = 0;
  #endif
  
 -	d->edb = new EDBFlatFile;
+-
 +	d->edb = 0;
- 
  	d->s5bServer = 0;
  	d->tuneManager = 0;
-@@ -378,7 +378,8 @@ PsiCon::~PsiCon()
+ 	d->autoUpdater = 0;
+@@ -378,7 +377,8 @@ PsiCon::~PsiCon()
  
  	delete d->autoUpdater;
  	delete d->actionList;
@@ -4240,7 +4241,7 @@
  	delete d->defaultMenuBar;
  	delete d->tabManager;
  	delete d->popupManager;
-@@ -704,6 +705,12 @@ bool PsiCon::init()
+@@ -704,6 +704,12 @@ bool PsiCon::init()
  
  	checkAccountsEmpty();
  
@@ -4279,19 +4280,22 @@
  	$$PWD/psitoolbar.cpp \
 --- psi.orig/src/widgets/psirichtext.cpp
 +++ psi/src/widgets/psirichtext.cpp
-@@ -263,9 +263,10 @@ static QString convertIconsToObjectRepla
+@@ -263,13 +263,12 @@ static QString convertIconsToObjectRepla
  static void applyFormatToIcons(QTextDocument *doc, TextIconFormatQueue *queue, QTextCursor &cursor)
  {
  	QTextCursor searchCursor = cursor;
-+	int bn = cursor.block().blockNumber();
- 	forever {
+-	forever {
++	while (!queue->isEmpty()) {
  		searchCursor = doc->find(QString(QChar::ObjectReplacementCharacter), searchCursor);
--		if (searchCursor.isNull()) {
-+		if (searchCursor.isNull() || searchCursor.block().blockNumber() != bn) {
+ 		if (searchCursor.isNull()) {
  			break;
  		}
  
-@@ -396,6 +397,26 @@ void PsiRichText::appendText(QTextDocume
+-		Q_ASSERT(!queue->isEmpty());
+ 		TextIconFormat *format = queue->dequeue();
+ 		if (format) {
+ 			searchCursor.setCharFormat(*format);
+@@ -396,6 +395,26 @@ void PsiRichText::appendText(QTextDocume
  
  	appendTextHelper(doc, text, cursor);
  
@@ -4343,7 +4347,7 @@
  
  	QString fragmentToPlainText(const QTextFragment &fragment);
  	QString blockToPlainText(const QTextBlock &block);
-@@ -159,6 +161,31 @@ void PsiTextView::appendText(const QStri
+@@ -169,6 +171,31 @@ void PsiTextView::appendText(const QStri
  	setTextCursor(cursor);
  }
  
