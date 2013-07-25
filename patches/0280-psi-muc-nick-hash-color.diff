@@ -20,7 +20,7 @@ Index: psi/src/chatview_te.cpp
 @@ -290,7 +290,7 @@
  		alerttagsc = "</b>";
  	}
- 
+
 -	if(mv.isSpooled()) {
 +	if(mv.isSpooled() && !PsiOptions::instance()->getOption("options.ui.muc.colored-history").toBool()) {
  		nickcolor = ColorOpt::instance()->color(infomrationalColorOpt).name();
@@ -32,15 +32,15 @@ Index: psi/src/chatviewcommon.cpp
 +++ psi/src/chatviewcommon.cpp	2013-01-15 14:04:04.600826150 +0400
 @@ -19,6 +19,8 @@
   */
- 
+
  #include <QWidget>
 +#include <QColor>
 +#include <QRegExp>
- 
+
  #include "chatviewcommon.h"
  #include "psioptions.h"
 @@ -42,30 +44,52 @@
- 
+
  QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
  {
 +	const char* rgbBlack = "#000000";
@@ -63,11 +63,11 @@ Index: psi/src/chatviewcommon.cpp
 -		sender=_nicks[nick];
 +		sender=_nicks[nickwoun];
  	}
- 
+
  	QStringList nickColors = validList.isEmpty()
  		? PsiOptions::instance()->getOption("options.ui.look.colors.muc.nick-colors").toStringList()
  		: validList;
- 
+
 -	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() || nickColors.empty()) {
 -		return "#000000";
 -	}
@@ -165,7 +165,7 @@ Index: psi/src/options/opt_groupchat.cpp
  	PsiOptions::instance()->setOption("options.ui.muc.use-highlighting", d->ck_gcHighlights->isChecked());
  	PsiOptions::instance()->setOption("options.ui.muc.use-nick-coloring", d->ck_gcNickColoring->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.muc.use-hash-nick-coloring", d->ck_gcHashNickColoring->isChecked());
- 
+
  	QStringList highlight;
  	int i;
 @@ -96,6 +97,8 @@

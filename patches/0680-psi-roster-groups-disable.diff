@@ -28,7 +28,7 @@ Index: psi/src/mainwin.cpp
  		{ "show_statusmsg", toggled, d->rosterWidget_, SLOT( setShowStatusMsg(bool) ) },
 +		{ "enable_groups",  toggled,   this, SLOT( actEnableGroupsActivated(bool) ) },
  #endif
- 
+
  		{ "button_options", activated, this, SIGNAL( doOptions() ) },
 @@ -644,6 +645,9 @@
  			if ( aName == "menu_play_sounds" ) {
@@ -43,7 +43,7 @@ Index: psi/src/mainwin.cpp
 @@ -1080,6 +1084,11 @@
  	PsiOptions::instance()->setOption("options.extended-presence.tune.publish",state);
  }
- 
+
 +void MainWin::actEnableGroupsActivated (bool state)
 +{
 +	PsiOptions::instance()->setOption("options.ui.contactlist.enable-groups", state);
@@ -71,15 +71,15 @@ Index: psi/src/psiactionlist.cpp
 @@ -140,6 +140,9 @@
  		viewGroups->setUsesDropDown(true);
  		viewGroups->setExclusive(false);
- 
+
 +		IconAction *actEnableGroups = new IconAction(tr("Show Roster Groups"), "psi/enable-groups", tr("Show Roster Groups"), 0, viewGroups, 0, true);
 +		actEnableGroups->setWhatsThis(tr("Enable/disable groups in roster"));
 +
  		IconAction *showOffline = new IconAction(tr("Show Offline Contacts"), "psi/show_offline", tr("Show Offline Contacts"), 0, viewGroups, 0, true);
  		showOffline->setWhatsThis(tr("Toggles visibility of offline contacts in roster"));
- 
+
 @@ -161,6 +164,7 @@
- 
+
  		ActionNames actions[] = {
  			{ "view_groups",  viewGroups  },
 +			{ "enable_groups",   actEnableGroups  },
@@ -95,11 +95,11 @@ Index: psi/src/psirosterwidget.cpp
  static const QString allowAutoResizeOptionPath = "options.ui.contactlist.automatically-resize-roster";
  static const QString showScrollBarOptionPath = "options.ui.contactlist.disable-scrollbar";
 +static const QString enableGroupsOptionPath = "options.ui.contactlist.enable-groups";
- 
+
  //----------------------------------------------------------------------------
  // PsiRosterFilterProxyModel
 @@ -181,7 +182,7 @@
- 
+
  	contactListModel_ = new PsiContactListModel(contactList_);
  	contactListModel_->invalidateLayout();
 -	contactListModel_->setGroupsEnabled(true);
@@ -115,5 +115,5 @@ Index: psi/src/psirosterwidget.cpp
 +		contactListModel_->setGroupsEnabled(PsiOptions::instance()->getOption(enableGroupsOptionPath).toBool());
 +	}
  }
- 
+
  void PsiRosterWidget::removeSelection(QMimeData* selection)

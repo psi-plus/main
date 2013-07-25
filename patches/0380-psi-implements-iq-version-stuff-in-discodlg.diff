@@ -4,11 +4,11 @@ Index: psi/src/discodlg.cpp
 +++ psi/src/discodlg.cpp	2013-01-15 14:04:07.076826250 +0400
 @@ -885,7 +885,7 @@
  	IconAction *actBrowse, *actBack, *actForward, *actRefresh, *actStop;
- 
+
  	// custom actions, that will be added to toolbar and context menu
 -	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd;
 +	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
- 
+
  	typedef QList<History*> HistoryList;
  	HistoryList backHistory, forwardHistory;
 @@ -1003,6 +1003,9 @@
@@ -18,7 +18,7 @@ Index: psi/src/discodlg.cpp
 +	actQueryVersion = new IconAction (tr("Query version"), "psi/info", tr("&Query version"), 0, dlg);
 +	connect (actQueryVersion, SIGNAL(triggered()), sm, SLOT(map()));
 +	sm->setMapping(actQueryVersion, Features::FID_QueryVersion);
- 
+
  	// create toolbar
  	toolBar = new QToolBar(tr("Service Discovery toolbar"), dlg);
 @@ -1028,6 +1031,7 @@
@@ -26,7 +26,7 @@ Index: psi/src/discodlg.cpp
  	toolBar->addAction(actVCard);
  	toolBar->addAction(actAHCommand);
 +	toolBar->addAction(actQueryVersion);
- 
+
  	// select protocol
  	if (PsiOptions::instance()->getOption("options.ui.show-deprecated.service-discovery.protocol-selector").toBool()) {
 @@ -1201,6 +1205,7 @@
@@ -35,7 +35,7 @@ Index: psi/src/discodlg.cpp
  	actAHCommand->setEnabled( f.canCommand() );
 +	actQueryVersion->setEnabled( f.hasVersion() );
  }
- 
+
  void DiscoDlg::Private::itemSelected (QTreeWidgetItem *item)
 @@ -1329,7 +1334,8 @@
  			actAdd->addTo(&p);
@@ -43,7 +43,7 @@ Index: psi/src/discodlg.cpp
  			actAHCommand->addTo(&p);
 -
 +			actQueryVersion->addTo(&p);
-+			
++
  			// popup with all available features
  			QMenu *fm = new QMenu(&p);
  			QHash<QAction*, int> actions;
@@ -59,12 +59,12 @@ Index: psi/src/psiaccount.cpp
 +		actionQueryVersion(jid);
 +	}
  }
- 
+
  void PsiAccount::actionManageBookmarks()
 @@ -3754,6 +3757,25 @@
  	sendFiles(j, l);
  }
- 
+
 +void PsiAccount::actionQueryVersion(const Jid& j)
 +{
 +	JT_ClientVersion *task = new JT_ClientVersion(d->client->rootTask());
@@ -80,7 +80,7 @@ Index: psi/src/psiaccount.cpp
 +	text += tr("Name:\t") + j->name();
 +	text += "\n" + tr("Version:\t") + j->version();
 +	text += "\n" + tr("Os:\t") + j->os();
-+	
++
 +	QMessageBox::information(NULL, QString(tr("Version Query Information")), text);
 +}
 +
@@ -97,13 +97,13 @@ Index: psi/src/psiaccount.h
  	void actionUnsetAvatar();
 +	void actionQueryVersion(const Jid& j);
  	void featureActivated(QString feature, Jid jid, QString node);
- 
+
  	void actionAssignKey(const Jid &);
 @@ -436,6 +437,7 @@
- 
+
  	void processReadNext(const UserListItem &);
  	void processReadNext(const Jid &);
 +	void queryVersionFinished();
- 
+
  protected:
  	bool validRosterExchangeItem(const RosterExchangeItem&);

@@ -91,7 +91,7 @@ index 7b76e6f..028170d 100644
  #include "psicontactlist.h"
 +#include "iconaction.h"
 +#include "actionlineedit.h"
- 
+
  AccountModifyDlg::AccountModifyDlg(PsiCon *_psi, QWidget *parent)
  :QDialog(parent)
 @@ -152,8 +154,21 @@ void AccountModifyDlg::init()
@@ -121,7 +121,7 @@ index 7b76e6f..028170d 100644
 @@ -472,6 +487,21 @@ void AccountModifyDlg::detailsChangePW()
  	}
  }
- 
+
 +void AccountModifyDlg::removeStunHost()
 +{
 +	// Don't remove no host
@@ -157,7 +157,7 @@ index 7b76e6f..028170d 100644
 +	}
  	acc.stunUser = le_stunUser->text();
  	acc.stunPass = le_stunPass->text();
- 
+
 diff --git a/src/accountmodifydlg.h b/src/accountmodifydlg.h
 index f838c9c..fa4e738 100644
 --- a/src/accountmodifydlg.h
@@ -165,17 +165,17 @@ index f838c9c..fa4e738 100644
 @@ -56,6 +56,8 @@ private slots:
  	void detailsVCard();
  	void detailsChangePW();
- 
+
 +	void removeStunHost();
 +
  	void save();
- 
+
  	//void pgpToggled(bool);
 @@ -83,7 +85,7 @@ private:
  	ProxyChooser *pc;
  	QCA::PGPKey key;
  	UserAccount acc;
--	
+-
 +
  	// Privacy
   	PrivacyListModel privacyModel;
@@ -185,15 +185,15 @@ index ee1b986..0fee29f 100644
 --- a/src/profiles.h
 +++ b/src/profiles.h
 @@ -89,8 +89,8 @@ public:
- 
+
  	QString optionsBase;
- 
+
 +	QStringList stunHosts;
  	QString stunHost;
 -	int stunPort;
  	QString stunUser;
  	QString stunPass;
- 
+
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
 index dfe9a1f..55c0f72 100644
 --- a/src/psi_profiles.cpp
@@ -201,7 +201,7 @@ index dfe9a1f..55c0f72 100644
 @@ -154,7 +154,29 @@ void UserAccount::reset()
  	proxy_user = "";
  	proxy_pass = "";
- 
+
 -	stunPort = 3478;
 +	stunHosts.clear();
 +	stunHosts << "stun.jabber.ru:5249"
@@ -226,13 +226,13 @@ index dfe9a1f..55c0f72 100644
 +			  << "stun.voxgratia.org";
 +
 +	stunHost = stunHosts[0];
- 
+
  	keybind.clear();
- 
+
 @@ -307,15 +329,14 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
  	ibbOnly = o->getOption(base + ".ibb-only").toBool();
- 
- 
+
+
 -	if (allSetOptions.contains(base + ".stun-host")) {
 -		stunHost = o->getOption(base + ".stun-host").toString();
 +	if (allSetOptions.contains(base + ".stun-hosts")) {
@@ -255,19 +255,19 @@ index dfe9a1f..55c0f72 100644
 @@ -460,8 +481,8 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
  	o->setOption(base + ".bytestreams-proxy", dtProxy.full());
  	o->setOption(base + ".ibb-only", ibbOnly);
- 
+
 +	o->setOption(base + ".stun-hosts", stunHosts);
  	o->setOption(base + ".stun-host", stunHost);
 -	o->setOption(base + ".stun-port", QString::number(stunPort));
  	o->setOption(base + ".stun-username", stunUser);
  	o->setOption(base + ".stun-password", stunPass);
- 
+
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
 index b185d1b..f229b3b 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -949,9 +949,14 @@ public:
- 
+
  	void updateAvCallSettings(const UserAccount &acc)
  	{
 -		avCallManager->setStunBindService(acc.stunHost, acc.stunPort);
@@ -282,14 +282,14 @@ index b185d1b..f229b3b 100644
 +		avCallManager->setStunRelayUdpService(stunHost, stunPort, acc.stunUser, acc.stunPass);
 +		avCallManager->setStunRelayTcpService(stunHost, stunPort, convert_proxy(acc, jid), acc.stunUser, acc.stunPass);
  	}
- 
+
  	bool isAlwaysVisibleContact(const Jid& jid) const
 @@ -4081,7 +4086,7 @@ void PsiAccount::queryVersionFinished()
  	text += tr("Name:\t") + j->name();
  	text += "\n" + tr("Version:\t") + j->version();
  	text += "\n" + tr("Os:\t") + j->os();
--	
+-
 +
  	QMessageBox::information(NULL, QString(tr("Version Query Information")), text);
  }
- 
+

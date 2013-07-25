@@ -5,7 +5,7 @@ Index: psi/src/bookmarkmanager.cpp
 @@ -138,6 +138,24 @@
  	}
  }
- 
+
 +bool BookmarkManager::isBookmarked(const XMPP::Jid &j)
 +{
 +	return indexOfConference(j) >= 0;
@@ -30,7 +30,7 @@ Index: psi/src/bookmarkmanager.cpp
 @@ -148,6 +166,20 @@
  	return conferences_;
  }
- 
+
 +int BookmarkManager::indexOfConference(const XMPP::Jid &j) const
 +{
 +	if (isAvailable_) {
@@ -60,25 +60,25 @@ Index: psi/src/bookmarkmanager.h
 +++ psi/src/bookmarkmanager.h	2013-01-15 14:04:07.900826284 +0400
 @@ -37,18 +37,22 @@
  	BookmarkManager(PsiAccount* account);
- 
+
  	bool isAvailable() const;
 +	bool isBookmarked(const XMPP::Jid &);
- 
+
  	QList<URLBookmark> urls() const;
  	QList<ConferenceBookmark> conferences() const;
 +	int indexOfConference(const XMPP::Jid &) const;
- 
+
  	void setBookmarks(const QList<URLBookmark>&, const QList<ConferenceBookmark>&);
  	void setBookmarks(const QList<URLBookmark>&);
  	void setBookmarks(const QList<ConferenceBookmark>&);
 +	void removeConference(const XMPP::Jid &);
- 
+
  signals:
  	void availabilityChanged();
  	void urlsChanged(const QList<URLBookmark>&);
  	void conferencesChanged(const QList<ConferenceBookmark>&);
 +	void bookmarksSaved();
- 
+
  private slots:
  	void getBookmarks_finished();
 Index: psi/src/groupchatdlg.cpp
@@ -92,7 +92,7 @@ Index: psi/src/groupchatdlg.cpp
 +#include <QCheckBox>
 +#include <QDialogButtonBox>
 +#include <QFormLayout>
- 
+
  #include "psicon.h"
  #include "psiaccount.h"
 @@ -76,6 +79,7 @@
@@ -113,7 +113,7 @@ Index: psi/src/groupchatdlg.cpp
  	IconAction *act_whiteboard;
  #endif
 @@ -683,6 +687,19 @@
- 
+
  	d->act_templates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
  	d->act_templates->setMenu(getTemplateMenu());
 +
@@ -135,7 +135,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -895,6 +912,25 @@
  	ui_.lb_ident->setVisible(account()->psi()->contactList()->enabledAccounts().count() > 1);
  }
- 
+
 +void GCMainDlg::updateBookmarkIcon()
 +{
 +	BookmarkManager *bm = account()->bookmarkManager();
@@ -164,12 +164,12 @@ Index: psi/src/groupchatdlg.cpp
  	d->pm_settings->addAction(d->act_nick);
 +	d->pm_settings->addAction(d->act_bookmark);
  }
- 
+
  void GCMainDlg::chatEditCreated()
 @@ -1853,6 +1890,71 @@
  	}
  }
- 
+
 +void GCMainDlg::doBookmark()
 +{
 +	BookmarkManager *bm = account()->bookmarkManager();
@@ -258,7 +258,7 @@ Index: psi/src/groupchatdlg.h
 +	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();
- 
+
 Index: psi/src/groupchatdlg.ui
 ===================================================================
 --- psi.orig/src/groupchatdlg.ui	2013-01-15 14:04:07.904826284 +0400

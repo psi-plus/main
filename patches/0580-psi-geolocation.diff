@@ -35,13 +35,13 @@ Index: psi/src/contactlistaccountmenu.cpp
 @@ -78,6 +79,9 @@
  		activityAction_ = new QAction(tr("Activity"), this);
  		connect(activityAction_, SIGNAL(triggered()), SLOT(setActivity()));
- 
+
 +		geolocationAction_ = new QAction(tr("GeoLocation"), this);
 +		connect(geolocationAction_, SIGNAL(triggered()), SLOT(setGeolocation()));
 +
  		setAvatarAction_ = new QAction(tr("Set Avatar"), this);
  		connect(setAvatarAction_, SIGNAL(triggered()), SLOT(setAvatar()));
- 
+
 @@ -123,6 +127,7 @@
  		menu->addMenu(statusMenu_);
  		menu->addAction(moodAction_);
@@ -66,7 +66,7 @@ Index: psi/src/contactlistaccountmenu.cpp
 @@ -226,6 +233,14 @@
  		account->account()->actionSetActivity();
  	}
- 
+
 +	void setGeolocation()
 +	{
 +		if (!account)
@@ -83,13 +83,13 @@ Index: psi/src/geolocation.cpp
 --- psi.orig/src/geolocation.cpp	2013-01-15 14:04:11.776826441 +0400
 +++ psi/src/geolocation.cpp	2013-01-15 14:04:11.772826441 +0400
 @@ -20,6 +20,7 @@
- 
+
  #include <QDomDocument>
  #include <QDomElement>
 +#include <QApplication>
- 
+
  #include "geolocation.h"
- 
+
 @@ -72,6 +73,56 @@
  		e.appendChild(doc.createTextNode(description_));
  		geoloc.appendChild(e);
@@ -144,29 +144,29 @@ Index: psi/src/geolocation.cpp
 +		e.appendChild(doc.createTextNode(text_));
 +		geoloc.appendChild(e);
 +	}
- 
+
  	return geoloc;
  }
 @@ -85,18 +136,38 @@
  		QDomElement m = n.toElement();
- 		if (m.tagName() == "alt") 
+ 		if (m.tagName() == "alt")
  			alt_ = Maybe<float>(m.text().toFloat());
--		if (m.tagName() == "bearing") 
+-		if (m.tagName() == "bearing")
 +		else if (m.tagName() == "bearing")
  			bearing_ = Maybe<float>(m.text().toFloat());
--		if (m.tagName() == "error") 
+-		if (m.tagName() == "error")
 +		else if (m.tagName() == "error")
  			error_ = Maybe<float>(m.text().toFloat());
--		if (m.tagName() == "lat") 
+-		if (m.tagName() == "lat")
 +		else if (m.tagName() == "lat")
  			lat_ = Maybe<float>(m.text().toFloat());
--		if (m.tagName() == "lon") 
+-		if (m.tagName() == "lon")
 +		else if (m.tagName() == "lon")
  			lon_ = Maybe<float>(m.text().toFloat());
--		if (m.tagName() == "datum") 
+-		if (m.tagName() == "datum")
 +		else if (m.tagName() == "datum")
  			datum_ = m.text();
--		if (m.tagName() == "description") 
+-		if (m.tagName() == "description")
 +		else if (m.tagName() == "description")
  			description_ = m.text();
 +		else if (m.tagName() == "country")
@@ -191,11 +191,11 @@ Index: psi/src/geolocation.cpp
 +			text_ = m.text();
  	}
  }
- 
+
 @@ -169,9 +240,60 @@
  	return description_;
  }
- 
+
 +const QString& GeoLocation::country() const
 +{
 +	return country_;
@@ -246,13 +246,13 @@ Index: psi/src/geolocation.cpp
 +	return text_;
 +}
 +
- bool GeoLocation::isNull() const 
+ bool GeoLocation::isNull() const
  {
 -	return !lat_.hasValue() || !lon_.hasValue();
 +	return !lat_.hasValue() && !lon_.hasValue() && !alt_.hasValue() && !bearing_.hasValue() && !error_.hasValue() && country_.isNull() && region_.isNull() && locality_.isNull()
 +		&& area_.isNull() && street_.isNull() && building_.isNull() && floor_.isNull() && room_.isNull() && postalcode_.isNull() && text_.isNull() && description_.isNull() && datum_.isNull();
  }
- 
+
  bool GeoLocation::operator==(const GeoLocation& o) const
 @@ -180,6 +302,13 @@
  	bool equal = true;
@@ -267,7 +267,7 @@ Index: psi/src/geolocation.cpp
 +			&& description() == o.description();
  	return equal;
  }
- 
+
 @@ -187,3 +316,123 @@
  {
  	return !((*this) == o);
@@ -399,7 +399,7 @@ Index: psi/src/geolocation.h
 @@ -52,7 +52,30 @@
  	void setDatum(const QString&);
  	void setDescription(const QString&);
- 
+
 +	const QString& country() const;
 +	const QString& region() const;
 +	const QString& locality() const;
@@ -424,7 +424,7 @@ Index: psi/src/geolocation.h
 +
  	QDomElement toXml(QDomDocument&);
 +	QString toString() const;
- 	
+
  	bool operator==(const GeoLocation&) const;
  	bool operator!=(const GeoLocation&) const;
 @@ -63,6 +86,7 @@
@@ -433,7 +433,7 @@ Index: psi/src/geolocation.h
  	QString datum_, description_;
 +	QString country_, region_, locality_, area_, street_, building_, floor_, room_, postalcode_, text_;
  };
- 
+
  #endif
 Index: psi/src/geolocation.ui
 ===================================================================
@@ -925,7 +925,7 @@ Index: psi/src/geolocationdlg.cpp
 +	if (geoloc.isNull()) {
 + 		pa_->pepManager()->retract("http://jabber.org/protocol/geoloc", "current");
 +	}
-+	else {                
++	else {
 +		pa_->pepManager()->publish("http://jabber.org/protocol/geoloc", PubSubItem("current",geoloc.toXml(*pa_->client()->rootTask()->doc())), PEPManager::PresenceAccess);
 +	}
 +	close();
@@ -1045,7 +1045,7 @@ Index: psi/src/physicallocation.cpp
  #include <QDomElement>
  #include <QStringList>
 @@ -268,3 +268,5 @@
- 
+
  	return str;
  }
 +
@@ -1062,10 +1062,10 @@ Index: psi/src/physicallocation.h
 +/*
  #ifndef PHYSICALOCATION_H
  #define PHYSICALOCATION_H
- 
+
 @@ -69,3 +69,4 @@
  };
- 
+
  #endif
 +*/
 Index: psi/src/psiaccount.cpp
@@ -1116,7 +1116,7 @@ Index: psi/src/psiaccount.cpp
 -	}
 +	}*/
  }
- 
+
  void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem& item)
 @@ -3485,7 +3485,7 @@
  			cpUpdate(*u);
@@ -1134,12 +1134,12 @@ Index: psi/src/psiaccount.cpp
 -	}
 +	}*/
  }
- 
+
  QList<UserListItem*> PsiAccount::findRelevant(const Jid &j) const
 @@ -3817,6 +3817,12 @@
  	w->show();
  }
- 
+
 +void PsiAccount::actionSetGeoLocation()
 +{
 +	GeoLocationDlg *w = new GeoLocationDlg(this);
@@ -1152,7 +1152,7 @@ Index: psi/src/psiaccount.cpp
 @@ -5550,6 +5556,11 @@
  	return d->self.activity();
  }
- 
+
 +const GeoLocation &PsiAccount::geolocation() const
 +{
 +	return d->self.geoLocation();
@@ -1170,7 +1170,7 @@ Index: psi/src/psiaccount.h
  #include "mood.h"
  #include "activity.h"
 +#include "geolocation.h"
- 
+
  namespace XMPP
  {
 @@ -153,6 +154,7 @@
@@ -1221,23 +1221,23 @@ Index: psi/src/src.pri
  	$$PWD/coloropt.h \
 +	$$PWD/geolocationdlg.h \
  	$$PWD/sendbuttonmenu.h
- 
- 
+
+
 @@ -346,6 +347,7 @@
  	$$PWD/bookmarkmanagedlg.cpp \
  	$$PWD/vcardphotodlg.cpp \
  	$$PWD/coloropt.cpp \
 +	$$PWD/geolocationdlg.cpp \
  	$$PWD/sendbuttonmenu.cpp
- 
- 
+
+
 @@ -579,6 +581,7 @@
  	$$PWD/bookmarkmanage.ui \
  	$$PWD/ahcommanddlg.ui \
  	$$PWD/ahcformdlg.ui \
 +	$$PWD/geolocation.ui \
  	$$PWD/sendbuttontemplateseditor.ui
- 
+
  # options dialog
 Index: psi/src/userlist.cpp
 ===================================================================
@@ -1246,7 +1246,7 @@ Index: psi/src/userlist.cpp
 @@ -189,7 +189,7 @@
  	return v_geoLocation;
  }
- 
+
 -void UserResource::setPhysicalLocation(const PhysicalLocation& physicalLocation)
 +/*void UserResource::setPhysicalLocation(const PhysicalLocation& physicalLocation)
  {
@@ -1258,13 +1258,13 @@ Index: psi/src/userlist.cpp
  	return v_physicalLocation;
 -}
 +}*/
- 
- 
+
+
  bool operator<(const UserResource &r1, const UserResource &r2)
 @@ -596,7 +596,7 @@
  	return v_geoLocation;
  }
- 
+
 -void UserListItem::setPhysicalLocation(const PhysicalLocation& physicalLocation)
 +/*void UserListItem::setPhysicalLocation(const PhysicalLocation& physicalLocation)
  {
@@ -1276,41 +1276,41 @@ Index: psi/src/userlist.cpp
  	return v_physicalLocation;
 -}
 +}*/
- 
+
  void UserListItem::setAvatarFactory(AvatarFactory* av)
  {
 @@ -779,12 +779,12 @@
  		str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(tune()) + "</div>";
- 
+
  	// User Physical Location
 -	if (!physicalLocation().isNull())
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(physicalLocation().toString()) + "</div>";
 +	//if (!physicalLocation().isNull())
 +	//	str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(physicalLocation().toString()) + "</div>";
- 
+
  	// User Geolocation
 -	if (!geoLocation().isNull())
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(geoLocation().lat().value()) + "/" + QString::number(geoLocation().lon().value()) + "</div>";
 +	if (!geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
 +		str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
- 
+
  	// resources
  	if(!userResourceList().isEmpty()) {
 @@ -869,12 +869,12 @@
  				str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(r.tune()) + "</div>";
- 
+
  			// User Physical Location
 -			if (!r.physicalLocation().isNull())
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(r.physicalLocation().toString()) + "</div>";
 +		//	if (!r.physicalLocation().isNull())
 +		//		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(r.physicalLocation().toString()) + "</div>";
- 
+
  			// User Geolocation
 -			if (!r.geoLocation().isNull())
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(r.geoLocation().lat().value()) + "/" + QString::number(r.geoLocation().lon().value()) + "</div>";
 +			if (!r.geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
 +				str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
- 
+
  			// Entity Time
  			if (r.timezoneOffset().hasValue()) {
 Index: psi/src/userlist.h
@@ -1324,7 +1324,7 @@ Index: psi/src/userlist.h
 -#include "physicallocation.h"
 +//#include "physicallocation.h"
  #include "maybe.h"
- 
+
  class AvatarFactory;
 @@ -68,8 +68,8 @@
  	const QString& tune() const;
@@ -1334,7 +1334,7 @@ Index: psi/src/userlist.h
 -	const PhysicalLocation& physicalLocation() const;
 +	//void setPhysicalLocation(const PhysicalLocation&);
 +	//const PhysicalLocation& physicalLocation() const;
- 
+
  private:
  	QString v_ver, v_clientName, v_clientVersion, v_clientOS, v_keyID;
 @@ -77,7 +77,7 @@
@@ -1355,7 +1355,7 @@ Index: psi/src/userlist.h
 +	//void setPhysicalLocation(const PhysicalLocation&);
 +	//const PhysicalLocation& physicalLocation() const;
  	void setAvatarFactory(AvatarFactory*);
- 
+
  	UserResourceList & userResourceList();
 @@ -169,7 +169,7 @@
  	Activity v_activity;
@@ -1365,4 +1365,4 @@ Index: psi/src/userlist.h
 +	//PhysicalLocation v_physicalLocation;
  	AvatarFactory* v_avatarFactory;
  };
- 
+

@@ -21,7 +21,7 @@ Index: psi/src/options/opt_chat.cpp
  	PsiOptions::instance()->setOption("options.ui.chat.raise-chat-windows-on-new-messages", d->ck_raiseChatWindow->isChecked());
  	PsiOptions::instance()->setOption("options.ui.chat.use-small-chats", d->ck_smallChats->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.tabs.show-tab-buttons", d->ck_showTabButtons->isChecked());
- 	
+
  	QString delafter;
  	switch (bg_delChats->buttons().indexOf( bg_delChats->checkedButton() )) {
 @@ -179,6 +180,7 @@
@@ -56,10 +56,10 @@ Index: psi/src/psicon.cpp
 +++ psi/src/psicon.cpp	2013-01-15 14:04:04.880826161 +0400
 @@ -1318,7 +1318,8 @@
  	}
- 
- 	if (option == "options.ui.tabs.use-tabs" || 
+
+ 	if (option == "options.ui.tabs.use-tabs" ||
 -		option == "options.ui.tabs.grouping") {
-+		option == "options.ui.tabs.grouping" || 
++		option == "options.ui.tabs.grouping" ||
 +		option == "options.ui.tabs.show-tab-buttons") {
  		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
  		//notifyRestart = false;
@@ -70,21 +70,21 @@ Index: psi/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:04.880826161 +0400
 @@ -781,7 +781,7 @@
  	}
- 
+
  	userManagement_ = enabled;
 -	tabWidget_->setTabButtonsShown(enabled);
 +	tabWidget_->setTabButtonsShown(PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool());
  	tabWidget_->setDragsEnabled(enabled);
  }
- 
+
 Index: psi/src/widgets/psitabwidget.cpp
 ===================================================================
 --- psi.orig/src/widgets/psitabwidget.cpp	2013-01-15 14:04:04.880826161 +0400
 +++ psi/src/widgets/psitabwidget.cpp	2013-01-15 14:04:04.880826161 +0400
 @@ -75,6 +75,10 @@
- 
+
  	setTabPosition(QTabWidget::North);
- 
+
 +	if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool()){
 +		closeButton_->hide();
 +		downButton_->hide();

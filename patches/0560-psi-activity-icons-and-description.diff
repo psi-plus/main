@@ -17,7 +17,7 @@ Index: psi/src/activity.cpp
 @@ -67,6 +67,16 @@
  	return text_;
  }
- 
+
 +QString Activity::typeValue() const
 +{
 +	return ActivityCatalog::instance()->findEntryByType(type_).value();
@@ -40,12 +40,12 @@ Index: psi/src/activitydlg.cpp
  #include "psiaccount.h"
  #include "pepmanager.h"
 +#include "psiiconset.h"
- 
+
  ActivityDlg::ActivityDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
  {
 @@ -36,12 +37,20 @@
  	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setActivity()));
- 
+
  	ui_.cb_general_type->addItem(tr("<unset>"));
 +	Activity::Type at = pa->activity().type();
 +	int i=1;
@@ -63,7 +63,7 @@ Index: psi/src/activitydlg.cpp
  	}
 +	ui_.le_description->setText(pa->activity().text());
  }
- 
+
  void ActivityDlg::loadSpecificActivities(const QString& generalActivityStr)
 @@ -53,13 +62,19 @@
  	}
@@ -91,7 +91,7 @@ Index: psi/src/activity.h
 --- psi.orig/src/activity.h	2013-01-15 14:04:11.160826416 +0400
 +++ psi/src/activity.h	2013-01-15 14:04:11.148826416 +0400
 @@ -75,6 +75,8 @@
- 
+
  	Type type() const;
  	QString typeText() const;
 +	QString typeValue() const;
@@ -209,7 +209,7 @@ Index: psi/src/options/opt_iconset.cpp
 --- psi.orig/src/options/opt_iconset.cpp	2013-01-15 14:04:11.160826416 +0400
 +++ psi/src/options/opt_iconset.cpp	2013-01-15 14:04:11.152826416 +0400
 @@ -24,6 +24,7 @@
- 
+
  #include "ui_opt_iconset_emo.h"
  #include "ui_opt_iconset_mood.h"
 +#include "ui_opt_iconset_activity.h"
@@ -219,7 +219,7 @@ Index: psi/src/options/opt_iconset.cpp
 @@ -47,6 +48,12 @@
  	IconsetClientUI() : QWidget() { setupUi(this); }
  };
- 
+
 +class IconsetActivityUI : public QWidget, public Ui::IconsetActivity
 +{
 +public:
@@ -382,7 +382,7 @@ Index: psi/src/options/opt_iconset.cpp
 +		threadCancelled.lock();
  		thread->cancelled = true;
  		threadCancelled.unlock();
- 
+
 Index: psi/src/options/opt_iconset.h
 ===================================================================
 --- psi.orig/src/options/opt_iconset.h	2013-01-15 14:04:11.160826416 +0400
@@ -390,7 +390,7 @@ Index: psi/src/options/opt_iconset.h
 @@ -93,6 +93,34 @@
  	IconsetLoadThread *thread;
  };
- 
+
 +class OptionsTabIconsetActivity : public OptionsTab
 +{
 +	Q_OBJECT
@@ -554,7 +554,7 @@ Index: psi/src/psiaccount.cpp
 @@ -5545,6 +5545,11 @@
  	return d->self.name();
  }
- 
+
 +const Activity &PsiAccount::activity() const
 +{
 +	return d->self.activity();
@@ -572,7 +572,7 @@ Index: psi/src/psiaccount.h
  #include "psiactions.h"
  #include "mood.h"
 +#include "activity.h"
- 
+
  namespace XMPP
  {
 @@ -151,6 +152,7 @@
@@ -601,7 +601,7 @@ Index: psi/src/psiiconset.cpp
 @@ -245,6 +245,23 @@
  		return def;
  	}
- 
+
 +	Iconset activityIconset(bool *ok)
 +	{
 +		Iconset def;
@@ -625,7 +625,7 @@ Index: psi/src/psiiconset.cpp
 @@ -401,6 +418,21 @@
  	return ok;
  }
- 
+
 +bool PsiIconset::loadActivity()
 +{
 +	bool ok = true;
@@ -645,7 +645,7 @@ Index: psi/src/psiiconset.cpp
  {
  	bool ok = true;
 @@ -423,6 +455,7 @@
- 
+
  	loadEmoticons();
  	loadMoods();
 +	loadActivity();
@@ -681,13 +681,13 @@ Index: psi/src/psiiconset.h
 +	bool loadActivity();
  	bool loadClients();
  };
- 
+
 Index: psi/src/userlist.cpp
 ===================================================================
 --- psi.orig/src/userlist.cpp	2013-01-15 14:04:11.160826416 +0400
 +++ psi/src/userlist.cpp	2013-01-15 14:04:11.156826416 +0400
 @@ -751,12 +751,17 @@
- 
+
  	// User Activity
  	if (!activity().isNull()) {
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Activity") + ": " + activity().typeText();
@@ -705,4 +705,4 @@ Index: psi/src/userlist.cpp
 +			str += QString(" (") + TextUtil::escape(activity().text()) + QString(")");
  		str += "</div>";
  	}
- 
+

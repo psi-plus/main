@@ -34,7 +34,7 @@ Index: psi/src/chatview_te.cpp
 @@ -109,6 +116,11 @@
  	dialog_ = dialog;
  }
- 
+
 +void ChatView::setEncryptionEnabled(bool enabled)
 +{
 +	isEncryptionEnabled_ = enabled;
@@ -54,7 +54,7 @@ Index: psi/src/chatview_te.cpp
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
 +	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered_pgp"), logIconDeliveredPgp);
  }
- 
+
  void ChatView::markReceived(QString id)
  {
  	if (useMessageIcons_) {
@@ -88,14 +88,14 @@ Index: psi/src/chatview_te.h
 @@ -64,6 +64,8 @@
  	bool internalFind(QString str, bool startFromBeginning = false);
  	ChatView *textWidget();
- 
+
 +	void setEncryptionEnabled(bool enabled);
 +
  protected:
  	// override the tab/esc behavior
  	bool focusNextPrevChild(bool next);
 @@ -93,6 +95,7 @@
- 
+
  private:
  	bool isMuc_;
 +	bool isEncryptionEnabled_;
@@ -127,7 +127,7 @@ Index: psi/src/chatview_webkit.cpp
 @@ -180,6 +181,11 @@
  	);
  }
- 
+
 +void ChatView::setEncryptionEnabled(bool enabled)
 +{
 +	isEncryptionEnabled_ = enabled;
@@ -143,7 +143,7 @@ Index: psi/src/chatview_webkit.cpp
 +	m["encrypted"] = isEncryptionEnabled_;
  	sendJsObject(m);
  }
- 
+
 @@ -314,6 +321,7 @@
  	QVariantMap vm = mv.toVariantMap(isMuc_, true);
  	vm["mtype"] = vm["type"];
@@ -151,7 +151,7 @@ Index: psi/src/chatview_webkit.cpp
 +	vm["encrypted"] = isEncryptionEnabled_;
  	sendJsObject(vm);
  }
- 
+
 Index: psi/src/chatview_webkit.h
 ===================================================================
 --- psi.orig/src/chatview_webkit.h	2013-01-15 14:04:33.636827330 +0400
@@ -159,7 +159,7 @@ Index: psi/src/chatview_webkit.h
 @@ -67,6 +67,8 @@
  	bool internalFind(QString str, bool startFromBeginning = false);
  	WebView * textWidget();
- 
+
 +	void setEncryptionEnabled(bool enabled);
 +
  protected:
@@ -183,7 +183,7 @@ Index: psi/src/psichatdlg.cpp
  						   !PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool());
 +	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
- 
+
  void PsiChatDlg::doClearButton()
 @@ -811,6 +812,7 @@
  void PsiChatDlg::setPGPEnabled(bool enabled)
@@ -191,7 +191,7 @@ Index: psi/src/psichatdlg.cpp
  	act_pgp_->setChecked(enabled);
 +	ui_.log->setEncryptionEnabled(enabled);
  }
- 
+
  void PsiChatDlg::toggleSmallChat()
 Index: psi/themes/chatview/psi/classic/index.html
 ===================================================================

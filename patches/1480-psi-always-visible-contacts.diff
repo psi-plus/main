@@ -13,7 +13,7 @@ Index: psi/src/contactlistgroup.cpp
 @@ -334,6 +334,11 @@
  	return haveOnlineContacts_;
  }
- 
+
 +bool ContactListGroup::haveAlwaysVisibleContacts() const
 +{
 +	return haveAlwaysVisibleContacts_;
@@ -24,7 +24,7 @@ Index: psi/src/contactlistgroup.cpp
  	return onlineContactsCount_;
 @@ -356,6 +361,7 @@
  		return;
- 
+
  	bool haveOnlineContacts = false;
 +	bool haveAlwaysVisibleContacts = false;
  	int onlineContactsCount = 0;
@@ -43,7 +43,7 @@ Index: psi/src/contactlistgroup.cpp
 @@ -387,6 +396,11 @@
  		}
  	}
- 
+
 +	if (haveAlwaysVisibleContacts != haveAlwaysVisibleContacts_) {
 +		haveAlwaysVisibleContacts_ = haveAlwaysVisibleContacts;
 +		model_->updatedGroupVisibility(this);
@@ -57,7 +57,7 @@ Index: psi/src/contactlistgroup.h
 --- psi.orig/src/contactlistgroup.h	2013-01-15 14:04:29.140827147 +0400
 +++ psi/src/contactlistgroup.h	2013-01-15 14:04:29.132827147 +0400
 @@ -52,6 +52,7 @@
- 
+
  	bool isFake() const;
  	bool haveOnlineContacts() const;
 +	bool haveAlwaysVisibleContacts() const;
@@ -71,7 +71,7 @@ Index: psi/src/contactlistgroup.h
 +	bool haveAlwaysVisibleContacts_;
  	int onlineContactsCount_;
  	int totalContactsCount_;
- 
+
 Index: psi/src/contactlistproxymodel.cpp
 ===================================================================
 --- psi.orig/src/contactlistproxymodel.cpp	2013-01-15 14:04:29.140827147 +0400
@@ -83,7 +83,7 @@ Index: psi/src/contactlistproxymodel.cpp
 +		else if (psiContact->isAlwaysVisible()) {
 +			return true;
 +		}
- 
+
  		bool show = true;
  		if (psiContact->isHidden()) {
 @@ -112,6 +115,10 @@
@@ -94,12 +94,12 @@ Index: psi/src/contactlistproxymodel.cpp
 +			if (group->haveAlwaysVisibleContacts()) {
 +				return true;
 +			}
- 
+
  			bool show = true;
  			if (index.data(Qt::DisplayRole) == PsiContact::hiddenGroupName()) {
 @@ -119,7 +126,6 @@
  			}
- 
+
  			if (!showOffline()) {
 -				ContactListGroup* group = static_cast<ContactListGroup*>(item);
  				return show && group->haveOnlineContacts();
@@ -112,11 +112,11 @@ Index: psi/src/profiles.h
 @@ -85,6 +85,8 @@
  	XMPP::Jid dtProxy;
  	bool ibbOnly;
- 
+
 +	QStringList alwaysVisibleContacts;
 +
  	QString optionsBase;
- 
+
  	QString stunHost;
 Index: psi/src/psiaccount.cpp
 ===================================================================
@@ -125,7 +125,7 @@ Index: psi/src/psiaccount.cpp
 @@ -894,6 +894,37 @@
  		avCallManager->setStunRelayTcpService(acc.stunHost, acc.stunPort, convert_proxy(acc, jid), acc.stunUser, acc.stunPass);
  	}
- 
+
 +	bool isAlwaysVisibleContact(const Jid& jid) const
 +	{
 +		return acc.alwaysVisibleContacts.contains(jid.bare());
@@ -159,20 +159,20 @@ Index: psi/src/psiaccount.cpp
 +
  private:
  	Status lastManualStatus_;
- 
+
 @@ -1271,6 +1302,8 @@
  	QTimer::singleShot(0, d, SLOT(loadQueue()));
- 
+
  	d->contactList->link(this);
 +
 +	d->updateContacts(); //update always visible contacts state
  }
- 
+
  PsiAccount::~PsiAccount()
 @@ -1336,6 +1369,11 @@
  	d->localAddress = QHostAddress();
  }
- 
+
 +void PsiAccount::updateAlwaysVisibleContact(PsiContact *pc)
 +{
 +	d->setAlwaysVisibleContact(pc->jid(), pc->isAlwaysVisible());
@@ -186,9 +186,9 @@ Index: psi/src/psiaccount.h
 --- psi.orig/src/psiaccount.h	2013-01-15 14:04:29.140827147 +0400
 +++ psi/src/psiaccount.h	2013-01-15 14:04:29.132827147 +0400
 @@ -191,6 +191,8 @@
- 
+
  	bool notifyOnline() const;
- 
+
 +	void updateAlwaysVisibleContact(PsiContact* pc);
 +
  	void modify();
@@ -217,7 +217,7 @@ Index: psi/src/psicontact.cpp
 @@ -550,6 +552,18 @@
  	// return ContactListItem::shouldBeVisible();
  }
- 
+
 +bool PsiContact::isAlwaysVisible() const
 +{
 +	return d->isAlwaysVisible_;
@@ -238,9 +238,9 @@ Index: psi/src/psicontact.h
 --- psi.orig/src/psicontact.h	2013-01-15 14:04:29.140827147 +0400
 +++ psi/src/psicontact.h	2013-01-15 14:04:29.132827147 +0400
 @@ -70,6 +70,9 @@
- 
+
  	virtual void setEditing(bool editing);
- 
+
 +	bool isAlwaysVisible() const;
 +	void setAlwaysVisible(bool visible);
 +
@@ -256,13 +256,13 @@ Index: psi/src/psicontactmenu.cpp
  	QAction* mucLeaveAction_;
  	QAction* blockAction_;
 +	QAction* visibleAction_;
- 
+
  #endif
- 
+
 @@ -427,6 +428,9 @@
  		blockAction_ = new IconAction(tr("Block"), "psi/stop", tr("Block"), 0, this, 0, true);
  		connect(blockAction_, SIGNAL(triggered(bool)), SLOT(block(bool)));
- 
+
 +		visibleAction_ = new IconAction(tr("Always Visible"), "psi/eye", tr("Always Visible"), 0, this, 0, true);
 +		connect(visibleAction_, SIGNAL(triggered(bool)), SLOT(setAlwaysVisible(bool)));
 +
@@ -288,7 +288,7 @@ Index: psi/src/psicontactmenu.cpp
 @@ -652,6 +658,14 @@
  		contact_->toggleBlockedStateConfirmation();
  	}
- 
+
 +	void setAlwaysVisible(bool visible)
 +	{
 +		if (!contact_)
@@ -311,7 +311,7 @@ Index: psi/src/psi_profiles.cpp
 +
 +	alwaysVisibleContacts = o->getOption(base + ".always-visible-contacts").toStringList();
  }
- 
+
  void UserAccount::toOptions(OptionsTree *o, QString base)
 @@ -463,6 +465,8 @@
  	o->setOption(base + ".tls.override-certificate", tlsOverrideCert);
@@ -320,5 +320,5 @@ Index: psi/src/psi_profiles.cpp
 +
 +	o->setOption(base + ".always-visible-contacts", alwaysVisibleContacts);
  }
- 
+
  void UserAccount::fromXml(const QDomElement &a)

@@ -7,7 +7,7 @@
 +		qDeleteAll(pendingCalls);
 +		pendingCalls.clear();
  	}
- 
+
  	void addPendingCall(MethodCall *call)
 @@ -240,6 +242,7 @@ void ObjectSession::reset()
  	d->invalidateWatchers();
@@ -16,7 +16,7 @@
 +	qDeleteAll(d->pendingCalls);
  	d->pendingCalls.clear();
  }
- 
+
 --- psi.orig/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
 +++ psi/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
 @@ -137,6 +137,8 @@ BSocket::BSocket(QObject *parent)
@@ -27,7 +27,7 @@
 +		delete d->resolver;
  	delete d;
  }
- 
+
 --- psi.orig/iris/src/xmpp/xmpp-core/securestream.cpp
 +++ psi/iris/src/xmpp/xmpp-core/securestream.cpp
 @@ -382,6 +382,12 @@ public:
@@ -41,16 +41,16 @@
 +		layers.clear();
 +	}
  };
- 
+
  SecureStream::SecureStream(ByteStream *s)
 @@ -401,6 +407,7 @@ SecureStream::SecureStream(ByteStream *s
- 
+
  SecureStream::~SecureStream()
  {
 +	d->deleteLayers();
  	delete d;
  }
- 
+
 @@ -573,9 +580,7 @@ void SecureStream::layer_tlsClosed(const
  {
  	setOpenMode(QIODevice::NotOpen);
@@ -61,7 +61,7 @@
 +	d->deleteLayers();
  	tlsClosed();
  }
- 
+
 @@ -628,9 +633,7 @@ void SecureStream::layer_error(int x)
  	d->errorCode = x;
  	setOpenMode(QIODevice::NotOpen);
@@ -78,7 +78,7 @@
 @@ -47,6 +47,20 @@ CL_DEBUG("~ContactListNextedGroup(%x): %
  	qDeleteAll(groups_);
  	groups_.clear();
- 
+
 +	QHashIterator<ContactListGroup::SpecialType, QPointer<ContactListGroup> > it(specialGroups_);
 +	while (it.hasNext())
 +	{
@@ -95,25 +95,25 @@
 +
  	ContactListGroup::clearGroup();
  }
- 
+
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
 @@ -1382,6 +1382,8 @@ PsiAccount::~PsiAccount()
  {
  	logout(true, loggedOutStatus());
- 
+
 +	setRCEnabled(false);
 +
  	emit accountDestroyed();
  	// nuke all related dialogs
  	deleteAllDialogs();
 @@ -1418,6 +1420,9 @@ PsiAccount::~PsiAccount()
- 
+
  	delete d->blockTransportPopupList;
- 
+
 +	qDeleteAll(d->userList);
 +	d->userList.clear();
 +
  	d->contactList->unlink(this);
  	delete d;
- 
+

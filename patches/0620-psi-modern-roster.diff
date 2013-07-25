@@ -82,7 +82,7 @@ Index: psi/src/contactlistmodel.h
 +		ClientRole = Qt::UserRole + 26,
 +		TuneRole = Qt::UserRole + 27,
 +		AvatarRole = Qt::UserRole + 28,
- 
+
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
 Index: psi/src/contactlistviewdelegate.cpp
@@ -98,7 +98,7 @@ Index: psi/src/contactlistviewdelegate.cpp
 +		txtRect.setHeight(option.fontMetrics.height());
 +		painter->setClipRect(txtRect);
  	}
- 
+
  	// painter->save();
 Index: psi/src/psicontactlistviewdelegate.cpp
 ===================================================================
@@ -120,7 +120,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +static const QString avatarAtLeftOptionPath = "options.ui.contactlist.avatars.avatars-at-left";
 +static const QString showStatusIconsPath = "options.ui.contactlist.show-status-icons";
 +static const QString statusIconsOverAvatarsPath = "options.ui.contactlist.status-icon-over-avatar";
- 
+
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
 @@ -53,6 +65,18 @@
@@ -140,22 +140,22 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +	optionChanged(showStatusIconsPath);
 +	optionChanged(statusIconsOverAvatarsPath);
  }
- 
+
  PsiContactListViewDelegate::~PsiContactListViewDelegate()
 @@ -63,7 +87,8 @@
- 
+
  int PsiContactListViewDelegate::avatarSize() const
  {
 -	return rowHeight_;
 +	return showAvatars_ ?
 +		qMax(avatarSize_ + 2, rowHeight_) : rowHeight_;
  }
- 
+
  QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
 @@ -91,6 +116,9 @@
  		}
  	}
- 
+
 +	if (!showStatusIcons_)
 +		return QPixmap();
 +
@@ -165,7 +165,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 @@ -105,6 +133,57 @@
  	return PsiIconset::instance()->statusPtr(index.data(ContactListModel::JidRole).toString(), s)->pixmap();
  }
- 
+
 +QList<QPixmap> PsiContactListViewDelegate::clientPixmap(const QModelIndex& index) const
 +{
 +	QList<QPixmap> pixList;
@@ -222,7 +222,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  	if (index.isValid()) {
 @@ -128,12 +207,51 @@
  	QRect r = option.rect;
- 
+
  	QRect avatarRect(r);
 -	const QPixmap statusPixmap = this->statusPixmap(index);
 -	avatarRect.translate(1, 1);
@@ -250,7 +250,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +		else {
 +			avatarRect.setTop(avatarRect.top() - h);
 +		}
- 
+
 -	r.setLeft(avatarRect.right() + 3);
 +		if(!avatarPixmap.isNull()) {
 +			painter->drawPixmap(avatarRect.topLeft(), avatarPixmap);
@@ -271,16 +271,16 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +			statusRect.setSize(statusPixmap.size());
 +			r.setLeft(statusRect.right() + 3);
 +		}
-+		painter->drawPixmap(statusRect.topLeft(), statusPixmap);		
++		painter->drawPixmap(statusRect.topLeft(), statusPixmap);
 +	} else
 +		r.setLeft(r.left() + 3);
- 
+
  	QColor textColor;
  	if(index.data(ContactListModel::IsAnimRole).toBool()) {
 @@ -189,6 +307,74 @@
  		drawText(painter, o, r, text, index);
  	}
- 
+
 +	QRect iconRect(r);
 +	QList<QPixmap> rightPixs;
 +	QList<int> rightWidths;
@@ -413,11 +413,11 @@ Index: psi/src/psicontactlistviewdelegate.h
 +++ psi/src/psicontactlistviewdelegate.h	2013-01-15 14:04:12.548826473 +0400
 @@ -52,6 +52,8 @@
  	virtual QRect editorRect(const QRect& nameRect) const;
- 
+
  	virtual QPixmap statusPixmap(const QModelIndex& index) const;
 +	virtual QList<QPixmap> clientPixmap(const QModelIndex& index) const;
 +	virtual QPixmap avatarIcon(const QModelIndex& index) const;
- 
+
  private slots:
  	void optionChanged(const QString& option);
 @@ -63,7 +65,9 @@
@@ -430,4 +430,4 @@ Index: psi/src/psicontactlistviewdelegate.h
 +	int avatarSize_, avatarRadius_;
  	mutable QHash<QModelIndex, bool> alertingIndexes_;
  };
- 
+

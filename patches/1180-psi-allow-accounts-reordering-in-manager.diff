@@ -40,7 +40,7 @@ Index: psi/src/accountmanagedlg.cpp
 @@ -286,6 +287,36 @@
  	}
  };
- 
+
 +
 +
 +AccountManageTree::AccountManageTree(QWidget *parent)
@@ -75,7 +75,7 @@ Index: psi/src/accountmanagedlg.cpp
  :QDialog(0)
  {
 @@ -308,6 +339,7 @@
- 
+
  	connect(lv_accs, SIGNAL(itemDoubleClicked(QTreeWidgetItem *, int)), SLOT(modify(QTreeWidgetItem *)));
  	connect(lv_accs, SIGNAL(currentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *)), SLOT(qlv_selectionChanged(QTreeWidgetItem *, QTreeWidgetItem *)));
 +	connect(lv_accs, SIGNAL(orderChanged(QList<PsiAccount*>)), psi, SLOT(setAccountsOrder(QList<PsiAccount*>)));
@@ -93,7 +93,7 @@ Index: psi/src/accountmanagedlg.cpp
 +
  	foreach(PsiAccount* pa, psi->contactList()->accounts())
  		new AccountManageItem(lv_accs, pa);
- 
+
 Index: psi/src/accountmanagedlg.h
 ===================================================================
 --- psi.orig/src/accountmanagedlg.h	2013-01-15 14:04:24.344826952 +0400
@@ -101,16 +101,16 @@ Index: psi/src/accountmanagedlg.h
 @@ -21,7 +21,7 @@
  #ifndef ACCOUNTMANAGEDLG_H
  #define ACCOUNTMANAGEDLG_H
- 
+
 -#include "ui_accountmanage.h"
 +#include <QTreeWidget>
- 
+
  namespace XMPP
  {
 @@ -33,6 +33,23 @@
  class PsiAccount;
  class QTreeWidgetItem;
- 
+
 +class AccountManageTree : public QTreeWidget
 +{
 +	Q_OBJECT
@@ -156,7 +156,7 @@ Index: psi/src/psicon.cpp
 +		accountTree.setOption("order", order);
  		QFile accountsFile(pathToProfile(activeProfile, ApplicationInfo::ConfigLocation) + "/accounts.xml");
  		accountTree.saveOptions(accountsFile.fileName(), "accounts", ApplicationInfo::optionsNS(), ApplicationInfo::version());;
- 
+
 @@ -651,6 +654,17 @@
  			ua.fromOptions(&d->accountTree, base);
  			accs += ua;
@@ -172,13 +172,13 @@ Index: psi/src/psicon.cpp
 +				}
 +			}
 +		}
- 
+
  		// Disable accounts if necessary, and overwrite locked properties
  		if (PsiOptions::instance()->getOption("options.ui.account.single").toBool() || !PsiOptions::instance()->getOption("options.account.domain").toString().isEmpty()) {
 @@ -1013,6 +1027,11 @@
  	d->contactList->removeAccount(pa);
  }
- 
+
 +void PsiCon::setAccountsOrder(QList<PsiAccount*> accounts)
 +{
 +	d->contactList->setAccountsOrder(accounts);
@@ -196,7 +196,7 @@ Index: psi/src/psicon.h
  	void doStatusPresets();
  	void checkAccountsEmpty();
 +	void setAccountsOrder(QList<PsiAccount*>);
- 
+
  public slots:
  	void doSleep();
 Index: psi/src/psicontactlist.cpp
@@ -205,7 +205,7 @@ Index: psi/src/psicontactlist.cpp
 +++ psi/src/psicontactlist.cpp	2013-01-15 14:04:24.340826952 +0400
 @@ -280,6 +280,28 @@
  }
- 
+
  /**
 + * Moves accounts from list to top. affects default account
 + */
@@ -238,9 +238,9 @@ Index: psi/src/psicontactlist.h
 +++ psi/src/psicontactlist.h	2013-01-15 14:04:24.340826952 +0400
 @@ -62,6 +62,7 @@
  	PsiAccount *defaultAccount() const;
- 
+
  	UserAccountList getUserAccountList() const;
 +	void setAccountsOrder(QList<PsiAccount*> accounts);
- 
+
  	PsiAccount* createAccount(const QString& name, const Jid& j = "", const QString& pass = "", bool opt_host = false, const QString& host = "", int port = 5222, bool legacy_ssl_probe = true, UserAccount::SSLFlag ssl = UserAccount::SSL_Auto, QString proxyID = "", const QString &tlsOverrideDomain="", const QByteArray &tlsOverrideCert=QByteArray());
  	void createAccount(const UserAccount&);

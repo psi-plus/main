@@ -5,7 +5,7 @@ Index: psi/src/mood.cpp
 @@ -48,6 +48,11 @@
  	return MoodCatalog::instance()->findEntryByType(type_).text();
  }
- 
+
 +QString Mood::typeValue() const
 +{
 +	return MoodCatalog::instance()->findEntryByType(type_).value();
@@ -20,7 +20,7 @@ Index: psi/src/mood.h
 +++ psi/src/mood.h	2013-01-15 14:03:59.932825960 +0400
 @@ -31,14 +31,16 @@
  public:
- 	enum Type { 
+ 	enum Type {
  		Unknown,
 -		Afraid, Amazed, Angry, Annoyed, Anxious, Aroused, Ashamed, Bored,
 -    	Brave, Calm, Cold, Confused, Contented, Cranky, Curious, Depressed,
@@ -40,16 +40,16 @@ Index: psi/src/mood.h
 +		Sarcastic, Serious, Shocked, Shy, Sick, Sleepy, Spontaneous, Stressed, Strong,
 +		Surprised, Thankful, Thirsty, Tired, Undefined, Weak, Worried
  	};
- 
+
  	Mood();
 @@ -47,6 +49,7 @@
- 
+
  	Type type() const;
  	QString typeText() const;
 +	QString typeValue() const;
  	const QString& text() const;
  	bool isNull() const;
- 
+
 Index: psi/src/moodcatalog.cpp
 ===================================================================
 --- psi.orig/src/moodcatalog.cpp	2013-01-15 14:03:59.940825960 +0400
@@ -57,7 +57,7 @@ Index: psi/src/moodcatalog.cpp
 @@ -53,11 +53,22 @@
  	return type_ == Mood::Unknown && text_.isNull() && value_.isNull();
  }
- 
+
 +bool MoodCatalog::Entry::operator<(const MoodCatalog::Entry &m) const
 +{
 +	if ( type_ == Mood::Undefined )
@@ -142,7 +142,7 @@ Index: psi/src/moodcatalog.cpp
  	entries_ += Entry(Mood::Worried, "worried", QObject::tr("Worried"));
 +	qSort(entries_);
  }
- 
+
  MoodCatalog* MoodCatalog::instance()
 Index: psi/src/moodcatalog.h
 ===================================================================
@@ -153,7 +153,7 @@ Index: psi/src/moodcatalog.h
  			const QString& text() const;
  			bool isNull() const;
 +			bool operator<(const MoodCatalog::Entry &m) const;
- 
+
  		private:
  			Mood::Type type_;
 Index: psi/src/mooddlg.cpp
@@ -165,12 +165,12 @@ Index: psi/src/mooddlg.cpp
  #include "psiaccount.h"
  #include "pepmanager.h"
 +#include "psiiconset.h"
- 
+
  MoodDlg::MoodDlg(PsiAccount* pa)
  	: QDialog(0), pa_(pa)
 @@ -36,9 +37,16 @@
- 	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setMood()));	
- 
+ 	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setMood()));
+
  	ui_.cb_type->addItem(tr("<unset>"));
 +	Mood::Type mt = pa->mood().type();
 +	int i=1;
@@ -184,8 +184,8 @@ Index: psi/src/mooddlg.cpp
  	}
 +	ui_.le_text->setText(pa->mood().text());
  }
- 
- 
+
+
 Index: psi/src/options/opt_appearance.cpp
 ===================================================================
 --- psi.orig/src/options/opt_appearance.cpp	2013-01-15 14:03:59.940825960 +0400
@@ -204,7 +204,7 @@ Index: psi/src/options/opt_iconset.cpp
 +++ psi/src/options/opt_iconset.cpp	2013-01-15 14:03:59.936825960 +0400
 @@ -23,6 +23,7 @@
  #include <QTreeWidget>
- 
+
  #include "ui_opt_iconset_emo.h"
 +#include "ui_opt_iconset_mood.h"
  #include "ui_opt_iconset_system.h"
@@ -213,7 +213,7 @@ Index: psi/src/options/opt_iconset.cpp
 @@ -33,6 +34,12 @@
  	IconsetEmoUI() : QWidget() { setupUi(this); }
  };
- 
+
 +class IconsetMoodUI : public QWidget, public Ui::IconsetMood
 +{
 +public:
@@ -378,7 +378,7 @@ Index: psi/src/options/opt_iconset.cpp
 +		threadCancelled.lock();
  		thread->cancelled = true;
  		threadCancelled.unlock();
- 
+
 Index: psi/src/options/opt_iconset.h
 ===================================================================
 --- psi.orig/src/options/opt_iconset.h	2013-01-15 14:03:59.940825960 +0400
@@ -386,7 +386,7 @@ Index: psi/src/options/opt_iconset.h
 @@ -65,6 +65,34 @@
  	IconsetLoadThread *thread;
  };
- 
+
 +class OptionsTabIconsetMoods : public OptionsTab
 +{
 +	Q_OBJECT
@@ -530,7 +530,7 @@ Index: psi/src/psiaccount.cpp
 @@ -5480,6 +5480,11 @@
  	return d->self.name();
  }
- 
+
 +const Mood &PsiAccount::mood() const
 +{
 +	return d->self.mood();
@@ -548,7 +548,7 @@ Index: psi/src/psiaccount.h
  #include "xmpp_status.h"
  #include "psiactions.h"
 +#include "mood.h"
- 
+
  namespace XMPP
  {
 @@ -149,6 +150,7 @@
@@ -577,7 +577,7 @@ Index: psi/src/psiiconset.cpp
 @@ -228,6 +228,23 @@
  		return def;
  	}
- 
+
 +	Iconset moodsIconset(bool *ok)
 +	{
 +		Iconset def;
@@ -601,7 +601,7 @@ Index: psi/src/psiiconset.cpp
 @@ -352,12 +369,28 @@
  	}
  }
- 
+
 +bool PsiIconset::loadMoods()
 +{
 +	bool ok = true;
@@ -621,12 +621,12 @@ Index: psi/src/psiiconset.cpp
  {
  	if (!loadSystem() || !loadRoster())
  		return false;
- 
+
  	loadEmoticons();
 +	loadMoods();
  	return true;
  }
- 
+
 @@ -369,6 +402,9 @@
  	else if (option == "options.iconsets.emoticons") {
  		loadEmoticons();
@@ -634,7 +634,7 @@ Index: psi/src/psiiconset.cpp
 +	else if (option == "options.iconsets.moods") {
 +		loadMoods();
 +	}
- 
+
  	// currently we rely on PsiCon calling reloadRoster() when
  	// all options are already applied. otherwise we risk the chance
 Index: psi/src/psiiconset.h
@@ -642,7 +642,7 @@ Index: psi/src/psiiconset.h
 --- psi.orig/src/psiiconset.h	2013-01-15 14:03:59.940825960 +0400
 +++ psi/src/psiiconset.h	2013-01-15 14:03:59.936825960 +0400
 @@ -44,6 +44,7 @@
- 
+
  	QHash<QString, Iconset*> roster;
  	QList<Iconset*> emoticons;
 +	Iconset moods;
@@ -650,12 +650,12 @@ Index: psi/src/psiiconset.h
  	void stripFirstAnimFrame(Iconset *);
  	static void removeAnimation(Iconset *);
 @@ -95,6 +96,7 @@
- 
+
  	bool loadRoster();
  	void loadEmoticons();
 +	bool loadMoods();
  };
- 
+
  #endif
 Index: psi/src/userlist.cpp
 ===================================================================
@@ -663,14 +663,14 @@ Index: psi/src/userlist.cpp
 +++ psi/src/userlist.cpp	2013-01-15 14:03:59.936825960 +0400
 @@ -466,6 +466,7 @@
  	// you most probably want to wrap it with TextUtil::escape()
- 
+
  	QString str;
 +	QString imgTag = "icon name"; // or 'img src' if appropriate QMimeSourceFactory is installed. but mblsha noticed that QMimeSourceFactory unloads sometimes
  	bool useAvatar = false;
  	if (v_avatarFactory && !v_avatarFactory->getAvatar(jid().bare()).isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.avatar").toBool())
  		useAvatar = true;
 @@ -493,7 +494,8 @@
- 
+
  	// User Mood
  	if (!mood().isNull()) {
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Mood") + ": " + mood().typeText();
@@ -682,7 +682,7 @@ Index: psi/src/userlist.cpp
 @@ -539,7 +541,6 @@
  			else if(status == STATUS_INVISIBLE)
  				istr = "status/invisible"; //this shouldn't happen
- 
+
 -			QString imgTag = "icon name"; // or 'img src' if appropriate QMimeSourceFactory is installed. but mblsha noticed that QMimeSourceFactory unloads sometimes
  			QString secstr;
  			if(isSecure(r.name()) && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.pgp").toBool())

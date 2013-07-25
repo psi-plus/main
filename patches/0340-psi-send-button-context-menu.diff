@@ -39,9 +39,9 @@ Index: psi/src/groupchatdlg.cpp
  	IconAction *act_whiteboard;
  #endif
 @@ -605,6 +605,13 @@
- 
+
  	d->state = Private::Connected;
- 
+
 +	SendButtonTemplatesMenu* menu = getTemplateMenu();
 +	if (menu) {
 +		connect(menu, SIGNAL(doPasteAndSend()), this, SLOT(doPasteAndSend()));
@@ -50,12 +50,12 @@ Index: psi/src/groupchatdlg.cpp
 +	}
 +
  	setAcceptDrops(true);
- 
+
  #ifndef Q_OS_MAC
 @@ -671,6 +678,11 @@
  	connect(d->act_mini_cmd, SIGNAL(triggered()), d, SLOT(doMiniCmd()));
  	addAction(d->act_mini_cmd);
- 
+
 +	d->act_ps = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
 +	connect(d->act_ps, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 +
@@ -74,7 +74,7 @@ Index: psi/src/groupchatdlg.cpp
 +	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
 +		ui_.toolbar->addAction(d->act_ps);
  	ui_.toolbar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
- 
+
  	// Common actions
 @@ -687,6 +704,7 @@
  	connect(d->act_send,SIGNAL(triggered()), SLOT(mle_returnPressed()));
@@ -96,22 +96,22 @@ Index: psi/src/groupchatdlg.cpp
 +		disconnect(menu, SIGNAL(doTemplateText(const QString &)), this, SLOT(sendTemp(const QString &)));
 +	}
  }
- 
+
  void GCMainDlg::ensureTabbedCorrectly()
 @@ -1766,6 +1791,9 @@
  	d->pm_settings->addSeparator();
- 
+
  	d->pm_settings->addAction(d->act_icon);
 +	d->pm_settings->addAction(d->act_templates);
 +	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
 +		d->pm_settings->addAction(d->act_ps);
  	d->pm_settings->addAction(d->act_nick);
  }
- 
+
 @@ -1797,6 +1825,50 @@
  	setTabIcon(PsiIconset::instance()->statusPtr(jid(), status)->icon());
  }
- 
+
 +void GCMainDlg::sendButtonMenu()
 +{
 +	SendButtonTemplatesMenu* menu = getTemplateMenu();
@@ -172,7 +172,7 @@ Index: psi/src/groupchatdlg.h
 +	void doPasteAndSend();
 +	void sendTemp(const QString &);
 +	void psButtonEnabled();
- 
+
  public:
  	class Private;
 Index: psi/src/groupchatdlg.ui
@@ -198,7 +198,7 @@ Index: psi/src/psichatdlg.cpp
  #include <QMessageBox>
  #include <QDebug>
 +#include <QTimer>
- 
+
  #include "psicon.h"
  #include "psiaccount.h"
 @@ -171,6 +172,23 @@
@@ -223,18 +223,18 @@ Index: psi/src/psichatdlg.cpp
 +		disconnect(menu, SIGNAL(doTemplateText(const QString &)), this, SLOT(sendTemp(const QString &)));
 +	}
  }
- 
+
  void PsiChatDlg::initUi()
 @@ -221,6 +239,7 @@
  	smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
   	ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
  	connect(ui_.pb_send, SIGNAL(clicked()), this, SLOT(doSend()));
 +	connect(ui_.pb_send, SIGNAL(customContextMenuRequested(const QPoint)), SLOT(sendButtonMenu()));
- 
+
  	act_mini_cmd_ = new QAction(this);
  	act_mini_cmd_->setText(tr("Input command..."));
 @@ -344,6 +363,12 @@
- 
+
  	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
  	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
 +
@@ -244,7 +244,7 @@ Index: psi/src/psichatdlg.cpp
 +	act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
 +	act_templates_->setMenu(getTemplateMenu());
  }
- 
+
  void PsiChatDlg::initToolBar()
 @@ -353,6 +378,11 @@
  	ui_.toolbar->addAction(act_clear_);
@@ -260,7 +260,7 @@ Index: psi/src/psichatdlg.cpp
  		ui_.toolbar->addAction(act_pgp_);
 @@ -530,6 +560,9 @@
  	pm_settings_->addSeparator();
- 
+
  	pm_settings_->addAction(act_icon_);
 +	pm_settings_->addAction(act_templates_);
 +	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
@@ -271,7 +271,7 @@ Index: psi/src/psichatdlg.cpp
 @@ -612,5 +645,48 @@
  	return ChatDlg::eventFilter( obj, ev );
  }
- 
+
 +void PsiChatDlg::sendButtonMenu()
 +{
 +	SendButtonTemplatesMenu* menu = getTemplateMenu();
@@ -315,7 +315,7 @@ Index: psi/src/psichatdlg.cpp
 +		}
 +	}
 +}
- 
+
  #include "psichatdlg.moc"
 Index: psi/src/psichatdlg.h
 ===================================================================
@@ -326,11 +326,11 @@ Index: psi/src/psichatdlg.h
  public:
  	PsiChatDlg(const Jid& jid, PsiAccount* account, TabManager* tabManager);
 +	~PsiChatDlg();
- 
+
  protected:
  	// reimplemented
 @@ -38,6 +39,11 @@
- 
+
  	// reimplemented
  	void chatEditCreated();
 +	void sendButtonMenu();
@@ -338,7 +338,7 @@ Index: psi/src/psichatdlg.h
 +	void doPasteAndSend();
 +	void sendTemp(const QString &);
 +	void psButtonEnabled();
- 
+
  private:
  	void initToolBar();
 @@ -72,7 +78,8 @@
@@ -349,7 +349,7 @@ Index: psi/src/psichatdlg.h
 +	IconAction* act_ps_;
 +	IconAction* act_templates_;
  	QAction *act_mini_cmd_;
- 
+
  	MCmdManager mCmdManager_;
 Index: psi/src/sendbuttonmenu.cpp
 ===================================================================
@@ -1314,8 +1314,8 @@ Index: psi/src/src.pri
 +	$$PWD/coloropt.h \
 +	$$PWD/sendbuttonmenu.h
 +
- 
- 
+
+
  HEADERS += tabcompletion.h
 @@ -342,7 +344,9 @@
  	$$PWD/accountlabel.cpp \
@@ -1325,7 +1325,7 @@ Index: psi/src/src.pri
 +	$$PWD/coloropt.cpp \
 +	$$PWD/sendbuttonmenu.cpp
 +
- 
+
  CONFIG += filetransfer
  filetransfer {
 @@ -573,7 +577,8 @@
@@ -1335,7 +1335,7 @@ Index: psi/src/src.pri
 -	$$PWD/ahcformdlg.ui
 +	$$PWD/ahcformdlg.ui \
 +	$$PWD/sendbuttontemplateseditor.ui
- 
+
  # options dialog
  include($$PWD/options/options.pri)
 Index: psi/src/tabs/tabbablewidget.cpp
@@ -1354,7 +1354,7 @@ Index: psi/src/tabs/tabbablewidget.cpp
 +	++TabbableWidget::chatsCount;
  	QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
  }
- 
+
 @@ -100,6 +106,42 @@
  	if (isTabbed()) {
  		getManagingTabDlg()->removeTabWithNoChecks(this);
@@ -1396,7 +1396,7 @@ Index: psi/src/tabs/tabbablewidget.cpp
 +	if (!new_window)
 +		::bringToFront(TabbableWidget::templateEditDlg);
  }
- 
+
  /**
 Index: psi/src/tabs/tabbablewidget.h
 ===================================================================
@@ -1407,13 +1407,13 @@ Index: psi/src/tabs/tabbablewidget.h
  #include "advwidget.h"
  #include "im.h" // ChatState
 +#include "sendbuttonmenu.h"
- 
+
  namespace XMPP {
  	class Jid;
 @@ -68,6 +69,11 @@
  	virtual int unreadMessageCount() const = 0;
  	virtual QString desiredCaption() const = 0;
- 
+
 +	// Templates
 +	SendButtonTemplatesMenu* getTemplateMenu();
 +	void showTemplateEditor();
@@ -1432,5 +1432,5 @@ Index: psi/src/tabs/tabbablewidget.h
 +	static QPointer<SendButtonTemplatesEditor> templateEditDlg;
 +	// ---
  };
- 
+
  #endif

@@ -10,9 +10,9 @@ Index: psi/src/chatview_te.cpp
  #include <QUrl>
 +#include <QMenu>
 +#include <QTextDocumentFragment>
- 
+
  static const char *infomrationalColorOpt = "options.ui.look.colors.messages.informational";
- 
+
 @@ -58,6 +60,12 @@
  	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
  	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
@@ -23,7 +23,7 @@ Index: psi/src/chatview_te.cpp
 +	addAction(actQuote_);
 +	connect(actQuote_, SIGNAL(triggered()), SLOT(quoteEvent()));
 +	connect(this, SIGNAL(selectionChanged()), SLOT(changeActQuoteState()));
- 
+
  	useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
  	if (useMessageIcons_) {
 @@ -123,10 +131,20 @@
@@ -37,7 +37,7 @@ Index: psi/src/chatview_te.cpp
 +		e->accept();
  	}
  }
- 
+
 +QMenu* ChatView::createStandardContextMenu(const QPoint &position)
 +{
 +	QMenu *menu = PsiTextView::createStandardContextMenu(position);
@@ -50,7 +50,7 @@ Index: psi/src/chatview_te.cpp
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
 @@ -188,6 +206,24 @@
  }
- 
+
  /**
 + * Make quote from any selected text and paste it in chat window
 + */
@@ -82,23 +82,23 @@ Index: psi/src/chatview_te.h
  	void clear();
  	void contextMenuEvent(QContextMenuEvent *e);
 +	QMenu* createStandardContextMenu(const QPoint &position);
- 
+
  	void init();
  	void setDialog(QWidget* dialog);
 @@ -80,12 +81,15 @@
- 
+
  protected slots:
  	void autoCopy();
 +	void quoteEvent();
 +	void changeActQuoteState();
- 
+
  private slots:
  	void slotScroll();
- 
+
  signals:
  	void showNM(const QString&);
 +	void quote(const QString &text);
- 
+
  private:
  	bool isMuc_;
 @@ -100,6 +104,7 @@
@@ -107,7 +107,7 @@ Index: psi/src/chatview_te.h
  	QPixmap logIconInfo;
 +	QAction *actQuote_;
  };
- 
+
  #endif
 Index: psi/src/groupchatdlg.cpp
 ===================================================================
@@ -120,7 +120,7 @@ Index: psi/src/groupchatdlg.cpp
 +
 +	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  }
- 
+
  void GCMainDlg::vcard(const QString& _str)
 Index: psi/src/msgmle.cpp
 ===================================================================
@@ -131,7 +131,7 @@ Index: psi/src/msgmle.cpp
  #include <QTextDocument>
  #include <QTimer>
 +#include <QClipboard>
- 
+
  #include "shortcutmanager.h"
  #include "spellchecker/spellhighlighter.h"
 @@ -92,6 +93,13 @@
@@ -146,12 +146,12 @@ Index: psi/src/msgmle.cpp
 +	connect(actPasteAsQuote_, SIGNAL(triggered()), SLOT(pasteAsQuote()));
 +	connect(clipboard, SIGNAL(dataChanged()), SLOT(changeActPasteAsQuoteState()));
  }
- 
+
  void ChatEdit::setShortcuts()
 @@ -118,6 +126,13 @@
  	controller_->setFont(f);
  }
- 
+
 +QMenu* ChatEdit::createStandardContextMenu(const QPoint &position)
 +{
 +	QMenu *menu = QTextEdit::createStandardContextMenu(position);
@@ -165,7 +165,7 @@ Index: psi/src/msgmle.cpp
 @@ -222,8 +237,10 @@
  		}
  	}
- 
+
 -	// Do normal menu
 -	QTextEdit::contextMenuEvent(e);
 +	// Do custom menu
@@ -174,11 +174,11 @@ Index: psi/src/msgmle.cpp
 +	delete menu;
  	e->accept();
  }
- 
+
 @@ -298,6 +315,18 @@
  	}
  }
- 
+
 +void ChatEdit::changeActPasteAsQuoteState()
 +{
 +	QClipboard *clipboard = QApplication::clipboard();
@@ -197,7 +197,7 @@ Index: psi/src/msgmle.cpp
 @@ -407,6 +436,24 @@
  	controller_->setCssString(css);
  }
- 
+
 +void ChatEdit::insertAsQuote(const QString &text)
 +{
 +	int pos =  textCursor().position();
@@ -228,7 +228,7 @@ Index: psi/src/msgmle.h
  	QSize sizeHint() const;
  	void setFont(const QFont &);
 +	QMenu* createStandardContextMenu(const QPoint &position);
- 
+
  	static bool checkSpellingGloballyEnabled();
  	void setCheckSpelling(bool);
 @@ -59,6 +60,7 @@
@@ -236,7 +236,7 @@ Index: psi/src/msgmle.h
  	void doHTMLTextMenu();
  	void setCssString(const QString& css);
 +	void insertAsQuote(const QString& text);
- 
+
  protected slots:
   	void applySuggestion();
 @@ -68,6 +70,8 @@
@@ -245,7 +245,7 @@ Index: psi/src/msgmle.h
  	void showHistoryMessageLast();
 +	void changeActPasteAsQuoteState();
 +	void pasteAsQuote();
- 
+
  protected:
  	// override the tab/esc behavior
 @@ -92,6 +96,8 @@
@@ -268,7 +268,7 @@ Index: psi/src/psichatdlg.cpp
 +
 +	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  }
- 
+
  void PsiChatDlg::updateCountVisibility()
 Index: psi/src/webview.cpp
 ===================================================================
@@ -284,12 +284,12 @@ Index: psi/src/webview.cpp
 +	addAction(actQuote_);
 +	connect(actQuote_, SIGNAL(triggered()), SLOT(quoteEvent()));
  }
- 
+
  void WebView::linkClickedEvent(const QUrl& url)
 @@ -66,6 +71,11 @@
  	isLoading_ = false;
  }
- 
+
 +void WebView::quoteEvent()
 +{
 +	emit quote(selectedText());
@@ -315,10 +315,10 @@ Index: psi/src/webview.h
  	QStringList jsBuffer_;
  	QPoint dragStartPosition;
 +	QAction *actQuote_;
- 
+
 +signals:
 +	void quote(const QString &text);
- 
+
  protected slots:
  	void linkClickedEvent(const QUrl& url);
  	void textCopiedEvent();
@@ -326,8 +326,8 @@ Index: psi/src/webview.h
  	void loadFinishedEvent(bool);
 +	void quoteEvent();
  };
- 
- 
+
+
 Index: psi/src/widgets/psitextview.cpp
 ===================================================================
 --- psi.orig/src/widgets/psitextview.cpp	2013-01-15 14:04:22.844826891 +0400
@@ -338,12 +338,12 @@ Index: psi/src/widgets/psitextview.cpp
  #include <QTextFragment>
 +#include <QRegExp>
  #include <QMimeData>
- 
+
  #include "urlobject.h"
 @@ -79,6 +80,54 @@
  	viewport()->setMouseTracking(true); // we want to get all mouseMoveEvents
  }
- 
+
 + /**
 + * Reimplemented createStandardContextMenu(const QPoint &position)
 + * for creating of custom context menu
@@ -396,7 +396,7 @@ Index: psi/src/widgets/psitextview.cpp
   * This function returns true if vertical scroll bar is
   * at its maximum position.
 @@ -175,11 +224,7 @@
- 
+
  void PsiTextView::contextMenuEvent(QContextMenuEvent *e)
  {
 -	QMenu *menu;
@@ -415,18 +415,18 @@ Index: psi/src/widgets/psitextview.h
 @@ -32,6 +32,9 @@
  public:
  	PsiTextView(QWidget *parent = 0);
- 
+
 +	// Reimplemented
 +	QMenu* createStandardContextMenu(const QPoint &position);
 +
  	bool atBottom();
- 
- 	virtual void appendText(const QString &text);	
+
+ 	virtual void appendText(const QString &text);
 @@ -72,6 +72,7 @@ protected:
  	class Private;
  private:
  	Private *d;
 +	bool isSelectedBlock();
  };
- 
+
  #endif

@@ -21,7 +21,7 @@ Index: psi/src/searchdlg.cpp
 +	QScrollArea *scrollArea;
 +
  };
- 
+
  SearchDlg::SearchDlg(const Jid &jid, PsiAccount *pa)
 @@ -174,6 +176,8 @@
  	d->pa->dialogRegister(this, d->jid);
@@ -29,11 +29,11 @@ Index: psi/src/searchdlg.cpp
  	d->xdata = 0;
 +	d->scrollArea = scrollArea;
 +
- 
+
  	setWindowTitle(windowTitle().arg(d->jid.full()));
- 
+
 @@ -184,8 +188,8 @@
- 
+
  	d->gr_form = new QWidget(gb_search);
  	d->gr_form_layout = new QGridLayout(d->gr_form);
 -	d->gr_form_layout->setSpacing(4);
@@ -41,7 +41,7 @@ Index: psi/src/searchdlg.cpp
 +	d->gr_form_layout->setSpacing(0);
 +	d->scrollArea->setWidget(d->gr_form);
  	d->gr_form->hide();
- 
+
  	pb_add->setEnabled(false);
 Index: psi/src/search.ui
 ===================================================================
@@ -666,13 +666,13 @@ Index: psi/src/xdata_widget.cpp
  #include <QNetworkRequest>
  #include <QNetworkReply>
 +#include <QSpacerItem>
- 
+
  #include "desktoputil.h"
  #include "xmpp_xdata.h"
 @@ -148,12 +149,12 @@
  		return _field;
  	}
- 
+
 -	QString labelText() const
 +	QString labelText(QString str=": ") const
  	{
@@ -682,7 +682,7 @@ Index: psi/src/xdata_widget.cpp
 -		return text + ": ";
 +		return text + str;
  	}
- 
+
  	QString reqText() const
 @@ -207,16 +208,22 @@
  			if ( s == "1" || s == "true" || s == "yes" )
@@ -691,10 +691,10 @@ Index: psi/src/xdata_widget.cpp
 -
 -		QLabel *label = new QLabel(labelText(), parent);
 -		grid->addWidget(label, row, 0);
-+		
++
 +		QHBoxLayout *layout = new QHBoxLayout;
 +		QSpacerItem *spacerItem = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
- 
+
  		check = new QCheckBox(parent);
  		check->setChecked(checked);
 -		grid->addWidget(check, row, 1);
@@ -703,25 +703,25 @@ Index: psi/src/xdata_widget.cpp
 +		QLabel *label = new QLabel(labelText(""), parent);
 +		layout->addWidget(label);
 +		layout->addSpacerItem(spacerItem);
-+		
++
 +		grid->addLayout(layout, row, 0);
- 
+
  		QLabel *req = new QLabel(reqText(), parent);
 -		grid->addWidget(req, row, 2);
 +		grid->addWidget(req, row, 1);
- 
+
  		if ( !f.desc().isEmpty() ) {
  			label->setToolTip(f.desc());
 @@ -256,8 +263,9 @@
  			text += *it;
  		}
- 
+
 -		QLabel *fixed = new QLabel("<qt>" + text + "</qt>", parent);
 -		grid->addWidget(fixed, row, 0, 2, 0);
 +		QLabel *fixed = new QLabel("<qt>" + text + "<br/></qt>", parent);
 +		fixed->setWordWrap(true);
 +		grid->addWidget(fixed, row, 0);
- 
+
  		if ( !f.desc().isEmpty() ) {
  			fixed->setToolTip(f.desc());
 @@ -294,16 +302,20 @@
@@ -730,24 +730,24 @@ Index: psi/src/xdata_widget.cpp
  			text = f.value().first();
 -
 +		QVBoxLayout *layout = new QVBoxLayout;
-+		
++
  		QLabel *label = new QLabel(labelText(), parent);
 -		grid->addWidget(label, row, 0);
 +		label->setWordWrap(true);
 +		layout->addWidget(label);
- 
+
  		edit = new QLineEdit(parent);
  		edit->setText(text);
 -		grid->addWidget(edit, row, 1);
 -
 +		layout->addWidget(edit);
-+		
++
 +		grid->addLayout(layout, row, 0);
-+		
++
  		QLabel *req = new QLabel(reqText(), parent);
 -		grid->addWidget(req, row, 2);
 +		grid->addWidget(req, row, 1);
- 
+
  		if ( !f.desc().isEmpty() ) {
  			label->setToolTip(f.desc());
 @@ -357,13 +369,18 @@
@@ -755,29 +755,29 @@ Index: psi/src/xdata_widget.cpp
  	: XDataField(f, ((XDataWidget *)parent)->client())
  	{
 +		QHBoxLayout *layout = new QHBoxLayout;
-+		
++
  		int row = grid->rowCount();
  		QLabel *label = new QLabel(labelText(), parent);
 -		grid->addWidget(label, row, 0);
 +		label->setWordWrap(true);
 +		layout->addWidget(label);
- 
+
  		combo = new QComboBox(parent);
 -		grid->addWidget(combo, row, 1);
 +		layout->addWidget(combo);
  		combo->setInsertPolicy(QComboBox::NoInsert);
-+		
++
 +		grid->addLayout(layout, row, 0);
- 
+
  		QString sel;
  		if ( !f.value().isEmpty() )
 @@ -382,7 +399,7 @@
  		}
- 
+
  		QLabel *req = new QLabel(reqText(), parent);
 -		grid->addWidget(req, row, 2);
 +		grid->addWidget(req, row, 1);
- 
+
  		if ( !f.desc().isEmpty() ) {
  			label->setToolTip(f.desc());
 @@ -425,6 +442,7 @@
@@ -786,35 +786,35 @@ Index: psi/src/xdata_widget.cpp
  		QLabel *label = new QLabel(labelText(), parent);
 +		label->setWordWrap(true);
  		grid->addWidget(label, row, 0);
- 
+
  		list = new QListWidget(parent);
 @@ -494,11 +512,14 @@
  	: XDataField(f, ((XDataWidget *)parent)->client())
  	{
  		int row = grid->rowCount();
 +		QHBoxLayout *layout = new QHBoxLayout;
-+		
++
  		QLabel *label = new QLabel(labelText(), parent);
 -		grid->addWidget(label, row, 0);
 +		label->setWordWrap(true);
 +		layout->addWidget(label);
- 
+
  		edit = new QTextEdit(parent);
 -		grid->addWidget(edit, row, 1);
 +		layout->addWidget(edit);
- 
+
  		QString text;
  		QStringList val = f.value();
 @@ -510,8 +531,10 @@
  		}
  		edit->setText(text);
- 
+
 +		grid->addLayout(layout, row, 0);
 +
  		QLabel *req = new QLabel(reqText(), parent);
 -		grid->addWidget(req, row, 2);
 +		grid->addWidget(req, row, 1);
- 
+
  		if ( !f.desc().isEmpty() ) {
  			label->setToolTip(f.desc());
 @@ -554,6 +577,8 @@
@@ -824,13 +824,13 @@ Index: psi/src/xdata_widget.cpp
 +	layout_->setContentsMargins(0,0,0,0);
 +
  }
- 
+
  XDataWidget::~XDataWidget()
 @@ -684,6 +709,7 @@
  	if ( f.count() ) {
  		// FIXME
  		QGridLayout *grid = new QGridLayout(fields);
 +		grid->setSpacing(3);
- 
+
  		XData::FieldList::ConstIterator it = f.begin();
  		for ( ; it != f.end(); ++it) {

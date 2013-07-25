@@ -18,9 +18,9 @@ Index: psi/src/chatdlg.cpp
 --- psi.orig/src/chatdlg.cpp	2013-01-15 14:04:27.960827099 +0400
 +++ psi/src/chatdlg.cpp	2013-01-15 14:04:27.952827099 +0400
 @@ -108,6 +108,14 @@
- 
+
  	status_ = -1;
- 
+
 +	autoSelectContact_ = false;
 +	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
 +		UserListItem *uli = account()->findFirstRelevant(jid);
@@ -35,7 +35,7 @@ Index: psi/src/chatdlg.cpp
 @@ -401,18 +409,7 @@
  	return dispNick_;
  }
- 
+
 -struct UserStatus {
 -	UserStatus()
 -			: userListItem(0)
@@ -66,7 +66,7 @@ Index: psi/src/chatdlg.cpp
 +
  		if (userStatus.statusType == XMPP::Status::Offline)
  			contactChatState_ = XMPP::StateNone;
- 
+
  		bool statusWithPriority = PsiOptions::instance()->getOption("options.ui.chat.status-with-priority").toBool();
  		bool statusChanged = false;
 -		if (status_ != userStatus.statusType || statusString_ != userStatus.status || (statusWithPriority && priority_ != userStatus.priority)) {
@@ -77,7 +77,7 @@ Index: psi/src/chatdlg.cpp
 @@ -514,6 +519,13 @@
  	}
  }
- 
+
 +void ChatDlg::updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence)
 +{
 +	Q_UNUSED(ul);
@@ -95,7 +95,7 @@ Index: psi/src/chatdlg.h
 @@ -48,6 +48,17 @@
  class ChatView;
  class ChatEdit;
- 
+
 +struct UserStatus {
 +	UserStatus()
 +			: userListItem(0)
@@ -116,7 +116,7 @@ Index: psi/src/chatdlg.h
  	Jid realJid() const;
 +	bool autoSelectContact() const {return autoSelectContact_;};
 +	static UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource);
- 
+
  signals:
  	void aInfo(const Jid &);
 @@ -98,6 +111,7 @@
@@ -124,16 +124,16 @@ Index: psi/src/chatdlg.h
  	void dragEnterEvent(QDragEnterEvent* event);
  	bool eventFilter(QObject *obj, QEvent *event);
 +	bool autoSelectContact_;
- 
+
  public slots:
  	// reimplemented
 @@ -152,6 +166,7 @@
- 
+
  	virtual void initUi() = 0;
  	virtual void capsChanged();
 +	virtual void updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence);
  	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
- 
+
  	void appendMessage(const Message &, bool local = false);
 Index: psi/src/chatdlg.ui
 ===================================================================
@@ -187,13 +187,13 @@ Index: psi/src/psiaccount.cpp
 @@ -2706,9 +2706,9 @@
  		return;
  	}
- 
+
 -	c = findChatDialog(j);
 +	/*c = findChatDialog(j);
  	if(!c)
 -		c = findChatDialog(m.from().full());
 +		c = findChatDialog(m.from().full());*/
- 
+
  	if(m.type() == "error") {
  		Stanza::Error err = m.error();
 @@ -2730,6 +2730,13 @@
@@ -213,7 +213,7 @@ Index: psi/src/psiaccount.cpp
 @@ -3183,9 +3190,33 @@
  	return false;
  }
- 
+
 -ChatDlg* PsiAccount::findChatDialog(const Jid& jid) const
 +ChatDlg* PsiAccount::findChatDialog(const Jid& jid, bool compareResource) const
 +{
@@ -244,10 +244,10 @@ Index: psi/src/psiaccount.cpp
 +{
 +	return findDialogs<ChatDlg*>(jid, compareResource);
  }
- 
+
  QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
 @@ -3701,7 +3732,8 @@
- 
+
  ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  {
 -	ChatDlg *c = findChatDialog(j);
@@ -298,7 +298,7 @@ Index: psi/src/psiaccount.cpp
  				}
  			}
 @@ -4922,13 +4953,11 @@
- 
+
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		else if(m.type() == "chat") {
 -			ChatDlg *c = findChatDialog(e->from());
@@ -309,7 +309,7 @@ Index: psi/src/psiaccount.cpp
 +			ChatDlg *c = findChatDialogEx(e->from());
 +			if (c)
  				c->setJid(e->from());
- 
+
 +
  			//if the chat exists, and is either open in a tab,
  			//or in a window
@@ -322,7 +322,7 @@ Index: psi/src/psiaccount.cpp
 +	ChatDlg *c = findChatDialogEx(j);
  	if(!c)
  		return;
- 
+
  	// extract the chats
  	QList<PsiEvent*> chatList;
 -	bool compareResources = true;
@@ -337,14 +337,14 @@ Index: psi/src/psiaccount.h
 @@ -162,7 +162,9 @@
  	QHostAddress *localAddress() const;
  	void passwordReady(QString password);
- 
+
 -	ChatDlg* findChatDialog(const Jid& jid) const;
 +	ChatDlg* findChatDialog(const Jid& jid, bool compareResource = true) const;
 +	ChatDlg* findChatDialogEx(const Jid& jid) const;
 +	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
- 
+
  	template<typename T>
- 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
+ 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const {
 Index: psi/src/psichatdlg.cpp
 ===================================================================
 --- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:27.960827099 +0400
@@ -377,11 +377,11 @@ Index: psi/src/psichatdlg.cpp
 +
  	ui_.lb_ident->setAccount(account());
  	ui_.lb_ident->setShowJid(false);
- 
+
 @@ -539,6 +561,110 @@
  	ui_.avatar->setToolTip(text);
  }
- 
+
 +void PsiChatDlg::updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence)
 +{
 +	static bool internal_change = false;
@@ -491,7 +491,7 @@ Index: psi/src/psichatdlg.cpp
  	Q_UNUSED(statusString);
 @@ -560,22 +686,6 @@
  	}
- 
+
  	if (u) {
 -		QString name;
 -		QString j;
@@ -510,12 +510,12 @@ Index: psi/src/psichatdlg.cpp
 -		ui_.le_jid->setToolTip(name);
 -
  		UserResourceList srl = u->userResourceList();
- 		if(!srl.isEmpty()) {			
+ 		if(!srl.isEmpty()) {
  			UserResource r;
 @@ -855,4 +965,76 @@
  	}
  }
- 
+
 +QString PsiChatDlg::makeContactName(const QString &name, const Jid &jid) const
 +{
 +	QString name_;
@@ -599,7 +599,7 @@ Index: psi/src/psichatdlg.h
  #include "psiwindowheader.h"
 +#include "widgets/actionlineedit.h"
 +
- 
+
  class IconAction;
  class PsiContact;
 @@ -54,6 +56,9 @@
@@ -609,7 +609,7 @@ Index: psi/src/psichatdlg.h
 +	void contactChanged();
 +	QString makeContactName(const QString &name, const Jid &jid) const;
 +	void doSwitchJidMode();
- 
+
  private:
  	void initToolBar();
 @@ -63,6 +68,7 @@
@@ -626,19 +626,19 @@ Index: psi/src/psichatdlg.h
  	void setMargins();
 +	void updateAutojidIcon();
 +	void setJidComboItem(int pos, const QString &text, const Jid &jid, const QString &icon_str);
- 
+
  private:
  	Ui::ChatDlg ui_;
 @@ -97,6 +105,9 @@
  	IconAction* act_add_contact;
  	QAction *act_mini_cmd_, *act_minimize_;
- 
+
 +	ActionLineEdit *le_autojid;
 +	IconAction *act_autojid;
 +
  	MCmdManager mCmdManager_;
  	MCmdSimpleSite mCmdSite_;
- 
+
 Index: psi/src/psicon.cpp
 ===================================================================
 --- psi.orig/src/psicon.cpp	2013-01-15 14:04:27.960827099 +0400
@@ -654,4 +654,4 @@ Index: psi/src/psicon.cpp
 +				c = account->findChatDialogEx(e->jid());
  			if(!c)
  				return; // should never happen
- 
+

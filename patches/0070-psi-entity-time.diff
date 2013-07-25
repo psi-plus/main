@@ -5,7 +5,7 @@ Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.cpp
 @@ -250,6 +250,23 @@
  	return "";
  }
- 
+
 +QDomElement queryTag(const QDomElement &e, const QString &element)
 +{
 +	bool found;
@@ -25,7 +25,7 @@ Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.cpp
 +
  /**
  	\brief Extracts the error code and description from the stanza element.
- 
+
 Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h
 ===================================================================
 --- psi.orig/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h	2013-01-15 14:03:59.540825944 +0400
@@ -39,7 +39,7 @@ Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h
 +QString queryNS(const QDomElement &e, const QString &element);
  void getErrorFromElement(const QDomElement &e, const QString &baseNS, int *code, QString *str);
  QDomElement addCorrectNS(const QDomElement &e);
- 
+
 Index: psi/src/entitytimetask.cpp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
@@ -246,7 +246,7 @@ Index: psi/src/infodlg.cpp
 @@ -776,13 +777,24 @@
  	}
  }
- 
+
 -void InfoDlg::requestClientVersion(const Jid& j)
 +/**
 + * \brief Requests per-resource information.
@@ -267,12 +267,12 @@ Index: psi/src/infodlg.cpp
 +	jet->get(j);
 +	jet->go(true);
  }
- 
+
  void InfoDlg::clientVersionFinished()
 @@ -803,6 +815,23 @@
  	}
  }
- 
+
 +void InfoDlg::entityTimeFinished()
 +{
 +	EntityTimeTask *j = (EntityTimeTask *)sender();
@@ -322,7 +322,7 @@ Index: psi/src/infodlg.h
 +	void requestResourceInfo(const XMPP::Jid& j);
  	void requestLastActivity();
  };
- 
+
 Index: psi/src/psiaccount.cpp
 ===================================================================
 --- psi.orig/src/psiaccount.cpp	2013-01-15 14:03:59.540825944 +0400
@@ -338,7 +338,7 @@ Index: psi/src/psiaccount.cpp
 @@ -1133,6 +1134,10 @@
  	d->httpAuthManager = new HttpAuthManager(d->client->rootTask());
  	connect(d->httpAuthManager, SIGNAL(confirmationRequest(const PsiHttpAuthRequest &)), SLOT(incomingHttpAuthRequest(const PsiHttpAuthRequest &)));
- 
+
 +	// Time server
 +	new TimeServer(d->client->rootTask());
 +	d->client->addExtension("e-time", QStringList("urn:xmpp:time"));
@@ -382,7 +382,7 @@ Index: psi/src/systeminfo.cpp
  	strcpy(fmt, "%Z");
  	strftime(str, 256, fmt, localtime(&x));
 @@ -212,14 +212,12 @@
- 
+
  #if defined(Q_OS_WIN)
  	TIME_ZONE_INFORMATION i;
 -	//GetTimeZoneInformation(&i);
@@ -399,7 +399,7 @@ Index: psi/src/systeminfo.cpp
  		int w = inDST ? i.DaylightName[n] : i.StandardName[n];
 @@ -262,3 +260,13 @@
  }
- 
+
  SystemInfo* SystemInfo::instance_ = NULL;
 +
 +/**
@@ -550,7 +550,7 @@ Index: psi/src/userlist.cpp
 @@ -102,6 +102,43 @@
  	}
  }
- 
+
 +/**
 + * \brief Timezone offset in minutes (if available).
 + */
@@ -594,7 +594,7 @@ Index: psi/src/userlist.cpp
 @@ -565,6 +602,12 @@
  			if (!r.geoLocation().isNull())
  				str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(r.geoLocation().lat().value()) + "/" + QString::number(r.geoLocation().lon().value()) + "</div>";
- 
+
 +			// Entity Time
 +			if (r.timezoneOffset().hasValue()) {
 +				QDateTime dt = QDateTime::currentDateTime().toUTC().addSecs(r.timezoneOffset().value()*60);
@@ -613,13 +613,13 @@ Index: psi/src/userlist.h
  #include "geolocation.h"
  #include "physicallocation.h"
 +#include "maybe.h"
- 
+
  class AvatarFactory;
  namespace XMPP {
 @@ -51,6 +52,10 @@
  	const QString& clientOS() const;
  	void setClient(const QString& name, const QString& version, const QString& os);
- 
+
 +	Maybe<int> timezoneOffset() const;
 +	const QString& timezoneOffsetString() const;
 +	void setTimezone(Maybe<int> tzo);
@@ -628,7 +628,7 @@ Index: psi/src/userlist.h
  	int pgpVerifyStatus() const;
  	QDateTime sigTimestamp() const;
 @@ -67,6 +72,8 @@
- 
+
  private:
  	QString v_ver, v_clientName, v_clientVersion, v_clientOS, v_keyID;
 +	Maybe<int> v_tzo;

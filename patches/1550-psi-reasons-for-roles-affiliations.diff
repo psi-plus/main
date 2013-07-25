@@ -24,7 +24,7 @@ Index: psi/src/groupchatdlg.cpp
 +				if(!reason.isEmpty()) {
 +					message += tr(" (Reason: %1)").arg(reason);
  				}
- 
+
  				if (!message.isEmpty()) {
 @@ -1925,20 +1932,45 @@
  		GCUserViewItem *contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
@@ -87,7 +87,7 @@ Index: psi/src/groupchatdlg.cpp
  		// Kick || Ban with reason
 @@ -1966,26 +1998,6 @@
  		}
- 
+
  	}
 -	else if(x == 15) {
 -		GCUserViewItem *contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
@@ -110,7 +110,7 @@ Index: psi/src/groupchatdlg.cpp
 -			d->mucManager->setAffiliation(contact->s.mucItem().jid(), MUCItem::Owner);
 -	}
  }
- 
+
  void GCMainDlg::contextMenuEvent(QContextMenuEvent *)
 Index: psi/src/mucreasonseditor.cpp
 ===================================================================
@@ -142,8 +142,8 @@ Index: psi/src/mucreasonseditor.cpp
  #include "common.h"
  #include "psioptions.h"
 +#include "ui_mucreasonseditor.h"
- 
- 
+
+
  MUCReasonsEditor::MUCReasonsEditor(QWidget* parent)
  	: QDialog(parent)
 +	, ui_(new Ui::MUCReasonsEditor)
@@ -157,13 +157,13 @@ Index: psi/src/mucreasonseditor.cpp
 +	connect(ui_->btnRemove, SIGNAL(clicked()), SLOT(removeButtonClicked()));
 +	connect(ui_->lstReasons, SIGNAL(currentTextChanged(QString)), SLOT(currentChanged(QString)));
  }
- 
+
  MUCReasonsEditor::~MUCReasonsEditor()
--{	
+-{
 +{
 +	delete ui_;
  }
- 
+
  void MUCReasonsEditor::accept()
  {
  	save();
@@ -171,7 +171,7 @@ Index: psi/src/mucreasonseditor.cpp
 +	reason_ = ui_->txtReason->text();
  	QDialog::accept();
  }
- 
+
 -void MUCReasonsEditor::on_btnAdd_clicked()
 +void MUCReasonsEditor::currentChanged(const QString &r)
 +{
@@ -187,7 +187,7 @@ Index: psi/src/mucreasonseditor.cpp
 -	ui_.lstReasons->addItem(reason_);
 +	ui_->lstReasons->addItem(reason_);
  }
- 
+
 -void MUCReasonsEditor::on_btnRemove_clicked()
 +void MUCReasonsEditor::removeButtonClicked()
  {
@@ -202,7 +202,7 @@ Index: psi/src/mucreasonseditor.cpp
 +			delete item;
  	}
  }
- 
+
  void MUCReasonsEditor::save()
  {
  	QStringList reasons;
@@ -242,14 +242,14 @@ Index: psi/src/mucreasonseditor.h
 +
  #ifndef MUCREASONSEDITOR_H
  #define MUCREASONSEDITOR_H
- 
+
  #include <QDialog>
- 
+
 -#include "ui_mucreasonseditor.h"
 +namespace Ui {
 +	class MUCReasonsEditor;
 +}
- 
+
  class MUCReasonsEditor: public QDialog
  {
 @@ -12,13 +35,17 @@

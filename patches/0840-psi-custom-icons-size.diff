@@ -5,7 +5,7 @@ Index: psi/src/discodlg.cpp
 --- psi.orig/src/discodlg.cpp	2013-01-15 14:04:18.476826714 +0400
 +++ psi/src/discodlg.cpp	2013-01-15 14:04:18.468826713 +0400
 @@ -1009,7 +1009,8 @@
- 
+
  	// create toolbar
  	toolBar = new QToolBar(tr("Service Discovery toolbar"), dlg);
 -	toolBar->setIconSize(QSize(16,16));
@@ -13,7 +13,7 @@ Index: psi/src/discodlg.cpp
 +	toolBar->setIconSize(QSize(s,s));
  	toolBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
  	replaceWidget(dlg->toolBarPlaceholder, toolBar);
- 
+
 Index: psi/src/groupchatdlg.cpp
 ===================================================================
 --- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:18.476826714 +0400
@@ -21,7 +21,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -715,7 +715,8 @@
  	connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateBookmarkIcon()));
  	connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
- 
+
 -	ui_.toolbar->setIconSize(QSize(16,16));
 +	int s = PsiIconset::instance()->system().iconSize();
 +	ui_.toolbar->setIconSize(QSize(s,s));
@@ -37,7 +37,7 @@ Index: psi/src/options/optionsdlg.cpp
  #include "iconset.h"
  #include "iconwidget.h"
 +#include "psiiconset.h"
- 
+
  #include <QLayout>
  #include <QLabel>
 @@ -88,7 +89,8 @@
@@ -57,7 +57,7 @@ Index: psi/src/options/optionsdlg.cpp
 -			iconSize = QSize(16, 16);
 +			int s = PsiIconset::instance()->system().iconSize();
 +			iconSize = QSize(s,s);
- 
+
  		int width = iconSize.width();
  		width += 8;
 Index: psi/src/psichatdlg.cpp
@@ -67,7 +67,7 @@ Index: psi/src/psichatdlg.cpp
 @@ -271,6 +271,10 @@
  	ui_.splitter->optionsChanged();
  	ui_.mle->optionsChanged();
- 
+
 +	int s = PsiIconset::instance()->system().iconSize();
 +	ui_.lb_status->setFixedSize(s,s);
 +	ui_.lb_client->setFixedSize(s,s);
@@ -94,12 +94,12 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  static const QString showStatusIconsPath = "options.ui.contactlist.show-status-icons";
  static const QString statusIconsOverAvatarsPath = "options.ui.contactlist.status-icon-over-avatar";
 +static const QString statusIconsetOptionPath = "options.iconsets.status";
- 
+
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
 @@ -59,6 +60,8 @@
  	connect(alertTimer_, SIGNAL(timeout()), SLOT(updateAlerts()));
- 
+
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), SLOT(optionChanged(const QString&)));
 +	connect(PsiIconset::instance(), SIGNAL(rosterIconsSizeChanged(int)), SLOT(rosterIconsSizeChanged(int)));
 +	statusIconSize_ = PsiIconset::instance()->roster.value(PsiOptions::instance()->getOption(statusIconsetOptionPath).toString())->iconSize();
@@ -118,7 +118,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 @@ -613,6 +616,13 @@
  	}
  }
- 
+
 +void PsiContactListViewDelegate::rosterIconsSizeChanged(int size)
 +{
 +	statusIconSize_ = size;
@@ -138,7 +138,7 @@ Index: psi/src/psicontactlistviewdelegate.h
  	void optionChanged(const QString& option);
  	void updateAlerts();
 +	void rosterIconsSizeChanged(int size);
- 
+
  private:
  	QTimer* alertTimer_;
 @@ -69,6 +70,7 @@
@@ -147,7 +147,7 @@ Index: psi/src/psicontactlistviewdelegate.h
  	mutable QHash<QModelIndex, bool> alertingIndexes_;
 +	int statusIconSize_;
  };
- 
+
  #endif
 Index: psi/src/psiiconset.cpp
 ===================================================================
@@ -163,7 +163,7 @@ Index: psi/src/psiiconset.cpp
 +		}
 +
  		d->loadIconset(&d->system, &sys);
- 
+
  		//d->system = d->systemIconset();
 @@ -507,6 +512,10 @@
  	if (d->cur_status != cur_status) {
@@ -174,19 +174,19 @@ Index: psi/src/psiiconset.cpp
 +			emit rosterIconsSizeChanged(newDef->iconSize());
 +
  		d->loadIconset(oldDef, newDef);
- 
+
  		roster.remove(d->cur_status);
 Index: psi/src/psiiconset.h
 ===================================================================
 --- psi.orig/src/psiiconset.h	2013-01-15 14:04:18.476826714 +0400
 +++ psi/src/psiiconset.h	2013-01-15 14:04:18.472826714 +0400
 @@ -80,6 +80,8 @@
- 
+
  signals:
  	void emoticonsChanged();
 +	void systemIconsSizeChanged(int);
 +	void rosterIconsSizeChanged(int);
- 
+
  public slots:
  	static void reset();
 Index: psi/src/psitoolbar.cpp
@@ -195,7 +195,7 @@ Index: psi/src/psitoolbar.cpp
 +++ psi/src/psitoolbar.cpp	2013-01-15 14:04:18.472826714 +0400
 @@ -29,6 +29,7 @@
  #include <QToolButton>
- 
+
  #include "iconset.h"
 +#include "psiiconset.h"
  #include "iconaction.h"
@@ -204,11 +204,11 @@ Index: psi/src/psitoolbar.cpp
 @@ -63,7 +64,8 @@
  	Q_ASSERT(mainWindow);
  	Q_ASSERT(actionList_);
- 
+
 -	setIconSize(QSize(16, 16));
 +	int s = PsiIconset::instance()->system().iconSize();
 +	setIconSize(QSize(s, s));
- 
+
  	customizeAction_ = new QAction(tr("&Configure Toolbar..."), this);
  	connect(customizeAction_, SIGNAL(triggered()), this, SIGNAL(customize()));
 Index: psi/src/tools/iconset/iconset.cpp
@@ -221,20 +221,20 @@ Index: psi/src/tools/iconset/iconset.cpp
  		homeUrl = QString::null;
 +		iconSize_ = 16;
  	}
- 
+
  public:
 @@ -1036,6 +1037,7 @@
  	QHash<QString, PsiIcon *> dict; // unsorted hash for fast search
  	QList<PsiIcon *> list;          // sorted list
  	QHash<QString, QString> info;
 +	int iconSize_;
- 
+
  public:
  	Private()
 @@ -1129,6 +1131,8 @@
  	{
  		Q_UNUSED(dir);
- 
+
 +		iconSize_ = 16;
 +
  		for (QDomNode node = i.firstChild(); !node.isNull(); node = node.nextSibling()) {
@@ -261,7 +261,7 @@ Index: psi/src/tools/iconset/iconset.cpp
  //! \endif
 @@ -1599,6 +1608,14 @@
  }
- 
+
  /**
 + * Returns the icons size from Iconset.
 + */
@@ -283,6 +283,6 @@ Index: psi/src/tools/iconset/iconset.h
  	const QString &creation() const;
  	const QString &homeUrl() const;
 +	const int &iconSize() const;
- 
+
  	const QString &fileName() const;
  	void setFileName(const QString &);

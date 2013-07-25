@@ -27,7 +27,7 @@ Index: psi/src/options/opt_iconset.cpp
 --- psi.orig/src/options/opt_iconset.cpp	2013-01-15 14:04:03.676826112 +0400
 +++ psi/src/options/opt_iconset.cpp	2013-01-15 14:04:03.668826112 +0400
 @@ -24,6 +24,7 @@
- 
+
  #include "ui_opt_iconset_emo.h"
  #include "ui_opt_iconset_mood.h"
 +#include "ui_opt_iconset_client.h"
@@ -37,7 +37,7 @@ Index: psi/src/options/opt_iconset.cpp
 @@ -40,6 +41,12 @@
  	IconsetMoodUI() : QWidget() { setupUi(this); }
  };
- 
+
 +class IconsetClientUI : public QWidget, public Ui::IconsetClient
 +{
 +public:
@@ -201,7 +201,7 @@ Index: psi/src/options/opt_iconset.cpp
 +		threadCancelled.lock();
  		thread->cancelled = true;
  		threadCancelled.unlock();
- 
+
 Index: psi/src/options/opt_iconset.h
 ===================================================================
 --- psi.orig/src/options/opt_iconset.h	2013-01-15 14:04:03.676826112 +0400
@@ -209,7 +209,7 @@ Index: psi/src/options/opt_iconset.h
 @@ -93,6 +93,34 @@
  	IconsetLoadThread *thread;
  };
- 
+
 +class OptionsTabIconsetClients : public OptionsTab
 +{
 +	Q_OBJECT
@@ -341,7 +341,7 @@ Index: psi/src/options/opt_roster.cpp
 @@ -44,7 +44,7 @@
  	d->ck_showMenubar->setWhatsThis(
  		tr("Shows the menubar in the application window."));
- 
+
 -
 +	connect(d->ck_showClientIcons, SIGNAL(toggled(bool)), d->cb_showAllClientIcons, SLOT(setEnabled(bool)));
  #ifdef Q_OS_MAC
@@ -352,7 +352,7 @@ Index: psi/src/options/opt_roster.cpp
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-tune-icons", d->ck_showTuneIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-client-icons", d->ck_showClientIcons->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.contactlist.show-all-client-icons", (d->cb_showAllClientIcons->currentIndex() == 0)?true:false);
- 
+
  	//avatars settings
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.size", d->sb_avatarsSize->value());
 @@ -96,7 +97,8 @@
@@ -445,7 +445,7 @@ Index: psi/src/psiiconset.cpp
 @@ -245,6 +245,23 @@
  		return def;
  	}
- 
+
 +	Iconset clientsIconset(bool *ok)
 +	{
 +		Iconset def;
@@ -469,7 +469,7 @@ Index: psi/src/psiiconset.cpp
 @@ -384,6 +401,21 @@
  	return ok;
  }
- 
+
 +bool PsiIconset::loadClients()
 +{
 +	bool ok = true;
@@ -489,13 +489,13 @@ Index: psi/src/psiiconset.cpp
  {
  	if (!loadSystem() || !loadRoster())
 @@ -391,6 +423,7 @@
- 
+
  	loadEmoticons();
  	loadMoods();
 +	loadClients();
  	return true;
  }
- 
+
 @@ -405,6 +438,9 @@
  	else if (option == "options.iconsets.moods") {
  		loadMoods();
@@ -503,7 +503,7 @@ Index: psi/src/psiiconset.cpp
 +	else if (option == "options.iconsets.clients") {
 +		loadClients();
 +	}
- 
+
  	// currently we rely on PsiCon calling reloadRoster() when
  	// all options are already applied. otherwise we risk the chance
 Index: psi/src/psiiconset.h
@@ -524,7 +524,7 @@ Index: psi/src/psiiconset.h
  	bool loadMoods();
 +	bool loadClients();
  };
- 
+
  #endif
 Index: psi/src/userlist.cpp
 ===================================================================
@@ -533,7 +533,7 @@ Index: psi/src/userlist.cpp
 @@ -319,6 +319,255 @@
  	return v_mood;
  }
- 
+
 +QStringList UserListItem::clients() const
 +{
 +	QStringList res;
@@ -793,7 +793,7 @@ Index: psi/src/userlist.cpp
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Using") + QString(": %1").arg(ver) + "</div>";
 +				str += QString("<div style='white-space:pre'>") + QObject::tr("Using") + QString(": <%1=\"%2\"> %3").arg(imgTag).arg("clients/" + findClient(r.clientName().toLower())).arg(ver) + "</div>";
  			}
- 
+
  			// status message
 Index: psi/src/userlist.h
 ===================================================================
@@ -806,5 +806,5 @@ Index: psi/src/userlist.h
 +	QStringList clients() const;
 +	QString findClient(QString name) const;
  	const Activity& activity() const;
- 
+
  	void setJid(const XMPP::Jid &);

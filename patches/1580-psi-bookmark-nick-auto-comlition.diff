@@ -5,7 +5,7 @@ Index: psi/src/mucjoindlg.cpp
 @@ -32,8 +32,12 @@
  #include "bookmarkmanager.h"
  #include "iconset.h"
- 
+
 +static const int nickConflictCode = 409;
 +static const QString additionalSymbol = "_";
 +
@@ -18,13 +18,13 @@ Index: psi/src/mucjoindlg.cpp
 @@ -243,22 +247,32 @@
  	controller_->recentGCAdd(jid_.full());
  	ui_.busy->stop();
- 
+
 +	nickAlreadyCompleted_ = false;
  	closeDialogs(this);
  	deleteLater();
  	account_->addMucItem(jid_.bare());
  }
- 
+
 -void MUCJoinDlg::error(int, const QString &str)
 +void MUCJoinDlg::error(int error, const QString &str)
  {
@@ -33,10 +33,10 @@ Index: psi/src/mucjoindlg.cpp
 -
  	ui_.busy->stop();
  	setWidgetsEnabled(true);
- 
+
  	account_->dialogUnregister(this);
  	controller_->dialogRegister(this);
- 
+
 +	if(!nickAlreadyCompleted_ && reason_ == MucAutoJoin && error == nickConflictCode) {
 +		nickAlreadyCompleted_ = true;
 +		ui_.le_nick->setText(ui_.le_nick->text() + additionalSymbol);
@@ -55,7 +55,7 @@ Index: psi/src/mucjoindlg.cpp
 @@ -271,7 +285,7 @@
  	ui_.le_room->setText(mucJid.node());
  }
- 
+
 -void MUCJoinDlg::setNick(const QString nick)
 +void MUCJoinDlg::setNick(const QString& nick)
  {
@@ -67,18 +67,18 @@ Index: psi/src/mucjoindlg.h
 +++ psi/src/mucjoindlg.h	2013-01-15 14:04:31.308827236 +0400
 @@ -46,7 +46,7 @@
  	~MUCJoinDlg();
- 
+
  	void setJid(const XMPP::Jid& jid);
 -	void setNick(const QString nick);
 +	void setNick(const QString& nick);
  	void setPassword(const QString& password);
- 
+
  	void joined();
 @@ -78,6 +78,7 @@
  	QPushButton* joinButton_;
  	XMPP::Jid jid_;
  	MucJoinReason reason_;
 +	bool nickAlreadyCompleted_;
- 
+
  	void disableWidgets();
  	void enableWidgets();

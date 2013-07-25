@@ -17,7 +17,7 @@ Index: psi/src/groupchatdlg.cpp
 --- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:09.848826363 +0400
 +++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:09.844826363 +0400
 @@ -233,6 +233,9 @@
- 
+
  	QPointer<MUCConfigDlg> configDlg;
  	QPointer<GroupchatTopicDlg> topicDlg;
 +
@@ -25,11 +25,11 @@ Index: psi/src/groupchatdlg.cpp
 +	int rosterSize;
  public:
  	bool trackBar;
- 
+
 @@ -743,12 +746,24 @@
  	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
- 
+
 +	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
 +
  	// resize the horizontal splitter
@@ -45,7 +45,7 @@ Index: psi/src/groupchatdlg.cpp
 +		list <<  d->logSize << d->rosterSize;
 +
  	ui_.hsplitter->setSizes(list);
- 
+
 +	if (leftRoster)
 +		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
 +
@@ -54,7 +54,7 @@ Index: psi/src/groupchatdlg.cpp
  	list << 324;
  	list << 10;
 @@ -778,6 +793,10 @@
- 
+
  GCMainDlg::~GCMainDlg()
  {
 +	//  Save splitters size
@@ -67,7 +67,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -798,6 +817,17 @@
  	}
  }
- 
+
 +void GCMainDlg::horizSplitterMoved()
 +{
 +	QList<int> list = ui_.hsplitter->sizes();
@@ -103,8 +103,8 @@ Index: psi/src/groupchatdlg.cpp
 @@ -1971,6 +2007,33 @@
  	}
  }
- 
-+ 
+
++
 +
 +void GCMainDlg::resizeEvent(QResizeEvent *e)
 +{
@@ -140,7 +140,7 @@ Index: psi/src/groupchatdlg.h
 +++ psi/src/groupchatdlg.h	2013-01-15 14:04:09.844826363 +0400
 @@ -88,6 +88,7 @@
  	void setShortcuts();
- 
+
  	// reimplemented
 +	void resizeEvent(QResizeEvent *e);
  	void dragEnterEvent(QDragEnterEvent *);
@@ -151,6 +151,6 @@ Index: psi/src/groupchatdlg.h
  	void sendTemp(const QString &);
  	void psButtonEnabled();
 +	void horizSplitterMoved();
- 
+
  public:
  	class Private;

@@ -30,13 +30,13 @@ Index: psi/src/accountstatusmenu.h
 @@ -20,6 +20,9 @@
  	void addChoose();
  	void addReconnect();
- 
+
 +private:
 +	void addIgnoreGlobalActions();
 +
  private slots:
  	void chooseStatusActivated();
- 
+
 Index: psi/src/mainwin.cpp
 ===================================================================
 --- psi.orig/src/mainwin.cpp	2013-01-15 14:04:35.240827395 +0400
@@ -80,7 +80,7 @@ Index: psi/src/profiles.h
 +	bool opt_automatic_resource, priority_dep_on_status, ignore_global_actions;
  	int security_level;
  	enum SSLFlag { SSL_No = 0, SSL_Yes = 1, SSL_Auto = 2, SSL_Legacy = 3 } ssl;
- 
+
 Index: psi/src/psi_profiles.cpp
 ===================================================================
 --- psi.orig/src/psi_profiles.cpp	2013-01-15 14:04:35.240827395 +0400
@@ -114,7 +114,7 @@ Index: psi/src/psi_profiles.cpp
  	readBoolAttribute(a, "automatic-resource", &opt_automatic_resource);
  	readBoolAttribute(a, "priority-depends-on-status", &priority_dep_on_status);
 +	readBoolAttribute(a, "ignore-global-actions", &ignore_global_actions);
- 
+
  	// Will be overwritten if there is a new option
  	bool opt_plain = false;
 Index: psi/src/psiaccount.cpp
@@ -124,7 +124,7 @@ Index: psi/src/psiaccount.cpp
 @@ -4066,6 +4066,11 @@
  	}
  }
- 
+
 +void PsiAccount::actionSetBlock(bool blocked)
 +{
 +	d->acc.ignore_global_actions = blocked;
@@ -150,17 +150,17 @@ Index: psi/src/psicon.cpp
 --- psi.orig/src/psicon.cpp	2013-01-15 14:04:35.240827395 +0400
 +++ psi/src/psicon.cpp	2013-01-15 14:04:35.236827395 +0400
 @@ -1173,7 +1173,7 @@
- 
+
  	// globally set each account which is logged in
  	foreach(PsiAccount* account, d->contactList->enabledAccounts())
 -		if (allOffline || account->isActive())
 +		if ((allOffline || account->isActive()) && (!account->accountOptions().ignore_global_actions || s.type() == Status::Offline))
  			account->setStatus(s, withPriority, isManualStatus);
- 
+
  	emit statusMessageChanged(s.status());
 @@ -1940,6 +1940,9 @@
  		aa = PsiAccount::AutoAway_None;
- 
+
  	foreach(PsiAccount* pa, d->contactList->enabledAccounts()) {
 +		if(pa->accountOptions().ignore_global_actions)
 +			continue;

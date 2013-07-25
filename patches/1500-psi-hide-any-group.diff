@@ -5,7 +5,7 @@ Index: psi/src/contactlistgroup.cpp
 @@ -334,6 +334,17 @@
  	return haveOnlineContacts_;
  }
- 
+
 +bool ContactListGroup::isHidden() const
 +{
 +	return model()->groupState()->isHidden(this);
@@ -30,9 +30,9 @@ Index: psi/src/contactlistgroup.h
  	int contactsCount() const;
 +	bool isHidden() const;
 +	void setHidden(bool hidden);
- 
+
  	QList<PsiContact*> contacts() const;
- 
+
 Index: psi/src/contactlistgroupmenu.cpp
 ===================================================================
 --- psi.orig/src/contactlistgroupmenu.cpp	2013-01-15 14:04:29.440827160 +0400
@@ -42,18 +42,18 @@ Index: psi/src/contactlistgroupmenu.cpp
  	QAction* actionMucShow_;
  	QAction* actionMucLeave_;
 +	QAction* actionHide_;
- 
+
  public:
  	Private(ContactListGroupMenu* menu, ContactListGroup* _group)
 @@ -108,6 +109,9 @@
  		actionMucLeave_ = new IconAction(tr("Leave All"), this, "psi/action_muc_leave");
  		connect(actionMucLeave_, SIGNAL(triggered()), SLOT(mucLeave()));
- 
+
 +		actionHide_ = new IconAction(tr("Hidden"), "psi/show_hidden", tr("Hidden"), 0, this, 0, true);
 +		connect(actionHide_, SIGNAL(triggered(bool)), SLOT(actHide(bool)));
 +
  		authMenu_ = 0;
- 
+
  		if (ContactListGroup::SpecialType_Conference != group->specialGroupType()) {
 @@ -120,6 +124,8 @@
  			menu->addAction(sendMessageAction_);
@@ -75,7 +75,7 @@ Index: psi/src/contactlistgroupmenu.cpp
 @@ -302,6 +309,14 @@
  		}
  	}
- 
+
 +	void actHide(bool hide)
 +	{
 +		if (!group)
@@ -94,7 +94,7 @@ Index: psi/src/contactlistgroupstate.cpp
 @@ -95,6 +95,23 @@
  	order_[group->fullName()] = order;
  }
- 
+
 +bool ContactListGroupState::isHidden(const ContactListGroup* group) const
 +{
 +	const QString groupName = group->fullName();
@@ -134,7 +134,7 @@ Index: psi/src/contactlistgroupstate.cpp
 +		}
 +	}
  }
- 
+
  void ContactListGroupState::save()
 @@ -220,6 +251,19 @@
  			}
@@ -153,7 +153,7 @@ Index: psi/src/contactlistgroupstate.cpp
 +			}
 +		}
 +	}
- 
+
  	PsiOptions::instance()->setOption(groupStateOptionPath.arg(id_), doc.toString());
  }
 Index: psi/src/contactlistgroupstate.h
@@ -163,19 +163,19 @@ Index: psi/src/contactlistgroupstate.h
 @@ -50,6 +50,9 @@
  	int groupOrder(const ContactListGroup* group) const;
  	void setGroupOrder(const ContactListGroup* group, int order);
- 
+
 +	bool isHidden(const ContactListGroup* group) const;
 +	void setHidden(const ContactListGroup* group, bool hidden);
 +
  	void updateGroupList(const ContactListModel* model);
- 
+
  	void load(const QString& id);
 @@ -66,6 +69,7 @@
  	QString id_;
  	GroupExpandedState expanded_;
  	QMap<QString, int> order_;
 +	QMap<QString, bool> hidden_;
- 
+
  	QStringList groupNames(const ContactListModel* model, const QModelIndex& parent, QStringList parentName) const;
  };
 Index: psi/src/contactlistproxymodel.cpp
@@ -184,10 +184,10 @@ Index: psi/src/contactlistproxymodel.cpp
 +++ psi/src/contactlistproxymodel.cpp	2013-01-15 14:04:29.436827159 +0400
 @@ -121,7 +121,7 @@
  			}
- 
+
  			bool show = true;
 -			if (index.data(Qt::DisplayRole) == PsiContact::hiddenGroupName()) {
 +			if (index.data(Qt::DisplayRole) == PsiContact::hiddenGroupName() || group->isHidden()) {
  				show = showHidden();
  			}
- 
+

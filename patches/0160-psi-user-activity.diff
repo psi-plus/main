@@ -171,7 +171,7 @@ Index: psi/src/activity.h
 +class Activity
 +{
 +public:
-+	enum Type { 
++	enum Type {
 +		Unknown,
 +		DoingChores, Drinking, Eating, Exercising, Grooming,
 +		HavingAppointment, Inactive, Relaxing, Talking, Traveling,
@@ -226,7 +226,7 @@ Index: psi/src/activity.h
 +
 +protected:
 +	void fromXml(const QDomElement&);
-+	
++
 +private:
 +	Type type_;
 +	SpecificType specificType_;
@@ -383,7 +383,7 @@ Index: psi/src/activitycatalog.cpp
 +
 +#include "activity.h"
 +#include "activitycatalog.h"
-+		
++
 +ActivityCatalog::Entry::Entry()
 +{
 +}
@@ -571,7 +571,7 @@ Index: psi/src/activitycatalog.cpp
 +{
 +	return entries_;
 +}
-+	
++
 +ActivityCatalog* ActivityCatalog::instance_ = 0;
 Index: psi/src/activitycatalog.h
 ===================================================================
@@ -628,19 +628,19 @@ Index: psi/src/activitycatalog.h
 +			QString value_;
 +			QString text_;
 +	};
-+	
++
 +	static ActivityCatalog* instance();
 +
 +	Entry findEntryByType(Activity::Type) const;
 +	Entry findEntryByType(Activity::SpecificType) const;
 +	Entry findEntryByValue(const QString&) const;
 +	Entry findEntryByText(const QString& text) const;
-+	
++
 +	const QList<Entry>& entries() const;
-+	
++
 +private:
 +	ActivityCatalog();
-+	
++
 +	QList<Entry> entries_;
 +	static ActivityCatalog* instance_;
 +
@@ -808,15 +808,15 @@ Index: psi/src/contactlistaccountmenu.cpp
 @@ -72,6 +73,9 @@
  		moodAction_ = new QAction(tr("Mood"), this);
  		connect(moodAction_, SIGNAL(triggered()), SLOT(setMood()));
- 
+
 +		activityAction_ = new QAction(tr("Activity"), this);
 +		connect(activityAction_, SIGNAL(triggered()), SLOT(setActivity()));
 +
  		setAvatarAction_ = new QAction(tr("Set Avatar"), this);
  		connect(setAvatarAction_, SIGNAL(triggered()), SLOT(setAvatar()));
- 
+
 @@ -113,6 +117,7 @@
- 
+
  		menu->addMenu(statusMenu_);
  		menu->addAction(moodAction_);
 +		menu->addAction(activityAction_);
@@ -838,7 +838,7 @@ Index: psi/src/contactlistaccountmenu.cpp
 @@ -204,6 +211,14 @@
  		account->account()->actionSetMood();
  	}
- 
+
 +	void setActivity()
 +	{
 +		if (!account)
@@ -857,7 +857,7 @@ Index: psi/src/contactview.cpp
 @@ -954,11 +954,14 @@
  		pm.insertItem(tr("Mood"), 11);
  		pm.setItemEnabled(11, d->pa->serverInfoManager()->hasPEP());
- 
+
 +		pm.insertItem(tr("Activity"), 12);
 +		pm.setItemEnabled(12, d->pa->serverInfoManager()->hasPEP());
 +
@@ -900,7 +900,7 @@ Index: psi/src/contactview.h
 +	void actionSetActivity();
  	void actionSetAvatar();
  	void actionUnsetAvatar();
- 
+
 Index: psi/src/psiaccount.cpp
 ===================================================================
 --- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:01.728826033 +0400
@@ -967,7 +967,7 @@ Index: psi/src/psiaccount.cpp
 @@ -3766,6 +3783,12 @@
  	w->show();
  }
- 
+
 +void PsiAccount::actionSetActivity()
 +{
 +	ActivityDlg *w = new ActivityDlg(this);
@@ -994,7 +994,7 @@ Index: psi/src/psicon.cpp
 --- psi.orig/src/psicon.cpp	2013-01-15 14:04:01.728826033 +0400
 +++ psi/src/psicon.cpp	2013-01-15 14:04:01.724826033 +0400
 @@ -611,6 +611,7 @@
- 
+
  	registerCaps("ep", QStringList()
  				 << "http://jabber.org/protocol/mood"
 +				 << "http://jabber.org/protocol/activity"
@@ -1002,7 +1002,7 @@ Index: psi/src/psicon.cpp
  				 << "http://jabber.org/protocol/physloc"
  				 << "http://jabber.org/protocol/geoloc"
 @@ -620,6 +621,7 @@
- 
+
  	registerCaps("ep-notify-2", QStringList()
  				 << "http://jabber.org/protocol/mood+notify"
 +				 << "http://jabber.org/protocol/activity+notify"
@@ -1048,7 +1048,7 @@ Index: psi/src/userlist.cpp
 @@ -319,6 +319,16 @@
  	return v_mood;
  }
- 
+
 +void UserListItem::setActivity(const Activity& activity)
 +{
 +	v_activity = activity;
@@ -1065,7 +1065,7 @@ Index: psi/src/userlist.cpp
 @@ -492,6 +502,17 @@
  	if(!v_keyID.isEmpty())
  		str += QString("<div style='white-space:pre'>") + QObject::tr("OpenPGP") + ": " + v_keyID.right(8) + "</div>";
- 
+
 +	// User Activity
 +	if (!activity().isNull()) {
 +		str += QString("<div style='white-space:pre'>") + QObject::tr("Activity") + ": " + activity().typeText();
@@ -1097,7 +1097,7 @@ Index: psi/src/userlist.h
  	bool isPrivate() const;
  	const Mood& mood() const;
 +	const Activity& activity() const;
- 
+
  	void setJid(const XMPP::Jid &);
  	void setInList(bool);
 @@ -130,6 +132,7 @@

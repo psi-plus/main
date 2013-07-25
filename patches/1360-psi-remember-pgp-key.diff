@@ -5,7 +5,7 @@ Index: psi/src/passphrasedlg.cpp
 @@ -42,3 +42,7 @@
  	return ui_.le_pass->text();
  }
- 
+
 +bool PassphraseDlg::rememberPassPhrase() const
 +{
 +	return ui_.cb_savePass->isChecked();
@@ -16,10 +16,10 @@ Index: psi/src/passphrasedlg.h
 +++ psi/src/passphrasedlg.h	2013-01-15 14:04:27.444827078 +0400
 @@ -32,6 +32,7 @@
  	void promptPassphrase(const QString& name);
- 
+
  	QString getPassphrase() const;
 +	bool rememberPassPhrase() const;
- 
+
  private:
  	Ui::Passphrase ui_;
 Index: psi/src/passphrase.ui
@@ -57,7 +57,7 @@ Index: psi/src/pgputil.cpp
 @@ -283,6 +286,11 @@
  	passphrases_.remove(id);
  }
- 
+
 +void PGPUtil::addPassphrase(const QString &id, const QString &pass)
 +{
 +	passphrases_.insert(id, pass);
@@ -72,14 +72,14 @@ Index: psi/src/pgputil.h
 +++ psi/src/pgputil.h	2013-01-15 14:04:27.444827078 +0400
 @@ -40,9 +40,11 @@
  	bool equals(QCA::PGPKey, QCA::PGPKey);
- 
+
  	void removePassphrase(const QString& id);
 +	void addPassphrase(const QString& id, const QString& pass);
- 
+
  signals:
  	void pgpKeysUpdated();
 +	void newPassPhase(const QString&, const QString&);
- 
+
  protected:
  	PGPUtil();
 Index: psi/src/profiles.h
@@ -88,12 +88,12 @@ Index: psi/src/profiles.h
 +++ psi/src/profiles.h	2013-01-15 14:04:27.444827078 +0400
 @@ -78,6 +78,7 @@
  	QMap<QString, GroupData> groupState;
- 
+
  	QCA::PGPKey pgpSecretKey;
 +	QString pgpPassPhrase;
- 
+
  	VarList keybind;
- 
+
 Index: psi/src/psiaccount.cpp
 ===================================================================
 --- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:27.448827079 +0400
@@ -104,12 +104,12 @@ Index: psi/src/psiaccount.cpp
  	connect(&PGPUtil::instance(), SIGNAL(pgpKeysUpdated()), SLOT(pgpKeysUpdated()));
 +	connect(&PGPUtil::instance(), SIGNAL(newPassPhase(QString,QString)), SLOT(newPgpPassPhase(QString,QString)));
  #endif
- 
+
  	d->setEnabled(enabled());
 @@ -5785,10 +5786,23 @@
  #endif
  }
- 
+
 +void PsiAccount::newPgpPassPhase(const QString &id, const QString &pass)
 +{
 +	const QString pgpSecretKeyID = (d->acc.pgpSecretKey.isNull() ? "" : d->acc.pgpSecretKey.keyId());
@@ -128,7 +128,7 @@ Index: psi/src/psiaccount.cpp
 +	}
 +#endif
  	QByteArray plain = d->loginStatus.status().toUtf8();
- 
+
  	PGPTransaction *t = new PGPTransaction(new QCA::OpenPGP());
 @@ -5812,6 +5826,7 @@
  	else {
@@ -147,7 +147,7 @@ Index: psi/src/psiaccount.h
  	void eventFromXml(PsiEvent* e);
  	void simulateContactOffline(const XMPP::Jid& contact);
 +	void newPgpPassPhase(const QString& id, const QString& pass);
- 
+
  private:
  	void handleEvent(PsiEvent* e, ActivationType activationType);
 Index: psi/src/psi_profiles.cpp
@@ -165,7 +165,7 @@ Index: psi/src/psi_profiles.cpp
 +		}
  	}
  #endif
- 
+
 @@ -382,8 +387,10 @@
  	o->setOption(base + ".priority", priority);
  	if (!pgpSecretKey.isNull()) {
@@ -188,4 +188,4 @@ Index: psi/src/psi_profiles.cpp
 +		}
  	}
  #endif
- 
+

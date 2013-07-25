@@ -137,9 +137,9 @@ Index: psi/src/mainwin.cpp
  #include "activitydlg.h"
  #include "geolocationdlg.h"
 +#include "activecontactsmenu.h"
- 
+
  #include "mainwin_p.h"
- 
+
 @@ -660,6 +661,8 @@
  	} actionlist[] = {
  		{ "choose_status", activated, this, SLOT( actChooseStatusActivated() ) },
@@ -152,7 +152,7 @@ Index: psi/src/mainwin.cpp
 @@ -1247,6 +1250,14 @@
  	}
  }
- 
+
 +void MainWin::actActiveContacts()
 +{
 +	ActiveContactsMenu* acm = new ActiveContactsMenu(d->psi, this);
@@ -173,7 +173,7 @@ Index: psi/src/mainwin.h
  	void actSetActivityActivated();
  	void actSetGeolocActivated();
 +	void actActiveContacts();
- 
+
  	bool showDockMenu(const QPoint &);
  	void dockActivated();
 Index: psi/src/psiaccount.cpp
@@ -183,7 +183,7 @@ Index: psi/src/psiaccount.cpp
 @@ -3305,6 +3305,17 @@
  	return findDialogs<ChatDlg*>(jid, compareResource);
  }
- 
+
 +QList<PsiContact*> PsiAccount::activeContacts() const
 +{
 +	QList<PsiContact*> ret;
@@ -205,11 +205,11 @@ Index: psi/src/psiaccount.h
 @@ -166,6 +166,8 @@
  	ChatDlg* findChatDialogEx(const Jid& jid) const;
  	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
- 
+
 +	QList<PsiContact*> activeContacts() const;
 +
  	template<typename T>
- 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const { 
+ 	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const {
  		return static_cast<T>(findDialog(((T)0)->staticMetaObject, jid, compareResource));
 Index: psi/src/psiactionlist.cpp
 ===================================================================
@@ -218,7 +218,7 @@ Index: psi/src/psiactionlist.cpp
 @@ -190,9 +190,13 @@
  		IconAction *eventNotifier = new EventNotifierAction(this, "EventNotifierAction");
  		eventNotifier->setWhatsThis (tr("Special item that displays number of pending events"));
- 
+
 +		IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 +		actActiveContacts->setWhatsThis (tr("Simple way to find contacts with opened chats"));
 +
@@ -242,14 +242,14 @@ Index: psi/src/psichatdlg.cpp
  #include "psioptions.h"
  #include "coloropt.h"
 @@ -484,6 +485,9 @@
- 
+
  	act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
  	act_templates_->setMenu(getTemplateMenu());
 +
 +	act_active_contacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 +	connect(act_active_contacts, SIGNAL(triggered()), SLOT(actActiveContacts()));
  }
- 
+
  void PsiChatDlg::initToolBar()
 @@ -513,6 +517,7 @@
  		ui_.toolbar->addAction(act_voice_);
@@ -257,12 +257,12 @@ Index: psi/src/psichatdlg.cpp
  	ui_.toolbar->addAction(act_add_contact);
 +	ui_.toolbar->addAction(act_active_contacts);
  }
- 
+
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
 @@ -665,6 +670,14 @@
  	internal_change = false;
  }
- 
+
 +void PsiChatDlg::actActiveContacts()
 +{
 +	ActiveContactsMenu* acm = new ActiveContactsMenu(account()->psi(), this);
@@ -283,15 +283,15 @@ Index: psi/src/psichatdlg.h
  	QString makeContactName(const QString &name, const Jid &jid) const;
  	void doSwitchJidMode();
 +	void actActiveContacts();
- 
+
  private:
  	void initToolBar();
 @@ -107,6 +108,7 @@
- 
+
  	ActionLineEdit *le_autojid;
  	IconAction *act_autojid;
 +	IconAction *act_active_contacts;
- 
+
  	MCmdManager mCmdManager_;
  	MCmdSimpleSite mCmdSite_;
 Index: psi/src/psicontact.cpp
@@ -300,7 +300,7 @@ Index: psi/src/psicontact.cpp
 +++ psi/src/psicontact.cpp	2013-01-15 14:04:33.256827315 +0400
 @@ -540,6 +540,17 @@
  }
- 
+
  /**
 + * Returns true if there is opened chat with this contact
 + */
@@ -321,13 +321,13 @@ Index: psi/src/psicontact.h
 --- psi.orig/src/psicontact.h	2013-01-15 14:04:33.260827315 +0400
 +++ psi/src/psicontact.h	2013-01-15 14:04:33.256827315 +0400
 @@ -66,6 +66,8 @@
- 
+
  	virtual bool isAnimated() const;
- 
+
 +	bool isActiveContact() const;
 +
  	void activate();
- 
+
  	virtual void setEditing(bool editing);
 Index: psi/src/src.pri
 ===================================================================

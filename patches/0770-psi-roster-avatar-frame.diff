@@ -30,12 +30,12 @@ Index: psi/src/mainwin.cpp
 @@ -78,6 +78,9 @@
  #include "psimedia/psimedia.h"
  #include "avcall/avcall.h"
- 
+
 +#include "rosteravatarframe.h"
 +#include "avatars.h"
 +
  using namespace XMPP;
- 
+
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
 @@ -125,6 +128,8 @@
  	EventNotifierAction* eventNotifier;
@@ -43,7 +43,7 @@ Index: psi/src/mainwin.cpp
  	MainWin* mainWin;
 +	RosterAvatarFrame* rosterAvatar;
 +	QPointer<PsiAccount> defaultAccount;
- 
+
  	QLineEdit* searchText;
  	QToolButton* searchPb;
 @@ -306,6 +311,7 @@
@@ -51,13 +51,13 @@ Index: psi/src/mainwin.cpp
  	d->statusTip = "";
  	d->nickname = "";
 +	d->defaultAccount = 0;
- 
+
  	QWidget *rosterBar = new QWidget(this);
  	bool allInOne = false;
 @@ -398,6 +404,16 @@
  	d->searchWidget->setVisible(false);
  #endif
- 
+
 +
 +	// create rosteravatarframe
 +	d->rosterAvatar = new RosterAvatarFrame(this);
@@ -76,7 +76,7 @@ Index: psi/src/mainwin.cpp
  	d->optionsButton->setMenu( d->optionsMenu );
  	d->statusButton->setMenu( d->statusMenu );
 +	d->rosterAvatar->setStatusMenu( d->statusMenu );
- 
+
  	buildToolbars();
  	// setUnifiedTitleAndToolBarOnMac(true);
 @@ -560,6 +577,9 @@
@@ -87,7 +87,7 @@ Index: psi/src/mainwin.cpp
 +		d->rosterAvatar->setVisible(PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool());
 +	}
  }
- 
+
  void MainWin::registerAction( IconAction* action )
 @@ -1298,6 +1318,7 @@
  		else {
@@ -95,14 +95,14 @@ Index: psi/src/mainwin.cpp
  			d->statusGroup->setPsiIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
 +			d->rosterAvatar->setStatusIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE)->icon());
  		}
- 
+
  		setWindowIcon(PsiIconset::instance()->status(STATUS_OFFLINE).impix());
 @@ -1306,6 +1327,7 @@
  		d->statusButton->setText(status2txt(status));
  		d->statusButton->setIcon(PsiIconset::instance()->statusPtr(status));
  		d->statusGroup->setPsiIcon(PsiIconset::instance()->statusPtr(status));
 +		d->rosterAvatar->setStatusIcon(PsiIconset::instance()->statusPtr(status)->icon());
- 
+
  		setWindowIcon(PsiIconset::instance()->status(status).impix());
  	}
 @@ -1607,6 +1629,38 @@
@@ -142,14 +142,14 @@ Index: psi/src/mainwin.cpp
 +		d->rosterAvatar->setAvatar(IconsetFactory::iconPixmap("psi/default_avatar"));
 +	}
  }
- 
+
  void MainWin::accountFeaturesChanged()
 Index: psi/src/mainwin.h
 ===================================================================
 --- psi.orig/src/mainwin.h	2013-01-15 14:04:16.272826624 +0400
 +++ psi/src/mainwin.h	2013-01-15 14:04:16.268826624 +0400
 @@ -83,6 +83,7 @@
- 
+
  signals:
  	void statusChanged(int);
 +	void statusMessageChanged(QString);
@@ -157,9 +157,9 @@ Index: psi/src/mainwin.h
  	void blankMessage();
  	void closeProgram();
 @@ -153,6 +154,9 @@
- 
+
  	void optionChanged(const QString&);
- 
+
 +	void nickChanged();
 +	void avatarChanged();
 +
@@ -175,7 +175,7 @@ Index: psi/src/options/opt_roster.cpp
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-menubar", d->ck_showMenubar->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.disable-scrollbar", d->ck_disableScrollbar->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.contactlist.show-roster-avatar-frame", d->ck_roster_avatar->isChecked());
- 
+
  	//enabled icons
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
 @@ -93,6 +94,7 @@
@@ -183,7 +183,7 @@ Index: psi/src/options/opt_roster.cpp
  	d->ck_showMenubar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool() );
  	d->ck_disableScrollbar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.disable-scrollbar").toBool() );
 +	d->ck_roster_avatar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool() );
- 
+
  	//enabled icons
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
 Index: psi/src/options/opt_roster.ui
@@ -225,7 +225,7 @@ Index: psi/src/psicon.cpp
  	}
 +	if(d->contactList->defaultAccount())
 +		emit statusMessageChanged(d->contactList->defaultAccount()->status().status());
- 
+
  	// show tip of the day
  	if ( PsiOptions::instance()->getOption("options.ui.tip.show").toBool() ) {
 @@ -1126,6 +1129,16 @@
@@ -243,7 +243,7 @@ Index: psi/src/psicon.cpp
 +	s.setStatus(message);
 +	setGlobalStatus(s, false, true);
  }
- 
+
  void PsiCon::pa_updatedActivity()
 Index: psi/src/psicon.h
 ===================================================================
@@ -254,7 +254,7 @@ Index: psi/src/psicon.h
  	void emitOptionsUpdate();
  	void restoringSavedChatsChanged();
 +	void statusMessageChanged(QString);
- 
+
  public slots:
  	void setGlobalStatus(const Status &, bool withPriority = false, bool isManualStatus = false);
 @@ -156,6 +157,7 @@
@@ -454,7 +454,7 @@ Index: psi/src/rosteravatarframe.h
 +	public:
 +		RosterAvatarFrame(QWidget *parent);
 +		void setAvatar(const QPixmap &avatar);
-+		void setStatusIcon(const QIcon &ico);                
++		void setStatusIcon(const QIcon &ico);
 +		void setNick(const QString &nick);
 +		void setStatusMenu(QMenu *menu);
 +
@@ -666,21 +666,21 @@ Index: psi/src/src.pri
  	$$PWD/geolocationdlg.h \
 +	$$PWD/rosteravatarframe.h \
  	$$PWD/sendbuttonmenu.h
- 
- 
+
+
 @@ -349,6 +350,7 @@
  	$$PWD/vcardphotodlg.cpp \
  	$$PWD/coloropt.cpp \
  	$$PWD/geolocationdlg.cpp \
 +	$$PWD/rosteravatarframe.cpp \
  	$$PWD/sendbuttonmenu.cpp
- 
- 
+
+
 @@ -583,6 +585,7 @@
  	$$PWD/ahcommanddlg.ui \
  	$$PWD/ahcformdlg.ui \
  	$$PWD/geolocation.ui \
 +	$$PWD/rosteravatarframe.ui \
  	$$PWD/sendbuttontemplateseditor.ui
- 
+
  # options dialog

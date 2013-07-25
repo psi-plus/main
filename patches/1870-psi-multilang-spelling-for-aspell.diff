@@ -16,7 +16,7 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 +++ psi/src/libpsi/tools/spellchecker/aspellchecker.cpp	2013-01-15 14:04:35.560827408 +0400
 @@ -33,23 +33,15 @@
  #include "aspellchecker.h"
- 
+
  ASpellChecker::ASpellChecker()
 +	: config_(new_aspell_config())
  {
@@ -38,19 +38,19 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 -	}
 +	setActiveLanguages(getAllLanguages());
  }
- 
+
  ASpellChecker::~ASpellChecker()
 @@ -59,30 +51,33 @@
  		config_ = NULL;
  	}
- 
+
 -	if(speller_) {
 -		delete_aspell_speller(speller_);
 -		speller_ = NULL;
 -	}
 +	clearSpellers();
  }
- 
+
  bool ASpellChecker::isCorrect(const QString& word)
  {
 -	if(speller_) {
@@ -66,12 +66,12 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 -	return true;
 +	return false;
  }
- 
+
  QList<QString> ASpellChecker::suggestions(const QString& word)
  {
  	QList<QString> words;
 -	if (speller_) {
--		const AspellWordList* list = aspell_speller_suggest(speller_, word.toUtf8(), -1); 
+-		const AspellWordList* list = aspell_speller_suggest(speller_, word.toUtf8(), -1);
 +
 +	foreach(AspellSpeller* speller, spellers_) {
 +		const AspellWordList* list = aspell_speller_suggest(speller, word.toUtf8(), -1);
@@ -101,13 +101,13 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
  		}
  	}
 @@ -105,10 +100,63 @@
- 
+
  bool ASpellChecker::available() const
  {
 -	return (speller_ != NULL);
 +	return !spellers_.isEmpty();
  }
- 
+
  bool ASpellChecker::writable() const
  {
  	return false;
@@ -172,7 +172,7 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.h
 @@ -46,9 +46,17 @@
  	virtual bool available() const;
  	virtual bool writable() const;
- 
+
 +	virtual void setActiveLanguages(const QList<QString>& langs);
 +	virtual QList<QString> getAllLanguages() const;
 +
@@ -186,7 +186,7 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.h
 +	typedef QList<AspellSpeller*> ASpellers;
 +	ASpellers spellers_;
  };
- 
+
  #endif
 Index: psi/src/libpsi/tools/spellchecker/spellchecker.h
 ===================================================================
@@ -195,7 +195,7 @@ Index: psi/src/libpsi/tools/spellchecker/spellchecker.h
 @@ -41,6 +41,9 @@
  	virtual bool isCorrect(const QString&);
  	virtual bool add(const QString&);
- 
+
 +	virtual void setActiveLanguages(const QList<QString>& ) {}
 +	virtual QList<QString> getAllLanguages() const { return QList<QString>(); }
 +
@@ -217,17 +217,17 @@ Index: psi/src/psicon.cpp
 @@ -737,6 +738,9 @@
  	optionChanged(tuneUrlFilterOptionPath);
  #endif
- 
+
 +	//init spellchecker
 +	optionChanged("options.ui.spell-check.langs");
 +
  	return result;
  }
- 
+
 @@ -1432,6 +1436,21 @@
  		return;
  	}
- 
+
 +	if (option == "options.ui.spell-check.langs") {
 +		QStringList langs = PsiOptions::instance()->getOption(option).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
 +		if(langs.isEmpty()) {

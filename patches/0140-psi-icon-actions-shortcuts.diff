@@ -61,20 +61,20 @@ Index: psi/src/psiactionlist.cpp
 +++ psi/src/psiactionlist.cpp	2013-01-15 14:04:01.288826015 +0400
 @@ -19,15 +19,20 @@
   */
- 
+
  #include "psiactionlist.h"
 +#include "shortcutmanager.h"
- 
+
  #include <QObject>
  #include <QPointer>
 +#include <map>
 +#include <utility>
- 
+
  #include "iconset.h"
  #include "psioptions.h"
- 
+
  #include "mainwin_p.h"
- 
+
 +using namespace std;
 +
  //----------------------------------------------------------------------------
@@ -85,17 +85,17 @@ Index: psi/src/psiactionlist.cpp
  	PsiCon *psi;
  	QPointer<ActionList> statusActionList;
 +	map<QString,IconAction*> actionmap;
- 
+
  	void createCommon();
  	void createMainWin();
 @@ -90,13 +96,21 @@
- 
+
  ActionList* PsiActionList::Private::createActionList( QString name, int id, ActionNames *actionlist )
  {
 +	static const QStringList skipList = QStringList() << "separator" << "spacer";
 +
  	ActionList *actions = new ActionList( name, id, false );
- 
+
  	QString aName;
  	for ( int i = 0; !(aName = QString(actionlist[i].name)).isEmpty(); i++ ) {
  		IconAction *action = actionlist[i].action;
@@ -108,7 +108,7 @@ Index: psi/src/psiactionlist.cpp
 +			}
 +		}
  	}
- 
+
  	list->addList( actions );
 @@ -411,6 +425,11 @@
  	statusActionList->action("status_chat")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.chat").toBool());
@@ -120,5 +120,5 @@ Index: psi/src/psiactionlist.cpp
 +		 i->second->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + i->first));
 +	}
  }
- 
+
  //----------------------------------------------------------------------------

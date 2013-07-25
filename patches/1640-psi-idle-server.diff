@@ -17,7 +17,7 @@ Index: psi/src/psiaccount.cpp
 @@ -318,6 +318,48 @@
  	return false;
  }
- 
+
 +
 +//----------------------------------------------------------------------------
 +// IdleServer
@@ -66,7 +66,7 @@ Index: psi/src/psiaccount.cpp
 @@ -1200,6 +1242,12 @@
  	PluginManager::instance()->addAccount(this, d->client);
  #endif
- 
+
 +	//Idle server
 +	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
 +		new IdleServer(this, d->client->rootTask());
@@ -81,13 +81,13 @@ Index: psi/src/psicon.cpp
 --- psi.orig/src/psicon.cpp	2013-01-15 14:04:32.148827270 +0400
 +++ psi/src/psicon.cpp	2013-01-15 14:04:32.144827270 +0400
 @@ -309,7 +309,7 @@
- 
+
  	struct IdleSettings
  	{
 -		IdleSettings()
 +		IdleSettings() : secondsIdle(0)
  		{}
- 
+
  		void update()
 @@ -322,10 +322,13 @@
  			notAvailableAfter = o->getOption("options.status.auto-away.not-availible-after").toInt();
@@ -95,16 +95,16 @@ Index: psi/src/psicon.cpp
  			menuXA = o->getOption("options.ui.menu.status.xa").toBool();
 +			useIdleServer = o->getOption("options.service-discovery.last-activity").toBool();
  		}
- 
+
  		bool useOffline, useNotAvailable, useAway, menuXA;
  		int offlineAfter, notAvailableAfter, awayAfter;
 +		int secondsIdle;
 +		bool useIdleServer;
  	};
- 
+
  	IdleSettings idleSettings_;
 @@ -1400,10 +1403,12 @@
- 
+
  	//Idle server
  	d->idleSettings_.update();
 -	if(d->idleSettings_.useAway || d->idleSettings_.useNotAvailable || d->idleSettings_.useOffline)
@@ -115,21 +115,21 @@ Index: psi/src/psicon.cpp
  		d->idle.stop();
 +		d->idleSettings_.secondsIdle = 0;
 +	}
- 
+
  	if (option == "options.ui.notifications.alert-style") {
  		alertIconUpdateAlertStyle();
 @@ -1921,6 +1926,7 @@
- 
+
  void PsiCon::secondsIdle(int sec)
  {
 +	d->idleSettings_.secondsIdle = sec;
  	int minutes = sec / 60;
  	PsiAccount::AutoAway aa;
- 
+
 @@ -1938,6 +1944,11 @@
  	}
  }
- 
+
 +int PsiCon::idle() const
 +{
 +	return d->idleSettings_.secondsIdle;
@@ -147,6 +147,6 @@ Index: psi/src/psicon.h
  	void dialogRegister(QWidget *w);
  	void dialogUnregister(QWidget *w);
 +	int idle() const;
- 
+
  	QMenuBar* defaultMenuBar() const;
- 
+

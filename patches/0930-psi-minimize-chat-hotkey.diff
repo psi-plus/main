@@ -17,27 +17,27 @@ Index: psi/src/groupchatdlg.cpp
 @@ -215,7 +215,7 @@
  #endif
  	QAction *act_send, *act_scrollup, *act_scrolldown, *act_close;
- 
+
 -	QAction *act_mini_cmd, *act_nick, *act_hide;
 +	QAction *act_mini_cmd, *act_nick, *act_hide, *act_minimize;
- 
+
  	MCmdSimpleSite mCmdSite;
  	MCmdManager mCmdManager;
 @@ -697,6 +697,10 @@
  	connect(d->act_mini_cmd, SIGNAL(triggered()), d, SLOT(doMiniCmd()));
  	addAction(d->act_mini_cmd);
- 
+
 +	d->act_minimize = new QAction(this);
 +	connect(d->act_minimize, SIGNAL(triggered()), SLOT(doMinimize()));
 +	addAction(d->act_minimize);
 +
  	d->act_ps = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
  	connect(d->act_ps, SIGNAL(triggered()), SLOT(doPasteAndSend()));
- 
+
 @@ -845,6 +849,11 @@
  	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
- 
+
 +void GCMainDlg::doMinimize()
 +{
 +	window()->showMinimized();
@@ -52,7 +52,7 @@ Index: psi/src/groupchatdlg.cpp
  	d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
 +	d->act_minimize->setShortcuts(ShortcutManager::instance()->shortcuts("chat.minimize"));
  }
- 
+
  void GCMainDlg::scrollUp()
 Index: psi/src/groupchatdlg.h
 ===================================================================
@@ -65,7 +65,7 @@ Index: psi/src/groupchatdlg.h
 +	void doMinimize();
 +
 +
- 
+
  public:
  	class Private;
 Index: psi/src/psichatdlg.cpp
@@ -73,33 +73,33 @@ Index: psi/src/psichatdlg.cpp
 --- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:19.320826748 +0400
 +++ psi/src/psichatdlg.cpp	2013-01-15 14:04:19.316826748 +0400
 @@ -248,6 +248,10 @@
- 
+
  	ui_.mini_prompt->hide();
- 
+
 +	act_minimize_ = new QAction(this);
 +
 +	connect(act_minimize_, SIGNAL(triggered()), SLOT(doMinimize()));
 +	addAction(act_minimize_);
  }
- 
+
  void PsiChatDlg::updateCountVisibility()
 @@ -327,6 +331,7 @@
- 
+
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
- 
+
 +	act_minimize_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.minimize"));
  }
- 
+
  void PsiChatDlg::updateIdentityVisibility()
 @@ -678,6 +683,10 @@
  	mCmdManager_.open(new MCmdSimpleState(MCMDCHAT, tr("Command>")), QStringList() );
  }
- 
+
 +void PsiChatDlg::doMinimize()
 +{
 +	window()->showMinimized();
 +}
- 
+
  bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
  	if ( obj == chatEdit() && ev->type() == QEvent::KeyPress ) {
 Index: psi/src/psichatdlg.h
@@ -120,6 +120,6 @@ Index: psi/src/psichatdlg.h
  	IconAction* act_templates_;
 -	QAction *act_mini_cmd_;
 +	QAction *act_mini_cmd_, *act_minimize_;
- 
+
  	MCmdManager mCmdManager_;
  	MCmdSimpleSite mCmdSite_;

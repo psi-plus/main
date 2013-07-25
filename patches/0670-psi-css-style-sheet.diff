@@ -101,10 +101,10 @@ Index: psi/src/contactlistitemmenu.cpp
 +++ psi/src/contactlistitemmenu.cpp	2013-01-15 14:04:13.784826523 +0400
 @@ -21,12 +21,17 @@
  #include "contactlistitemmenu.h"
- 
+
  #include "shortcutmanager.h"
 +#include "psioptions.h"
- 
+
  ContactListItemMenu::ContactListItemMenu(ContactListItem* item, ContactListModel* model)
  	: QMenu(0)
  	, item_(item)
@@ -115,7 +115,7 @@ Index: psi/src/contactlistitemmenu.cpp
 +		setStyleSheet(css);
 +	}
  }
- 
+
  ContactListItemMenu::~ContactListItemMenu()
 Index: psi/src/gcuserview.cpp
 ===================================================================
@@ -124,7 +124,7 @@ Index: psi/src/gcuserview.cpp
 @@ -523,6 +523,10 @@
  	pm->addAction(act);
  	act->setData(3);
- 
+
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	if (!css.isEmpty()) {
 +		pm->setStyleSheet(css);
@@ -137,7 +137,7 @@ Index: psi/src/groupchatdlg.cpp
 --- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:13.792826523 +0400
 +++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:13.784826523 +0400
 @@ -1704,6 +1704,10 @@
- 
+
  void GCMainDlg::setLooks()
  {
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
@@ -146,18 +146,18 @@ Index: psi/src/groupchatdlg.cpp
 +	}
  	ui_.vsplitter->optionsChanged();
  	ui_.mle->optionsChanged();
- 
+
 Index: psi/src/mainwin.cpp
 ===================================================================
 --- psi.orig/src/mainwin.cpp	2013-01-15 14:04:13.792826523 +0400
 +++ psi/src/mainwin.cpp	2013-01-15 14:04:13.784826523 +0400
 @@ -514,6 +514,7 @@
- 
+
  		/*QShortcut *sp_ss = new QShortcut(QKeySequence(tr("Ctrl+Shift+N")), this);
  		connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
 +	optionChanged("options.ui.contactlist.css");
  }
- 
+
  MainWin::~MainWin()
 @@ -546,6 +547,12 @@
  		loadToolbarsState();
@@ -170,7 +170,7 @@ Index: psi/src/mainwin.cpp
 +		}
 +	}
  }
- 
+
  void MainWin::registerAction( IconAction* action )
 Index: psi/src/psichatdlg.cpp
 ===================================================================
@@ -179,14 +179,14 @@ Index: psi/src/psichatdlg.cpp
 @@ -264,6 +264,10 @@
  {
  	ChatDlg::setLooks();
- 
+
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	if (!css.isEmpty()) {
 +		setStyleSheet(css);
 +	}
  	ui_.splitter->optionsChanged();
  	ui_.mle->optionsChanged();
- 
+
 Index: psi/src/psicon.cpp
 ===================================================================
 --- psi.orig/src/psicon.cpp	2013-01-15 14:04:13.792826523 +0400
@@ -194,7 +194,7 @@ Index: psi/src/psicon.cpp
 @@ -501,6 +501,10 @@
  	d->iconSelect = new IconSelectPopup(0);
  	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
- 
+
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	if (!css.isEmpty())
 +		d->iconSelect->setStyleSheet(css);
@@ -222,7 +222,7 @@ Index: psi/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:13.788826523 +0400
 @@ -368,6 +368,11 @@
  		tabWidget_->setTabPosition(QTabWidget::South);
- 
+
  	setWindowOpacity(double(qMax(MINIMUM_OPACITY,PsiOptions::instance()->getOption("options.ui.chat.opacity").toInt()))/100);
 +
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
@@ -230,7 +230,7 @@ Index: psi/src/tabs/tabdlg.cpp
 +		setStyleSheet(css);
 +	}
  }
- 
+
  void TabDlg::tabSelected(QWidget* _selected)
 Index: psi/src/widgets/fancypopup.cpp
 ===================================================================
@@ -246,7 +246,7 @@ Index: psi/src/widgets/fancypopup.cpp
 +		popup->setStyleSheet(css);
 +	}
  }
- 
+
  bool FancyPopup::Private::eventFilter(QObject *o, QEvent *e)
 Index: psi/src/widgets/iconaction.cpp
 ===================================================================
@@ -255,7 +255,7 @@ Index: psi/src/widgets/iconaction.cpp
 @@ -30,6 +30,8 @@
  class Iconset;
  #endif
- 
+
 +#include "psioptions.h"
 +
  #include <QLayout>
@@ -263,7 +263,7 @@ Index: psi/src/widgets/iconaction.cpp
  #include <QTimer>
 @@ -428,6 +430,11 @@
  	d->updatePopup();
- 
+
  	d->exclusive = exclusive;
 +
 +	const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
@@ -271,7 +271,7 @@ Index: psi/src/widgets/iconaction.cpp
 +		d->popup->setStyleSheet(css);
 +	}
  }
- 
+
  IconActionGroup::~IconActionGroup()
 Index: psi/src/widgets/psitabwidget.cpp
 ===================================================================
@@ -279,10 +279,10 @@ Index: psi/src/widgets/psitabwidget.cpp
 +++ psi/src/widgets/psitabwidget.cpp	2013-01-15 14:04:13.788826523 +0400
 @@ -74,6 +74,7 @@
  	stacked_ = new QStackedLayout(layout_);
- 
+
  	setTabPosition(QTabWidget::North);
 +	setLooks();
- 
+
  	if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool()){
  		closeButton_->hide();
 @@ -179,7 +180,16 @@
@@ -299,8 +299,8 @@ Index: psi/src/widgets/psitabwidget.cpp
 +	if (!css.isEmpty()) {
 +		setStyleSheet(css);
 +	}
- } 
- 
+ }
+
  /**
 Index: psi/src/widgets/psitabwidget.h
 ===================================================================
@@ -311,7 +311,7 @@ Index: psi/src/widgets/psitabwidget.h
  	void setCurrentPage(int);
  	void removeCurrentPage();
 +	void setLooks();
- 
+
  signals:
  	void mouseDoubleClickTab(QWidget *tab);
 Index: psi/src/widgets/psitiplabel.cpp
@@ -327,7 +327,7 @@ Index: psi/src/widgets/psitiplabel.cpp
 +		setStyleSheet(css);
 +	}
  }
- 
+
  void PsiTipLabel::setText(const QString& text)
 Index: psi/src/widgets/urlobject.cpp
 ===================================================================
@@ -335,17 +335,17 @@ Index: psi/src/widgets/urlobject.cpp
 +++ psi/src/widgets/urlobject.cpp	2013-01-15 14:04:13.788826523 +0400
 @@ -19,6 +19,7 @@
   */
- 
+
  #include "urlobject.h"
 +#include "psioptions.h"
- 
+
  #include <QApplication>
  #include <QClipboard>
 @@ -233,6 +234,7 @@
  	}
- 
+
  	m->addAction(d->act_copy);
 +	m->setStyleSheet(PsiOptions::instance()->getOption("options.ui.look.css").toString());
  	return m;
  }
- 
+

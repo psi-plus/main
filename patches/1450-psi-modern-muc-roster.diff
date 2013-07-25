@@ -52,15 +52,15 @@ Index: psi/src/avatars.cpp
 @@ -275,7 +276,7 @@
  	void avatarUpdated()
  		{ emit avatarChanged(jid_); }
- 
+
 -private:
 +protected:
  	Jid jid_;
  };
- 
+
 @@ -303,6 +304,48 @@
  //------------------------------------------------------------------------------
- 
+
  //------------------------------------------------------------------------------
 +// VCardMucAvatar: Avatars coming from VCards of MUC contacts.
 +//------------------------------------------------------------------------------
@@ -106,11 +106,11 @@ Index: psi/src/avatars.cpp
 +//------------------------------------------------------------------------------
  // VCardStaticAvatar: VCard static photo avatar (not published through presence)
  //------------------------------------------------------------------------------
- 
+
 @@ -505,6 +548,25 @@
  	return pm;
  }
- 
+
 +QPixmap AvatarFactory::getMucAvatar(const Jid& _jid)
 +{
 +	Jid jid = _jid;
@@ -119,7 +119,7 @@ Index: psi/src/avatars.cpp
 +		av = muc_vcard_avatars_[jid.full()];
 +	}
 +
-+	QPixmap pm = (av ? av->getPixmap() : QPixmap());	
++	QPixmap pm = (av ? av->getPixmap() : QPixmap());
 +	pm = ensureSquareAvatar(pm);
 +
 +	// Update iconset
@@ -136,7 +136,7 @@ Index: psi/src/avatars.cpp
 @@ -577,6 +639,12 @@
  	emit avatarChanged(j);
  }
- 
+
 +void AvatarFactory::updateMucAvatar(const Jid &j)
 +{
 +	getMucAvatar(j);
@@ -149,7 +149,7 @@ Index: psi/src/avatars.cpp
 @@ -609,6 +677,18 @@
  	}
  }
- 
+
 +void AvatarFactory::newMucItem(const Jid &fullJid, const Status &s)
 +{
 +	if (s.hasPhotoHash()) {
@@ -168,7 +168,7 @@ Index: psi/src/avatars.cpp
 @@ -634,6 +714,37 @@
  	return MAX_AVATAR_SIZE;
  }
- 
+
 +QPixmap AvatarFactory::roundedAvatar(const QPixmap &pix, int rad, int avSize)
 +{
 +	QPixmap avatar_icon;
@@ -221,7 +221,7 @@ Index: psi/src/avatars.h
  	class PubSubItem;
 +	class Status;
  }
- 
+
  using namespace XMPP;
 @@ -65,16 +67,21 @@
  	void importManualAvatar(const Jid& j, const QString& fileName);
@@ -230,19 +230,19 @@ Index: psi/src/avatars.h
 +
 +	void newMucItem(const Jid& fullJid, const Status& s);
 +	QPixmap getMucAvatar(const Jid& jid);
- 	
+
  	static QString getManualDir();
  	static QString getCacheDir();
  	static int maxAvatarSize();
 +	static QPixmap roundedAvatar(const QPixmap& pix, int rad, int avatarSize);
- 
+
  signals:
  	void avatarChanged(const Jid&);
- 
+
  public slots:
  	void updateAvatar(const Jid&);
 +	void updateMucAvatar(const Jid&);
- 
+
  protected slots:
  	void itemPublished(const Jid&, const QString&, const PubSubItem&);
 @@ -92,6 +99,7 @@
@@ -278,7 +278,7 @@ Index: psi/src/gcuserview.cpp
  #include "avcall/avcall.h"
 +#include "xmpp_muc.h"
 +#include "avatars.h"
- 
+
  static bool caseInsensitiveLessThan(const QString &s1, const QString &s2)
  {
 @@ -54,6 +56,31 @@
@@ -311,7 +311,7 @@ Index: psi/src/gcuserview.cpp
 +		font.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
 +		fontHeight_ = QFontMetrics(font).height()+2;
  	}
- 
+
  	void paint(QPainter* mp, const QStyleOptionViewItem& option, const QModelIndex& index) const
 @@ -66,52 +93,204 @@
  				paintGroup(mp, option, gi);
@@ -322,7 +322,7 @@ Index: psi/src/gcuserview.cpp
  			}
  		}
  	}
- 
+
  	void paintGroup(QPainter* p, const QStyleOptionViewItem& o, GCUserViewGroupItem* gi) const
  	{
 -		bool slimGroups = PsiOptions::instance()->getOption("options.ui.look.contactlist.use-slim-group-headings").toBool();
@@ -340,7 +340,7 @@ Index: psi/src/gcuserview.cpp
 +		if (!slimGroups_ || (o.state & QStyle::State_Selected) ) {
 +			p->fillRect(rect, colorBackground_);
  		}
- 
+
 -		p->setPen(QPen(colorForeground));
 +		p->setPen(QPen(colorForeground_));
  		rect.translate(2, (rect.height() - o.fontMetrics.height())/2);
@@ -363,7 +363,7 @@ Index: psi/src/gcuserview.cpp
  			}
  		}
  	}
- 
+
 -	void paintContact(QPainter* mp, const QStyleOptionViewItem& option, const QModelIndex& index) const
 +	void paintContact(QPainter* mp, const QStyleOptionViewItem& option, const QModelIndex& index, GCUserViewItem* item) const
  	{
@@ -500,7 +500,7 @@ Index: psi/src/gcuserview.cpp
 +		}
 +
  	}
- 
+
  	QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
  	{
 -		return QItemDelegate::sizeHint(option, index);
@@ -530,12 +530,12 @@ Index: psi/src/gcuserview.cpp
 +	bool showGroups_, slimGroups_, nickColoring_, showClients_, showAffiliations_, showStatusIcons_, showAvatar_, avatarAtLeft_;
 +	int avatarSize_, fontHeight_, avatarRadius_;
  };
- 
- 
+
+
 @@ -125,10 +304,21 @@
  {
  }
- 
+
 +void GCUserViewItem::setAvatar(const QPixmap &pix)
 +{
 +	avatar_ = pix;
@@ -566,26 +566,26 @@ Index: psi/src/gcuserview.cpp
  	}
 @@ -304,7 +494,7 @@
  	}
- 
+
  	lvi->s = s;
 -	lvi->setIcon(0, PsiIconset::instance()->status(lvi->s).icon());
 +	lvi->setIcon(PsiIconset::instance()->status(lvi->s).pixmap());
  	gr->sortChildren(0, Qt::AscendingOrder);
  }
- 
+
 @@ -369,6 +559,8 @@
  	ur.setClient(client_name,client_version,"");
  	//ur.setClient(QString(),QString(),"");
  	u.userResourceList().append(ur);
 +	u.setPrivate(true);
 +	u.setAvatarFactory(dlg->account()->avatarFactory());
- 
+
  	PsiToolTip::showText(mapToGlobal(pos), u.makeTip(), this);
  	return true;
 @@ -573,4 +765,10 @@
  		contextMenuRequested(event->pos());
  }
- 
+
 +void GCUserView::setLooks()
 +{
 +	((GCUserViewDelegate*)itemDelegate())->updateSettings();
@@ -605,20 +605,20 @@ Index: psi/src/gcuserview.h
 +	QPixmap avatar() const { return avatar_; };
 +	void setIcon(const QPixmap &icon);
 +	QPixmap icon() const { return icon_; };
- 
+
  	Status s;
- 
+
  	virtual bool operator<  (const QTreeWidgetItem& it) const;
 +
 +private:
 +	QPixmap avatar_;
 +	QPixmap icon_;
  };
- 
+
  class GCUserViewGroupItem : public QTreeWidgetItem
 @@ -66,6 +74,7 @@
  	~GCUserView();
- 
+
  	void setMainDlg(GCMainDlg* mainDlg);
 +	GCMainDlg* mainDlg() const { return gcDlg_; };
  	virtual QMimeData* mimeData(const QList<QTreeWidgetItem*>items) const;
@@ -629,7 +629,7 @@ Index: psi/src/gcuserview.h
  	QStringList nickList() const;
  	void doContextMenu(QTreeWidgetItem* it);
 +	void setLooks();
- 
+
  protected:
  	enum Role { Moderator = 0, Participant = 1, Visitor = 2 };
 Index: psi/src/groupchatdlg.cpp
@@ -641,25 +641,25 @@ Index: psi/src/groupchatdlg.cpp
  #include "psirichtext.h"
  #include "psiwindowheader.h"
 +#include "avatars.h"
- 
+
  #include "mcmdsimplesite.h"
- 
+
 @@ -816,6 +817,7 @@
- 
+
  	// Connect signals from MUC manager
  	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
 +	connect(d->mucManager, SIGNAL(action_success(MUCManager::Action)), ui_.lv_users, SLOT(update()));
- 
+
  	setLooks();
  	setShortcuts();
 @@ -824,6 +826,8 @@
  	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
- 
+
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
 +
 +	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
  }
- 
+
  void GCMainDlg::vcard(const QString& _str)
 @@ -1484,6 +1488,8 @@
  			}
@@ -673,7 +673,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -1578,6 +1584,22 @@
  		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
  	}
- 
+
 +	if(!nick.isEmpty())
 +		account()->avatarFactory()->newMucItem(jidForNick(nick), s);
 +}
@@ -691,7 +691,7 @@ Index: psi/src/groupchatdlg.cpp
 +			it->setAvatar(account()->avatarFactory()->getMucAvatar(jid_));
 +	}
  }
- 
+
  void GCMainDlg::message(const Message &_m)
 @@ -1838,6 +1860,8 @@
  #ifndef Q_OS_MAC
@@ -700,7 +700,7 @@ Index: psi/src/groupchatdlg.cpp
 +
 +	ui_.lv_users->setLooks();
  }
- 
+
  void GCMainDlg::optionsUpdate()
 Index: psi/src/groupchatdlg.h
 ===================================================================
@@ -711,16 +711,16 @@ Index: psi/src/groupchatdlg.h
  	void verticalSplitterMoved(int, int);
  	void doMinimize();
 +	void avatarUpdated(const Jid& jid);
- 
- 
- 
+
+
+
 @@ -173,6 +174,7 @@
  	QDateTime lastMsgTime_;
- 
+
  	void setMargins();
 +	inline XMPP::Jid jidForNick(const QString &nick) const;
  };
- 
+
  class GCFindDlg : public QDialog
 Index: psi/src/options/opt_appearance.cpp
 ===================================================================
@@ -732,8 +732,8 @@ Index: psi/src/options/opt_appearance.cpp
  	addTab( new OptionsTabIconsetSystem(this) );
 +	addTab( new OptionsTabIconsetAffiliations(this) );
  }
- 
- 
+
+
 Index: psi/src/options/opt_iconset.cpp
 ===================================================================
 --- psi.orig/src/options/opt_iconset.cpp	2013-01-15 14:04:28.552827124 +0400
@@ -744,12 +744,12 @@ Index: psi/src/options/opt_iconset.cpp
  #include "ui_opt_iconset_roster.h"
 +#include "ui_opt_iconset_affiliation.h"
  #include "ui_ui_isdetails.h"
- 
+
  class IconsetEmoUI : public QWidget, public Ui::IconsetEmo
 @@ -60,6 +61,12 @@
  	IconsetSystemUI() : QWidget() { setupUi(this); }
  };
- 
+
 +class IconsetAffiliationUI : public QWidget, public Ui::IconsetAffiliation
 +{
 +  public:
@@ -912,7 +912,7 @@ Index: psi/src/options/opt_iconset.cpp
 +		threadCancelled.lock();
  		thread->cancelled = true;
  		threadCancelled.unlock();
- 
+
 Index: psi/src/options/opt_iconset.h
 ===================================================================
 --- psi.orig/src/options/opt_iconset.h	2013-01-15 14:04:28.552827124 +0400
@@ -920,7 +920,7 @@ Index: psi/src/options/opt_iconset.h
 @@ -149,6 +149,34 @@
  	IconsetLoadThread *thread;
  };
- 
+
 +class OptionsTabIconsetAffiliations : public OptionsTab
 +{
 +	Q_OBJECT
@@ -1066,7 +1066,7 @@ Index: psi/src/psiaccount.cpp
  	u->setName(j.resource());
  	u->setPrivate(true);
 +	u->setAvatarFactory(avatarFactory());
- 
+
  	// make a resource so the contact appears online
  	UserResource ur;
 Index: psi/src/psichatdlg.cpp
@@ -1075,14 +1075,14 @@ Index: psi/src/psichatdlg.cpp
 +++ psi/src/psichatdlg.cpp	2013-01-15 14:04:28.548827123 +0400
 @@ -717,6 +717,7 @@
  	}
- 
+
  	UserListItem *ul = account()->findFirstRelevant(jid());
 +	bool private_ = false;
  	if (ul && !ul->userResourceList().isEmpty()) {
  		UserResourceList::Iterator it = ul->userResourceList().find(jid().resource());
  		if (it == ul->userResourceList().end())
 @@ -724,9 +725,12 @@
- 
+
  		res = (*it).name();
  		client = (*it).clientName();
 +		private_ = ul->isPrivate();
@@ -1104,11 +1104,11 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  #include "contactlistview.h"
  #include "common.h"
 +#include "avatars.h"
- 
+
  static const QString contactListFontOptionPath = "options.ui.look.font.contactlist";
  static const QString slimGroupsOptionPath = "options.ui.look.contactlist.use-slim-group-headings";
 @@ -158,33 +159,12 @@
- 
+
  QPixmap PsiContactListViewDelegate::avatarIcon(const QModelIndex& index) const
  {
 -	QPixmap avatar_icon;
@@ -1137,11 +1137,11 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 -	} else {
 -		avatar_icon = QPixmap();
 -	}
- 
+
 -	return avatar_icon;
 +	return AvatarFactory::roundedAvatar(av, avatarRadius_, avSize);
  }
- 
+
  QSize PsiContactListViewDelegate::sizeHint(const QStyleOptionViewItem& /*option*/, const QModelIndex& index) const
 Index: psi/src/psiiconset.cpp
 ===================================================================
@@ -1161,7 +1161,7 @@ Index: psi/src/psiiconset.cpp
 @@ -288,6 +288,23 @@
  		return def;
  	}
- 
+
 +	Iconset affiliationsIconset(bool *ok)
 +	{
 +		Iconset def;
@@ -1185,7 +1185,7 @@ Index: psi/src/psiiconset.cpp
 @@ -462,6 +479,21 @@
  	return ok;
  }
- 
+
 +bool PsiIconset::loadAffiliations()
 +{
 +	bool ok = true;
@@ -1211,7 +1211,7 @@ Index: psi/src/psiiconset.cpp
 +	loadAffiliations();
  	return true;
  }
- 
+
 @@ -491,6 +524,9 @@
  	else if (option == "options.iconsets.clients") {
  		loadClients();
@@ -1219,7 +1219,7 @@ Index: psi/src/psiiconset.cpp
 +	else if (option == "options.iconsets.affiliations") {
 +		loadAffiliations();
 +	}
- 
+
  	// currently we rely on PsiCon calling reloadRoster() when
  	// all options are already applied. otherwise we risk the chance
 Index: psi/src/psiiconset.h
@@ -1239,9 +1239,9 @@ Index: psi/src/psiiconset.h
  	bool loadActivity();
  	bool loadClients();
 +	bool loadAffiliations();
-+	
++
  };
- 
+
  QString status2name(int s);
 Index: psi/src/userlist.cpp
 ===================================================================
@@ -1250,7 +1250,7 @@ Index: psi/src/userlist.cpp
 @@ -767,14 +767,18 @@
  		mucItem = userResourceList()[0].status().hasMUCItem();
  	}
- 
+
 -	if (v_avatarFactory && !v_avatarFactory->getAvatar(jid().bare()).isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.avatar").toBool())
 +	if (v_avatarFactory
 +		&& (isPrivate() ? !v_avatarFactory->getMucAvatar(jid().full()).isNull() : !v_avatarFactory->getAvatar(jid().bare()).isNull())
@@ -1258,10 +1258,10 @@ Index: psi/src/userlist.cpp
 +	{
  		useAvatar = true;
 +	}
- 	
+
  	str += "<table cellspacing=\"3\"><tr>";
  	str += "<td>";
- 
+
  	if (useAvatar) {
 -		str += QString("<icon name=\"avatars/%1\">").arg(jid().bare());
 +		str += QString("<icon name=\"avatars/%1\">").arg(isPrivate() ? TextUtil::escape(jid().full()) : jid().bare());

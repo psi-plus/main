@@ -19,27 +19,27 @@ Index: psi/src/mainwin.cpp
 @@ -83,6 +83,10 @@
  #include "rosteravatarframe.h"
  #include "avatars.h"
- 
+
 +#ifdef HAVE_X11
 +#include <x11windowsystem.h>
 +#endif
 +
  using namespace XMPP;
- 
+
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
 @@ -143,6 +147,10 @@
  	int hideTimerInterval; //interval in sec
  	bool useAutohide;
- 
+
 +#ifdef Q_OS_WIN
 +	DWORD deactivationTickCount;
 +#endif
 +
  	QSignalMapper* statusMapper;
- 
+
  	PsiIcon* nextAnim;
 @@ -1426,7 +1434,23 @@
- 
+
  void MainWin::changeEvent(QEvent *event)
  {
 -    if (event->type() == QEvent::ActivationChange ||
@@ -66,7 +66,7 @@ Index: psi/src/mainwin.cpp
 @@ -1552,14 +1576,37 @@
  	updateTray();
  }
- 
+
 -void MainWin::toggleVisible()
 +void MainWin::toggleVisible(bool fromTray)
  {
@@ -105,12 +105,12 @@ Index: psi/src/mainwin.cpp
 +	else
 +		isHidden() ? trayShow() : trayHide();
  }
- 
+
  void MainWin::setTrayToolTip(const Status& status, bool, bool)
 @@ -1581,32 +1628,21 @@
  		return;
  	}
- 
+
 -	if(!isHidden()) {
 -		trayHide();
 -	}
@@ -119,14 +119,14 @@ Index: psi/src/mainwin.cpp
 -	}
 +	toggleVisible(true);
  }
- 
+
  void MainWin::trayDoubleClicked()
  {
 -	if(!PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool()) {
 -		return;
 -	}
 +	//Double click works like second single click now if "double-click" style is disabled
- 
+
 -	if(d->nextAmount > 0) {
 -		doRecvNextEvent();
 -		return;
@@ -136,7 +136,7 @@ Index: psi/src/mainwin.cpp
 +			return;
 +		}
  	}
- 
+
 -
 -	if(!isHidden()) {
 -		trayHide();
@@ -146,7 +146,7 @@ Index: psi/src/mainwin.cpp
 -	}
 +	toggleVisible(true);
  }
- 
+
  void MainWin::trayShow()
 Index: psi/src/mainwin.h
 ===================================================================
@@ -155,12 +155,12 @@ Index: psi/src/mainwin.h
 @@ -175,7 +175,7 @@
  	void optionsUpdate();
  	void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
- 
+
 -	void toggleVisible();
 +	void toggleVisible(bool fromTray = false);
- 
+
  	void avcallConfig();
- 
+
 Index: psi/src/src.pri
 ===================================================================
 --- psi.orig/src/src.pri	2013-01-15 14:04:18.208826703 +0400
@@ -168,12 +168,12 @@ Index: psi/src/src.pri
 @@ -353,6 +353,10 @@
  	$$PWD/rosteravatarframe.cpp \
  	$$PWD/sendbuttonmenu.cpp
- 
+
 +unix:!macx:!haiku {
 +	HEADERS += $$PWD/x11windowsystem.h
 +	SOURCES += $$PWD/x11windowsystem.cpp
 +}
- 
+
  CONFIG += filetransfer
  filetransfer {
 Index: psi/src/x11windowsystem.cpp

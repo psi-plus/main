@@ -10,7 +10,7 @@ Index: psi/src/psiaccount.cpp
  	d->wbManager = new WbManager(d->client, this, d->sxeManager);
 +	connect(d->wbManager, SIGNAL(wbRequest(Jid,int)),SLOT(wbRequest(Jid,int)));
  #endif
- 
+
  	// Avatars
 @@ -1554,7 +1555,12 @@
  {
@@ -29,7 +29,7 @@ Index: psi/src/psiaccount.cpp
 @@ -2729,6 +2735,19 @@
  	processIncomingMessage(_m);
  }
- 
+
 +#ifdef WHITEBOARDING
 +void PsiAccount::wbRequest(const Jid &j, int id)
 +{
@@ -71,7 +71,7 @@ Index: psi/src/psiaccount.h
 +#ifdef WHITEBOARDING
 +class WbManager;
 +#endif
- 
+
  // sick sick remove this someday please!
  struct GCContact;
 @@ -135,6 +138,9 @@
@@ -92,7 +92,7 @@ Index: psi/src/psiaccount.h
 +#ifdef WHITEBOARDING
 +	void wbRequest(const Jid& j, int id);
 +#endif
- 	
+
  	void itemPublished(const Jid&, const QString&, const PubSubItem&);
  	void itemRetracted(const Jid&, const QString&, const PubSubRetraction&);
 Index: psi/src/psicon.cpp
@@ -106,7 +106,7 @@ Index: psi/src/psicon.cpp
 +#ifdef WHITEBOARDING
 +#include "whiteboarding/wbmanager.h"
 +#endif
- 
+
  #include "AutoUpdater/AutoUpdater.h"
  #ifdef HAVE_SPARKLE
 @@ -1779,6 +1782,16 @@
@@ -131,7 +131,7 @@ Index: psi/src/psievent.h
 --- psi.orig/src/psievent.h	2013-01-15 14:04:36.872827462 +0400
 +++ psi/src/psievent.h	2013-01-15 14:04:36.868827462 +0400
 @@ -53,6 +53,9 @@
- 
+
  	enum {
  		Message,
 +#ifdef WHITEBOARDING
@@ -143,7 +143,7 @@ Index: psi/src/psievent.h
 @@ -174,6 +177,26 @@
  	QString v_at;
  };
- 
+
 +#ifdef WHITEBOARDING
 +class SxeEvent : public MessageEvent
 +{
@@ -174,18 +174,18 @@ Index: psi/src/sxe/sxemanager.cpp
 @@ -50,9 +50,9 @@
  	connect(&negotiationTimer_, SIGNAL(timeout()), SLOT(negotiationTimeout()));
  }
- 
+
 -void SxeManager::addInvitationCallback(bool (*callback)(const Jid &peer, const QList<QString> &features)) {
 -	invitationCallbacks_ += callback;
 -}
 +//void SxeManager::addInvitationCallback(bool (*callback)(const Jid &peer, const QList<QString> &features)) {
 +//	invitationCallbacks_ += callback;
 +//}
- 
+
  void SxeManager::messageReceived(const Message &message) {
  	// only process messages that contain a <sxe/> with a nonempty
 @@ -269,8 +269,9 @@
- 
+
  		// check if one of the invitation callbacks accepts the invitation.
  		const QString sessionId = negotiation->sessionId;
 -		foreach(bool (*callback)(const Jid &peer, const QList<QString> &features), invitationCallbacks_) {
@@ -224,7 +224,7 @@ Index: psi/src/sxe/sxemanager.h
 @@ -118,6 +118,8 @@
  	/*! \brief Emitted when \a an invitation to \a jid was declined and joining an alternative session \a session was suggested.*/
  	void alternativeSession(const Jid &jid, const QString &session);
- 
+
 +	void invitationCallback(const Jid &peer, const QList<QString> &features, bool* result);
 +
  private:
@@ -246,11 +246,11 @@ Index: psi/src/whiteboarding/wbmanager.cpp
 --- psi.orig/src/whiteboarding/wbmanager.cpp	2013-01-15 14:04:36.872827462 +0400
 +++ psi/src/whiteboarding/wbmanager.cpp	2013-01-15 14:04:36.868827462 +0400
 @@ -32,8 +32,45 @@
- 
+
  using namespace XMPP;
- 
+
 -// -----------------------------------------------------------------------------
- 
+
 +class WbRequest
 +{
 +public:
@@ -294,31 +294,31 @@ Index: psi/src/whiteboarding/wbmanager.cpp
  	sxemanager_ = sxemanager;
 @@ -41,12 +78,14 @@
  	client->addExtension("whiteboard", Features(WBNS));
- 
+
  	connect(sxemanager_, SIGNAL(sessionNegotiated(SxeSession*)), SLOT(createWbDlg(SxeSession*)));
 -	sxemanager_->addInvitationCallback(WbManager::checkInvitation);
 +	//sxemanager_->addInvitationCallback(WbManager::checkInvitation);
 +	connect(sxemanager, SIGNAL(invitationCallback(Jid,QList<QString>,bool*)), this, SLOT(checkInvitation(Jid,QList<QString>,bool*)));
  }
- 
+
  WbManager::~WbManager()
  {
  	qDeleteAll(dialogs_);
 +	qDeleteAll(requests_);
  }
- 
+
  void WbManager::openWhiteboard(const Jid &target, const Jid &ownJid, bool groupChat, bool promptInitialDoc) {
 @@ -143,13 +182,33 @@
  	}
  }
- 
+
 -bool WbManager::checkInvitation(const Jid &peer, const QList<QString> &features) {
 -	if(!features.contains(WBNS))
 -		return false;
 +void WbManager::checkInvitation(const Jid &peer, const QList<QString> &features, bool* result) {
 +	if(*result)
 +		return;
- 
+
 -	return (QMessageBox::Yes == QMessageBox::question(NULL,
 +	if(!features.contains(WBNS)) {
 +		*result = false;
@@ -352,10 +352,10 @@ Index: psi/src/whiteboarding/wbmanager.h
 +++ psi/src/whiteboarding/wbmanager.h	2013-01-15 14:04:36.868827462 +0400
 @@ -37,6 +37,7 @@
  }
- 
+
  using namespace XMPP;
 +class WbRequest;
- 
+
  /*! \brief The manager for whiteboard dialogs.
   *  The manager listen to SxeManager to pick up any new sessions negotiated by
 @@ -58,7 +59,8 @@
@@ -365,7 +365,7 @@ Index: psi/src/whiteboarding/wbmanager.h
 -    static bool checkInvitation(const Jid &peer, const QList<QString> &features);
 +	//static bool checkInvitation(const Jid &peer, const QList<QString> &features);
 +	void requestActivated(int id);
- 
+
  public slots:
  	/*! \brief Opens the existing dialog to the specified contact or starts a new session negotiation if necessary.*/
 @@ -75,13 +77,20 @@
@@ -379,7 +379,7 @@ Index: psi/src/whiteboarding/wbmanager.h
 +
 +signals:
 +	void wbRequest(const Jid &peer, int id);
- 
+
  private slots:
  	/*! \brief Removes and deletes the dialog for the given session.*/
  	void removeDialog(WbDlg* dialog);
@@ -388,5 +388,5 @@ Index: psi/src/whiteboarding/wbmanager.h
 +
 +	void  checkInvitation(const Jid &peer, const QList<QString> &features, bool* result);
  };
- 
+
  #endif

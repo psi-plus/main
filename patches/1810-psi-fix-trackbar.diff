@@ -3,7 +3,7 @@ Index: psi/src/tabs/tabbablewidget.cpp
 --- psi.orig/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:34.516827366 +0400
 +++ psi/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:34.512827366 +0400
 @@ -37,10 +37,15 @@
- 
+
  TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabManager)
  	: AdvancedWidget<QWidget>(0)
 +	, state_(Deactivated)
@@ -42,14 +42,14 @@ Index: psi/src/tabs/tabbablewidget.cpp
 +		deactivated();
  	}
  }
- 
+
 Index: psi/src/tabs/tabbablewidget.h
 ===================================================================
 --- psi.orig/src/tabs/tabbablewidget.h	2013-01-15 14:04:34.516827366 +0400
 +++ psi/src/tabs/tabbablewidget.h	2013-01-15 14:04:34.512827366 +0400
 @@ -22,6 +22,7 @@
  #define TABBABLE_H
- 
+
  #include <QIcon>
 +#include <QTimer>
  #include "advwidget.h"
@@ -57,22 +57,22 @@ Index: psi/src/tabs/tabbablewidget.h
  #include "sendbuttonmenu.h"
 @@ -83,19 +84,26 @@
  	void vSplitterMoved(int,int);
- 
+
  public slots:
 -	virtual void deactivated();
 -	virtual void activated();
  	void bringToFront(bool raiseWindow = true);
  	virtual void ensureTabbedCorrectly();
  	void hideTab();
- 
+
  protected:
  	virtual void setJid(const Jid&);
 +	virtual void deactivated();
 +	virtual void activated();
- 
+
  	// reimplemented
  	void changeEvent(QEvent* e);
- 
+
 +private slots:
 +	void commitState();
 +
@@ -95,13 +95,13 @@ Index: psi/src/tabs/tabdlg.cpp
 -		selectedTab_->deactivated();
 +		QCoreApplication::postEvent(selectedTab_, new QEvent(QEvent::ActivationChange));
  	}
- 
+
  	selectedTab_ = selected;
  	if (selected) {
 -		selected->activated();
 +		QCoreApplication::postEvent(selected, new QEvent(QEvent::ActivationChange));
  	}
- 
+
  	updateCaption();
 @@ -517,7 +517,7 @@
  	chat->hide();

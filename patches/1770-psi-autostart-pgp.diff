@@ -1,7 +1,7 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
 @@ -62,6 +62,7 @@
- 		</muc> 
+ 		</muc>
  		<pgp comment="PGP encryption options">
  			<enable comment="Enable PGP globally" type="bool">true</enable>
 +			<auto-start comment="Automatically enable PGP encryption" type="bool">false</auto-start>
@@ -11,8 +11,8 @@
 --- psi.orig/src/psichatdlg.cpp
 +++ psi/src/psichatdlg.cpp
 @@ -172,7 +172,7 @@ private:
- 
- 
+
+
  PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
 -		: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_)
 +	: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_), autoPGP_(true)
@@ -20,11 +20,11 @@
  	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
  	connect(account(), SIGNAL(addedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
 @@ -481,6 +481,7 @@ void PsiChatDlg::initToolButtons()
- 
+
  	act_pgp_ = new IconAction(tr("Toggle Encryption"), "", tr("Toggle Encryption"), 0, this, 0, true);
  	ui_.tb_pgp->setDefaultAction(act_pgp_);
 +	connect(act_pgp_, SIGNAL(triggered(bool)), SLOT(actPgpToggled(bool)));
- 
+
  	act_info_ = new IconAction(tr("User Info"), "psi/vCard", tr("User Info"), 0, this);
  	connect(act_info_, SIGNAL(triggered()), SLOT(doInfo()));
 @@ -789,16 +790,44 @@ void PsiChatDlg::updatePGP()
@@ -35,7 +35,7 @@
 +		setPGPEnabled(false);
  		act_pgp_->setEnabled(false);
  	}
- 
+
 +	checkPGPAutostart();
 +
  	ui_.tb_pgp->setVisible(account()->hasPGP() &&
@@ -43,7 +43,7 @@
  						   !PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool());
  	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
- 
+
 +void PsiChatDlg::checkPGPAutostart()
 +{
 +	if(account()->hasPGP() && autoPGP_ && PsiOptions::instance()->getOption("options.pgp.auto-start").toBool()) {
@@ -80,7 +80,7 @@
  	void doSwitchJidMode();
  	void actActiveContacts();
 +	void actPgpToggled(bool);
- 
+
  private:
  	void initToolBar();
 @@ -75,6 +76,7 @@ private:
@@ -94,7 +94,7 @@
 @@ -122,6 +124,8 @@ private:
  	int logHeight;
  	int chateditHeight;
- 
+
 +	bool autoPGP_;
 +
  private:

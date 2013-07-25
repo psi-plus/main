@@ -21,17 +21,17 @@ Index: psi/src/groupchatdlg.cpp
  #include "lastactivitytask.h"
  #include "psirichtext.h"
 +#include "psiwindowheader.h"
- 
+
  #include "mcmdsimplesite.h"
- 
+
 @@ -238,9 +239,13 @@
- 
+
  	int logSize;
  	int rosterSize;
 +
  public:
  	bool trackBar;
- 
+
 +	bool tabmode;
 +	PsiWindowHeader *winHeader_;
 +
@@ -56,7 +56,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -2105,6 +2118,25 @@
  	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
  }
- 
+
 +void GCMainDlg::setMargins()
 +{
 +	ui_.vboxLayout->setContentsMargins(0,0,0,0);
@@ -84,13 +84,13 @@ Index: psi/src/groupchatdlg.h
 --- psi.orig/src/groupchatdlg.h	2013-01-15 14:04:22.036826859 +0400
 +++ psi/src/groupchatdlg.h	2013-01-15 14:04:22.028826858 +0400
 @@ -169,6 +169,8 @@
- 
+
  	PsiOptions* options_;
  	QDateTime lastMsgTime_;
 +
 +	void setMargins();
  };
- 
+
  class GCFindDlg : public QDialog
 Index: psi/src/mainwin.cpp
 ===================================================================
@@ -102,7 +102,7 @@ Index: psi/src/mainwin.cpp
  	bool useAutohide;
 +	bool isHide;
 +
- 
+
  #ifdef Q_OS_WIN
  	DWORD deactivationTickCount;
 @@ -570,6 +572,8 @@
@@ -112,7 +112,7 @@ Index: psi/src/mainwin.cpp
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
 +	setMouseTracking(!isBorder());
  }
- 
+
  MainWin::~MainWin()
 @@ -624,6 +628,11 @@
  		if(d->useAutohide)
@@ -124,12 +124,12 @@ Index: psi/src/mainwin.cpp
 +		show();
 +	}
  }
- 
+
  void MainWin::hideTimerTimeout()
 @@ -793,13 +802,19 @@
  	d->onTop = _onTop;
  	d->asTool = _asTool;
- 
+
 -	Qt::WindowFlags flags = 0;
 +	Qt::WindowFlags flags = windowFlags();
  	if(d->onTop) {
@@ -144,7 +144,7 @@ Index: psi/src/mainwin.cpp
 +	else {
 +		flags &= ~Qt::Tool;
 +	}
- 
+
  	setWindowFlags(flags);
  	show();
 @@ -1730,6 +1745,7 @@
@@ -154,11 +154,11 @@ Index: psi/src/mainwin.cpp
 +		d->isHide = false;
  	}
  }
- 
+
 @@ -1983,4 +1999,32 @@
  	}
  }
- 
+
 +void MainWin::mousePressEvent(QMouseEvent *e)
 +{
 +	if (e->button() == Qt::MidButton && !isBorder()) {
@@ -197,7 +197,7 @@ Index: psi/src/mainwin.h
  #include <QString>
  #include <QStringList>
 +#include <QMouseEvent>
- 
+
  #include "advwidget.h"
  #include "xmpp_status.h"
 @@ -84,6 +85,8 @@
@@ -206,7 +206,7 @@ Index: psi/src/mainwin.h
  #endif
 +	void mousePressEvent(QMouseEvent *e);
 +	void mouseReleaseEvent(QMouseEvent *e);
- 
+
  signals:
  	void statusChanged(XMPP::Status::Type);
 Index: psi/src/options/opt_application.cpp
@@ -214,7 +214,7 @@ Index: psi/src/options/opt_application.cpp
 --- psi.orig/src/options/opt_application.cpp	2013-01-15 14:04:22.036826859 +0400
 +++ psi/src/options/opt_application.cpp	2013-01-15 14:04:22.028826858 +0400
 @@ -43,7 +43,9 @@
- 
+
  	w = new OptApplicationUI();
  	OptApplicationUI *d = (OptApplicationUI *)w;
 -
@@ -226,18 +226,18 @@ Index: psi/src/options/opt_application.cpp
  		tr("Makes Psi use a docklet icon, also known as system tray icon."));
 @@ -90,6 +92,7 @@
  	OptApplicationUI *d = (OptApplicationUI *)w;
- 
+
  	PsiOptions::instance()->setOption("options.ui.contactlist.quit-on-close", d->ck_quitOnClose->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.decorate-windows", d->ck_winDecor->isChecked());
- 
+
  	// Auto-update
  	PsiOptions::instance()->setOption("options.auto-update.check-on-startup", d->ck_autoUpdate->isChecked());
 @@ -134,6 +137,7 @@
- 
+
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
  	d->ck_quitOnClose->setChecked(PsiOptions::instance()->getOption("options.ui.contactlist.quit-on-close").toBool());
 +	d->ck_winDecor->setChecked(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
- 
+
  	// docklet
  	d->ck_docklet->setChecked( PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() );
 Index: psi/src/options/opt_application.ui
@@ -279,11 +279,11 @@ Index: psi/src/psichatdlg.cpp
  	mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
 +	tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
- 
+
  	SendButtonTemplatesMenu* menu = getTemplateMenu();
  	if (menu) {
 @@ -256,6 +258,12 @@
- 
+
  	connect(act_minimize_, SIGNAL(triggered()), SLOT(doMinimize()));
  	addAction(act_minimize_);
 +
@@ -293,11 +293,11 @@ Index: psi/src/psichatdlg.cpp
 +	}
 +	setMargins();
  }
- 
+
  void PsiChatDlg::updateCountVisibility()
 @@ -484,6 +492,22 @@
  	ChatDlg::activated();
- 
+
  	updateCountVisibility();
 +
 +	bool border = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
@@ -316,12 +316,12 @@ Index: psi/src/psichatdlg.cpp
 +			winHeader_->setVisible(false);
 +	}
  }
- 
+
  void PsiChatDlg::setContactToolTip(QString text)
 @@ -789,4 +813,23 @@
  	}
  }
- 
+
 +void PsiChatDlg::setMargins()
 +{
 +	ui_.vboxLayout->setContentsMargins(0,0,0,0);
@@ -347,11 +347,11 @@ Index: psi/src/psichatdlg.h
 --- psi.orig/src/psichatdlg.h	2013-01-15 14:04:22.036826859 +0400
 +++ psi/src/psichatdlg.h	2013-01-15 14:04:22.032826858 +0400
 @@ -9,6 +9,7 @@
- 
+
  #include "ui_chatdlg.h"
  #include "typeaheadfind.h"
 +#include "psiwindowheader.h"
- 
+
  class IconAction;
  class PsiContact;
 @@ -70,6 +71,7 @@
@@ -359,11 +359,11 @@ Index: psi/src/psichatdlg.h
  	ChatView* chatView() const;
  	ChatEdit* chatEdit() const;
 +	void setMargins();
- 
+
  private:
  	Ui::ChatDlg ui_;
 @@ -99,6 +101,11 @@
- 
+
  	bool smallChat_;
  	class ChatDlgMCmdProvider;
 +
@@ -372,7 +372,7 @@ Index: psi/src/psichatdlg.h
 +	QPointer <PsiWindowHeader> winHeader_;
 +
  };
- 
+
  #endif
 Index: psi/src/tabs/tabdlg.cpp
 ===================================================================
@@ -380,7 +380,7 @@ Index: psi/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:22.032826858 +0400
 @@ -167,9 +167,19 @@
  		delegate_->tabWidgetCreated(this, tabWidget_);
- 
+
  	QVBoxLayout *vert1 = new QVBoxLayout(this);
 -	vert1->setMargin(1);
 +	//Add windowheader widget if window not decorated
@@ -394,18 +394,18 @@ Index: psi/src/tabs/tabdlg.cpp
 +		vert1->setMargin(1);
 +	}
  	vert1->addWidget(tabWidget_);
- 
+
 +
  	setAcceptDrops(true);
- 
+
  	X11WM_CLASS("tabs");
 @@ -189,6 +199,7 @@
- 
+
  	if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
  		setGeometryOptionPath(geometryOption);
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
  }
- 
+
  TabDlg::~TabDlg()
 Index: psi/src/tabs/tabdlg.h
 ===================================================================
@@ -413,10 +413,10 @@ Index: psi/src/tabs/tabdlg.h
 +++ psi/src/tabs/tabdlg.h	2013-01-15 14:04:22.032826858 +0400
 @@ -29,6 +29,7 @@
  #include "advwidget.h"
- 
+
  #include "tabbablewidget.h"
 +#include "psiwindowheader.h"
- 
+
  class PsiCon;
  class ChatTabs;
 @@ -170,6 +171,7 @@
@@ -425,7 +425,7 @@ Index: psi/src/tabs/tabdlg.h
  	void updateTabBar();
 +	PsiWindowHeader *winHeader_;
  };
- 
+
  #endif
 Index: psi/src/tools/advwidget/advwidget.h
 ===================================================================
@@ -434,10 +434,10 @@ Index: psi/src/tools/advwidget/advwidget.h
 @@ -21,6 +21,7 @@
  #ifndef ADVWIDGET_H
  #define ADVWIDGET_H
- 
+
 +#include <QMouseEvent>
  #include <QWidget>
- 
+
  class GAdvancedWidget : public QObject
 @@ -65,6 +66,81 @@
  {
@@ -518,7 +518,7 @@ Index: psi/src/tools/advwidget/advwidget.h
 +		}
 +		return false;
 +	}
- 
+
  public:
  	AdvancedWidget(QWidget *parent = 0, Qt::WindowFlags f = 0)
 @@ -73,6 +149,7 @@
@@ -528,11 +528,11 @@ Index: psi/src/tools/advwidget/advwidget.h
 +		border = true;
  		gAdvWidget = new GAdvancedWidget( this );
  	}
- 
+
 @@ -151,6 +228,46 @@
  		windowTitleChanged();
  	}
- 
+
 +	void setWindowBorder(bool isDecorated)
 +	{
 +		Qt::WindowFlags flags = BaseClass::windowFlags();
@@ -697,7 +697,7 @@ Index: psi/src/tools/advwidget/advwidget.h
 +		}
 +	}
  };
- 
+
  #endif
 Index: psi/src/widgets/psiwindowheader.cpp
 ===================================================================
@@ -1136,7 +1136,7 @@ Index: psi/src/widgets/widgets.pri
 +	$$PWD/psiwindowheader.cpp \
  	$$PWD/actionlineedit.cpp \
  	$$PWD/typeaheadfind.cpp
- 
+
 @@ -43,10 +44,12 @@
  	$$PWD/psitiplabel.h \
  	$$PWD/psitabwidget.h \
@@ -1144,10 +1144,10 @@ Index: psi/src/widgets/widgets.pri
 +	$$PWD/psiwindowheader.h \
  	$$PWD/actionlineedit.h \
  	$$PWD/typeaheadfind.h
- 
+
 -FORMS += $$PWD/fancypopup.ui
 +FORMS += $$PWD/fancypopup.ui \
 +	$$PWD/psiwindowheader.ui
- 
+
  # to remove dependency on iconset and stuff
  #DEFINES += WIDGET_PLUGIN

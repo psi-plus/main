@@ -19,10 +19,10 @@ Index: psi/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp	2013-01-15 14:04:02.452826062 +0400
 @@ -695,6 +695,7 @@
  	}
- 
+
  	m_ = m;
 +	emit chatEdit()->appendMessageHistory(m.body());
- 
+
  	// Request events
  	if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
 Index: psi/src/groupchatdlg.cpp
@@ -34,9 +34,9 @@ Index: psi/src/groupchatdlg.cpp
  	m.setBody(str);
  	m.setTimeStamp(QDateTime::currentDateTime());
 +	emit d->mle()->appendMessageHistory(m.body());
- 
+
  	aSend(m);
- 
+
 Index: psi/src/msgmle.cpp
 ===================================================================
 --- psi.orig/src/msgmle.cpp	2013-01-15 14:04:02.456826062 +0400
@@ -50,13 +50,13 @@ Index: psi/src/msgmle.cpp
 +	initActions();
 +	setShortcuts();
  }
- 
+
  ChatEdit::~ChatEdit()
  {
 +	clearMessageHistory();
  	delete spellhighlighter_;
  }
- 
+
 +void ChatEdit::initActions()
 +{
 +	act_showMessagePrev = new QAction(this);
@@ -90,7 +90,7 @@ Index: psi/src/msgmle.cpp
 @@ -239,6 +271,90 @@
  	setCheckSpelling(checkSpellingGloballyEnabled());
  }
- 
+
 +void ChatEdit::showHistoryMessageNext()
 +{
 +	if (!typedMsgsHistory.isEmpty()) {
@@ -183,9 +183,9 @@ Index: psi/src/msgmle.h
 --- psi.orig/src/msgmle.h	2013-01-15 14:04:02.456826062 +0400
 +++ psi/src/msgmle.h	2013-01-15 14:04:02.456826062 +0400
 @@ -23,6 +23,8 @@
- 
+
  #include <QTextEdit>
- 
+
 +#define MAX_MESSAGE_HISTORY 50
 +
  class ChatEdit;
@@ -194,7 +194,7 @@ Index: psi/src/msgmle.h
 @@ -47,10 +49,18 @@
  	static bool checkSpellingGloballyEnabled();
  	void setCheckSpelling(bool);
- 
+
 +public slots:
 +	void appendMessageHistory(const QString& text);
 +	void clearMessageHistory();
@@ -207,7 +207,7 @@ Index: psi/src/msgmle.h
 +	void showHistoryMessagePrev();
 +	void showHistoryMessageFirst();
 +	void showHistoryMessageLast();
- 
+
  protected:
  	// override the tab/esc behavior
 @@ -58,6 +68,10 @@
@@ -218,7 +218,7 @@ Index: psi/src/msgmle.h
 +	void initActions();
 +	void setShortcuts();
 +	void setEditText(const QString& text);
- 
+
  private:
  	QWidget	*dialog_;
 @@ -65,6 +79,13 @@
@@ -233,5 +233,5 @@ Index: psi/src/msgmle.h
 +	QAction* act_showMessageLast;
 +	QString currentText;
  };
- 
- 
+
+

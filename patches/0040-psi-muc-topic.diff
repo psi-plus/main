@@ -6,8 +6,8 @@ Index: psi/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp	2013-01-15 14:03:58.868825917 +0400
 @@ -97,6 +97,8 @@
  static const QString geometryOption = "options.ui.muc.size";
- 
- 
+
+
 +#include "groupchattopicdlg.h"
 +
  //----------------------------------------------------------------------------
@@ -15,26 +15,26 @@ Index: psi/src/groupchatdlg.cpp
  //----------------------------------------------------------------------------
 @@ -225,7 +227,7 @@
  	QString lastSearch;
- 
+
  	QPointer<MUCConfigDlg> configDlg;
 -
 +	QPointer<GroupchatTopicDlg> topicDlg;
  public:
  	bool trackBar;
- 
+
 @@ -594,7 +596,7 @@
  	ui_.log->setAccount(account());
  #endif
- 
+
 -	connect(ui_.pb_topic, SIGNAL(clicked()), SLOT(doTopic()));
 +	connect(ui_.pb_topic, SIGNAL(clicked()), SLOT(openTopic()));
  	PsiToolTip::install(ui_.le_topic);
- 
+
  	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
 @@ -928,23 +930,27 @@
  	}
  }*/
- 
+
 -void GCMainDlg::doTopic()
 +void GCMainDlg::openTopic()
  {
@@ -59,7 +59,7 @@ Index: psi/src/groupchatdlg.cpp
 +		connect(d->topicDlg, SIGNAL(topicAccepted(const QString)), this, SLOT(setTopic(const QString)));
  	}
  }
- 
+
 +void GCMainDlg::setTopic(const QString &topic)
 +{
 +	Message m(jid());
@@ -75,7 +75,7 @@ Index: psi/src/groupchatdlg.cpp
 @@ -1442,6 +1448,11 @@
  	return d->self;
  }
- 
+
 +const QString& GCMainDlg::topic() const
 +{
 +	return d->topic;
@@ -93,7 +93,7 @@ Index: psi/src/groupchatdlg.h
  	void setPassword(const QString&);
  	const QString& nick() const;
 +	const QString& topic() const;
- 
+
  	bool isInactive() const;
  	void reactivate();
 @@ -107,7 +108,8 @@
@@ -279,19 +279,19 @@ Index: psi/src/src.pri
 -		$$PWD/mucjoindlg.h
 +		$$PWD/mucjoindlg.h \
 +		$$PWD/groupchattopicdlg.h
- 
+
  	SOURCES += \
  		$$PWD/groupchatdlg.cpp \
  		$$PWD/gcuserview.cpp \
 -		$$PWD/mucjoindlg.cpp
 +		$$PWD/mucjoindlg.cpp \
 +		$$PWD/groupchattopicdlg.cpp
- 
+
  	FORMS += \
  		$$PWD/groupchatdlg.ui \
 -		$$PWD/mucjoin.ui
 +		$$PWD/mucjoin.ui \
 +		$$PWD/groupchattopicdlg.ui
  }
- 
+
  whiteboarding {

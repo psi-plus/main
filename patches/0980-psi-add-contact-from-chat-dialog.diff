@@ -8,7 +8,7 @@ Index: psi/src/chatdlg.cpp
  	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
 +	updateRealJid();
  }
- 
+
  void ChatDlg::vcard(const QString& string)
 @@ -378,6 +379,7 @@
  	if (!j.compare(jid())) {
@@ -21,7 +21,7 @@ Index: psi/src/chatdlg.cpp
 @@ -645,6 +647,16 @@
  	TabbableWidget::invalidateTab();
  }
- 
+
 +void ChatDlg::updateRealJid()
 +{
 +	realJid_ = account()->realJid(jid());
@@ -44,13 +44,13 @@ Index: psi/src/chatdlg.h
  	PsiAccount* account() const;
  	void setText(const QString& );
 +	Jid realJid() const;
- 
+
  signals:
  	void aInfo(const Jid &);
 @@ -142,6 +143,7 @@
  	// reimplemented
  	virtual void invalidateTab();
- 
+
 +	void updateRealJid();
  	void resetComposing();
  	void doneSend();
@@ -60,7 +60,7 @@ Index: psi/src/chatdlg.h
  	Message m_;
  	bool lastWasEncrypted_;
 +	Jid realJid_;
- 
+
  	// Message Events & Chat States
  	QTimer* composingTimer_;
 Index: psi/src/psiaccount.cpp
@@ -70,7 +70,7 @@ Index: psi/src/psiaccount.cpp
 @@ -3571,6 +3571,20 @@
  	}*/
  }
- 
+
 +Jid PsiAccount::realJid(const Jid &j) const
 +{
 +	GCContact *c = findGCContact(j);
@@ -95,7 +95,7 @@ Index: psi/src/psiaccount.h
 @@ -204,6 +204,7 @@
  	void groupChatChangeNick(const QString &host, const QString &room, const QString& nick, const Status &);
  	void groupChatLeave(const QString &host, const QString &room);
- 
+
 +	Jid realJid(const Jid &j) const;
  	PsiContact* selfContact() const;
  	const QList<PsiContact*>& contactList() const;
@@ -120,20 +120,20 @@ Index: psi/src/psichatdlg.cpp
 +	connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
 +	connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
  	mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
- 
+
  	SendButtonTemplatesMenu* menu = getTemplateMenu();
 @@ -310,6 +314,7 @@
- 
+
  	updateIdentityVisibility();
  	updateCountVisibility();
 +	updateContactAdding();
- 
+
  	// toolbuttons
  	QIcon i;
 @@ -353,6 +358,26 @@
  	}
  }
- 
+
 +void PsiChatDlg::updateContactAdding(PsiContact* c)
 +{
 +	if (!c || realJid().compare(c->jid(), false)) {
@@ -160,7 +160,7 @@ Index: psi/src/psichatdlg.cpp
 @@ -373,6 +398,9 @@
  	act_html_text = new IconAction(tr("Set Text Format"), "psi/text", tr("Set Text Format"), 0, this);
  	connect(act_html_text, SIGNAL(triggered()), chatEdit(), SLOT(doHTMLTextMenu()));
- 
+
 +	act_add_contact = new IconAction(tr("Add Contact To Roster"), "psi/addContact", tr("Add Contact"), 0, this);
 +	connect(act_add_contact, SIGNAL(triggered()), SLOT(addContact()));
 +
@@ -173,12 +173,12 @@ Index: psi/src/psichatdlg.cpp
  	}
 +	ui_.toolbar->addAction(act_add_contact);
  }
- 
+
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
 @@ -688,6 +717,14 @@
  	mCmdManager_.open(new MCmdSimpleState(MCMDCHAT, tr("Command>")), QStringList() );
  }
- 
+
 +void PsiChatDlg::addContact()
 +{
 +	Jid j(realJid());
@@ -196,10 +196,10 @@ Index: psi/src/psichatdlg.h
 +++ psi/src/psichatdlg.h	2013-01-15 14:04:21.000826816 +0400
 @@ -11,6 +11,7 @@
  #include "typeaheadfind.h"
- 
+
  class IconAction;
 +class PsiContact;
- 
+
  class PsiChatDlg : public ChatDlg
  {
 @@ -33,11 +34,14 @@
@@ -214,7 +214,7 @@ Index: psi/src/psichatdlg.h
  	void updateCountVisibility();
 +	void updateContactAdding(PsiContact* c = 0);
 +	void updateContactAdding(const Jid &j);
- 
+
  	// reimplemented
  	void chatEditCreated();
 @@ -85,6 +89,7 @@
@@ -223,5 +223,5 @@ Index: psi/src/psichatdlg.h
  	IconAction* act_html_text;
 +	IconAction* act_add_contact;
  	QAction *act_mini_cmd_, *act_minimize_;
- 
+
  	MCmdManager mCmdManager_;

@@ -20,34 +20,34 @@ Index: psi/src/mainwin.cpp
 @@ -135,6 +135,10 @@
  	QToolButton* searchPb;
  	QWidget* searchWidget;
- 
+
 +	QTimer *hideTimer;
 +	int hideTimerInterval; //interval in sec
 +	bool useAutohide;
 +
  	QSignalMapper* statusMapper;
- 
+
  	PsiIcon* nextAnim;
 @@ -180,10 +184,13 @@
- 
+
  	char* squishStr = getenv("SQUISH_ENABLED");
  	squishEnabled = squishStr != 0;
 +
 +	hideTimer = new QTimer();
  }
- 
+
  MainWin::Private::~Private()
  {
 +	delete(hideTimer);
  }
- 
+
  void MainWin::Private::registerActions()
 @@ -532,6 +539,7 @@
  	// setUnifiedTitleAndToolBarOnMac(true);
- 
+
  	connect(qApp, SIGNAL(dockActivated()), SLOT(dockActivated()));
 +	qApp->installEventFilter(this);
- 
+
  	connect(psi, SIGNAL(emitOptionsUpdate()), SLOT(optionsUpdate()));
  	optionsUpdate();
 @@ -539,6 +547,11 @@
@@ -60,7 +60,7 @@ Index: psi/src/mainwin.cpp
 +	d->hideTimer->setInterval(d->hideTimerInterval*1000);
 +	optionChanged("options.contactlist.use-autohide");
  }
- 
+
  MainWin::~MainWin()
 @@ -580,6 +593,28 @@
  	else if (option == "options.ui.contactlist.show-roster-avatar-frame") {
@@ -89,12 +89,12 @@ Index: psi/src/mainwin.cpp
 +	else
 +		setWindowState(Qt::WindowMinimized);
  }
- 
+
  void MainWin::registerAction( IconAction* action )
 @@ -1419,6 +1454,31 @@
  	QWidget::keyPressEvent(e);
  }
- 
+
 +void MainWin::enterEvent(QEvent *e)
 +{
 +	if(d->useAutohide)
@@ -130,7 +130,7 @@ Index: psi/src/mainwin.cpp
 +	if(d->useAutohide)
 +		d->hideTimer->start();
  }
- 
+
  void MainWin::trayHide()
 @@ -1838,6 +1900,8 @@
  void MainWin::showNoFocus()
@@ -139,14 +139,14 @@ Index: psi/src/mainwin.cpp
 +	if(d->useAutohide)
 +		d->hideTimer->start();
  }
- 
+
  void MainWin::avcallConfig()
 Index: psi/src/mainwin.h
 ===================================================================
 --- psi.orig/src/mainwin.h	2013-01-15 14:04:16.776826645 +0400
 +++ psi/src/mainwin.h	2013-01-15 14:04:16.772826645 +0400
 @@ -72,9 +72,12 @@
- 
+
  protected:
  	// reimplemented
 +	bool eventFilter(QObject* o, QEvent* e);
@@ -161,7 +161,7 @@ Index: psi/src/mainwin.h
 @@ -157,6 +160,8 @@
  	void nickChanged();
  	void avatarChanged();
- 
+
 +	void hideTimerTimeout();
 +
  public slots:
@@ -177,7 +177,7 @@ Index: psi/src/options/opt_roster.cpp
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-roster-avatar-frame", d->ck_roster_avatar->isChecked());
 +	PsiOptions::instance()->setOption("options.contactlist.use-autohide", d->cb_autohide->isChecked());
 +	PsiOptions::instance()->setOption("options.contactlist.autohide-interval", d->sb_hideInterval->value());
- 
+
  	//enabled icons
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
 @@ -95,6 +97,9 @@
@@ -187,7 +187,7 @@ Index: psi/src/options/opt_roster.cpp
 +	d->cb_autohide->setChecked( PsiOptions::instance()->getOption("options.contactlist.use-autohide").toBool() );
 +	d->sb_hideInterval->setValue( PsiOptions::instance()->getOption("options.contactlist.autohide-interval").toInt() );
 +	d->sb_hideInterval->setEnabled(d->cb_autohide->isChecked());
- 
+
  	//enabled icons
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
 Index: psi/src/options/opt_roster.ui

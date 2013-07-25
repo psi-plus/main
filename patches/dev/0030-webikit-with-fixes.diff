@@ -74,7 +74,7 @@
 +			return false;
 +		if(ret != 0)
 +			return false;
-+		
++
 +		conf->addExtra("CONFIG += webkit");
 +		return true;
 +	}
@@ -230,13 +230,13 @@
  #include "psirichtext.h"
 +#include "messageview.h"
 +#include "chatview.h"
- 
+
  #ifdef Q_WS_WIN
  #include <windows.h>
 @@ -117,12 +119,16 @@ void ChatDlg::init()
  	initActions();
  	setShortcuts();
- 
+
 -	// TODO: this have to be moved to chatEditCreated()
 +	chatEdit()->installEventFilter(this);
  	chatView()->setDialog(this);
@@ -246,28 +246,28 @@
 +	chatView()->setAccount(account());
 +#endif
 +	chatView()->init();
- 
+
 -	chatEdit()->installEventFilter(this);
 -	connect(chatView(), SIGNAL(selectionChanged()), SLOT(logSelectionChanged()));
 +	// seems its useless hack
 +	//connect(chatView(), SIGNAL(selectionChanged()), SLOT(logSelectionChanged())); //
- 
+
  	// SyntaxHighlighters modify the QTextEdit in a QTimer::singleShot(0, ...) call
  	// so we need to install our hooks after it fired for the first time
 @@ -200,12 +206,12 @@ void ChatDlg::setShortcuts()
- 
+
  void ChatDlg::scrollUp()
  {
 -	chatView()->verticalScrollBar()->setValue(chatView()->verticalScrollBar()->value() - chatView()->verticalScrollBar()->pageStep() / 2);
 +	chatView()->scrollUp();
  }
- 
+
  void ChatDlg::scrollDown()
  {
 -	chatView()->verticalScrollBar()->setValue(chatView()->verticalScrollBar()->value() + chatView()->verticalScrollBar()->pageStep() / 2);
 +	chatView()->scrollDown();
  }
- 
+
  void ChatDlg::closeEvent(QCloseEvent *e)
 @@ -303,12 +309,13 @@ void ChatDlg::logSelectionChanged()
  {
@@ -288,10 +288,10 @@
 +//	}
  #endif
  }
- 
+
 @@ -450,18 +457,7 @@ void ChatDlg::updateContact(const Jid &j
  			updatePGP();
- 
+
  			if (fromPresence && statusChanged) {
 -				QString msg = tr("%1 is %2").arg(Qt::escape(dispNick_)).arg(status2txt(status_));
 -				if (!statusString_.isEmpty()) {
@@ -308,7 +308,7 @@
 +				chatView()->dispatchMessage(MessageView::statusMessage(dispNick_, status_, statusString_));
  			}
  		}
- 
+
 @@ -670,6 +666,8 @@ void ChatDlg::doSend()
  	if (isEncryptionEnabled()) {
  		m.setWasEncrypted(true);
@@ -316,20 +316,20 @@
 +	QString id = account()->client()->genUniqueId();
 +	m.setId(id); // we need id early for message manipulations in chatview
  	m_ = m;
- 
+
  	// Request events
 @@ -777,7 +775,7 @@ QString ChatDlg::whoNick(bool local) con
  		result = dispNick_;
  	}
- 
+
 -	return Qt::escape(result);
 +	return result;
  }
- 
+
  void ChatDlg::appendMessage(const Message &m, bool local)
 @@ -792,17 +790,14 @@ void ChatDlg::appendMessage(const Messag
  	encEnabled = lastWasEncrypted_;
- 
+
  	if (encChanged) {
 -		if (encEnabled) {
 -			appendSysMsg(QString("<icon name=\"psi/cryptoYes\"> ") + tr("Encryption Enabled"));
@@ -356,7 +356,7 @@
 @@ -810,21 +805,31 @@ void ChatDlg::appendMessage(const Messag
  		}
  	}
- 
+
 -	QString txt = messageText(m);
 -	QString subject = messageSubject(m);
 -
@@ -372,7 +372,7 @@
 +	if (!m.subject().isEmpty()) {
 +		chatView()->dispatchMessage(MessageView::subjectMessage(m.subject()));
 +	}
- 
+
 -	if (local) {
 -		deferredScroll();
 +	MessageView mv(MessageView::Message);
@@ -397,12 +397,12 @@
 +		}
 +		chatView()->dispatchMessage(MessageView::urlsMessage(urlsMap));
  	}
- 
+
  	// if we're not active, notify the user by changing the title
 @@ -855,16 +860,6 @@ void ChatDlg::appendMessage(const Messag
  	}
  }
- 
+
 -void ChatDlg::deferredScroll()
 -{
 -	QTimer::singleShot(250, this, SLOT(slotScroll()));
@@ -419,7 +419,7 @@
 @@ -1029,67 +1024,8 @@ void ChatDlg::nicksChanged()
  	// this function is intended to be reimplemented in subclasses
  }
- 
+
 -static const QString me_cmd = "/me ";
 -
 -bool ChatDlg::isEmoteMessage(const XMPP::Message& m)
@@ -482,7 +482,7 @@
  {
 -	chatView()->setDialog(this);
  	chatEdit()->setDialog(this);
- 
+
  	if (highlightersInstalled_) {
 --- psi.orig/src/chatdlg.h
 +++ psi/src/chatdlg.h
@@ -503,7 +503,7 @@
 -	QString messageText(const XMPP::Message& m);
 -	QString messageSubject(const XMPP::Message& m);
  	virtual void chatEditCreated();
- 
+
 -	enum SpooledType {
 -		Spooled_None,
 -		Spooled_OfflineStorage
@@ -513,7 +513,7 @@
  	virtual void capsChanged();
  	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
 -	virtual QString colorString(bool local, SpooledType spooled) const = 0;
- 
+
  	void appendMessage(const Message &, bool local = false);
  	virtual bool isEncryptionEnabled() const;
  	virtual void appendSysMsg(const QString& txt) = 0;
@@ -521,7 +521,7 @@
 -	virtual void appendNormalMessage(SpooledType spooled, const QDateTime& time, bool local, const QString& txt, const QString& subject) = 0;
 -	virtual void appendMessageFields(const Message& m) = 0;
  	virtual void nicksChanged();
- 
+
  	QString whoNick(bool local) const;
 --- psi.orig/src/chatdlg.ui
 +++ psi/src/chatdlg.ui
@@ -2177,7 +2177,7 @@
  	QString lastWhois;
 @@ -849,8 +849,8 @@ void EventDlg::init()
  	}
- 
+
  	// text area
 -	d->mle = new ChatView(this);
 -	d->mle->setDialog(this);
@@ -2209,16 +2209,16 @@
 @@ -571,7 +571,7 @@ FileRequestDlg::FileRequestDlg(const Jid
  	connect(d->psi, SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
  	updateIdentityVisibility();
- 
+
 -	d->te = new ChatView(this);
 +	d->te = new PsiTextView(this);
  	d->te->setReadOnly(false);
  	d->te->setAcceptRichText(false);
  	replaceWidget(te_desc, d->te);
 @@ -662,7 +662,7 @@ FileRequestDlg::FileRequestDlg(const QDa
- 
+
  	replaceWidget(lb_accountlabel, hb);
- 
+
 -	d->te = new ChatView(this);
 +	d->te = new PsiTextView(this);
  	d->te->setAcceptRichText(false);
@@ -2236,12 +2236,12 @@
  #include "xmpp_tasks.h"
 @@ -189,7 +190,6 @@ public:
  		nonAnonymous = false;
- 		
+
  		trackBar = false;
 -		oldTrackBarPosition = 0;
  		mCmdManager.registerProvider(this);
  	}
- 
+
 @@ -198,6 +198,7 @@ public:
  	MUCManager *mucManager;
  	QString self, prev_self;
@@ -2251,18 +2251,18 @@
  	IconAction *act_find, *act_clear, *act_icon, *act_configure;
  #ifdef WHITEBOARDING
 @@ -226,8 +227,6 @@ public:
- 	
+
  public:
  	bool trackBar;
 -protected:
 -	int  oldTrackBarPosition;
- 
+
  public:
  	ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
 @@ -245,11 +244,6 @@ public slots:
  		PsiRichText::addEmoticon(mle(), text);
  	}
- 
+
 -	void deferredScroll() {
 -		//QTimer::singleShot(250, this, SLOT(slotScroll()));
 -		te_log()->scrollToBottom();
@@ -2274,7 +2274,7 @@
 @@ -433,76 +427,11 @@ join <channel>{,<channel>} [pass{,<pass>
  	virtual void mCmdSiteDestroyed() {
  	}
- 
+
 -
 -
 -protected slots:
@@ -2291,18 +2291,18 @@
 -			cursor.clearSelection();
 -			te_log()->setTextCursor(cursor);
 -		}
--		
+-
 -		bool found = te_log()->find(str);
 -		if(!found) {
 -			if (!startFromBeginning)
 -				return internalFind(str, true);
--			
+-
 -			return false;
 -		}
 -
 -		return true;
 -	}
--	
+-
 -private:
 -	void removeTrackBar(QTextCursor &cursor)
 -	{
@@ -2314,7 +2314,7 @@
 -			cursor.setBlockFormat(blockFormat);
 -		}
 -	}
--		
+-
 -	void addTrackBar(QTextCursor &cursor)
 -	{
 -		cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
@@ -2325,7 +2325,7 @@
 -		cursor.setBlockFormat(blockFormat);
 -	}
 -
- public:		
+ public:
  	void doTrackBar()
  	{
  		trackBar = false;
@@ -2347,7 +2347,7 @@
 -		te_log()->verticalScrollBar()->setValue(scrollbarValue);
 +		te_log()->doTrackBar();
  	}
- 
+
  public:
 @@ -633,7 +562,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	: TabbableWidget(j.bare(), pa, tabManager)
@@ -2365,49 +2365,49 @@
 +#ifdef WEBKIT
 +	ui_.log->setAccount(account());
 +#endif
- 
+
  	connect(ui_.pb_topic, SIGNAL(clicked()), SLOT(doTopic()));
  	PsiToolTip::install(ui_.le_topic);
 @@ -674,7 +606,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	ui_.tb_emoticons->setIcon(IconsetFactory::icon("psi/smile").icon());
- 
+
  #ifdef Q_WS_MAC
 -	connect(ui_.log, SIGNAL(selectionChanged()), SLOT(logSelectionChanged()));
 +	// seems its useless hack
 +	//connect(ui_.log, SIGNAL(selectionChanged()), SLOT(logSelectionChanged()));
  #endif
- 
+
  	ui_.lv_users->setMainDlg(this);
 @@ -733,6 +666,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	ui_.mini_prompt->hide();
  	connect(ui_.mle, SIGNAL(textEditCreated(QTextEdit*)), SLOT(chatEditCreated()));
  	chatEditCreated();
 +	ui_.log->init(); //here is we ready to do that
- 
+
  	d->pm_settings = new QMenu(this);
  	connect(d->pm_settings, SIGNAL(aboutToShow()), SLOT(buildMenu()));
 @@ -810,12 +744,12 @@ void GCMainDlg::setShortcuts()
- 
+
  void GCMainDlg::scrollUp()
  {
 -	ui_.log->verticalScrollBar()->setValue(ui_.log->verticalScrollBar()->value() - ui_.log->verticalScrollBar()->pageStep()/2);
 +	ui_.log->scrollUp();
  }
- 
+
  void GCMainDlg::scrollDown()
  {
 -	ui_.log->verticalScrollBar()->setValue(ui_.log->verticalScrollBar()->value() + ui_.log->verticalScrollBar()->pageStep()/2);
 +	ui_.log->scrollDown();
  }
- 
+
  void GCMainDlg::closeEvent(QCloseEvent *e)
 @@ -866,10 +800,11 @@ void GCMainDlg::logSelectionChanged()
  {
  #ifdef Q_WS_MAC
  	// A hack to only give the message log focus when text is selected
--	if (ui_.log->textCursor().hasSelection()) 
+-	if (ui_.log->textCursor().hasSelection())
 -		ui_.log->setFocus();
--	else 
+-	else
 -		ui_.mle->chatEdit()->setFocus();
 +// seems its already useless. at least copy works w/o this hack
 +//	if (ui_.log->textCursor().hasSelection())
@@ -2416,15 +2416,15 @@
 +//		ui_.mle->chatEdit()->setFocus();
  #endif
  }
- 
+
 @@ -1011,7 +946,7 @@ void GCMainDlg::doTopic()
- 
+
  void GCMainDlg::doClear()
  {
 -	ui_.log->setText("");
 +	ui_.log->clear();
  }
- 
+
  void GCMainDlg::doClearButton()
 @@ -1026,7 +961,7 @@ void GCMainDlg::doClearButton()
  			)
@@ -2451,7 +2451,7 @@
 -	appendSysMsg(message, false, QDateTime::currentDateTime());
 +	appendSysMsg(message);
  }
- 
+
  void GCMainDlg::presence(const QString &nick, const Status &s)
 @@ -1208,7 +1143,7 @@ void GCMainDlg::presence(const QString &
  		else {
@@ -2461,7 +2461,7 @@
 +		appendSysMsg(message);
  		return;
  	}
- 
+
 @@ -1228,7 +1163,7 @@ void GCMainDlg::presence(const QString &
  	if(s.isAvailable()) {
  		// Available
@@ -2482,7 +2482,7 @@
  		else {
 @@ -1280,23 +1215,18 @@ void GCMainDlg::presence(const QString &
  				}
- 
+
  				if (!message.isEmpty()) {
 -					appendSysMsg(message, false, QDateTime::currentDateTime());
 +					appendSysMsg(message);
@@ -2514,7 +2514,7 @@
 +			appendSysMsg(log);
  			goForcedLeave();
  		}
- 
+
 @@ -1385,7 +1315,7 @@ void GCMainDlg::presence(const QString &
  					message += QString(" (%1)").arg(s.status());
  				}
@@ -2527,7 +2527,7 @@
 @@ -1416,18 +1346,33 @@ void GCMainDlg::message(const Message &_
  		d->nonAnonymous = false;
  	}
- 
+
 -
  	if(!m.subject().isNull()) {
 -		ui_.le_topic->setText(m.subject());
@@ -2565,11 +2565,11 @@
 +		//ui_.log->dispatchMessage(tv);
 +		return;
  	}
- 
+
  	if(m.body().isEmpty())
 @@ -1460,7 +1405,7 @@ void GCMainDlg::message(const Message &_
  	}
- 
+
  	if(from.isEmpty())
 -		appendSysMsg(m.body(), alert, m.timeStamp(), true);
 +		appendSysMsg(m.body(), alert, m.timeStamp());
@@ -2579,7 +2579,7 @@
 @@ -1487,144 +1432,57 @@ const QString& GCMainDlg::nick() const
  	return d->self;
  }
- 
+
 -void GCMainDlg::updateLastMsgTime(QDateTime t)
 +void GCMainDlg::appendSysMsg(const QString &str, bool alert, const QDateTime &ts)
  {
@@ -2598,7 +2598,7 @@
  	}
 +	appendSysMsg(mv);
  }
- 
+
 -void GCMainDlg::appendSysMsg(const QString &str, bool alert, const QDateTime &ts, bool prepareAsChatMessage)
 -{
 -	// FIXME:
@@ -2614,7 +2614,7 @@
 +{
  	if (d->trackBar)
  		d->doTrackBar();
- 
+
 -	if (!PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool())
 -		alert=false;
 -
@@ -2628,12 +2628,12 @@
 -	ui_.log->appendText(QString("<font color=\"%1\">[%2]").arg(color, timestr) +
 -		QString(" *** %1</font>").arg(prepareAsChatMessage ? TextUtil::prepareMessageText(str) : Qt::escape(str)));
 +	ui_.log->dispatchMessage(mv);
- 
+
 -	if(alert)
 +	if(mv.isAlert())
  		doAlert();
  }
- 
+
 -QString GCMainDlg::getNickColor(QString nick)
 -{
 -	int sender;
@@ -2647,9 +2647,9 @@
 -		}
 -		sender=nicks[nick];
 -	}
--	
+-
 -	QStringList nickColors = PsiOptions::instance()->getOption("options.ui.look.colors.muc.nick-colors").toStringList();
--	
+-
 -	if(!PsiOptions::instance()->getOption("options.ui.muc.use-nick-coloring").toBool() || nickColors.empty()) {
 -		return "#000000";
 -	}
@@ -2683,7 +2683,7 @@
 +	mv.setLocal(mv.nick() == d->self);
 +	mv.setSpooled(m.spooled());
 +	mv.setDateTime(m.timeStamp());
- 
+
 -	who = m.from().resource();
 -	if (d->trackBar&&m.from().resource() != d->self&&!m.spooled())
 +	if (d->trackBar && !mv.isLocal() && !mv.isSpooled()) {
@@ -2718,7 +2718,7 @@
 -		txt = TextUtil::plain2rich(m.body());
 -
 -	txt = TextUtil::linkify(txt);
- 
+
 -	if(PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool())
 -		txt = TextUtil::emoticonify(txt);
 -	if( PsiOptions::instance()->getOption("options.ui.chat.legacy-formatting").toBool() )
@@ -2744,7 +2744,7 @@
 -		d->deferredScroll();
 -	}
 +	ui_.log->dispatchMessage(mv);
- 
+
  	// if we're not active, notify the user by changing the title
 -	if(!isActiveTab() && (who != d->self)) {
 +	if(!isActiveTab() && !mv.isLocal()) {
@@ -2763,7 +2763,7 @@
  	class Message;
 @@ -136,9 +137,9 @@ private:
  	Ui::GroupChatDlg ui_;
- 
+
  	void doAlert();
 -	void appendSysMsg(const QString &, bool, const QDateTime &ts=QDateTime(), bool prepareAsChatMessage=false);
 +	void appendSysMsg(const QString &, bool alert=false, const QDateTime &ts=QDateTime());
@@ -2771,12 +2771,12 @@
  	void appendMessage(const Message &, bool);
 -	void updateLastMsgTime(QDateTime t);
  	void setLooks();
- 
+
  	void mucKickMsgHelper(const QString &nick, const Status &s, const QString &nickJid, const QString &title,
 @@ -147,9 +148,6 @@ private:
- 
+
  	void contextMenuEvent(QContextMenuEvent *);
- 
+
 -	QString getNickColor(QString);
 -	QMap<QString,int> nicks;
 -	int nicknumber;
@@ -3245,12 +3245,12 @@
  #include <QTextDocument>
  #include <QTimer>
 -#include <QDateTime>
- 
+
  #include "shortcutmanager.h"
  #include "spellchecker/spellhighlighter.h"
 @@ -41,135 +39,6 @@
  #include "psioptions.h"
- 
+
  //----------------------------------------------------------------------------
 -// ChatView
 -//----------------------------------------------------------------------------
@@ -3292,7 +3292,7 @@
 -void ChatView::keyPressEvent(QKeyEvent *e)
 -{
 -/*	if(e->key() == Qt::Key_Escape)
--		e->ignore(); 
+-		e->ignore();
 -#ifdef Q_WS_MAC
 -	else if(e->key() == Qt::Key_W && e->modifiers() & Qt::ControlModifier)
 -		e->ignore();
@@ -3304,7 +3304,7 @@
 -		e->ignore();
 -	else if(e->key() == Qt::Key_I && (e->modifiers() & Qt::ControlModifier))
 -		e->ignore(); */
--	/*else*/ if(e->key() == Qt::Key_M && (e->modifiers() & Qt::ControlModifier) && !isReadOnly()) // newline 
+-	/*else*/ if(e->key() == Qt::Key_M && (e->modifiers() & Qt::ControlModifier) && !isReadOnly()) // newline
 -		append("\n");
 -/*	else if(e->key() == Qt::Key_U && (e->modifiers() & Qt::ControlModifier) && !isReadOnly())
 -		setText(""); */
@@ -3342,27 +3342,27 @@
 -		    (e->key() == Qt::Key_Insert && (e->modifiers() & Qt::ControlModifier)))
 -		{
 -			if (!chatEdit->textCursor().hasSelection() &&
--			     this->textCursor().hasSelection()) 
+-			     this->textCursor().hasSelection())
 -			{
 -				this->copy();
 -				return true;
 -			}
 -		}
 -	}
--	
+-
 -	return false;
 -}
 -
 -void ChatView::appendText(const QString &text)
 -{
 -	bool doScrollToBottom = atBottom();
--	
--	// prevent scrolling back to selected text when 
+-
+-	// prevent scrolling back to selected text when
 -	// restoring selection
 -	int scrollbarValue = verticalScrollBar()->value();
--	
+-
 -	PsiTextView::appendText(text);
--	
+-
 -	if (doScrollToBottom)
 -		scrollToBottom();
 -	else
@@ -3387,9 +3387,9 @@
 --- psi.orig/src/msgmle.h
 +++ psi/src/msgmle.h
 @@ -23,8 +23,6 @@
- 
+
  #include <QTextEdit>
- 
+
 -#include "psitextview.h"
 -
  class ChatEdit;
@@ -3398,7 +3398,7 @@
 @@ -32,34 +30,6 @@ class QResizeEvent;
  class QTimer;
  class SpellHighlighter;
- 
+
 -class ChatView : public PsiTextView
 -{
 -	Q_OBJECT
@@ -3427,7 +3427,7 @@
 -private:
 -	QWidget* dialog_;
 -};
- 
+
  class ChatEdit : public QTextEdit
  {
 --- psi.orig/src/networkaccessmanager.cpp
@@ -3507,7 +3507,7 @@
 +
 +void NetworkAccessManager::callFinished() {
 +    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender());
-+    
++
 +    if (reply) {
 +        emit finished(reply);
 +    }
@@ -3653,14 +3653,14 @@
 +#include "opt_theme.h"
  #include "common.h"
  #include "iconwidget.h"
- 
+
 @@ -21,6 +22,7 @@
  #include "ui_opt_appearance_misc.h"
  #include "psioptions.h"
  #include "coloropt.h"
 +#include "psithememanager.h"
- 
- 
+
+
  class OptAppearanceUI : public QWidget, public Ui::OptAppearance
 @@ -78,12 +80,25 @@ QSize FontLabel::sizeHint() const
  OptionsTabAppearance::OptionsTabAppearance(QObject *parent) : MetaOptionsTab(parent, "appearance", "", tr("Appearance"), tr("Psi's appearance"), "psi/appearance")
@@ -3684,7 +3684,7 @@
  	addTab( new OptionsTabIconsetSystem(this) );
 -	addTab( new OptionsTabAppearanceMisc(this) );
  }
- 
+
 +
  //----------------------------------------------------------------------------
  // OptionsTabAppearanceMisc
@@ -3698,14 +3698,14 @@
 +		{d->ck_cUserText,        d->pb_cUserText,        "messages.usertext", ""}
 +
  	};
- 
+
  	bg_color = new QButtonGroup(this);
 --- psi.orig/src/options/opt_appearance.h
 +++ psi/src/options/opt_appearance.h
 @@ -36,6 +36,13 @@ public:
  	OptionsTabAppearance(QObject *parent);
  };
- 
+
 +class OptionsTabIconset : public MetaOptionsTab
 +{
 +	Q_OBJECT
@@ -4127,7 +4127,7 @@
 -#include "textutil.h"
  #include "xmpp_tasks.h"
  #include "lastactivitytask.h"
- 
+
 @@ -136,8 +136,8 @@ public slots:
  			dlg_->appendSysMsg("No version information available.");
  			return;
@@ -4137,7 +4137,7 @@
 +		dlg_->appendSysMsg(Qt::escape(QString("Version response: N: %2 V: %3 OS: %4")
 +			.arg(version->name(), version->version(), version->os())));
  	};
- 
+
  	void lastactivity_finished()
 @@ -154,7 +154,7 @@ public slots:
  				.arg(idle->time().toString()));
@@ -4147,11 +4147,11 @@
 +				.arg(idle->time().toString(), Qt::escape(idle->status())));
  		}
  	}
- 
+
 @@ -526,67 +526,6 @@ void PsiChatDlg::updateCounter()
  	ui_.lb_count->setNum(chatEdit()->toPlainText().length());
  }
- 
+
 -void PsiChatDlg::appendEmoteMessage(SpooledType spooled, const QDateTime& time, bool local, const QString& txt, const QString& subject)
 -{
 -	updateLastMsgTime(time);
@@ -4217,7 +4217,7 @@
  {
  	return act_pgp_->isChecked();
 @@ -594,25 +533,7 @@ bool PsiChatDlg::isEncryptionEnabled() c
- 
+
  void PsiChatDlg::appendSysMsg(const QString &str)
  {
 -	QDateTime t = QDateTime::currentDateTime();
@@ -4241,7 +4241,7 @@
 -	return ColorOpt::instance()->color("options.ui.look.colors.messages.received").name();
 +	chatView()->dispatchMessage(MessageView::fromHtml(str, MessageView::System));
  }
- 
+
  ChatView* PsiChatDlg::chatView() const
 @@ -643,23 +564,13 @@ void PsiChatDlg::doSend() {
  	if (mCmdSite_.isActive()) {
@@ -4254,7 +4254,7 @@
  		ChatDlg::doSend();
  	}
  }
- 
+
 -void PsiChatDlg::updateLastMsgTime(QDateTime t)
 -{
 -	bool doInsert = t.date() != lastMsgTime_.date();
@@ -4282,15 +4282,15 @@
 -	void updateLastMsgTime(QDateTime t);
  	ChatView* chatView() const;
  	ChatEdit* chatEdit() const;
- 
+
 @@ -86,7 +81,6 @@ private:
  	MCmdTabCompletion tabCompletion;
- 
+
  	bool smallChat_;
 -	QDateTime lastMsgTime_;
  	class ChatDlgMCmdProvider;
  };
- 
+
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -40,6 +40,7 @@
@@ -4315,7 +4315,7 @@
 @@ -191,6 +196,7 @@ private:
  	}
  };
- 
+
 +
  //----------------------------------------------------------------------------
  // PsiCon::Private
@@ -4323,7 +4323,7 @@
 @@ -473,6 +479,18 @@ bool PsiCon::init()
  		//}
  	}
- 
+
 +#ifdef WEBKIT
 +	PsiThemeManager::instance()->registerProvider(
 +			new ChatViewThemeProvider(this), true);
@@ -4338,12 +4338,12 @@
 +
  	if ( !d->actionList )
  		d->actionList = new PsiActionList( this );
- 
+
 @@ -619,7 +637,6 @@ bool PsiCon::init()
- 	}	
- 	
+ 	}
+
  	checkAccountsEmpty();
--	
+-
  	// try autologin if needed
  	foreach(PsiAccount* account, d->contactList->accounts()) {
  		account->autoLogin();
@@ -5166,7 +5166,7 @@
 @@ -592,6 +607,31 @@ unix:!dbus {
  	SOURCES += $$PWD/activeprofiles_stub.cpp
  }
- 
+
 +webkit {
 +	HEADERS += 	$$PWD/chatview_webkit.h \
 +			$$PWD/networkaccessmanager.h \
@@ -5205,7 +5205,7 @@
 +		sharedfiles.files += ../themes
 +	}
  	INSTALLS += sharedfiles
- 
+
  	# Widgets
 --- psi.orig/src/statusdlg.cpp
 +++ psi/src/statusdlg.cpp
@@ -5230,7 +5230,7 @@
 @@ -161,8 +161,8 @@ void StatusSetDlg::init()
  	connect(d->cb_preset, SIGNAL(currentIndexChanged(int)), SLOT(chooseStatusPreset(int)));
  	hb1->addWidget(d->cb_preset,3);
- 
+
 -	d->te = new ChatView(this);
 -	d->te->setDialog(this);
 +	d->te = new PsiTextView(this);
@@ -5242,7 +5242,7 @@
 +++ psi/src/textutil.cpp
 @@ -150,7 +150,7 @@ QString TextUtil::rich2plain(const QStri
  				out += '\n';
- 			
+
  			// handle output of Qt::convertFromPlainText() correctly
 -			if((tagName == "p" || tagName == "/p") && out.length() > 0)
 +			if((tagName == "p" || tagName == "/p" || tagName == "div") && out.length() > 0)
@@ -5252,7 +5252,7 @@
 @@ -535,6 +535,15 @@ QString TextUtil::emoticonify(const QStr
  	return out;
  }
- 
+
 +QString TextUtil::img2title(const QString &in)
 +{
 +	QString ret = in;
@@ -5264,9 +5264,9 @@
 +
  QString TextUtil::legacyFormat(const QString& in)
  {
- 
+
 @@ -552,38 +561,3 @@ QString TextUtil::legacyFormat(const QSt
- 
+
  	return out;
  }
 -
@@ -5311,7 +5311,7 @@
  	QString legacyFormat(const QString &);
  	QString emoticonify(const QString &in);
 +	QString img2title(const QString &in);
- 
+
  	QString prepareMessageText(const QString& text, bool isEmote=false, bool isHtml=false);
  };
 --- psi.orig/src/theme.cpp
@@ -5577,9 +5577,9 @@
  #include <QCoreApplication>
  #include <QLocale>
 +#include <QBuffer>
- 
+
  #include <QTextCodec>
- 
+
 @@ -270,6 +271,7 @@ public:
  		text = from.text;
  		sound = from.sound;
@@ -5593,13 +5593,13 @@
  	Anim *anim;
  	QIcon *icon;
 +	mutable QByteArray rawData;
- 
+
  	int activatedCount;
  	friend class PsiIcon;
 @@ -447,6 +450,24 @@ const QIcon &PsiIcon::icon() const
  	return *d->icon;
  }
- 
+
 +#ifdef WEBKIT
 +/**
 + * Returns original image data
@@ -5637,7 +5637,7 @@
 @@ -961,6 +986,20 @@ const QStringList IconsetFactory::icons(
  	return IconsetFactoryPrivate::instance()->icons();
  }
- 
+
 +#ifdef WEBKIT
 +/**
 + * Returs image raw data aka original image
@@ -5664,18 +5664,18 @@
 +#ifdef WEBKIT
 +	virtual const QByteArray & raw() const;
 +#endif
- 
+
  	virtual const Impix &impix() const;
  	virtual const Impix &frameImpix() const;
 @@ -236,6 +239,9 @@ public:
- 
+
  	static const PsiIcon *iconPtr(const QString &name);
  	static const QStringList icons();
 +#ifdef WEBKIT
 +	static const QByteArray raw(const QString &name);
 +#endif
  };
- 
+
  #endif
 --- psi.orig/src/webview.cpp
 +++ psi/src/webview.cpp
@@ -5946,11 +5946,11 @@
 + * Extended QWebView.
 + *
 + * It's used in EventView and HTMLChatView.
-+ * Provides evaluateJavaScript escaping and secure NetworkManager with icon:// URL 
-+ * support and \<img\> whitelisting. 
++ * Provides evaluateJavaScript escaping and secure NetworkManager with icon:// URL
++ * support and \<img\> whitelisting.
 + *
-+ * Better name for it would be: PsiWebView, but it's used in HTMLChatView which is 
-+ * Psi-unaware.  
++ * Better name for it would be: PsiWebView, but it's used in HTMLChatView which is
++ * Psi-unaware.
 + */
 +class WebView : public QWebView {
 +
@@ -6002,7 +6002,7 @@
 @@ -104,10 +104,6 @@ signals:
  	void iconSelected(const PsiIcon *);
  	void textSelected(QString);
- 
+
 -public slots:
 -	void aboutToShow() { iconStart(); }
 -	void aboutToHide() { iconStop();  }
@@ -6013,23 +6013,23 @@
 @@ -147,8 +143,8 @@ private:
  		}
  	}
- 
+
 -	void enterEvent(QEvent *) { setFocus();   update(); } // focus follows mouse mode
 -	void leaveEvent(QEvent *) { clearFocus(); update(); }
 +	void enterEvent(QEvent *) { iconStart(); setFocus();  update(); } // focus follows mouse mode
 +	void leaveEvent(QEvent *) { iconStop(); clearFocus(); update(); }
- 
+
  private slots:
  	void iconUpdated()
 @@ -338,8 +334,8 @@ void IconSelect::setIconset(const Iconse
  		connect (b, SIGNAL(iconSelected(const PsiIcon *)), menu, SIGNAL(iconSelected(const PsiIcon *)));
  		connect (b, SIGNAL(textSelected(QString)), menu, SIGNAL(textSelected(QString)));
- 
+
 -		connect (menu, SIGNAL(aboutToShow()), b, SLOT(aboutToShow()));
 -		connect (menu, SIGNAL(aboutToHide()), b, SLOT(aboutToHide()));
 +		//connect (menu, SIGNAL(aboutToShow()), b, SLOT(aboutToShow()));
 +		//connect (menu, SIGNAL(aboutToHide()), b, SLOT(aboutToHide()));
- 
+
  		if (++column >= size) {
  			++row;
 --- psi.orig/themes/chatview/adium/adapter.js
@@ -6044,7 +6044,7 @@
 +		var resources = ["Template.html", "FileTransferRequest.html",
 +		"Footer.html", "Header.html", "Status.html", "Topic.html", "Content.html",
 +		"Incoming/Content.html", "Incoming/NextContent.html",
-+		"Incoming/Context.html", "Incoming/NextContext.html", 
++		"Incoming/Context.html", "Incoming/NextContext.html",
 +		"Outgoing/Content.html", "Outgoing/NextContent.html",
 +		"Outgoing/Context.html", "Outgoing/NextContext.html"];
 +		for (var i=0; i<resources.length; i++) {
@@ -6134,12 +6134,12 @@
 +	var dateFormat = "hh:mm";
 +	var cdata;
 +	var proxyEl = document.createElement("div");
-+	
++
 +	function TemplateVar(name, param) {
 +		this.name = name;
 +		this.param = param
 +	}
-+	
++
 +	TemplateVar.prototype = {
 +		toString : function() {
 +			//chat.console("DEBUG: TemplateVar.prototype.toString " + session);
@@ -6161,7 +6161,7 @@
 +			return d || "";
 +		}
 +	}
-+	
++
 +	function TemplateTimeVar(name, param) {
 +		this.name = name;
 +		if (param) {
@@ -6175,18 +6175,18 @@
 +			this.format = dateFormat
 +		}
 +	}
-+	
++
 +	TemplateTimeVar.prototype.toString = function() {
 +		//chat.console("DEBUG: TemplateTimeVar.prototype.toString");
 +		return cdata[this.name] instanceof Date?
-+			server.formatDate(cdata[this.name], this.format) : 
++			server.formatDate(cdata[this.name], this.format) :
 +			(cdata[this.name] ? cdata[this.name] : "");
 +	}
 +
 +	function Template(raw) {
 +		var splitted = raw.split(/(%[\w]+(?:\{[\w:%]+\})?%)/), i;
 +		this.parts = [];
-+		
++
 +		for (i = 0; i < splitted.length; i++) {
 +			var m = splitted[i].match(/%([\w]+)(?:\{([\w:%]+)\})?%/);
 +			if (m) {
@@ -6198,7 +6198,7 @@
 +			}
 +		}
 +	}
-+	
++
 +	Template.prototype.toString = function(data) {
 +		chat.console("prepare Template.prototype.toString1");
 +		cdata = data || cdata;
@@ -6208,21 +6208,21 @@
 +		chat.console("prepare Template.prototype.toString2");
 +		return proxyEl.innerHTML;
 +	}
-+	
++
 +	// Template variable constructors
 +	var tvConstructors = {
 +		time : TemplateTimeVar,
 +		timeOpened : TemplateTimeVar
 +	}
-+	
++
 +	function psiOption(name) {
 +		return eval("[" + server.psiOption(name) + "][0]")
 +	}
-+	
++
 +	return {
 +		getHtml : function() {
 +			session = window.chatSession; // global session because Template needs it
-+			
++
 +			//chat.console("prepare html");
 +			var html = server.cache("html");
 +			var ip = server.cache("Info.plist");
@@ -6256,7 +6256,7 @@
 +			}
 +			//chat.console("prepare html5");
 +			html = html.replace(/%@/g, function(){return replace.shift() || ""});
-+			
++
 +			var styles = [];
 +			if (ip.DefaultBackgroundColor) {
 +				styles.push("background-color:#"+ip.DefaultBackgroundColor);
@@ -6281,7 +6281,7 @@
 +			var ip = server.cache("Info.plist");
 +			var prevGrouppingData = null;
 +			var groupping = !(ip.DisableCombineConsecutive == true);
-+			
++
 +			chat.adapter.receiveObject = function(data) {
 +				cdata = data;
 +				try {
@@ -6299,7 +6299,7 @@
 +									(prevGrouppingData.userid == cdata.userid) &&
 +									(prevGrouppingData.emote == cdata.emote) &&
 +									(prevGrouppingData.local == cdata.local));
-+									
++
 +								if (data.nextOfGroup) {
 +									template = data.local?templates.outgoingNextContent:templates.incomingNextContent;
 +								} else {
@@ -6358,12 +6358,12 @@
 +					chat.util.showCriticalError("APPEND ERROR: " + e + " \nline: " + e.line)
 +				}
 +			};
-+			
++
 +			var t = {};
 +			var templates = {}
 +			var tcList = ["Status.html", "Content.html",
 +				"Incoming/Content.html", "Incoming/NextContent.html",
-+				"Incoming/Context.html", "Incoming/NextContext.html", 
++				"Incoming/Context.html", "Incoming/NextContext.html",
 +				"Outgoing/Content.html", "Outgoing/NextContent.html",
 +				"Outgoing/Context.html", "Outgoing/NextContext.html"];
 +			var i
@@ -6410,7 +6410,7 @@
 +		// NOTE:
 +		// Any percent signs in this file must be escaped!
 +		// Use two escape signs (%%) to display it, this is passed through a format call!
-+		
++
 +		function appendHTML(html) {
 +			var node = document.getElementById("Chat");
 +			var range = document.createRange();
@@ -6418,7 +6418,7 @@
 +			var documentFragment = range.createContextualFragment(html);
 +			node.appendChild(documentFragment);
 +		}
-+		
++
 +		// a coalesced HTML object buffers and outputs DOM objects en masse.
 +		// saves A LOT of CSS recalculation time when loading many messages.
 +		// (ex. a long twitter timeline)
@@ -6430,11 +6430,11 @@
 +			this.isCoalescing = false;
 +			this.isConsecutive = undefined;
 +			this.shouldScroll = undefined;
-+			
++
 +			var appendElement = function (elem) {
 +				document.getElementById("Chat").appendChild(elem);
 +			};
-+			
++
 +			function outputHTML() {
 +				var insert = document.getElementById("insert");
 +				if(!!insert && self.isConsecutive) {
@@ -6446,14 +6446,14 @@
 +					appendElement(self.fragment);
 +				}
 +				alignChat(self.shouldScroll);
-+				
++
 +				// reset state to empty/non-coalescing
 +				self.shouldScroll = undefined;
 +				self.isConsecutive = undefined;
 +				self.isCoalescing = false;
 +				self.coalesceRounds = 0;
 +			}
-+			
++
 +			// creates and returns a new documentFragment, containing all content nodes
 +			// which can be inserted as a single node.
 +			function createHTMLNode(html) {
@@ -6461,26 +6461,26 @@
 +				range.selectNode(document.getElementById("Chat"));
 +				return range.createContextualFragment(html);
 +			}
-+			
++
 +			// removes first insert node from the internal fragment.
 +			function rmInsertNode() {
 +				var insert = self.fragment.querySelector("#insert");
 +				if(insert)
 +					insert.parentNode.removeChild(insert);
 +			}
-+			
++
 +			function setShouldScroll(flag) {
 +				if(flag && undefined === self.shouldScroll)
 +					self.shouldScroll = flag;
 +			}
-+			
++
 +			// hook in a custom method to append new data
 +			// to the chat.
 +			this.setAppendElementMethod = function (func) {
 +				if(typeof func === 'function')
 +					appendElement = func;
 +			}
-+						
++
 +			// (re)start the coalescing timer.
 +			//   we wait 25ms for a new message to come in.
 +			//   If we get one, restart the timer and wait another 10ms.
@@ -6495,7 +6495,7 @@
 +				if(400 < self.coalesceRounds)
 +					self.cancel();
 +			}
-+			
++
 +			// if we need to append content into an insertion div,
 +			// we need to clear the buffer and cancel the timeout.
 +			this.cancel = function() {
@@ -6504,10 +6504,10 @@
 +					outputHTML();
 +				}
 +			}
-+			
-+			
++
++
 +			// coalased analogs to the global functions
-+			
++
 +			this.append = function(html, shouldScroll) {
 +				// if we started this fragment with a consecuative message,
 +				// cancel and output before we continue
@@ -6518,13 +6518,13 @@
 +				rmInsertNode();
 +				var node = createHTMLNode(html);
 +				self.fragment.appendChild(node);
-+				
++
 +				node = null;
 +
 +				setShouldScroll(shouldScroll);
 +				self.coalesce();
 +			}
-+			
++
 +			this.appendNext = function(html, shouldScroll) {
 +				if(undefined === self.isConsecutive)
 +					self.isConsecutive = true;
@@ -6539,7 +6539,7 @@
 +				setShouldScroll(shouldScroll);
 +				self.coalesce();
 +			}
-+			
++
 +			this.replaceLast = function (html, shouldScroll) {
 +				rmInsertNode();
 +				var node = createHTMLNode(html);
@@ -6554,7 +6554,7 @@
 +		//Appending new content to the message view
 +		function appendMessage(html) {
 +			var shouldScroll;
-+			
++
 +			// Only call nearBottom() if should scroll is undefined.
 +			if(undefined === coalescedHTML.shouldScroll) {
 +				shouldScroll = nearBottom();
@@ -6563,13 +6563,13 @@
 +			}
 +			appendMessageNoScroll(html, shouldScroll);
 +		}
-+		
-+		function appendMessageNoScroll(html, shouldScroll) {			
++
++		function appendMessageNoScroll(html, shouldScroll) {
 +			shouldScroll = shouldScroll || false;
 +			// always try to coalesce new, non-griuped, messages
 +			coalescedHTML.append(html, shouldScroll)
 +		}
-+		
++
 +		function appendNextMessage(html){
 +			var shouldScroll;
 +			if(undefined === coalescedHTML.shouldScroll) {
@@ -6579,7 +6579,7 @@
 +			}
 +			appendNextMessageNoScroll(html, shouldScroll);
 +		}
-+		
++
 +		function appendNextMessageNoScroll(html, shouldScroll){
 +			shouldScroll = shouldScroll || false;
 +			// only group next messages if we're already coalescing input
@@ -6626,7 +6626,7 @@
 +		//Dynamically exchange the active stylesheet
 +		function setStylesheet( id, url ) {
 +			var code = "<style id=\"" + id + "\" type=\"text/css\" media=\"screen,print\">";
-+			if( url.length ) 
++			if( url.length )
 +				code += "@import url( \"" + url + "\" );";
 +			code += "</style>";
 +			var range = document.createRange();
@@ -6642,25 +6642,25 @@
 +			var node = event.target;
 +			if (node.tagName.toLowerCase() != 'img')
 +				return;
-+				
++
 +			imageSwap(node, false);
 +		}
-+		
++
 +		/* Converts textual emoticons to images if textToImagesFlag is true, otherwise vice versa */
 +		function imageSwap(node, textToImagesFlag) {
 +			var shouldScroll = nearBottom();
-+			
++
 +			var images = [node];
 +			if (event.altKey) {
 +				while (node.id != "Chat" && node.parentNode.id != "Chat")
 +					node = node.parentNode;
 +				images = node.querySelectorAll(textToImagesFlag ? "a" : "img");
 +			}
-+			
++
 +			for (var i = 0; i < images.length; i++) {
 +				textToImagesFlag ? textToImage(images[i]) : imageToText(images[i]);
 +			}
-+			
++
 +			alignChat(shouldScroll);
 +		}
 +
@@ -6674,7 +6674,7 @@
 +			img.className = node.className;
 +			node.parentNode.replaceChild(img, node);
 +		}
-+		
++
 +		function imageToText(node)
 +		{
 +			if (client.zoomImage(node) || !node.alt)
@@ -6688,7 +6688,7 @@
 +			a.appendChild(text);
 +			node.parentNode.replaceChild(a, node);
 +		}
-+		
++
 +		//Align our chat to the bottom of the window.  If true is passed, view will also be scrolled down
 +		function alignChat(shouldScroll) {
 +			var windowHeight = window.innerHeight;
@@ -6710,7 +6710,7 @@
 +		window.onresize = function windowDidResize(){
 +			alignChat(true/*nearBottom()*/); //nearBottom buggy with inactive tabs
 +		}
-+		
++
 +		function initStyle() {
 +			alignChat(true);
 +			if(!coalescedHTML)
@@ -6748,7 +6748,7 @@
 +++ psi/themes/chatview/psi/adapter.js
 @@ -0,0 +1,260 @@
 +try {
-+	
++
 +window[chatServer.jsNamespace()].adapter = {
 +	loadTheme : function() {
 +        chatServer.setHtml(chatServer.getFileContents("index.html"));
@@ -6773,15 +6773,15 @@
 +			prevGrouppingData : null,
 +			groupping : false,
 +			chatElement : null,
-+		
++
 +			TemplateVar : function(name) {
 +				this.name = name;
 +			},
-+		
++
 +			Template : function(raw) {
 +				var splitted = raw.split('%'), i;
 +				this.parts = [];
-+				
++
 +				for (i = 0; i < splitted.length; i++) {
 +					if (/^[a-zA-Z]+$/.test(splitted[i])) {
 +						this.parts.push(new shared.TemplateVar(splitted[i]));
@@ -6792,15 +6792,15 @@
 +					}
 +				}
 +			},
-+			
++
 +			psiOption : function(name) {
 +				return eval("[" + shared.server.psiOption(name) + "][0]")
 +			},
-+			
++
 +			colorOption : function(name) {
 +				return eval("[" + shared.server.colorOption(name) + "][0]")
 +			},
-+			
++
 +			appendHtml : function(html, scroll, nextEl) { //scroll[true|false|auto/other]
 +				if (typeof(scroll) == 'boolean') {
 +					shared.scroller.atBottom = scroll;
@@ -6812,14 +6812,14 @@
 +				}
 +				shared.scroller.invalidate();
 +			},
-+			
++
 +			stopGroupping : function() {
 +				if (shared.prevGrouppingData) {
 +					shared.prevGrouppingData.nextEl.parentNode.removeChild(shared.prevGrouppingData.nextEl)
 +					shared.prevGrouppingData = null;
 +				}
 +			},
-+			
++
 +			initTheme : function(config) {
 +				if (inited) {
 +					chat.util.showCriticalError("Theme should not be inited twice. Something wrong with theme.")
@@ -6866,14 +6866,14 @@
 +				return shared.cdata.nextOfGroup;
 +			}
 +		};
-+        
++
 +        // internationalization
 +        function tr(text)
 +        {
 +            // TODO translate
 +            return text;
 +        }
-+        
++
 +        // accepts some templater object and object with 2 optional methods: "pre" and "post(text)"
 +        function proxyTemplate(template, handlers)
 +        {
@@ -6884,7 +6884,7 @@
 +                return result;
 +            }}
 +        }
-+		
++
 +		shared.TemplateVar.prototype = {
 +			toString : function() {
 +				if (shared.varHandlers[this.name]) {
@@ -6909,12 +6909,12 @@
 +				return d || "";
 +			}
 +		}
-+		
++
 +		shared.Template.prototype.toString = function() {
 +			return this.parts.join("");
 +		}
-+		
-+		
++
++
 +		chat.adapter.receiveObject = function(data) {
 +			shared.cdata = data;
 +			if (!inited) {
@@ -6992,13 +6992,13 @@
 +				chat.util.showCriticalError("APPEND ERROR: " + e + " \nline: " + e.line)
 +			}
 +		};
-+	
++
 +		chat.adapter.initSession = null;
 +		chat.adapter.loadTheme = null;
 +		window.chatServer = null;
 +		window.chatSession = null;
 +		return shared;
-+	
++
 +	}
 +}
 +
@@ -7038,14 +7038,14 @@
 +	var nicks = {};
 +	var nickNumber = 0;
 +	var chat = window[chatServer.jsNamespace()];
-+	
++
 +	var cssBody = chat.util.findStyleSheet(document.styleSheets[0], "body").style;
 +	var cssSentMsg = chat.util.findStyleSheet(document.styleSheets[0], ".sent").style;
 +	var cssReceivedMsg = chat.util.findStyleSheet(document.styleSheets[0], ".received").style;
 +	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
 +	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
 +	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
-+	
++
 +	var applyPsiSettings = function() {
 +		chat.util.updateObject(cssBody, eval("["+shared.session.getFont()+"][0]"));
 +		cssBody.color = shared.server.getPaletteTextcolor(); // global message color palette().color(QPalette::Text).name();
@@ -7054,7 +7054,7 @@
 +		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
 +		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
 +	}
-+	
++
 +	var shared = chat.adapter.initSession();
 +	shared.initTheme({
 +		chatElement : document.body,
@@ -7109,13 +7109,13 @@
 +			}
 +		}
 +	});
-+	
++
 +	applyPsiSettings();
-+	
++
 +	shared.session.signalInited();
-+	
++
 +	return {
-+		
++
 +	};
 +}()
 +
@@ -7149,12 +7149,12 @@
 +				er.style.cssText = "background-color:red;color:white;border:1px solid black;padding:1em;margin:1em;font-weight:bold";
 +				er.innerHTML = chat.util.escapeHtml(text).replace(/\n/, "<br/>");
 +			},
-+			
++
 +			// just for debug
 +			escapeHtml : function(html) {
 +				return html.split("&").join("&amp;").split( "<").join("&lt;").split(">").join("&gt;");
 +			},
-+			
++
 +			// just for debug
 +			props : function(e, rec) {
 +				var ret='';
@@ -7183,7 +7183,7 @@
 +				}
 +				return ret;
 +			},
-+			
++
 +			// replaces <icon name="icon_name" text="icon_text" />
 +			// with <img src="icon://psi/icon_name" title="icon_text" />
 +			icon2img : function (obj) {
@@ -7206,13 +7206,13 @@
 +					}
 +				}
 +			},
-+			
++
 +			updateObject : function(object, update) {
 +				for (var i in update) {
 +					object[i] = update[i]
 +				}
 +			},
-+			
++
 +			findStyleSheet : function (sheet, selector) {
 +				for (var i=0; i<sheet.cssRules.length; i++) {
 +					if (sheet.cssRules[i].selectorText == selector)
@@ -7220,19 +7220,19 @@
 +				}
 +				return false;
 +			},
-+			
++
 +			appendHtml : function(dest, html) {
 +				htmlSource.innerHTML = html;
 +				chat.util.replaceIcons(htmlSource);
 +				while (htmlSource.firstChild) dest.appendChild(htmlSource.firstChild);
 +			},
-+			
++
 +			siblingHtml : function(dest, html) {
 +				htmlSource.innerHTML = html;
 +				chat.util.replaceIcons(htmlSource);
 +				while (htmlSource.firstChild) dest.parentNode.insertBefore(htmlSource.firstChild, dest);
 +			},
-+			
++
 +			ensureDeleted : function(id) {
 +				if (id) {
 +					var el = document.getElementById(id);
@@ -7241,7 +7241,7 @@
 +					}
 +				}
 +			},
-+			
++
 +			loadXML : function(path, allowEmpty) {
 +				allowEmpty = allowEmpty || false;
 +				text = server.getFileContents(path);
@@ -7256,7 +7256,7 @@
 +				}
 +			}
 +		},
-+		
++
 +		WindowScroller : function(animate) {
 +			var o=this, state, timerId
 +			var ignoreNextScroll = false;
@@ -7290,14 +7290,14 @@
 +					timerId = null;
 +				}
 +			}
-+			
++
 +			//timeout to be sure content rerendered correctly
 +			window.addEventListener("resize", function() {setTimeout(function(){
 +				if (o.atBottom) { //immediatelly scroll to bottom if we wish it
 +					window.scrollTo(0, document.height - window.innerHeight);
 +				}
 +			}, 0);}, false);
-+			
++
 +			//let's consider scroll may happen only by user action
 +			window.addEventListener("scroll", function(){
 +				if (ignoreNextScroll) {
@@ -7307,7 +7307,7 @@
 +				stopAnimation();
 +				o.atBottom = document.height == (window.innerHeight+window.pageYOffset);
 +			}, false);
-+			
++
 +			//EXTERNAL API
 +			// checks current state of scroll and wish and activates necessary actions
 +			o.invalidate = function() {
@@ -7315,7 +7315,7 @@
 +					startAnimation();
 +				}
 +			}
-+			
++
 +			o.force = function() {
 +				o.atBottom = true;
 +				o.invalidate();

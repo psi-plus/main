@@ -52,7 +52,7 @@ Index: psi/src/mainwin.cpp
 @@ -41,6 +42,8 @@
  #include <windows.h>
  #endif
- 
+
 +#include "tabmanager.h"
 +#include "tabdlg.h"
  #include "common.h"
@@ -61,7 +61,7 @@ Index: psi/src/mainwin.cpp
 @@ -96,14 +99,20 @@
  	Private(PsiCon *, MainWin *);
  	~Private();
- 
+
 -	QVBoxLayout* vb_main;
  	bool onTop, asTool;
  	QMenu* mainMenu, *statusMenu, *optionsMenu, *toolsMenu;
@@ -77,22 +77,22 @@ Index: psi/src/mainwin.cpp
 +	int tabsSize;
 +	int rosterSize;
 +	bool isLeftRoster;
- 
+
  	PopupAction* optionsButton, *statusButton;
  	IconActionGroup* statusGroup;
 @@ -135,7 +144,7 @@
  	void updateMenu(QStringList actions, QMenu* menu);
  };
- 
+
 -MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : psi(_psi), mainWin(_mainWin)
 +MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
  {
- 
+
  	statusGroup   = (IconActionGroup *)getAction("status_all");
 @@ -256,6 +265,10 @@
  #define TOOLW_FLAGS ((Qt::WindowFlags) 0)
  #endif
- 
+
 +const QString toolbarsStateOptionPath = "options.ui.save.toolbars-state";
 +const QString rosterGeometryPath      = "options.ui.save.roster-width";
 +const QString tabsGeometryPath        = "options.ui.save.log-width";
@@ -103,7 +103,7 @@ Index: psi/src/mainwin.cpp
 @@ -281,14 +294,43 @@
  	d->statusTip = "";
  	d->nickname = "";
- 
+
 -	QWidget* center = new QWidget (this);
 -	setCentralWidget ( center );
 +	QWidget *rosterBar = new QWidget(this);
@@ -137,7 +137,7 @@ Index: psi/src/mainwin.cpp
 +		d->splitter->setSizes(sizes);
 +	} else
 +		setCentralWidget(rosterBar);
- 
+
 -	d->vb_main = new QVBoxLayout(center);
 +	d->vb_roster = new QVBoxLayout(rosterBar);
  #ifndef NEWCONTACTLIST
@@ -148,7 +148,7 @@ Index: psi/src/mainwin.cpp
 +	d->rosterWidget_ = new PsiRosterWidget(rosterBar);
  	d->rosterWidget_->setContactList(psi->contactList());
  #endif
- 
+
 @@ -302,13 +344,31 @@
  	// d->contactListView_->setFrameShape(QFrame::NoFrame);
  #endif
@@ -175,7 +175,7 @@ Index: psi/src/mainwin.cpp
 +		}
 +	}
 +
- 
+
  #ifndef NEWCONTACTLIST
  	// create search bar
 -	d->searchWidget = new QWidget(centralWidget());
@@ -186,7 +186,7 @@ Index: psi/src/mainwin.cpp
  	searchLayout->setMargin(0);
  	searchLayout->setSpacing(0);
 @@ -325,15 +385,15 @@
- 
+
  	//add contact view
  #ifndef NEWCONTACTLIST
 -	d->vb_main->addWidget(cvlist);
@@ -202,19 +202,19 @@ Index: psi/src/mainwin.cpp
 -	d->vb_main->addWidget(d->rosterWidget_);
 +	d->vb_roster->addWidget(d->rosterWidget_);
  #endif
- 
+
  	d->statusMenu = new QMenu(tr("Status"), this);
 @@ -390,7 +450,6 @@
- 
+
  	mainMenuBar()->addMenu(d->statusMenu);
- 
+
 -	QMenu* viewMenu = new QMenu(tr("View"), this);
  	mainMenuBar()->addMenu(viewMenu);
  	d->getAction("show_offline")->addTo(viewMenu);
  	// if (PsiOptions::instance()->getOption("options.ui.menu.view.show-away").toBool()) {
 @@ -457,9 +516,22 @@
  	}
- 
+
  	saveToolbarsState();
 +
 +	if(d->splitter) {
@@ -224,7 +224,7 @@ Index: psi/src/mainwin.cpp
 +
  	delete d;
  }
- 
+
 +void MainWin::splitterMoved()
 +{
 +	QList<int> list = d->splitter->sizes();
@@ -238,7 +238,7 @@ Index: psi/src/mainwin.cpp
 @@ -691,8 +763,6 @@
  	return menuBar();
  }
- 
+
 -const QString toolbarsStateOptionPath = "options.ui.contactlist.toolbars-state";
 -
  void MainWin::saveToolbarsState()
@@ -247,7 +247,7 @@ Index: psi/src/mainwin.cpp
 @@ -713,8 +783,21 @@
  	qDeleteAll(toolbars_);
  	toolbars_.clear();
- 
+
 +	bool allInOne = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A');
  	foreach(QString base, PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true)) {
 -		PsiToolBar* tb = new PsiToolBar(base, this, d->psi->actionList());
@@ -277,12 +277,12 @@ Index: psi/src/mainwin.cpp
 +		d->viewToolBar->setUpdatesEnabled(true);
 +	}
  }
- 
+
  bool MainWin::showDockMenu(const QPoint &)
 @@ -1089,6 +1177,17 @@
  #endif
  }
- 
+
 +void MainWin::changeEvent(QEvent *event)
 +{
 +    if (event->type() == QEvent::ActivationChange ||
@@ -300,7 +300,7 @@ Index: psi/src/mainwin.cpp
 @@ -1527,4 +1626,26 @@
  		AvCallManager::config();
  }
- 
+
 +void MainWin::resizeEvent(QResizeEvent *e)
 +{
 +	AdvancedWidget<QMainWindow>::resizeEvent(e);
@@ -329,7 +329,7 @@ Index: psi/src/mainwin.h
 --- psi.orig/src/mainwin.h	2013-01-15 14:04:04.268826136 +0400
 +++ psi/src/mainwin.h	2013-01-15 14:04:04.264826136 +0400
 @@ -72,7 +72,9 @@
- 
+
  protected:
  	// reimplemented
 +	void resizeEvent(QResizeEvent *e);
@@ -340,10 +340,10 @@ Index: psi/src/mainwin.h
  #ifdef Q_OS_WIN
 @@ -141,6 +143,7 @@
  	void searchTextStarted(QString const &text);
- 
+
  	void registerAction( IconAction * );
 +	void splitterMoved();
- 
+
  public slots:
  	void setWindowIcon(const QPixmap&);
 Index: psi/src/options/opt_chat.cpp
@@ -367,7 +367,7 @@ Index: psi/src/options/opt_chat.cpp
 +			d->cb_tabGrouping->removeItem(5);
  		}
  	}
- 	
+
 @@ -188,16 +191,18 @@
  		d->cb_tabGrouping->setCurrentIndex(2);
  	} else if (tabGrouping == "CM") {
@@ -414,9 +414,9 @@ Index: psi/src/psicon.cpp
 @@ -1317,7 +1317,8 @@
  		alertIconUpdateAlertStyle();
  	}
- 
+
 -	if (option == "options.ui.tabs.use-tabs") {
-+	if (option == "options.ui.tabs.use-tabs" || 
++	if (option == "options.ui.tabs.use-tabs" ||
 +		option == "options.ui.tabs.grouping") {
  		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
  		//notifyRestart = false;
@@ -440,7 +440,7 @@ Index: psi/src/psitoolbar.cpp
 @@ -54,7 +54,7 @@
  	return Qt::NoToolBarArea;
  }
- 
+
 -PsiToolBar::PsiToolBar(const QString& base, QMainWindow* mainWindow, MetaActionList* actionList)
 +PsiToolBar::PsiToolBar(const QString& base, QWidget* mainWindow, MetaActionList* actionList)
  	: QToolBar(mainWindow)
@@ -449,7 +449,7 @@ Index: psi/src/psitoolbar.cpp
 @@ -81,6 +81,11 @@
  	menu.exec(e->globalPos());
  }
- 
+
 +QString PsiToolBar::base() const
 +{
 +	return base_;
@@ -461,7 +461,7 @@ Index: psi/src/psitoolbar.cpp
 @@ -108,11 +113,13 @@
  		}
  	}
- 
+
 -	QMainWindow* mainWindow = dynamic_cast<QMainWindow*>(parentWidget());
 -	mainWindow->addToolBar(dockPositionToToolBarArea((Qt3Dock)o->getOption(base_ + ".dock.position").toInt()),
 -	                       this);
@@ -475,7 +475,7 @@ Index: psi/src/psitoolbar.cpp
 +				mainWindow->insertToolBarBreak(this);
 +		}
  	}
- 
+
  	updateVisibility();
 Index: psi/src/psitoolbar.h
 ===================================================================
@@ -483,34 +483,34 @@ Index: psi/src/psitoolbar.h
 +++ psi/src/psitoolbar.h	2013-01-15 14:04:04.264826136 +0400
 @@ -35,11 +35,12 @@
  	Q_OBJECT
- 
+
  public:
 -	PsiToolBar(const QString& base, QMainWindow* mainWindow, MetaActionList* actionList);
 +	PsiToolBar(const QString& base, QWidget* mainWindow, MetaActionList* actionList);
  	~PsiToolBar();
- 
+
  	void initialize();
  	void updateVisibility();
 +	QString base() const;
- 
+
  	static void structToOptions(PsiOptions* options, const ToolbarPrefs& s);
- 
+
 Index: psi/src/tabs/tabdlg.cpp
 ===================================================================
 --- psi.orig/src/tabs/tabdlg.cpp	2013-01-15 14:04:04.268826136 +0400
 +++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:04.264826136 +0400
 @@ -186,7 +186,8 @@
- 
+
  	setShortcuts();
- 
+
 -	setGeometryOptionPath(geometryOption);
 +	if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
 +		setGeometryOptionPath(geometryOption);
  }
- 
+
  TabDlg::~TabDlg()
 @@ -487,7 +488,7 @@
- 
+
  void TabDlg::checkHasChats()
  {
 -	if (tabWidget_->count() > 0)

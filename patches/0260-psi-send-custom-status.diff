@@ -8,7 +8,7 @@ Index: psi/src/contactlistgroupmenu.cpp
  #include "psiaccount.h"
 +#include "statusdlg.h"
 +#include "xmpp_tasks.h"
- 
+
  class ContactListGroupMenu::Private : public QObject
  {
 @@ -45,6 +47,11 @@
@@ -20,13 +20,13 @@ Index: psi/src/contactlistgroupmenu.cpp
 +	QAction* actionAuthRequest_;
 +	QAction* actionAuthRemove_;
 +	QAction* actionCustomStatus_;
- 
+
  public:
  	Private(ContactListGroupMenu* menu, ContactListGroup* _group)
 @@ -57,6 +64,18 @@
  		renameAction_ = new IconAction("", tr("Re&name"), menu->shortcuts("contactlist.rename"), this, "act_rename");
  		connect(renameAction_, SIGNAL(triggered()), this, SLOT(rename()));
- 
+
 +		actionAuth_ = new QAction(tr("Resend Authorization to Group"), this);
 +		connect(actionAuth_, SIGNAL(triggered()), this, SLOT(authResend()));
 +
@@ -58,7 +58,7 @@ Index: psi/src/contactlistgroupmenu.cpp
 @@ -121,6 +145,73 @@
  		emit menu_->removeSelection();
  	}
- 
+
 +	void authResend()
 +	{
 +		if (!group)
@@ -153,7 +153,7 @@ Index: psi/src/psicontactmenu.cpp
 @@ -349,6 +352,9 @@
  		authRemoveAction_ = new IconAction(tr("Remove Authorization From"), this, "");
  		connect(authRemoveAction_, SIGNAL(triggered()), SLOT(authRemove()));
- 
+
 +		customStatusAction_ = new IconAction(tr("Sen&d Status"), this, "psi/action_direct_presence");
 +		connect(customStatusAction_, SIGNAL(triggered()), SLOT(customStatus()));
 +
@@ -169,7 +169,7 @@ Index: psi/src/psicontactmenu.cpp
  		pictureMenu_ = menu_->addMenu(tr("&Picture"));
  		pictureMenu_->addAction(pictureAssignAction_);
 @@ -473,6 +480,7 @@
- 
+
  		addAuthAction_->setVisible(!contact_->isSelf() && !contact_->inList() && !PsiOptions::instance()->getOption("options.ui.contactlist.lockdown-roster").toBool());
  		addAuthAction_->setEnabled(contact_->account()->isAvailable());
 +		customStatusAction_->setEnabled(contact_->account()->isAvailable() && !contact_->isPrivate());
@@ -179,7 +179,7 @@ Index: psi/src/psicontactmenu.cpp
 @@ -667,6 +675,24 @@
  			contact_->account()->actionAuthRemove(contact_->jid());
  	}
- 
+
 +	void customStatus()
 +	{
 +		if (!contact_)
@@ -213,24 +213,24 @@ Index: psi/src/statusdlg.cpp
 +	QList<XMPP::Jid> jl;
 +	setStatusEnum setStatusMode;
  };
- 
+
  StatusSetDlg::StatusSetDlg(PsiCon *psi, const Status &s)
 @@ -106,6 +109,7 @@
  	d->s = s;
- 
+
  	setWindowTitle(CAP(tr("Set Status: All accounts")));
 +	d->setStatusMode = setStatusForAccount;
  	init();
  }
- 
+
 @@ -120,9 +124,24 @@
  	d->s = s;
- 
+
  	setWindowTitle(CAP(tr("Set Status: %1").arg(d->pa->name())));
 +	d->setStatusMode = setStatusForAccount;
  	init();
  }
- 
+
 +void StatusSetDlg::setJid(const Jid &j)
 +{
 +	d->j = j;
@@ -250,7 +250,7 @@ Index: psi/src/statusdlg.cpp
  	int type = makeSTATUS(d->s);
 @@ -248,9 +267,31 @@
  	QString str = d->te->getPlainText();
- 
+
   	if (d->le_priority->text().isEmpty())
 - 		emit set(makeStatus(type, str), false, true);
 + 		//emit set(makeStatus(type, str), false, true);
@@ -265,7 +265,7 @@ Index: psi/src/statusdlg.cpp
 +				emit setJidList(d->jl, makeStatus(type,str));
 +				break;
 +		}
-  	else 
+  	else
 - 		emit set(makeStatus(type, str, d->le_priority->text().toInt()), true, true);
 + 		//emit set(makeStatus(type, str, d->le_priority->text().toInt()), true, true);
 +		switch(d->setStatusMode) {
@@ -279,7 +279,7 @@ Index: psi/src/statusdlg.cpp
 +				emit setJidList(d->jl, makeStatus(type,str, d->le_priority->text().toInt()));
 +				break;
 +		}
- 
+
  	close();
  }
 Index: psi/src/statusdlg.h
@@ -287,9 +287,9 @@ Index: psi/src/statusdlg.h
 --- psi.orig/src/statusdlg.h	2013-01-15 14:04:04.032826127 +0400
 +++ psi/src/statusdlg.h	2013-01-15 14:04:04.028826126 +0400
 @@ -23,6 +23,9 @@
- 
+
  #include <QDialog>
- 
+
 +#include <QList>
 +#include "xmpp_jid.h"
 +
@@ -297,9 +297,9 @@ Index: psi/src/statusdlg.h
  class PsiAccount;
  class UserListItem;
 @@ -33,6 +36,8 @@
- 
+
  using namespace XMPP;
- 
+
 +enum setStatusEnum{setStatusForAccount = 0, setStatusForJid, setStatusForJidList};
 +
  class StatusShowDlg : public QDialog
@@ -308,7 +308,7 @@ Index: psi/src/statusdlg.h
 @@ -48,9 +53,14 @@
  	StatusSetDlg(PsiAccount *, const Status &);
  	~StatusSetDlg();
- 
+
 +	void setJid(const Jid &);
 +	void setJidList(const QList<XMPP::Jid> &);
 +
@@ -317,6 +317,6 @@ Index: psi/src/statusdlg.h
  	void cancelled();
 +	void setJid(const Jid &, const Status &);
 +	void setJidList(const QList<XMPP::Jid> &, const Status &);
- 
+
  private slots:
  	void doButton();

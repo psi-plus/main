@@ -28,7 +28,7 @@ Index: psi/src/mainwin.cpp
 +
 +	QString ToolTipText;
  };
- 
+
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
 @@ -710,7 +715,8 @@
  		connect(d->tray, SIGNAL(clicked(const QPoint &, int)), SLOT(trayClicked(const QPoint &, int)));
@@ -37,13 +37,13 @@ Index: psi/src/mainwin.cpp
 -		d->tray->setToolTip(ApplicationInfo::name());
 +		setTrayToolTip();
 +		connect(d->tray, SIGNAL(doToolTip(QObject *, QPoint)), this, SLOT(doTrayToolTip(QObject *, QPoint)));
- 
+
  		updateReadNext(d->nextAnim, d->nextAmount);
- 
+
 @@ -1093,12 +1099,87 @@
  #endif
  }
- 
+
 -void MainWin::setTrayToolTip(int status)
 +void MainWin::setTrayToolTip()
  {
@@ -77,7 +77,7 @@ Index: psi/src/mainwin.cpp
 +			istr = "status/invisible";
 +		Tip += QString("<div style='white-space:pre'>") + QString("<%1=\"%2\"> ").arg(imgTag).arg(istr) + QString("<b>%1</b>").arg(TextUtil::escape(pa->name())) + "</div>";
 +		TipPlain += "\n" + pa->name() + " (" + stat.typeString() + ")";
-+		QString text = stat.status();		
++		QString text = stat.status();
 +		if(!text.isEmpty()) {
 +			text = clipStatus(text, 40, 1);
 +			Tip += QString("<div style='white-space:pre'>%1: %2</div>").arg(tr("Status Message")).arg(TextUtil::escape(text));
@@ -128,12 +128,12 @@ Index: psi/src/mainwin.cpp
 +{
 +	PsiToolTip::showText(p, d->ToolTipText);
  }
- 
+
  void MainWin::decorateButton(int status)
 @@ -1109,6 +1190,8 @@
  		action->setChecked ( d->statusActions[action] == status );
  	}
- 
+
 +	setTrayToolTip();
 +
  	if(d->lastStatus == status) {
@@ -159,24 +159,24 @@ Index: psi/src/mainwin.cpp
 -	d->tray->setToolTip(s);
 +	setTrayToolTip();
  }
- 
+
  void MainWin::trayClicked(const QPoint &, int button)
 @@ -1383,6 +1453,7 @@
- 
+
  	updateTray();
  	updateCaption();
 +	setTrayToolTip();
  }
- 
+
  QString MainWin::numEventsString(int x) const
 @@ -1419,6 +1490,8 @@
- 
+
  	buildTrayMenu();
  	d->tray->setContextMenu(d->trayMenu);
 +
 +	d->tray->iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
  }
- 
+
  void MainWin::doRecvNextEvent()
 @@ -1441,6 +1514,7 @@
  void MainWin::numAccountsChanged()
@@ -184,7 +184,7 @@ Index: psi/src/mainwin.cpp
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
 +	setTrayToolTip();
  }
- 
+
  void MainWin::accountFeaturesChanged()
 Index: psi/src/mainwin.h
 ===================================================================
@@ -193,16 +193,16 @@ Index: psi/src/mainwin.h
 @@ -101,7 +101,7 @@
  	void buildMainMenu();
  	void buildToolsMenu();
- 
+
 -	void setTrayToolTip(int);
 +	void setTrayToolTip();
- 
+
  	void activatedStatusAction(int);
- 
+
 @@ -145,6 +145,8 @@
  	void registerAction( IconAction * );
  	void splitterMoved();
- 
+
 +	void doTrayToolTip(QObject *, QPoint);
 +
  public slots:
@@ -217,11 +217,11 @@ Index: psi/src/psitrayicon.cpp
  #include <QApplication> // old
  #include <QSystemTrayIcon>
 +#include <QHelpEvent>
- 
+
  #include "psitrayicon.h"
  #include "iconset.h"
 @@ -13,13 +14,16 @@
- 
+
  PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
  	: QObject(parent)
 +	, icon_(NULL)
@@ -238,10 +238,10 @@ Index: psi/src/psitrayicon.cpp
 +
 +	iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
  }
- 
+
  PsiTrayIcon::~PsiTrayIcon()
 @@ -35,7 +39,11 @@
- 
+
  void PsiTrayIcon::setToolTip(const QString &str)
  {
 +#ifndef HAVE_X11
@@ -250,12 +250,12 @@ Index: psi/src/psitrayicon.cpp
 +	Q_UNUSED(str)
 +#endif
  }
- 
+
  void PsiTrayIcon::setIcon(const PsiIcon *icon, bool alert)
 @@ -78,6 +86,11 @@
  	return false;
  }
- 
+
 +void PsiTrayIcon::iconsetChanged(const QString &iconset)
 +{
 +	iconset_ = iconset;
@@ -267,10 +267,10 @@ Index: psi/src/psitrayicon.cpp
 @@ -179,7 +192,7 @@
  	if ( !icon_ )
  		return;
- 
+
 -	QString cachedName = "PsiTray/" + PsiOptions::instance()->getOption("options.iconsets.status").toString() + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
 +	QString cachedName = "PsiTray/" + iconset_ + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
- 
+
  	QPixmap p;
  	if ( !QPixmapCache::find(cachedName, p) ) {
 @@ -188,3 +201,12 @@
@@ -291,9 +291,9 @@ Index: psi/src/psitrayicon.h
 --- psi.orig/src/psitrayicon.h	2013-01-15 14:04:10.892826405 +0400
 +++ psi/src/psitrayicon.h	2013-01-15 14:04:10.888826405 +0400
 @@ -25,10 +25,13 @@
- 
+
  	bool isWMDock();
- 
+
 +	void iconsetChanged(const QString& iconset);
 +
  signals:
@@ -301,7 +301,7 @@ Index: psi/src/psitrayicon.h
  	void doubleClicked(const QPoint &);
  	void closed();
 +	void doToolTip(QObject *, QPoint);
- 
+
  public slots:
  	void show();
 @@ -41,10 +44,12 @@
@@ -309,11 +309,11 @@ Index: psi/src/psitrayicon.h
  	QPixmap makeIcon();
  	QRgb pixelBlend(QRgb p1, QRgb p2);
 +	bool eventFilter( QObject *, QEvent * );
- 
+
  private:
  	PsiIcon* icon_;
  	QSystemTrayIcon* trayicon_;
 +	QString iconset_;
  };
- 
- 
+
+
