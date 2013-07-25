@@ -3706,7 +3706,7 @@ diff --git a/src/networkaccessmanager.h b/src/networkaccessmanager.h
 new file mode 100644
 --- /dev/null
 +++ b/src/networkaccessmanager.h
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,94 @@
 +/*
 + * networkaccessmanager.h - Network Manager for WebView able to process
 + * custom url schemas
@@ -3745,6 +3745,7 @@ new file mode 100644
 +
 +class NAMSchemeHandler {
 +public:
++	virtual ~NAMSchemeHandler() {}
 +	virtual QByteArray data(const QUrl &) const = 0;
 +};
 +
@@ -5921,9 +5922,10 @@ diff --git a/src/tools/iconset/iconset.h b/src/tools/iconset/iconset.h
  #endif
 diff --git a/src/webview.cpp b/src/webview.cpp
 new file mode 100644
+index 0000000..23e1e5c
 --- /dev/null
 +++ b/src/webview.cpp
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,187 @@
 +/*
 + * webview.cpp - QWebView handling links and copying text
 + * Copyright (C) 2010 senu, Rion
@@ -5949,6 +5951,7 @@ new file mode 100644
 +#include <QMimeData>
 +#include <QApplication>
 +#include <QStyle>
++#include <QDebug>
 +
 +#include "webview.h"
 +#include "urlobject.h"
@@ -6046,7 +6049,7 @@ new file mode 100644
 +	QWebView::mouseReleaseEvent(event);
 +	possibleDragging = false;
 +#ifdef HAVE_X11
-+	if (!page()->selectedText().isEmpty()) {
++	if (!page()->selectedHtml().isEmpty()) {
 +		convertClipboardHtmlImages(QClipboard::Selection);
 +	}
 +#endif
@@ -6066,7 +6069,7 @@ new file mode 100644
 +	QDrag *drag = new QDrag(this);
 +	QMimeData *mimeData = new QMimeData;
 +
-+	QString html = selectedHtml();
++	QString html = TextUtil::img2title(selectedHtml());
 +	mimeData->setHtml(html);
 +	mimeData->setText(TextUtil::rich2plain(html));
 +
@@ -6077,13 +6080,11 @@ new file mode 100644
 +void WebView::convertClipboardHtmlImages(QClipboard::Mode mode)
 +{
 +	QClipboard *cb = QApplication::clipboard();
-+	//qDebug("text selection before: %s", qPrintable(cb->text(mode)));
-+	QString html = TextUtil::img2title(cb->mimeData(mode)->html());
++	QString html = TextUtil::img2title(selectedHtml());
 +	QMimeData *data = new QMimeData;
 +	data->setHtml(html);
 +	data->setText(TextUtil::rich2plain(html, false));
 +	cb->setMimeData(data, mode);
-+	//qDebug("selection: %s", qPrintable(cb->mimeData(mode)->text()));
 +}
 +
 +void WebView::evaluateJS(const QString &scriptSource)
@@ -6092,26 +6093,9 @@ new file mode 100644
 +	page()->mainFrame()->evaluateJavaScript(scriptSource);
 +}
 +
-+QString WebView::selectedHtml()
-+{
-+	// WARNING: selectedHtml must be implemented in qt-4.8 and
-+	// this ugly hack will become useless
-+	QClipboard *clipboard = QApplication::clipboard();
-+	QMimeData *originalData = new QMimeData;
-+	foreach (QString format, clipboard->mimeData(QClipboard::Clipboard)->formats()) {
-+		originalData->setData(format, clipboard->mimeData(QClipboard::Clipboard)->data(format));
-+	}
-+	copySelected();
-+
-+	QString html = clipboard->mimeData()->html();
-+	clipboard->setMimeData(originalData);
-+
-+	return html;
-+}
-+
 +QString WebView::selectedText()
 +{
-+	return TextUtil::rich2plain(selectedHtml());
++	return TextUtil::rich2plain(TextUtil::img2title(selectedHtml()));
 +}
 +
 +void WebView::copySelected()
@@ -6133,7 +6117,7 @@ diff --git a/src/webview.h b/src/webview.h
 new file mode 100644
 --- /dev/null
 +++ b/src/webview.h
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,106 @@
 +/*
 + * webview.h - QWebView handling links and copying text
 + * Copyright (C) 2010 senu, Rion
@@ -6206,7 +6190,6 @@ new file mode 100644
 +	/** Evaluates JavaScript code */
 +	void evaluateJS(const QString &scriptSource = "");
 +
-+	QString selectedHtml();
 +	QString selectedText();
 +	bool isLoading() { return isLoading_; }
 +
