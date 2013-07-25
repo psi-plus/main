@@ -5446,6 +5446,15 @@ diff --git a/src/statusdlg.cpp b/src/statusdlg.cpp
 diff --git a/src/textutil.cpp b/src/textutil.cpp
 --- a/src/textutil.cpp
 +++ b/src/textutil.cpp
+@@ -113,7 +113,7 @@ QString TextUtil::plain2rich(const QString &plain)
+ 	return "<span style='white-space: pre-wrap'>" + rich + "</span>";
+ }
+ 
+-QString TextUtil::rich2plain(const QString &in)
++QString TextUtil::rich2plain(const QString &in, bool collapseSpaces)
+ {
+ 	QString out;
+ 
 @@ -139,7 +139,7 @@ QString TextUtil::rich2plain(const QString &in)
  				out += '\n';
  
@@ -5455,6 +5464,15 @@ diff --git a/src/textutil.cpp b/src/textutil.cpp
  				out += '\n';
  		}
  		// entity?
+@@ -167,7 +167,7 @@ QString TextUtil::rich2plain(const QString &in)
+ 			if(in[i] == QChar::Nbsp)
+ 				out += ' ';
+ 			else if(in[i] != '\n') {
+-				if(i == 0 || out.length() == 0)
++				if(!collapseSpaces || i == 0 || out.length() == 0)
+ 					out += ' ';
+ 				else {
+ 					QChar last = out.at(out.length()-1);
 @@ -529,6 +529,15 @@ QString TextUtil::emoticonify(const QString &in)
  	return out;
  }
@@ -5513,7 +5531,13 @@ diff --git a/src/textutil.cpp b/src/textutil.cpp
 diff --git a/src/textutil.h b/src/textutil.h
 --- a/src/textutil.h
 +++ b/src/textutil.h
-@@ -15,6 +15,7 @@ namespace TextUtil
+@@ -10,11 +10,12 @@ namespace TextUtil
+ 
+ 	QString quote(const QString &, int width=60, bool quoteEmpty=false);
+ 	QString plain2rich(const QString &);
+-	QString rich2plain(const QString &);
++	QString rich2plain(const QString &, bool collapseSpaces = true);
+ 	QString resolveEntities(const QString &);
  	QString linkify(const QString &);
  	QString legacyFormat(const QString &);
  	QString emoticonify(const QString &in);
@@ -6057,7 +6081,7 @@ new file mode 100644
 +	QString html = TextUtil::img2title(cb->mimeData(mode)->html());
 +	QMimeData *data = new QMimeData;
 +	data->setHtml(html);
-+	data->setText(TextUtil::rich2plain(html));
++	data->setText(TextUtil::rich2plain(html, false));
 +	cb->setMimeData(data, mode);
 +	//qDebug("selection: %s", qPrintable(cb->mimeData(mode)->text()));
 +}
