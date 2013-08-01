@@ -1,50 +1,10 @@
-Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.cpp
-===================================================================
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.cpp	2013-01-15 14:03:59.540825944 +0400
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.cpp	2013-01-15 14:03:59.532825944 +0400
-@@ -250,6 +250,23 @@
- 	return "";
- }
-
-+QDomElement queryTag(const QDomElement &e, const QString &element)
-+{
-+	bool found;
-+	QDomElement q = findSubTag(e, element, &found);
-+	return q;
-+}
-+
-+QString queryNS(const QDomElement &e, const QString &element)
-+{
-+	bool found;
-+	QDomElement q = findSubTag(e, element, &found);
-+	if(found)
-+		return q.attribute("xmlns");
-+
-+	return "";
-+}
-+
- /**
- 	\brief Extracts the error code and description from the stanza element.
-
-Index: psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h
-===================================================================
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h	2013-01-15 14:03:59.540825944 +0400
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_xmlcommon.h	2013-01-15 14:03:59.532825944 +0400
-@@ -68,7 +68,9 @@
- XDomNodeList childElementsByTagNameNS(const QDomElement &e, const QString &nsURI, const QString &localName);
- QDomElement createIQ(QDomDocument *doc, const QString &type, const QString &to, const QString &id);
- QDomElement queryTag(const QDomElement &e);
-+QDomElement queryTag(const QDomElement &e, const QString &element);
- QString queryNS(const QDomElement &e);
-+QString queryNS(const QDomElement &e, const QString &element);
- void getErrorFromElement(const QDomElement &e, const QString &baseNS, int *code, QString *str);
- QDomElement addCorrectNS(const QDomElement &e);
-
-Index: psi/src/entitytimetask.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/entitytimetask.cpp	2013-01-15 14:03:59.532825944 +0400
-@@ -0,0 +1,123 @@
+Entering 'iris'
+Entering 'src/libpsi'
+diff --git a/src/entitytimetask.cpp b/src/entitytimetask.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/entitytimetask.cpp
+@@ -0,0 +1,122 @@
 +/*
 + * entitytimetask.cpp - Entity time fetching task
 + * Copyright (C) 2007  Maciej Niedzielski
@@ -133,14 +93,13 @@ Index: psi/src/entitytimetask.cpp
 +		return false;
 +
 +	if (x.attribute("type") == "result") {
-+		bool found = false;
-+		QDomElement q = queryTag(x, "time");
++		QDomElement q = x.firstChildElement("time");
 +		QDomElement tag;
-+		tag = findSubTag(q, "utc", &found);
-+		if (found)
++		tag = q.firstChildElement("utc");
++		if (!tag.isNull())
 +			utc_ = tagContent(tag);
-+		tag = findSubTag(q, "tzo", &found);
-+		if (found) {
++		tag = q.firstChildElement("tzo");
++		if (!tag.isNull()) {
 +			tzoString_ = tagContent(tag);
 +			tzo_ = stringToOffset(tzoString_);
 +		}
@@ -168,10 +127,10 @@ Index: psi/src/entitytimetask.cpp
 +{
 +	return tzo_;
 +}
-Index: psi/src/entitytimetask.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/entitytimetask.h	2013-01-15 14:03:59.532825944 +0400
+diff --git a/src/entitytimetask.h b/src/entitytimetask.h
+new file mode 100644
+--- /dev/null
++++ b/src/entitytimetask.h
 @@ -0,0 +1,49 @@
 +/*
 + * entitytimetask.h - Entity time fetching task
@@ -222,10 +181,9 @@ Index: psi/src/entitytimetask.h
 +};
 +
 +#endif
-Index: psi/src/infodlg.cpp
-===================================================================
---- psi.orig/src/infodlg.cpp	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/infodlg.cpp	2013-01-15 14:03:59.532825944 +0400
+diff --git a/src/infodlg.cpp b/src/infodlg.cpp
+--- a/src/infodlg.cpp
++++ b/src/infodlg.cpp
 @@ -45,6 +45,7 @@
  #include "iconset.h"
  #include "common.h"
@@ -234,7 +192,7 @@ Index: psi/src/infodlg.cpp
  #include "vcardfactory.h"
  #include "iconwidget.h"
  #ifndef NEWCONTACTLIST
-@@ -242,7 +243,7 @@
+@@ -242,7 +243,7 @@ InfoDlg::InfoDlg(int type, const Jid &j, const VCard &vcard, PsiAccount *pa, QWi
  	updateStatus();
  	foreach(UserListItem* u, d->findRelevant(j)) {
  		foreach(UserResource r, u->userResourceList()) {
@@ -243,10 +201,10 @@ Index: psi/src/infodlg.cpp
  		}
  		if (u->userResourceList().isEmpty() && u->lastAvailable().isNull()) {
  			requestLastActivity();
-@@ -776,13 +777,24 @@
+@@ -776,13 +777,24 @@ void InfoDlg::setStatusVisibility(bool visible)
  	}
  }
-
+ 
 -void InfoDlg::requestClientVersion(const Jid& j)
 +/**
 + * \brief Requests per-resource information.
@@ -267,12 +225,12 @@ Index: psi/src/infodlg.cpp
 +	jet->get(j);
 +	jet->go(true);
  }
-
+ 
  void InfoDlg::clientVersionFinished()
-@@ -803,6 +815,23 @@
+@@ -803,6 +815,23 @@ void InfoDlg::clientVersionFinished()
  	}
  }
-
+ 
 +void InfoDlg::entityTimeFinished()
 +{
 +	EntityTimeTask *j = (EntityTimeTask *)sender();
@@ -293,7 +251,7 @@ Index: psi/src/infodlg.cpp
  void InfoDlg::requestLastActivity()
  {
  	LastActivityTask *jla = new LastActivityTask(d->jid.bare(),d->pa->client()->rootTask());
-@@ -828,7 +857,7 @@
+@@ -828,7 +857,7 @@ void InfoDlg::contactAvailable(const Jid &j, const Resource &r)
  {
  	if (d->jid.compare(j,false)) {
  		if (!d->infoRequested.contains(j.withResource(r.name()).full())) {
@@ -302,11 +260,10 @@ Index: psi/src/infodlg.cpp
  		}
  	}
  }
-Index: psi/src/infodlg.h
-===================================================================
---- psi.orig/src/infodlg.h	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/infodlg.h	2013-01-15 14:03:59.532825944 +0400
-@@ -59,6 +59,7 @@
+diff --git a/src/infodlg.h b/src/infodlg.h
+--- a/src/infodlg.h
++++ b/src/infodlg.h
+@@ -59,6 +59,7 @@ private slots:
  	void contactUnavailable(const Jid &, const Resource &);
  	void contactUpdated(const Jid &);
  	void clientVersionFinished();
@@ -314,7 +271,7 @@ Index: psi/src/infodlg.h
  	void requestLastActivityFinished();
  	void jt_finished();
  	void doSubmit();
-@@ -87,7 +88,7 @@
+@@ -87,7 +88,7 @@ private:
  	bool edited();
  	void setEdited(bool);
  	void setPreviewPhoto(const QString& str);
@@ -322,12 +279,11 @@ Index: psi/src/infodlg.h
 +	void requestResourceInfo(const XMPP::Jid& j);
  	void requestLastActivity();
  };
-
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:03:59.536825944 +0400
-@@ -132,6 +132,7 @@
+ 
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -131,6 +131,7 @@
  #include "rc.h"
  #include "tabdlg.h"
  #include "proxy.h"
@@ -335,10 +291,10 @@ Index: psi/src/psiaccount.cpp
  #include "bobfilecache.h"
  #include "psicontactlist.h"
  #include "psicontact.h"
-@@ -1133,6 +1134,10 @@
+@@ -1128,6 +1129,10 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	d->httpAuthManager = new HttpAuthManager(d->client->rootTask());
  	connect(d->httpAuthManager, SIGNAL(confirmationRequest(const PsiHttpAuthRequest &)), SLOT(incomingHttpAuthRequest(const PsiHttpAuthRequest &)));
-
+ 
 +	// Time server
 +	new TimeServer(d->client->rootTask());
 +	d->client->addExtension("e-time", QStringList("urn:xmpp:time"));
@@ -346,11 +302,10 @@ Index: psi/src/psiaccount.cpp
  	// Initialize Adhoc Commands server
  	d->ahcManager = new AHCServerManager(this);
  	d->rcSetStatusServer = 0;
-Index: psi/src/src.pri
-===================================================================
---- psi.orig/src/src.pri	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/src.pri	2013-01-15 14:03:59.536825944 +0400
-@@ -158,6 +158,8 @@
+diff --git a/src/src.pri b/src/src.pri
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -158,6 +158,8 @@ HEADERS += \
  	$$PWD/xdata_widget.h \
  	$$PWD/statuspreset.h \
  	$$PWD/lastactivitytask.h \
@@ -359,7 +314,7 @@ Index: psi/src/src.pri
  	$$PWD/bobfilecache.h \
  	$$PWD/mucmanager.h \
  	$$PWD/mucconfigdlg.h \
-@@ -291,6 +293,8 @@
+@@ -290,6 +292,8 @@ SOURCES += \
  	$$PWD/psiactionlist.cpp \
  	$$PWD/xdata_widget.cpp \
  	$$PWD/lastactivitytask.cpp \
@@ -368,21 +323,40 @@ Index: psi/src/src.pri
  	$$PWD/bobfilecache.cpp \
  	$$PWD/statuspreset.cpp \
  	$$PWD/mucmanager.cpp \
-Index: psi/src/systeminfo.cpp
-===================================================================
---- psi.orig/src/systeminfo.cpp	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/systeminfo.cpp	2013-01-15 14:03:59.536825944 +0400
-@@ -181,7 +181,7 @@
- 		if(s.at(0) == '+')
- 			s.remove(0,1);
- 		s.truncate(s.length()-2);
+diff --git a/src/systeminfo.cpp b/src/systeminfo.cpp
+--- a/src/systeminfo.cpp
++++ b/src/systeminfo.cpp
+@@ -13,6 +13,7 @@
+ #include <QSysInfo>
+ #include <QProcess>
+ #include <QTextStream>
++#include <QByteArray>
+ 
+ #if defined(HAVE_X11) || defined(Q_OS_MAC)
+ #include <time.h>
+@@ -176,14 +177,13 @@ SystemInfo::SystemInfo() : QObject(QCoreApplication::instance())
+ 	time(&x);
+ 	char str[256];
+ 	char fmt[32];
++	int size;
+ 	strcpy(fmt, "%z");
+-	strftime(str, 256, fmt, localtime(&x));
+-	if(strcmp(fmt, str)) {
+-		QString s = str;
+-		if(s.at(0) == '+')
+-			s.remove(0,1);
+-		s.truncate(s.length()-2);
 -		timezone_offset_ = s.toInt();
-+		timezone_offset_ = s.toInt() * 60;	// FIX-ME: should really read the offset in minutes
++	size = strftime(str, 256, fmt, localtime(&x));
++	if(size && strncmp(fmt, str, size)) {
++		timezone_offset_ = QByteArray::fromRawData(str + 1, 2).toInt() * 60 + QByteArray::fromRawData(str + 3, 2).toInt();
++		if(str[0] == '-')
++			timezone_offset_ = -timezone_offset_;
  	}
  	strcpy(fmt, "%Z");
  	strftime(str, 256, fmt, localtime(&x));
-@@ -212,14 +212,12 @@
-
+@@ -214,14 +214,12 @@ SystemInfo::SystemInfo() : QObject(QCoreApplication::instance())
+ 
  #if defined(Q_OS_WIN)
  	TIME_ZONE_INFORMATION i;
 -	//GetTimeZoneInformation(&i);
@@ -397,9 +371,9 @@ Index: psi/src/systeminfo.cpp
  	timezone_str_ = "";
  	for(int n = 0; n < 32; ++n) {
  		int w = inDST ? i.DaylightName[n] : i.StandardName[n];
-@@ -262,3 +260,13 @@
+@@ -266,3 +264,13 @@ SystemInfo* SystemInfo::instance()
  }
-
+ 
  SystemInfo* SystemInfo::instance_ = NULL;
 +
 +/**
@@ -411,11 +385,12 @@ Index: psi/src/systeminfo.cpp
 + * \fn const QString& SystemInfo::timezoneString() const
 + * \brief Local timezone name.
 + */
-Index: psi/src/timeserver.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/timeserver.cpp	2013-01-15 14:03:59.536825944 +0400
-@@ -0,0 +1,87 @@
+diff --git a/src/timeserver.cpp b/src/timeserver.cpp
+new file mode 100644
+index 0000000..b703fec
+--- /dev/null
++++ b/src/timeserver.cpp
+@@ -0,0 +1,71 @@
 +/*
 + * timeserver.cpp - Entity time server
 + * Copyright (C) 2001, 2002, 2007  Justin Karneges, Maciej Niedzielski
@@ -465,8 +440,7 @@ Index: psi/src/timeserver.cpp
 +	if (e.tagName() != "iq" || e.attribute("type") != "get")
 +		return false;
 +
-+	QString ns = queryNS(e, "time");
-+	QString ns_deprecated = queryNS(e);
++	QString ns = e.firstChildElement("time").attribute("xmlns");
 +	if (ns == "urn:xmpp:time") {
 +		QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
 +		QDomElement time = doc()->createElement("time");
@@ -486,27 +460,13 @@ Index: psi/src/timeserver.cpp
 +		send(iq);
 +		return true;
 +	}
-+	else if (ns_deprecated == "jabber:iq:time") {
-+		QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
-+		QDomElement query = doc()->createElement("query");
-+		query.setAttribute("xmlns", "jabber:iq:time");
-+		iq.appendChild(query);
-+
-+		QDateTime local = QDateTime::currentDateTime();
-+		QString str = SystemInfo::instance()->timezoneString();
-+		query.appendChild(textTag(doc(), "utc", TS2stamp(local.toUTC())));
-+		query.appendChild(textTag(doc(), "tz", str));
-+		query.appendChild(textTag(doc(), "display", QString("%1 %2").arg(local.toString()).arg(str)));
-+
-+		send(iq);
-+		return true;
-+	}
 +	return false;
 +}
-Index: psi/src/timeserver.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/timeserver.h	2013-01-15 14:03:59.536825944 +0400
+diff --git a/src/timeserver.h b/src/timeserver.h
+new file mode 100644
+index 0000000..1b5011b
+--- /dev/null
++++ b/src/timeserver.h
 @@ -0,0 +1,35 @@
 +/*
 + * timeserver.h - Entity time server
@@ -543,14 +503,13 @@ Index: psi/src/timeserver.h
 +};
 +
 +#endif
-Index: psi/src/userlist.cpp
-===================================================================
---- psi.orig/src/userlist.cpp	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/userlist.cpp	2013-01-15 14:03:59.536825944 +0400
-@@ -102,6 +102,43 @@
+diff --git a/src/userlist.cpp b/src/userlist.cpp
+--- a/src/userlist.cpp
++++ b/src/userlist.cpp
+@@ -102,6 +102,43 @@ void UserResource::setClient(const QString &name, const QString& version, const
  	}
  }
-
+ 
 +/**
 + * \brief Timezone offset in minutes (if available).
 + */
@@ -591,10 +550,10 @@ Index: psi/src/userlist.cpp
  const QString & UserResource::publicKeyID() const
  {
  	return v_keyID;
-@@ -565,6 +602,12 @@
+@@ -565,6 +602,12 @@ QString UserListItem::makeBareTip(bool trim, bool doLinkify) const
  			if (!r.geoLocation().isNull())
  				str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(r.geoLocation().lat().value()) + "/" + QString::number(r.geoLocation().lon().value()) + "</div>";
-
+ 
 +			// Entity Time
 +			if (r.timezoneOffset().hasValue()) {
 +				QDateTime dt = QDateTime::currentDateTime().toUTC().addSecs(r.timezoneOffset().value()*60);
@@ -604,22 +563,21 @@ Index: psi/src/userlist.cpp
  			// client
  			if(!r.versionString().isEmpty() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.client-version").toBool()) {
  				QString ver = r.versionString();
-Index: psi/src/userlist.h
-===================================================================
---- psi.orig/src/userlist.h	2013-01-15 14:03:59.540825944 +0400
-+++ psi/src/userlist.h	2013-01-15 14:03:59.536825944 +0400
+diff --git a/src/userlist.h b/src/userlist.h
+--- a/src/userlist.h
++++ b/src/userlist.h
 @@ -30,6 +30,7 @@
  #include "mood.h"
  #include "geolocation.h"
  #include "physicallocation.h"
 +#include "maybe.h"
-
+ 
  class AvatarFactory;
  namespace XMPP {
-@@ -51,6 +52,10 @@
+@@ -51,6 +52,10 @@ public:
  	const QString& clientOS() const;
  	void setClient(const QString& name, const QString& version, const QString& os);
-
+ 
 +	Maybe<int> timezoneOffset() const;
 +	const QString& timezoneOffsetString() const;
 +	void setTimezone(Maybe<int> tzo);
@@ -627,8 +585,8 @@ Index: psi/src/userlist.h
  	const QString & publicKeyID() const;
  	int pgpVerifyStatus() const;
  	QDateTime sigTimestamp() const;
-@@ -67,6 +72,8 @@
-
+@@ -67,6 +72,8 @@ public:
+ 
  private:
  	QString v_ver, v_clientName, v_clientVersion, v_clientOS, v_keyID;
 +	Maybe<int> v_tzo;
