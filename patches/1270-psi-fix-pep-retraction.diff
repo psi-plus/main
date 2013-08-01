@@ -1,32 +1,30 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/src/activity.cpp
-===================================================================
---- psi.orig/src/activity.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/activity.cpp	2013-01-15 14:04:26.368827035 +0400
+--- a/src/activity.cpp
++++ b/src/activity.cpp
 @@ -84,8 +84,8 @@
-
+ 
  QDomElement Activity::toXml(QDomDocument& doc)
  {
 -	QDomElement activity = doc.createElement("activity");
 -	activity.setAttribute("xmlns", "http://jabber.org/protocol/activity");
 +	QDomElement activity = doc.createElement(PEP_ACTIVITY_TN);
 +	activity.setAttribute("xmlns", PEP_ACTIVITY_NS);
-
+ 
  	if (!type() == Unknown) {
  		ActivityCatalog* ac = ActivityCatalog::instance();
 @@ -98,9 +98,6 @@
-
+ 
  		activity.appendChild(el);
  	}
 -	else {
 -		qWarning("activity.cpp: ERROR: Converting unknown activity");
 -	}
-
+ 
  	if (!text().isEmpty()) {
  		QDomElement el = doc.createElement("text");
 @@ -114,14 +111,17 @@
-
+ 
  void Activity::fromXml(const QDomElement& element)
  {
 -	if (element.tagName() != "activity")
@@ -34,7 +32,7 @@ Index: psi/src/activity.cpp
 -
  	type_ = Activity::Unknown;
  	specificType_ = Activity::UnknownSpecific;
-
+ 
 +	if (element.tagName() != PEP_ACTIVITY_TN)
 +		return;
 +
@@ -46,39 +44,33 @@ Index: psi/src/activity.cpp
  		if (child.tagName() == "text") {
  			text_ = child.text();
  		}
-Index: psi/src/activity.h
-===================================================================
---- psi.orig/src/activity.h	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/activity.h	2013-01-15 14:04:26.368827035 +0400
+--- a/src/activity.h
++++ b/src/activity.h
 @@ -23,6 +23,9 @@
-
+ 
  #include <QString>
-
+ 
 +#define PEP_ACTIVITY_TN "activity"
 +#define PEP_ACTIVITY_NS "http://jabber.org/protocol/activity"
 +
  class QDomElement;
  class QDomDocument;
-
-Index: psi/src/activitycatalog.cpp
-===================================================================
---- psi.orig/src/activitycatalog.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/activitycatalog.cpp	2013-01-15 14:04:26.368827035 +0400
+ 
+--- a/src/activitycatalog.cpp
++++ b/src/activitycatalog.cpp
 @@ -27,6 +27,8 @@
-
+ 
  ActivityCatalog::Entry::Entry()
  {
 +	type_ = Activity::Unknown;
 +	specificType_ = Activity::UnknownSpecific;
  }
-
+ 
  ActivityCatalog::Entry::Entry(Activity::Type type, const QString& value, const QString& text)
-Index: psi/src/activitydlg.cpp
-===================================================================
---- psi.orig/src/activitydlg.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/activitydlg.cpp	2013-01-15 14:04:26.368827035 +0400
+--- a/src/activitydlg.cpp
++++ b/src/activitydlg.cpp
 @@ -94,7 +94,7 @@
-
+ 
  	foreach(PsiAccount *pa, pa_) {
  		if (generalActivityStr == tr("<unset>")) {
 -			pa->pepManager()->retract("http://jabber.org/protocol/activity", "current");
@@ -95,18 +87,16 @@ Index: psi/src/activitydlg.cpp
  		}
  	}
  	close();
-Index: psi/src/avatars.cpp
-===================================================================
---- psi.orig/src/avatars.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/avatars.cpp	2013-01-15 14:04:26.368827035 +0400
+--- a/src/avatars.cpp
++++ b/src/avatars.cpp
 @@ -241,7 +241,7 @@
-
+ 
  protected:
  	void requestAvatar() {
 -		factory()->account()->pepManager()->get(jid_,"urn:xmpp:avatar:data",hash());
 +		factory()->account()->pepManager()->get(jid_,PEP_AVATAR_DATA_NS,hash());
  	}
-
+ 
  	void avatarUpdated()
 @@ -557,20 +557,16 @@
  			// Publish data
@@ -132,9 +122,9 @@ Index: psi/src/avatars.cpp
 +		account()->pepManager()->disable(PEP_AVATAR_METADATA_TN, PEP_AVATAR_METADATA_NS, "current");
  	}
  }
-
+ 
 @@ -640,8 +636,8 @@
-
+ 
  void AvatarFactory::itemPublished(const Jid& jid, const QString& n, const PubSubItem& item)
  {
 -	if (n == "urn:xmpp:avatar:data") {
@@ -144,7 +134,7 @@ Index: psi/src/avatars.cpp
  			if (pep_avatars_.contains(jid.bare())) {
  				pep_avatars_[jid.bare()]->setData(item.id(),item.payload().text());
  			}
-@@ -650,15 +646,17 @@
+@@ -650,12 +646,14 @@
  			qWarning("avatars.cpp: Unexpected item payload");
  		}
  	}
@@ -155,17 +145,13 @@ Index: psi/src/avatars.cpp
  			connect(pep_avatars_[jid.bare()],SIGNAL(avatarChanged(const Jid&)),this, SLOT(updateAvatar(const Jid&)));
  		}
 +		// check for the deprecated <stop/> child element
- 		QDomElement e;
- 		bool found;
- 		e = findSubTag(item.payload(), "stop", &found);
--		if (found) {
+ 		QDomElement e = item.payload().firstChildElement("stop");
 +		// if there's a <stop/> element or the <metadata/> element is empty, remove user's avatar
-+		if (found || !item.payload().hasChildNodes()) {
+ 		if (!e.isNull()) {
  			pep_avatars_[jid.bare()]->updateHash("");
  		}
- 		else {
-@@ -669,12 +667,12 @@
-
+@@ -667,12 +665,12 @@
+ 
  void AvatarFactory::publish_success(const QString& n, const PubSubItem& item)
  {
 -	if (n == "urn:xmpp:avatar:data" && item.id() == selfAvatarHash_) {
@@ -180,7 +166,7 @@ Index: psi/src/avatars.cpp
  		QDomElement info_el = doc->createElement("info");
  		info_el.setAttribute("id",selfAvatarHash_);
  		info_el.setAttribute("bytes",avatar_image.byteCount());
-@@ -682,7 +680,7 @@
+@@ -680,7 +678,7 @@
  		info_el.setAttribute("width",avatar_image.width());
  		info_el.setAttribute("type",image2type(selfAvatarData_));
  		meta_el.appendChild(info_el);
@@ -188,15 +174,13 @@ Index: psi/src/avatars.cpp
 +		account()->pepManager()->publish(PEP_AVATAR_METADATA_NS,PubSubItem(selfAvatarHash_,meta_el));
  	}
  }
-
-Index: psi/src/avatars.h
-===================================================================
---- psi.orig/src/avatars.h	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/avatars.h	2013-01-15 14:04:26.368827035 +0400
+ 
+--- a/src/avatars.h
++++ b/src/avatars.h
 @@ -28,6 +28,12 @@
-
+ 
  #include "iconset.h"
-
+ 
 +#define PEP_AVATAR_DATA_TN     "data"
 +#define PEP_AVATAR_DATA_NS     "urn:xmpp:avatar:data"
 +
@@ -206,29 +190,27 @@ Index: psi/src/avatars.h
  class PsiAccount;
  class Avatar;
  class VCardAvatar;
-Index: psi/src/geolocation.cpp
-===================================================================
---- psi.orig/src/geolocation.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/geolocation.cpp	2013-01-15 14:04:26.368827035 +0400
+--- a/src/geolocation.cpp
++++ b/src/geolocation.cpp
 @@ -35,8 +35,8 @@
-
+ 
  QDomElement GeoLocation::toXml(QDomDocument& doc)
  {
 -	QDomElement geoloc = doc.createElement("geoloc");
 -	geoloc.setAttribute("xmlns", "http://jabber.org/protocol/geoloc");
 +	QDomElement geoloc = doc.createElement(PEP_GEOLOC_TN);
 +	geoloc.setAttribute("xmlns", PEP_GEOLOC_NS);
-
+ 
  	if (alt_.hasValue()) {
  		QDomElement e = doc.createElement("alt");
 @@ -129,11 +129,14 @@
-
+ 
  void GeoLocation::fromXml(const QDomElement& e)
  {
 -	if (e.tagName() != "geoloc")
 +	if (e.tagName() != PEP_GEOLOC_TN)
  		return;
-
+ 
  	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling()) {
  		QDomElement m = n.toElement();
 +		if (m.isNull()) {
@@ -237,26 +219,22 @@ Index: psi/src/geolocation.cpp
  		if (m.tagName() == "alt")
  			alt_ = Maybe<float>(m.text().toFloat());
  		else if (m.tagName() == "bearing")
-Index: psi/src/geolocation.h
-===================================================================
---- psi.orig/src/geolocation.h	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/geolocation.h	2013-01-15 14:04:26.368827035 +0400
+--- a/src/geolocation.h
++++ b/src/geolocation.h
 @@ -25,6 +25,9 @@
-
+ 
  #include "maybe.h"
-
+ 
 +#define PEP_GEOLOC_TN "geoloc"
 +#define PEP_GEOLOC_NS "http://jabber.org/protocol/geoloc"
 +
  class QDomElement;
  class QDomDocument;
-
-Index: psi/src/geolocationdlg.cpp
-===================================================================
---- psi.orig/src/geolocationdlg.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/geolocationdlg.cpp	2013-01-15 14:04:26.372827035 +0400
+ 
+--- a/src/geolocationdlg.cpp
++++ b/src/geolocationdlg.cpp
 @@ -160,10 +160,10 @@
-
+ 
  	foreach(PsiAccount *pa, pa_) {
  		if (geoloc.isNull()) {
 -			pa->pepManager()->retract("http://jabber.org/protocol/geoloc", "current");
@@ -268,19 +246,17 @@ Index: psi/src/geolocationdlg.cpp
  		}
  	}
  	close();
-Index: psi/src/mood.cpp
-===================================================================
---- psi.orig/src/mood.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/mood.cpp	2013-01-15 14:04:26.372827035 +0400
+--- a/src/mood.cpp
++++ b/src/mood.cpp
 @@ -65,16 +65,13 @@
-
+ 
  QDomElement Mood::toXml(QDomDocument& doc)
  {
 -	QDomElement mood = doc.createElement("mood");
 -	mood.setAttribute("xmlns", "http://jabber.org/protocol/mood");
 +	QDomElement mood = doc.createElement(PEP_MOOD_TN);
 +	mood.setAttribute("xmlns", PEP_MOOD_NS);
-
+ 
  	if (!type() == Unknown) {
  		QDomElement el = doc.createElement(MoodCatalog::instance()->findEntryByType(type()).value());
  		mood.appendChild(el);
@@ -288,11 +264,11 @@ Index: psi/src/mood.cpp
 -	else {
 -		qWarning("mood.cpp: ERROR: Converting unknown mood");
 -	}
-
+ 
  	if (!text().isEmpty()) {
  		QDomElement el = doc.createElement("text");
 @@ -88,11 +85,16 @@
-
+ 
  void Mood::fromXml(const QDomElement& e)
  {
 -	if (e.tagName() != "mood")
@@ -300,7 +276,7 @@ Index: psi/src/mood.cpp
 +
 +	if (e.tagName() != PEP_MOOD_TN)
  		return;
-
+ 
  	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling()) {
  		QDomElement m = n.toElement();
 +		if(m.isNull()) {
@@ -309,36 +285,30 @@ Index: psi/src/mood.cpp
  		if (m.tagName() == "text") {
  			text_ = m.text();
  		}
-Index: psi/src/mood.h
-===================================================================
---- psi.orig/src/mood.h	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/mood.h	2013-01-15 14:04:26.372827035 +0400
+--- a/src/mood.h
++++ b/src/mood.h
 @@ -23,6 +23,9 @@
-
+ 
  #include <QString>
-
+ 
 +#define PEP_MOOD_TN "mood"
 +#define PEP_MOOD_NS "http://jabber.org/protocol/mood"
 +
  class QDomElement;
  class QDomDocument;
-
-Index: psi/src/moodcatalog.cpp
-===================================================================
---- psi.orig/src/moodcatalog.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/moodcatalog.cpp	2013-01-15 14:04:26.372827035 +0400
+ 
+--- a/src/moodcatalog.cpp
++++ b/src/moodcatalog.cpp
 @@ -27,6 +27,7 @@
-
+ 
  MoodCatalog::Entry::Entry()
  {
 +	type_ = Mood::Unknown;
  }
-
+ 
  MoodCatalog::Entry::Entry(Mood::Type type, const QString& value, const QString& text) : type_(type), value_(value), text_(text)
-Index: psi/src/mooddlg.cpp
-===================================================================
---- psi.orig/src/mooddlg.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/mooddlg.cpp	2013-01-15 14:04:26.372827035 +0400
+--- a/src/mooddlg.cpp
++++ b/src/mooddlg.cpp
 @@ -58,11 +58,11 @@
  	QString moodstr = ui_.cb_type->currentText();
  	foreach(PsiAccount *pa, pa_) {
@@ -353,14 +323,12 @@ Index: psi/src/mooddlg.cpp
  		}
  	}
  	close();
-Index: psi/src/pepmanager.cpp
-===================================================================
---- psi.orig/src/pepmanager.cpp	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/pepmanager.cpp	2013-01-15 14:04:26.372827035 +0400
-@@ -576,6 +576,16 @@
+--- a/src/pepmanager.cpp
++++ b/src/pepmanager.cpp
+@@ -570,6 +570,16 @@
  }
-
-
+ 
+ 
 +void PEPManager::disable(const QString& tagName, const QString& node, const QString& id)
 +{
 +	// disable by publishing an empty element
@@ -374,15 +342,13 @@ Index: psi/src/pepmanager.cpp
  void PEPManager::publishFinished()
  {
  	PEPPublishTask* task = (PEPPublishTask*) sender();
-Index: psi/src/pepmanager.h
-===================================================================
---- psi.orig/src/pepmanager.h	2013-01-15 14:04:26.376827035 +0400
-+++ psi/src/pepmanager.h	2013-01-15 14:04:26.372827035 +0400
+--- a/src/pepmanager.h
++++ b/src/pepmanager.h
 @@ -59,6 +59,7 @@
-
+ 
  	void publish(const QString& node, const PubSubItem&, Access = DefaultAccess);
  	void retract(const QString& node, const QString& id);
 +	void disable(const QString& tagName, const QString& node, const QString& id);
  	void get(const Jid& jid, const QString& node, const QString& id);
-
+ 
  	//void getSubscriptions(const Jid& jid);
