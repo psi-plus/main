@@ -250,27 +250,28 @@ index 9c59294..4f9e3c6 100644
  void OptionsTabPlugins::listPlugins()
  {
    	if ( !w )
-@@ -84,16 +96,16 @@ void OptionsTabPlugins::listPlugins()
-
+@@ -84,16 +97,16 @@ void OptionsTabPlugins::listPlugins()
+ 
  	PluginManager *pm=PluginManager::instance();
-
+ 
 -	QStringList plugins=pm->availablePlugins();
 -		foreach (QString plugin, plugins){
+-		d->cb_plugins->addItem(plugin);
 +	QStringList plugins = pm->availablePlugins();
 +	plugins.sort();
 +	foreach (const QString& plugin, plugins){
- 		d->cb_plugins->addItem(plugin);
++		d->cb_plugins->addItem(pm->icon(plugin), plugin);
  	}
  	pluginSelected(0);
  }
-
+ 
 -void OptionsTabPlugins::loadToggled(int state)
 +void OptionsTabPlugins::loadToggled(bool state)
  {
 -	Q_UNUSED(state);
  	if ( !w )
  		return;
-
+ 
 @@ -101,9 +113,10 @@ void OptionsTabPlugins::loadToggled(int state)
 
  	QString option=QString("%1.%2")
@@ -815,9 +816,9 @@ index b3ff446..d1d54d9 100644
  {
  	load();	// reads plugin name, etc
  	unload();
-@@ -107,6 +145,16 @@ const QString& PluginHost::version() const
+@@ -107,6 +145,26 @@ const QString& PluginHost::version() const
  }
-
+ 
  /**
 + * \brief Returns plugin priority.
 + *
@@ -826,6 +827,16 @@ index b3ff446..d1d54d9 100644
 +int PluginHost::priority() const
 +{
 +	return priority_;
++}
++
++/**
++ * \brief Returns plugin icon.
++ *
++ * Data is available also when plugin is not loaded.
++ */
++const QIcon& PluginHost::icon() const
++{
++	return icon_;
 +}
 +
 +/**
@@ -865,11 +876,15 @@ index b3ff446..d1d54d9 100644
  			//Check it's the right sort of plugin
  			PsiPlugin* psiPlugin = qobject_cast<PsiPlugin*>(plugin);
  			if (psiPlugin) {
-@@ -161,6 +217,12 @@ bool PluginHost::load()
+@@ -161,6 +227,16 @@ bool PluginHost::load()
  				name_ = psiPlugin->name();
  				shortName_ = psiPlugin->shortName();
  				version_ = psiPlugin->version();
 +				priority_ = psiPlugin->priority();
++				icon_ = QIcon(psiPlugin->icon());
++				// FIXME No icon if plugin disabled.
++				// I don't know how but this workaround works.
++				icon_.availableSizes();
 +				PluginInfoProvider *pip = qobject_cast<PluginInfoProvider*>(plugin_);
 +				if (pip) {
 +					hasInfo_ = true;
@@ -1684,12 +1699,13 @@ index fd5ecb7..77a9ce3 100644
 
  public:
  	PluginHost(PluginManager* manager, const QString& pluginFile);
-@@ -38,6 +60,7 @@ public:
+@@ -38,6 +61,8 @@ public:
  	const QString& name() const;
  	const QString& shortName() const;
  	const QString& version() const;
 +	int priority() const;
-
++	const QIcon& icon() const;
+ 
  	// loading
  	bool load();
 @@ -51,16 +74,20 @@ public:
@@ -2229,10 +2245,10 @@ index 5d3fea6..7b2898f 100644
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -351,15 +485,296 @@ QString PluginManager::uniqueId(int account)
+@@ -351,15 +485,306 @@ QString PluginManager::uniqueId(int account)
  	return id;
  }
-
+ 
 +QString PluginManager::getStatus(int account) const
 +{
 +	Status S;
@@ -2513,6 +2529,16 @@ index 5d3fea6..7b2898f 100644
 +	return info;
 +}
 +
++QIcon PluginManager::icon(const QString& plugin) const
++{
++	QIcon icon;
++	if (hosts_.contains(plugin)) {
++		icon = hosts_[plugin]->icon();
++	}
++
++	return icon;
++}
++
  /**
   * Tells the plugin manager about an XMPP::Client and the owning PsiAccount
   */
@@ -2525,7 +2551,7 @@ index 5d3fea6..7b2898f 100644
  	new StreamWatcher(client->rootTask(), this, id);
 +	connect(account, SIGNAL(accountDestroyed()), this, SLOT(accountDestroyed()));
  }
-
+ 
  /**
 @@ -372,6 +787,199 @@ bool PluginManager::verifyStanza(const QString& stanza)
  	return true;
@@ -2748,31 +2774,30 @@ index 1e50384..5ea0f7f 100644
 
  namespace XMPP {
  	class Client;
-@@ -33,29 +37,48 @@ class PluginManager : public QObject
-
+@@ -33,29 +37,49 @@ class PluginManager : public QObject
+ 
  public:
  	static PluginManager* instance();
 +	void initNewSession(PsiCon *psi);
-
+ 
 -	QStringList availablePlugins();
 +	QStringList availablePlugins() const;
-
+ 
 -	void addAccount(const PsiAccount* account, XMPP::Client* client);
 +	void addAccount(PsiAccount* account, XMPP::Client* client);
-
+ 
  	void loadEnabledPlugins();
  	bool unloadAllPlugins();
-
+ 
 -	QString pathToPlugin(const QString& plugin);
 -	QString shortName(const QString& plugin);
 +	QString pathToPlugin(const QString& plugin) const;
 +	QString shortName(const QString& plugin) const;
 +	QString version(const QString& plugin) const;
  	QWidget* optionsWidget(const QString& plugin);
-
+ 
 -	bool processEvent(const PsiAccount* account, QDomElement& eventXml);
 -	bool processMessage(const PsiAccount* account, const QString& jidFrom, const QString& body, const QString& subject);
--
 +	void setShortcuts();
 +
 +	bool processEvent(PsiAccount* account, QDomElement& eventXml);
@@ -2790,10 +2815,11 @@ index 1e50384..5ea0f7f 100644
 +
 +	QString pluginInfo(const QString& plugin) const;
 +	bool hasInfoProvider(const QString& plugin) const;
-+
++	QIcon icon(const QString& plugin) const;
+ 
  	static const QString loadOptionPrefix;
  	static const QString pluginOptionPrefix;
-
+ 
  private:
  	PluginManager();
 +	PsiCon *psi_;
@@ -2802,9 +2828,9 @@ index 1e50384..5ea0f7f 100644
 -	void updatePluginsList();
 +	QList<PluginHost*> updatePluginsList();
 +	void loadPluginIfEnabled(PluginHost* plugin);
-
+ 
  	static PluginManager* instance_;
-
+ 
 @@ -63,26 +86,71 @@ private:
  	QVector<XMPP::Client*> clients_;
 
@@ -3571,15 +3597,20 @@ index 5c8c8a6..4e09b2c 100644
 
  	/**
  	 * \brief Enable plugin
-@@ -87,6 +108,8 @@ public:
+@@ -87,8 +108,12 @@ public:
  	 */
  	virtual bool disable() = 0;
-
+ 
 +	virtual void applyOptions() = 0;
 +	virtual void restoreOptions() = 0;
++
++	virtual QIcon icon() const = 0;
  };
-
- Q_DECLARE_INTERFACE(PsiPlugin, "org.psi-im.PsiPlugin/0.3");
+ 
+-Q_DECLARE_INTERFACE(PsiPlugin, "org.psi-im.PsiPlugin/0.3");
++Q_DECLARE_INTERFACE(PsiPlugin, "org.psi-im.PsiPlugin/0.4");
+ 
+ #endif
 diff --git a/src/plugins/include/shortcutaccessinghost.h b/src/plugins/include/shortcutaccessinghost.h
 new file mode 100644
 index 0000000..7687eba
