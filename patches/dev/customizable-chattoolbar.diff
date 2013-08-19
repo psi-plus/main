@@ -1,5 +1,5 @@
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index af090f6..7c9c836 100644
+index af090f6..a2454c5 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -66,7 +66,7 @@ index af090f6..7c9c836 100644
 -	d->act_find = new IconAction(tr("Find"), "psi/search", tr("&Find"), 0, this, "", true);
 -	connect(d->act_find, SIGNAL(triggered()), d->typeahead, SLOT(toggleVisibility()));
 +	ActionList* actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Groupchat).at(0);
-+	foreach (QString name, actList->actions()) {
++	foreach (const QString &name, actList->actions()) {
 +		IconAction *action = actList->action(name)->copy();
 +		action->setParent(this);
 +		d->actions->addAction(name, action);
@@ -106,7 +106,7 @@ index af090f6..7c9c836 100644
 -	d->act_html_text = new IconAction(tr("Set Text Format"), "psi/text", tr("Set Text Format"), 0, this);
 -	connect(d->act_html_text, SIGNAL(triggered()), d->mle(), SLOT(doHTMLTextMenu()));
 +	actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-+	foreach (QString name, actList->actions()) {
++	foreach (const QString &name, actList->actions()) {
 +		IconAction *action = actList->action(name)->copy();
 +		action->setParent(this);
 +		d->actions->addAction(name, action);
@@ -148,7 +148,7 @@ index af090f6..7c9c836 100644
 -	ui_.toolbar->addAction(d->act_html_text);
 +
 +	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m1.actions").toStringList();
-+	foreach (QString actionName, actionsNames) {
++	foreach (const QString &actionName, actionsNames) {
 +#ifdef PSI_PLUGINS
 +		if (actionName.endsWith("-plugin")) {
 +			PluginManager::instance()->addGCToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
@@ -283,7 +283,7 @@ index af090f6..7c9c836 100644
  
  void GCMainDlg::sendTemp(const QString &templText)
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index 2000f7a..8a13624 100644
+index 2000f7a..c2f024a 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -397,8 +397,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
@@ -305,7 +305,7 @@ index 2000f7a..8a13624 100644
 -	foreach(QString base, PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true)) {
 +	PsiOptions *options = PsiOptions::instance();
 +	bool allInOne = options->getOption("options.ui.tabs.grouping").toString().contains('A');
-+	foreach(QString base, options->getChildOptionNames("options.ui.contactlist.toolbars", true, true)) {
++	foreach(const QString &base, options->getChildOptionNames("options.ui.contactlist.toolbars", true, true)) {
 +		QString toolbarName = options->getOption(base + ".name").toString();
 +		if (toolbarName == "Chat Toolbar" || toolbarName == "Conference Toolbar") {
 +			continue;
@@ -790,7 +790,7 @@ index 95ae0ca..4068b89 100644
    <customwidget>
     <class>IconToolButton</class>
 diff --git a/src/options/opt_toolbars.cpp b/src/options/opt_toolbars.cpp
-index 0e676f1..255758d 100644
+index 0e676f1..c714e77 100644
 --- a/src/options/opt_toolbars.cpp
 +++ b/src/options/opt_toolbars.cpp
 @@ -23,6 +23,10 @@
@@ -854,7 +854,7 @@ index 0e676f1..255758d 100644
  
  	noDirty = false;
  }
-@@ -186,7 +220,14 @@ void OptionsTabToolbars::restoreOptions()
+@@ -186,7 +220,11 @@ void OptionsTabToolbars::restoreOptions()
  
  	PsiOptions *o = PsiOptions::instance();
  
@@ -862,25 +862,20 @@ index 0e676f1..255758d 100644
 +	QStringList toolbarBases;
 +	toolbarBases = o->getChildOptionNames("options.ui.contactlist.toolbars", true, true);
 +
-+	bool hasChatToolbar = false;
-+	bool hasGroupchatToolbar = false;
-+
 +	QString chatToolbarName = tr("Chat Toolbar");
 +	QString groupchatToolbarName = tr("Conference Toolbar");
  
  	foreach(QString base, toolbarBases) {
  		ToolbarPrefs tb;
-@@ -202,15 +243,40 @@ void OptionsTabToolbars::restoreOptions()
+@@ -202,15 +240,19 @@ void OptionsTabToolbars::restoreOptions()
  		tb.keys = o->getOption(base + ".actions").toStringList();
  
  		p->toolbars[base] = tb;
 -		d->cb_toolbars->addItem(tb.name, base);
 +		if (tb.name == "Chat Toolbar") {
-+			hasChatToolbar = true;
 +			d->cb_toolbars->addItem(chatToolbarName, base);
 +		}
 +		else if (tb.name == "Conference Toolbar") {
-+			hasGroupchatToolbar = true;
 +			d->cb_toolbars->addItem(groupchatToolbarName, base);
 +		}
 +		else {
@@ -891,33 +886,15 @@ index 0e676f1..255758d 100644
 -	if (d->cb_toolbars->count() > 0) {
 -		d->cb_toolbars->setCurrentIndex(0);
 -		toolbarSelectionChanged(0);
-+	// Init default toolbar (for paranoics)
-+	if (!hasChatToolbar) {
-+		ToolbarPrefs tb;
-+		tb.name = "Chat Toolbar";
-+
-+		QString base = "chat-toolbar";
-+		p->toolbars[base] = tb;
-+		d->cb_toolbars->insertItem(0, chatToolbarName, base);
- 	}
+-	}
 -	else
 -		toolbarSelectionChanged(-1);
-+
-+	if (!hasGroupchatToolbar) {
-+		ToolbarPrefs tb;
-+		tb.name = "Conference Toolbar";
-+
-+		QString base = "groupchat-toolbar";
-+		p->toolbars[base] = tb;
-+		d->cb_toolbars->insertItem(1, groupchatToolbarName, base);
-+	}
-+
 +	d->cb_toolbars->setCurrentIndex(0);
 +	toolbarSelectionChanged(0);
  }
  
  //----------------------------------------------------------------------------
-@@ -322,7 +388,8 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -322,7 +364,8 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  	d->le_toolbarName->setEnabled(enable);
  	// d->pb_toolbarPosition->setEnabled(enable && moveable);
  	d->ck_toolbarOn->setEnabled(enable);
@@ -927,7 +904,7 @@ index 0e676f1..255758d 100644
  	// d->ck_toolbarStretch->setEnabled(enable && moveable);
  	d->lw_selectedActions->setEnabled(enable && customizeable);
  	d->tw_availActions->setEnabled(enable && customizeable);
-@@ -330,8 +397,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -330,8 +373,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  	d->tb_down->setEnabled(enable && customizeable);
  	d->tb_left->setEnabled(enable && customizeable);
  	d->tb_right->setEnabled(enable && customizeable);
@@ -938,7 +915,7 @@ index 0e676f1..255758d 100644
  
  	d->tw_availActions->clear();
  	d->lw_selectedActions->clear();
-@@ -357,7 +425,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -357,7 +401,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  		QTreeWidget *tw = d->tw_availActions;
  		QTreeWidgetItem *lastRoot = 0;
  
@@ -949,7 +926,7 @@ index 0e676f1..255758d 100644
  			QTreeWidgetItem *root = new QTreeWidgetItem(tw, lastRoot);
  			lastRoot = root;
  			root->setText(0, actionList->name());
-@@ -388,7 +458,7 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -388,7 +434,7 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  
  	QStringList::Iterator it = tb.keys.begin();
  	for (; it != tb.keys.end(); ++it) {
@@ -958,7 +935,7 @@ index 0e676f1..255758d 100644
  	}
  	updateArrows();
  
-@@ -520,7 +590,7 @@ void OptionsTabToolbars::toolbarAddAction()
+@@ -520,7 +566,7 @@ void OptionsTabToolbars::toolbarAddAction()
  	if (!item || item->data(0, Qt::UserRole).toString().isEmpty())
  		return;
  
@@ -1015,8 +992,71 @@ index 71bb09b..a2c4656 100644
  	void addAccountMenu(QMenu *menu, PsiAccount* account);
  	void addContactMenu(QMenu *menu, PsiAccount* account, QString jid);
  
+diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
+index d9c2da2..359fd37 100644
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -1358,6 +1358,58 @@ bool OptionsMigration::fromFile(const QString &fname)
+ 
+ void OptionsMigration::lateMigration()
+ {
++	// Add default chat and groupchat toolbars
++	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat Toolbar") {
++		ToolbarPrefs chatToolbar;
++		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
++		chatToolbar.name = "Chat Toolbar";
++		chatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_add_contact"
++						 << "spacer" << "act_icon" << "act_voice" << "act_file" << "act_pgp"
++						 << "act_info" << "act_history" << "act_ps" << "act_templates"
++						 << "act_active_contacts";
++
++		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
++			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_ps"));
++		}
++		if (!PsiOptions::instance()->getOption("options.pgp.enable").toBool()) {
++			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_pgp"));
++		}
++
++		ToolbarPrefs groupchatToolbar;
++		groupchatToolbar.on = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
++		groupchatToolbar.name = "Conference Toolbar";
++		groupchatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_configure"
++							  << "spacer" << "act_icon" << "act_ps" << "act_templates";
++		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
++			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_ps"));
++		}
++
++		QList<ToolbarPrefs> toolbars;
++		toolbars << chatToolbar
++		         << groupchatToolbar;
++
++		QStringList toolbarBases = PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true);
++		foreach(QString base, toolbarBases) {
++			ToolbarPrefs tb;
++			tb.id = PsiOptions::instance()->getOption(base + ".key").toString();
++			tb.name = PsiOptions::instance()->getOption(base + ".name").toString();
++			tb.on = PsiOptions::instance()->getOption(base + ".visible").toBool();
++			tb.locked = PsiOptions::instance()->getOption(base + ".locked").toBool();
++			tb.dock = (Qt3Dock)PsiOptions::instance()->getOption(base + ".dock.position").toInt(); //FIXME
++			tb.nl = PsiOptions::instance()->getOption(base + ".dock.nl").toBool();
++			tb.keys = PsiOptions::instance()->getOption(base + ".actions").toStringList();
++
++			toolbars << tb;
++		}
++
++		PsiOptions::instance()->removeOption("options.ui.contactlist.toolbars", true);
++
++		foreach(ToolbarPrefs tb, toolbars) {
++			tb.locked = true;
++			PsiToolBar::structToOptions(PsiOptions::instance(), tb);
++		}
++	}
++
+ 	foreach(QString opt, PsiOptions::instance()->allOptionNames()) {
+ 		if (opt.startsWith("options.status.presets.") ||
+ 			opt.startsWith("options.iconsets.service-status.") ||
 diff --git a/src/psiactionlist.cpp b/src/psiactionlist.cpp
-index 36449dd..2b06b78 100644
+index 36449dd..c7cb137 100644
 --- a/src/psiactionlist.cpp
 +++ b/src/psiactionlist.cpp
 @@ -28,6 +28,9 @@
@@ -1116,7 +1156,7 @@ index 36449dd..2b06b78 100644
 +	PluginManager *pm = PluginManager::instance();
 +	QStringList plugins = pm->availablePlugins();
 +	ActionList *actions = new ActionList(tr("Plugins"), type, false);
-+	foreach (QString plugin, plugins) {
++	foreach (const QString &plugin, plugins) {
 +		IconAction *action = new IconAction (plugin, "", plugin, 0, this);
 +		action->setIcon(pm->icon(plugin));
 +		actions->addAction(pm->shortName(plugin) + "-plugin", action);
@@ -1142,7 +1182,7 @@ index ac3a7ed..a2bf0de 100644
  
  public:
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 470d221..b7f5951 100644
+index 470d221..8e89be4 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -49,7 +49,8 @@
@@ -1257,7 +1297,7 @@ index 470d221..b7f5951 100644
 -	act_info_ = new IconAction(tr("User Info"), "psi/vCard", tr("User Info"), 0, this);
 -	connect(act_info_, SIGNAL(triggered()), SLOT(doInfo()));
 +	ActionList* list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Chat).at(0);
-+	foreach (QString name, list->actions()) {
++	foreach (const QString &name, list->actions()) {
 +		IconAction *action = list->action(name)->copy();
 +		action->setParent(this);
 +		actions_->addAction(name, action);
@@ -1327,7 +1367,7 @@ index 470d221..b7f5951 100644
 -	act_active_contacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 -	connect(act_active_contacts, SIGNAL(triggered()), SLOT(actActiveContacts()));
 +	list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-+	foreach (QString name, list->actions()) {
++	foreach (const QString &name, list->actions()) {
 +		IconAction *action = list->action(name)->copy();
 +		action->setParent(this);
 +		actions_->addAction(name, action);
@@ -1347,7 +1387,7 @@ index 470d221..b7f5951 100644
 +
 +	PsiOptions *options = PsiOptions::instance();
 +	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m0.actions").toStringList();
-+	foreach (QString actionName, actionsNames) {
++	foreach (const QString &actionName, actionsNames) {
 +		if (actionName == "act_voice" && !AvCallManager::isSupported()) {
 +			continue;
 +		}
