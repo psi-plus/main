@@ -1,5 +1,5 @@
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index af090f6..9b080c2 100644
+index af090f6..6c2f313 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -226,18 +226,20 @@ index af090f6..9b080c2 100644
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -1923,6 +1941,28 @@ void GCMainDlg::setLooks()
+@@ -1923,6 +1941,30 @@ void GCMainDlg::setLooks()
  	ui_.lv_users->setLooks();
  }
  
 +void GCMainDlg::setToolbuttons()
 +{
++	ui_.toolbar->clear();
 +	PsiOptions *options = PsiOptions::instance();
 +	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m1.actions").toStringList();
 +	foreach (const QString &actionName, actionsNames) {
 +#ifdef PSI_PLUGINS
 +		if (actionName.endsWith("-plugin")) {
-+			PluginManager::instance()->addGCToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
++			QString name = PluginManager::instance()->nameByShortName(actionName.mid(0, actionName.length() - 7));
++			PluginManager::instance()->addGCToolBarButton(this, ui_.toolbar, account(), jid().full(), name);
 +			continue;
 +		}
 +#endif
@@ -255,7 +257,7 @@ index af090f6..9b080c2 100644
  void GCMainDlg::optionsUpdate()
  {
  	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
-@@ -1930,6 +1970,7 @@ void GCMainDlg::optionsUpdate()
+@@ -1930,6 +1972,7 @@ void GCMainDlg::optionsUpdate()
  	delete m;*/
  
  	setLooks();
@@ -263,7 +265,7 @@ index af090f6..9b080c2 100644
  	setShortcuts();
  	d->typeahead->optionsUpdate();
  	// update status icons
-@@ -2055,21 +2096,20 @@ void GCMainDlg::buildMenu()
+@@ -2055,21 +2098,20 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -291,7 +293,7 @@ index af090f6..9b080c2 100644
  		d->pm_settings->addSeparator();
  		PluginManager::instance()->addGCToolBarButton(this, d->pm_settings, account(), jid().full());
  	}
-@@ -2127,7 +2167,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2127,7 +2169,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -300,7 +302,7 @@ index af090f6..9b080c2 100644
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2205,7 +2245,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2205,7 +2247,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -983,51 +985,153 @@ index 0e676f1..c714e77 100644
  	rebuildToolbarKeys();
  	updateArrows();
  }
+diff --git a/src/pluginhost.cpp b/src/pluginhost.cpp
+index 0f63888..fcb8cec 100644
+--- a/src/pluginhost.cpp
++++ b/src/pluginhost.cpp
+@@ -229,6 +229,8 @@ bool PluginHost::load()
+ 				version_ = psiPlugin->version();
+ 				priority_ = psiPlugin->priority();
+ 				icon_ = QIcon(psiPlugin->icon());
++				hasToolBarButton_ = qobject_cast<ToolbarIconAccessor*>(plugin_) ? true : false;
++				hasGCToolBarButton_ = qobject_cast<GCToolbarIconAccessor*>(plugin_) ? true : false;
+ 				PluginInfoProvider *pip = qobject_cast<PluginInfoProvider*>(plugin_);
+ 				if (pip) {
+ 					hasInfo_ = true;
+@@ -1116,6 +1118,11 @@ void PluginHost::addToolBarButton(QObject* parent, QWidget* toolbar, int account
+ 	}
+ }
+ 
++bool PluginHost::hasToolBarButton()
++{
++	return hasToolBarButton_;
++}
++
+ void PluginHost::addGCToolBarButton(QObject* parent, QWidget* toolbar, int account, const QString& contact)
+ {
+ 	GCToolbarIconAccessor *ta = qobject_cast<GCToolbarIconAccessor*>(plugin_);
+@@ -1135,6 +1142,11 @@ void PluginHost::addGCToolBarButton(QObject* parent, QWidget* toolbar, int accou
+ 	}
+ }
+ 
++bool PluginHost::hasGCToolBarButton()
++{
++	return hasGCToolBarButton_;
++}
++
+ void PluginHost::initPopup(const QString& text, const QString& title, const QString& icon, int type)
+ {
+ 	manager_->initPopup(text, title, icon, type);
+diff --git a/src/pluginhost.h b/src/pluginhost.h
+index 842a1da..3f234b2 100644
+--- a/src/pluginhost.h
++++ b/src/pluginhost.h
+@@ -171,7 +171,10 @@ public:
+ 	void unregisterOption(const QString& name);
+ 
+ 	void addToolBarButton(QObject* parent, QWidget* toolbar, int account, const QString& contact);
++	bool hasToolBarButton();
++
+ 	void addGCToolBarButton(QObject* parent, QWidget* toolbar, int account, const QString& contact);
++	bool hasGCToolBarButton();
+ 
+ 	void addAccountMenu(QMenu *menu, int account);
+ 	void addContactMenu(QMenu *menu, int account, const QString& jid);
+@@ -201,6 +204,8 @@ private:
+ 	QIcon icon_;
+ 	QPluginLoader* loader_;
+ 	Iconset* iconset_;
++	bool hasToolBarButton_;
++	bool hasGCToolBarButton_;
+ 
+ 	bool valid_;
+ 	bool connected_;
 diff --git a/src/pluginmanager.cpp b/src/pluginmanager.cpp
-index 9d4743d..d49651a 100644
+index 9d4743d..135494e 100644
 --- a/src/pluginmanager.cpp
 +++ b/src/pluginmanager.cpp
-@@ -814,19 +814,24 @@ void PluginManager::restoreOptions(const QString& plugin)
+@@ -296,6 +296,18 @@ QString PluginManager::shortName(const QString& plugin) const
+ 	return name;
+ }
+ 
++QString PluginManager::nameByShortName(const QString& shortName) const
++{
++	QString name;
++	foreach (PluginHost* host, pluginsByPriority_) {
++		if (host->shortName() == shortName) {
++			name = host->name();
++			break;
++		}
++	}
++	return name;
++}
++
+ QString PluginManager::version(const QString& plugin) const
+ {
+ 	QString name;
+@@ -814,22 +826,35 @@ void PluginManager::restoreOptions(const QString& plugin)
  	}
  }
  
 -void PluginManager::addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact)
-+void PluginManager::addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& pluginName)
++void PluginManager::addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& plugin)
  {
- 
+-
  	foreach (PluginHost* host, pluginsByPriority_) {
 -		host->addToolBarButton(parent,toolbar, accountIds_[account], contact);
-+		if (pluginName.isEmpty() || (host->shortName() + "-plugin" == pluginName)) {
++		if (plugin.isEmpty() || (host->name() == plugin)) {
 +			host->addToolBarButton(parent,toolbar, accountIds_[account], contact);
-+			break;
 +		}
  	}
  }
  
 -void PluginManager::addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact)
-+void PluginManager::addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& pluginName)
++bool PluginManager::hasToolBarButton(const QString& plugin) const
++{
++	return hosts_[plugin]->hasToolBarButton();
++}
++
++void PluginManager::addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& plugin)
  {
  
  	foreach (PluginHost* host, pluginsByPriority_) {
 -		host->addGCToolBarButton(parent,toolbar, accountIds_[account], contact);
-+		if (pluginName.isEmpty() || (host->shortName() + "-plugin" == pluginName)) {
++		if (plugin.isEmpty() || (host->name() == plugin)) {
 +			host->addGCToolBarButton(parent,toolbar, accountIds_[account], contact);
 +		}
  	}
  }
  
++bool PluginManager::hasGCToolBarButton(const QString& plugin) const
++{
++	return hosts_[plugin]->hasGCToolBarButton();
++}
++
+ void PluginManager::setStatus(int account, const QString& status, const QString& statusMessage)
+ {
+ 	if(account < accountIds_.size()) {
 diff --git a/src/pluginmanager.h b/src/pluginmanager.h
-index 71bb09b..a2c4656 100644
+index 71bb09b..1c22a2e 100644
 --- a/src/pluginmanager.h
 +++ b/src/pluginmanager.h
-@@ -62,8 +62,8 @@ public:
+@@ -49,6 +49,7 @@ public:
+ 	bool isEnabled(const QString& plugin) const;
+ 	QString pathToPlugin(const QString& plugin) const;
+ 	QString shortName(const QString& plugin) const;
++	QString nameByShortName(const QString& shortName) const;
+ 	QString version(const QString& plugin) const;
+ 	QWidget* optionsWidget(const QString& plugin);
+ 
+@@ -62,8 +63,10 @@ public:
  
  	void applyOptions(const QString& plugin);
  	void restoreOptions(const QString& plugin);
 -	void addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact);
 -	void addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact);
-+	void addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& pluginName = "");
-+	void addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& pluginName = "");
++	void addToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& plugin = "");
++	bool hasToolBarButton(const QString& plugin) const;
++	void addGCToolBarButton(QObject* parent, QWidget* toolbar, PsiAccount* account, const QString& contact, const QString& plugin = "");
++	bool hasGCToolBarButton(const QString& plugin) const;
  	void addAccountMenu(QMenu *menu, PsiAccount* account);
  	void addContactMenu(QMenu *menu, PsiAccount* account, QString jid);
  
@@ -1123,7 +1227,7 @@ index d9c2da2..7c595dc 100644
  		if (opt.startsWith("options.status.presets.") ||
  			opt.startsWith("options.iconsets.service-status.") ||
 diff --git a/src/psiactionlist.cpp b/src/psiactionlist.cpp
-index 36449dd..c7cb137 100644
+index 36449dd..79b14c7 100644
 --- a/src/psiactionlist.cpp
 +++ b/src/psiactionlist.cpp
 @@ -28,6 +28,9 @@
@@ -1145,7 +1249,7 @@ index 36449dd..c7cb137 100644
  	struct ActionNames {
  		const char *name;
  		IconAction *action;
-@@ -443,10 +448,87 @@ void PsiActionList::Private::createMessage()
+@@ -443,10 +448,94 @@ void PsiActionList::Private::createMessage()
  
  void PsiActionList::Private::createChat()
  {
@@ -1224,7 +1328,14 @@ index 36449dd..c7cb137 100644
 +	QStringList plugins = pm->availablePlugins();
 +	ActionList *actions = new ActionList(tr("Plugins"), type, false);
 +	foreach (const QString &plugin, plugins) {
-+		IconAction *action = new IconAction (plugin, "", plugin, 0, this);
++		if ((type == Actions_Chat      && !pm->hasToolBarButton(plugin)) ||
++			(type == Actions_Groupchat && !pm->hasGCToolBarButton(plugin))) {
++
++			continue;
++		}
++
++		qDebug() << plugin;
++		IconAction *action = new IconAction(plugin, "", plugin, 0, this);
 +		action->setIcon(pm->icon(plugin));
 +		actions->addAction(pm->shortName(plugin) + "-plugin", action);
 +	}
@@ -1249,7 +1360,7 @@ index ac3a7ed..a2bf0de 100644
  
  public:
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 470d221..f925782 100644
+index 470d221..69d3add 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -49,7 +49,8 @@
@@ -1320,7 +1431,7 @@ index 470d221..f925782 100644
  
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
-@@ -424,11 +428,39 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
+@@ -424,11 +428,40 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
  		Jid rj = realJid();
  		UserListItem *uli;
  		if (rj.isNull() || ((uli = account()->findFirstRelevant(rj)) && (uli->inList() || uli->isSelf()))) {
@@ -1345,7 +1456,8 @@ index 470d221..f925782 100644
 +
 +#ifdef PSI_PLUGINS
 +		if (actionName.endsWith("-plugin")) {
-+			PluginManager::instance()->addToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
++			QString name = PluginManager::instance()->nameByShortName(actionName.mid(0, actionName.length() - 7));
++			PluginManager::instance()->addToolBarButton(this, ui_.toolbar, account(), jid().full(), name);
 +			continue;
 +		}
 +#endif
@@ -1362,7 +1474,7 @@ index 470d221..f925782 100644
  }
  
  void PsiChatDlg::copyUserJid()
-@@ -452,54 +484,69 @@ void PsiChatDlg::initToolButtons()
+@@ -452,54 +485,69 @@ void PsiChatDlg::initToolButtons()
  	ui_.vboxLayout1->addLayout(hb3a);
  // -- typeahead
  
@@ -1478,7 +1590,7 @@ index 470d221..f925782 100644
  }
  
  void PsiChatDlg::initToolBar()
-@@ -507,32 +554,7 @@ void PsiChatDlg::initToolBar()
+@@ -507,32 +555,7 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->setWindowTitle(tr("Chat Toolbar"));
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s, s));
@@ -1512,7 +1624,7 @@ index 470d221..f925782 100644
  }
  
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -787,18 +809,18 @@ void PsiChatDlg::optionsUpdate()
+@@ -787,18 +810,18 @@ void PsiChatDlg::optionsUpdate()
  void PsiChatDlg::updatePGP()
  {
  	if (account()->hasPGP()) {
@@ -1534,7 +1646,7 @@ index 470d221..f925782 100644
  	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
  
-@@ -854,7 +876,7 @@ void PsiChatDlg::doClearButton()
+@@ -854,7 +877,7 @@ void PsiChatDlg::doClearButton()
  
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
@@ -1543,7 +1655,7 @@ index 470d221..f925782 100644
  	ui_.log->setEncryptionEnabled(enabled);
  }
  
-@@ -868,25 +890,25 @@ void PsiChatDlg::buildMenu()
+@@ -868,25 +891,25 @@ void PsiChatDlg::buildMenu()
  {
  	// Dialog menu
  	pm_settings_->clear();
@@ -1580,7 +1692,7 @@ index 470d221..f925782 100644
  		pm_settings_->addSeparator();
  		PluginManager::instance()->addToolBarButton(this, pm_settings_, account(), jid().full());
  	}
-@@ -900,7 +922,7 @@ void PsiChatDlg::updateCounter()
+@@ -900,7 +923,7 @@ void PsiChatDlg::updateCounter()
  
  bool PsiChatDlg::isEncryptionEnabled() const
  {
@@ -1589,7 +1701,7 @@ index 470d221..f925782 100644
  }
  
  void PsiChatDlg::appendSysMsg(const QString &str)
-@@ -999,14 +1021,14 @@ void PsiChatDlg::doPasteAndSend()
+@@ -999,14 +1022,14 @@ void PsiChatDlg::doPasteAndSend()
  	if(ChatDlg::isActiveTab()) {
  		chatEdit()->paste();
  		doSend();
