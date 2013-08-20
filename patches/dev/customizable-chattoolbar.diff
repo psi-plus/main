@@ -1032,38 +1032,66 @@ index 71bb09b..a2c4656 100644
  	void addContactMenu(QMenu *menu, PsiAccount* account, QString jid);
  
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
-index d9c2da2..359fd37 100644
+index d9c2da2..7c595dc 100644
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
-@@ -1358,6 +1358,58 @@ bool OptionsMigration::fromFile(const QString &fname)
+@@ -45,6 +45,9 @@
+ #ifdef HAVE_PGPUTIL
+ #include "pgputil.h"
+ #endif
++#ifdef PSI_PLUGINS
++#include "pluginmanager.h"
++#endif
+ 
+ using namespace XMPP;
+ using namespace XMLHelper;
+@@ -1358,6 +1361,76 @@ bool OptionsMigration::fromFile(const QString &fname)
  
  void OptionsMigration::lateMigration()
  {
 +	// Add default chat and groupchat toolbars
 +	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat Toolbar") {
++		QStringList pluginsKeys;
++#ifdef PSI_PLUGINS
++		PluginManager *pm = PluginManager::instance();
++		QStringList plugins = pm->availablePlugins();
++		foreach (const QString &plugin, plugins) {
++			pluginsKeys << pm->shortName(plugin) + "-plugin";
++		}
++#endif
 +		ToolbarPrefs chatToolbar;
 +		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
++		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
 +		chatToolbar.name = "Chat Toolbar";
-+		chatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_add_contact"
-+						 << "spacer" << "act_icon" << "act_voice" << "act_file" << "act_pgp"
++		chatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_add_contact";
++		chatToolbar.keys += pluginsKeys;
++		chatToolbar.keys << "spacer" << "act_icon" << "act_voice" << "act_file" << "act_pgp"
 +						 << "act_info" << "act_history" << "act_ps" << "act_templates"
 +						 << "act_active_contacts";
 +
 +		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
 +			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_ps"));
 +		}
++		PsiOptions::instance()->removeOption("options.ui.chat.disable-paste-send");
++
 +		if (!PsiOptions::instance()->getOption("options.pgp.enable").toBool()) {
 +			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_pgp"));
 +		}
++		PsiOptions::instance()->removeOption("options.pgp.enable");
 +
 +		ToolbarPrefs groupchatToolbar;
 +		groupchatToolbar.on = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
++		PsiOptions::instance()->removeOption("options.ui.tabs.use-tabs");
++
 +		groupchatToolbar.name = "Conference Toolbar";
-+		groupchatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_configure"
-+							  << "spacer" << "act_icon" << "act_ps" << "act_templates";
++		groupchatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_configure";
++		groupchatToolbar.keys += pluginsKeys;
++		groupchatToolbar.keys << "spacer" << "act_icon" << "act_ps" << "act_templates";
++
 +		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
 +			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("act_ps"));
 +		}
++		PsiOptions::instance()->removeOption("options.ui.chat.disable-paste-send");
 +
 +		QList<ToolbarPrefs> toolbars;
 +		toolbars << chatToolbar
@@ -1622,32 +1650,52 @@ index 7e0ccb5..f7c4d99 100644
  
  	ActionLineEdit *le_autojid;
 diff --git a/src/psioptions.cpp b/src/psioptions.cpp
-index ede8253..bc55d28 100644
+index ede8253..e6e7d8e 100644
 --- a/src/psioptions.cpp
 +++ b/src/psioptions.cpp
-@@ -183,6 +183,21 @@ bool PsiOptions::newProfile()
+@@ -31,7 +31,9 @@
+ #include "statuspreset.h"
+ #include "psitoolbar.h"
+ #include "common.h"
+-
++#ifdef PSI_PLUGINS
++#include "pluginmanager.h"
++#endif
+ using namespace XMPP;
+ 
+ 
+@@ -183,6 +185,30 @@ bool PsiOptions::newProfile()
  	            ).toOptions(this);
  
  	{
++		QStringList pluginsKeys;
++#ifdef PSI_PLUGINS
++		PluginManager *pm = PluginManager::instance();
++		QStringList plugins = pm->availablePlugins();
++		foreach (const QString &plugin, plugins) {
++			pluginsKeys << pm->shortName(plugin) + "-plugin";
++		}
++#endif
 +		ToolbarPrefs chatToolbar;
 +		chatToolbar.on = false;
 +		chatToolbar.name = "Chat Toolbar";
-+		chatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_add_contact"
-+						 << "spacer" << "act_icon" << "act_voice" << "act_file" << "act_pgp"
++		chatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_add_contact";
++		chatToolbar.keys += pluginsKeys;
++		chatToolbar.keys << "spacer" << "act_icon" << "act_voice" << "act_file" << "act_pgp"
 +						 << "act_info" << "act_history" << "act_ps" << "act_templates"
 +						 << "act_active_contacts";
 +
 +		ToolbarPrefs groupchatToolbar;
 +		groupchatToolbar.on = false;
 +		groupchatToolbar.name = "Conference Toolbar";
-+		groupchatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_configure"
-+							  << "spacer" << "act_icon" << "act_ps" << "act_templates";
-+
++		groupchatToolbar.keys << "act_clear"  << "act_find" << "act_html_text" << "act_configure";
++		groupchatToolbar.keys += pluginsKeys;
++		groupchatToolbar.keys << "spacer" << "act_icon" << "act_ps" << "act_templates";
 +
  		ToolbarPrefs buttons;
  		buttons.name = tr("Buttons");
  #ifndef Q_OS_MAC
-@@ -203,7 +218,9 @@ bool PsiOptions::newProfile()
+@@ -203,7 +229,9 @@ bool PsiOptions::newProfile()
  		eventNotifier.dock = Qt3Dock_Bottom;
  
  		QList<ToolbarPrefs> toolbars;
@@ -1658,7 +1706,7 @@ index ede8253..bc55d28 100644
  		         << showContacts
  		         << eventNotifier;
  		foreach(ToolbarPrefs tb, toolbars) {
-@@ -372,4 +389,3 @@ void PsiOptions::resetOption(const QString &name)
+@@ -372,4 +400,3 @@ void PsiOptions::resetOption(const QString &name)
  
  PsiOptions* PsiOptions::instance_ = NULL;
  PsiOptions* PsiOptions::defaults_ = NULL;
