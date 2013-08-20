@@ -1,5 +1,5 @@
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index af090f6..a2454c5 100644
+index af090f6..9b080c2 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -138,7 +138,7 @@ index af090f6..a2454c5 100644
  	d->act_bookmark = new IconAction(this);
  	connect(d->act_bookmark, SIGNAL(triggered()), SLOT(doBookmark()));
  	ui_.le_topic->addAction(d->act_bookmark);
-@@ -784,23 +813,28 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -784,23 +813,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s,s));
@@ -146,24 +146,6 @@ index af090f6..a2454c5 100644
 -	ui_.toolbar->addAction(d->act_find);
 -	ui_.toolbar->addAction(d->act_configure);
 -	ui_.toolbar->addAction(d->act_html_text);
-+
-+	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m1.actions").toStringList();
-+	foreach (const QString &actionName, actionsNames) {
-+#ifdef PSI_PLUGINS
-+		if (actionName.endsWith("-plugin")) {
-+			PluginManager::instance()->addGCToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
-+			continue;
-+		}
-+#endif
-+
-+		IconAction *action = d->actions->action(actionName);
-+		if (action) {
-+			action->addTo(ui_.toolbar);
-+			if (actionName == "act_icon" || actionName == "act_templates") {
-+				((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
-+			}
-+		}
-+	}
 +
  //#ifdef WHITEBOARDING
  //	ui_.toolbar->addAction(d->act_whiteboard);
@@ -181,7 +163,7 @@ index af090f6..a2454c5 100644
  	ui_.toolbar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
  
  	// Common actions
-@@ -838,10 +872,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -838,10 +854,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(ui_.vsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(verticalSplitterMoved(int,int)));
  
  	// resize the horizontal splitter
@@ -195,7 +177,7 @@ index af090f6..a2454c5 100644
  	if(leftRoster)
  		list << d->rosterSize << d->logSize;
  	else
-@@ -853,8 +887,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -853,8 +869,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
  	// resize the vertical splitter
@@ -206,7 +188,15 @@ index af090f6..a2454c5 100644
  	setVSplitterPosition(d->logHeight, d->chateditHeight);
  
  	X11WM_CLASS("groupchat");
-@@ -976,8 +1010,9 @@ void GCMainDlg::ensureTabbedCorrectly()
+@@ -866,6 +882,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 	connect(d->mucManager, SIGNAL(action_success(MUCManager::Action)), ui_.lv_users, SLOT(update()));
+ 
+ 	setLooks();
++	setToolbuttons();
+ 	setShortcuts();
+ 	invalidateTab();
+ 	setConnecting();
+@@ -976,8 +993,9 @@ void GCMainDlg::ensureTabbedCorrectly()
  
  void GCMainDlg::setShortcuts()
  {
@@ -218,7 +208,7 @@ index af090f6..a2454c5 100644
  	d->act_send->setShortcuts(ShortcutManager::instance()->shortcuts("chat.send"));
  	if (!isTabbed()) {
  		d->act_close->setShortcuts(ShortcutManager::instance()->shortcuts("common.close"));
-@@ -1454,7 +1489,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1454,7 +1472,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		if (d->configDlg) {
  			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
  		}
@@ -227,7 +217,7 @@ index af090f6..a2454c5 100644
  	}
  
  	PsiOptions *options_ = PsiOptions::instance();
-@@ -1895,7 +1930,7 @@ void GCMainDlg::setLooks()
+@@ -1895,7 +1913,7 @@ void GCMainDlg::setLooks()
  	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
  	ui_.lv_users->setFont(f);
  
@@ -236,7 +226,44 @@ index af090f6..a2454c5 100644
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -2055,21 +2090,20 @@ void GCMainDlg::buildMenu()
+@@ -1923,6 +1941,28 @@ void GCMainDlg::setLooks()
+ 	ui_.lv_users->setLooks();
+ }
+ 
++void GCMainDlg::setToolbuttons()
++{
++	PsiOptions *options = PsiOptions::instance();
++	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m1.actions").toStringList();
++	foreach (const QString &actionName, actionsNames) {
++#ifdef PSI_PLUGINS
++		if (actionName.endsWith("-plugin")) {
++			PluginManager::instance()->addGCToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
++			continue;
++		}
++#endif
++
++		IconAction *action = d->actions->action(actionName);
++		if (action) {
++			action->addTo(ui_.toolbar);
++			if (actionName == "act_icon" || actionName == "act_templates") {
++				((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
++			}
++		}
++	}
++}
++
+ void GCMainDlg::optionsUpdate()
+ {
+ 	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
+@@ -1930,6 +1970,7 @@ void GCMainDlg::optionsUpdate()
+ 	delete m;*/
+ 
+ 	setLooks();
++	setToolbuttons();
+ 	setShortcuts();
+ 	d->typeahead->optionsUpdate();
+ 	// update status icons
+@@ -2055,21 +2096,20 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -264,7 +291,7 @@ index af090f6..a2454c5 100644
  		d->pm_settings->addSeparator();
  		PluginManager::instance()->addGCToolBarButton(this, d->pm_settings, account(), jid().full());
  	}
-@@ -2127,7 +2161,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2127,7 +2167,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -273,7 +300,7 @@ index af090f6..a2454c5 100644
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2205,7 +2239,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2205,7 +2245,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -282,6 +309,18 @@ index af090f6..a2454c5 100644
  }
  
  void GCMainDlg::sendTemp(const QString &templText)
+diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
+index b895987..8e1ef3a 100644
+--- a/src/groupchatdlg.h
++++ b/src/groupchatdlg.h
+@@ -164,6 +164,7 @@ private:
+ 	void appendSysMsg(const MessageView &);
+ 	void appendMessage(const Message &, bool);
+ 	void setLooks();
++	void setToolbuttons();
+ 
+ 	void mucKickMsgHelper(const QString &nick, const Status &s, const QString &nickJid, const QString &title,
+ 			const QString &youSimple, const QString &youBy, const QString &someoneSimple,
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
 index 2000f7a..c2f024a 100644
 --- a/src/mainwin.cpp
@@ -1182,7 +1221,7 @@ index ac3a7ed..a2bf0de 100644
  
  public:
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 470d221..8e89be4 100644
+index 470d221..f925782 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -49,7 +49,8 @@
@@ -1220,7 +1259,13 @@ index 470d221..8e89be4 100644
  			ui_.toolbar->show();
  			ui_.tb_actions->hide();
  			ui_.tb_emoticons->hide();
-@@ -380,20 +383,20 @@ void PsiChatDlg::setLooks()
+@@ -375,25 +378,26 @@ void PsiChatDlg::setLooks()
+ 	updateIdentityVisibility();
+ 	updateCountVisibility();
+ 	updateContactAdding();
++	updateToolbuttons();
+ 
+ 	// toolbuttons
  	QIcon i;
  	i.addPixmap(IconsetFactory::icon("psi/cryptoNo").impix(),  QIcon::Normal, QIcon::Off);
  	i.addPixmap(IconsetFactory::icon("psi/cryptoYes").impix(), QIcon::Normal, QIcon::On);
@@ -1247,7 +1292,7 @@ index 470d221..8e89be4 100644
  
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
-@@ -424,9 +427,9 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
+@@ -424,11 +428,39 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
  		Jid rj = realJid();
  		UserListItem *uli;
  		if (rj.isNull() || ((uli = account()->findFirstRelevant(rj)) && (uli->inList() || uli->isSelf()))) {
@@ -1256,10 +1301,40 @@ index 470d221..8e89be4 100644
  		} else {
 -			act_add_contact->setVisible(true);
 +			actions_->action("act_add_contact")->setVisible(true);
++		}
++	}
++}
++
++void PsiChatDlg::updateToolbuttons()
++{
++	ui_.toolbar->clear();
++	PsiOptions *options = PsiOptions::instance();
++	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m0.actions").toStringList();
++	foreach (const QString &actionName, actionsNames) {
++		if (actionName == "act_voice" && !AvCallManager::isSupported()) {
++			continue;
++		}
++
++#ifdef PSI_PLUGINS
++		if (actionName.endsWith("-plugin")) {
++			PluginManager::instance()->addToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
++			continue;
++		}
++#endif
++
++		IconAction *action = actions_->action(actionName);
++		if (action) {
++			action->addTo(ui_.toolbar);
++			if (actionName == "act_icon" || actionName == "act_templates") {
++				((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
++			}
  		}
  	}
++
  }
-@@ -452,54 +455,69 @@ void PsiChatDlg::initToolButtons()
+ 
+ void PsiChatDlg::copyUserJid()
+@@ -452,54 +484,69 @@ void PsiChatDlg::initToolButtons()
  	ui_.vboxLayout1->addLayout(hb3a);
  // -- typeahead
  
@@ -1296,18 +1371,18 @@ index 470d221..8e89be4 100644
 -
 -	act_info_ = new IconAction(tr("User Info"), "psi/vCard", tr("User Info"), 0, this);
 -	connect(act_info_, SIGNAL(triggered()), SLOT(doInfo()));
+-
+-	act_history_ = new IconAction(tr("Message History"), "psi/history", tr("Message History"), 0, this);
+-	connect(act_history_, SIGNAL(triggered()), SLOT(doHistory()));
+-
+-	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
+-	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
 +	ActionList* list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Chat).at(0);
 +	foreach (const QString &name, list->actions()) {
 +		IconAction *action = list->action(name)->copy();
 +		action->setParent(this);
 +		actions_->addAction(name, action);
  
--	act_history_ = new IconAction(tr("Message History"), "psi/history", tr("Message History"), 0, this);
--	connect(act_history_, SIGNAL(triggered()), SLOT(doHistory()));
--
--	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
--	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
--
 -	act_ps_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
 -	connect(act_ps_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 -
@@ -1375,7 +1450,7 @@ index 470d221..8e89be4 100644
  }
  
  void PsiChatDlg::initToolBar()
-@@ -507,32 +525,29 @@ void PsiChatDlg::initToolBar()
+@@ -507,32 +554,7 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->setWindowTitle(tr("Chat Toolbar"));
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s, s));
@@ -1384,21 +1459,9 @@ index 470d221..8e89be4 100644
 -	ui_.toolbar->addAction(act_find);
 -// -- typeahead
 -	ui_.toolbar->addAction(act_html_text);
-+
-+	PsiOptions *options = PsiOptions::instance();
-+	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m0.actions").toStringList();
-+	foreach (const QString &actionName, actionsNames) {
-+		if (actionName == "act_voice" && !AvCallManager::isSupported()) {
-+			continue;
-+		}
-+
- #ifdef PSI_PLUGINS
+-#ifdef PSI_PLUGINS
 -	PluginManager::instance()->addToolBarButton(this, ui_.toolbar, account(), jid().full());
-+		if (actionName.endsWith("-plugin")) {
-+			PluginManager::instance()->addToolBarButton(this, ui_.toolbar, account(), jid().full(), actionName);
-+			continue;
-+		}
- #endif
+-#endif
 -	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
 -	ui_.toolbar->addAction(act_icon_);
 -	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
@@ -1414,21 +1477,14 @@ index 470d221..8e89be4 100644
 -	ui_.toolbar->addAction(act_history_);
 -	if (AvCallManager::isSupported()) {
 -		ui_.toolbar->addAction(act_voice_);
-+
-+		IconAction *action = actions_->action(actionName);
-+		if (action) {
-+			action->addTo(ui_.toolbar);
-+			if (actionName == "act_icon" || actionName == "act_templates") {
-+				((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
-+			}
-+		}
- 	}
+-	}
 -	ui_.toolbar->addAction(act_add_contact);
 -	ui_.toolbar->addAction(act_active_contacts);
++	updateToolbuttons();
  }
  
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -787,18 +802,18 @@ void PsiChatDlg::optionsUpdate()
+@@ -787,18 +809,18 @@ void PsiChatDlg::optionsUpdate()
  void PsiChatDlg::updatePGP()
  {
  	if (account()->hasPGP()) {
@@ -1450,7 +1506,7 @@ index 470d221..8e89be4 100644
  	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
  
-@@ -854,7 +869,7 @@ void PsiChatDlg::doClearButton()
+@@ -854,7 +876,7 @@ void PsiChatDlg::doClearButton()
  
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
@@ -1459,7 +1515,7 @@ index 470d221..8e89be4 100644
  	ui_.log->setEncryptionEnabled(enabled);
  }
  
-@@ -868,25 +883,25 @@ void PsiChatDlg::buildMenu()
+@@ -868,25 +890,25 @@ void PsiChatDlg::buildMenu()
  {
  	// Dialog menu
  	pm_settings_->clear();
@@ -1496,7 +1552,7 @@ index 470d221..8e89be4 100644
  		pm_settings_->addSeparator();
  		PluginManager::instance()->addToolBarButton(this, pm_settings_, account(), jid().full());
  	}
-@@ -900,7 +915,7 @@ void PsiChatDlg::updateCounter()
+@@ -900,7 +922,7 @@ void PsiChatDlg::updateCounter()
  
  bool PsiChatDlg::isEncryptionEnabled() const
  {
@@ -1505,7 +1561,7 @@ index 470d221..8e89be4 100644
  }
  
  void PsiChatDlg::appendSysMsg(const QString &str)
-@@ -999,14 +1014,14 @@ void PsiChatDlg::doPasteAndSend()
+@@ -999,14 +1021,14 @@ void PsiChatDlg::doPasteAndSend()
  	if(ChatDlg::isActiveTab()) {
  		chatEdit()->paste();
  		doSend();
@@ -1523,7 +1579,7 @@ index 470d221..8e89be4 100644
  
  void PsiChatDlg::sendTemp(const QString &templText)
 diff --git a/src/psichatdlg.h b/src/psichatdlg.h
-index 7e0ccb5..52e47b0 100644
+index 7e0ccb5..f7c4d99 100644
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
 @@ -11,7 +11,7 @@
@@ -1535,7 +1591,15 @@ index 7e0ccb5..52e47b0 100644
  
  class IconAction;
  class PsiContact;
-@@ -93,20 +93,8 @@ private:
+@@ -47,6 +47,7 @@ private slots:
+ 	void updateCountVisibility();
+ 	void updateContactAdding(PsiContact* c = 0);
+ 	void updateContactAdding(const Jid &j);
++	void updateToolbuttons();
+ 	void copyUserJid();
+ 
+ 	// reimplemented
+@@ -93,20 +94,8 @@ private:
  
  	QMenu* pm_settings_;
  
