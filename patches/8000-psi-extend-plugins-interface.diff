@@ -122,18 +122,20 @@ index 75da6ce..6259455 100644
  
  	void statusChanged(XMPP::Status::Type statusType, bool forceDialog)
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index a517626..dc277fd 100644
+index a517626..9998de6 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -84,6 +84,7 @@
+@@ -84,6 +84,9 @@
  #include "mucreasonseditor.h"
  #include "mcmdmanager.h"
  #include "lastactivitytask.h"
++#ifdef PSI_PLUGINS
 +#include "pluginmanager.h"
++#endif
  #include "psirichtext.h"
  #include "psiwindowheader.h"
  #include "avatars.h"
-@@ -792,6 +793,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -792,6 +795,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  //#ifdef WHITEBOARDING
  //	ui_.toolbar->addAction(d->act_whiteboard);
  //#endif
@@ -143,7 +145,18 @@ index a517626..dc277fd 100644
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(d->act_icon);
  	((QToolButton *)ui_.toolbar->widgetForAction(d->act_icon))->setPopupMode(QToolButton::InstantPopup);
-@@ -2065,6 +2069,12 @@ void GCMainDlg::buildMenu()
+@@ -872,6 +878,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
+ 
+ 	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
++
++#ifdef PSI_PLUGINS
++	PluginManager::instance()->setupGCTab(this, account(), jid().full());
++#endif
+ }
+ 
+ void GCMainDlg::vcard(const QString& _str)
+@@ -2065,6 +2075,12 @@ void GCMainDlg::buildMenu()
  		d->pm_settings->addAction(d->act_ps);
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
@@ -755,10 +768,10 @@ index 0000000..6b1f848
 + </connections>
 +</ui>
 diff --git a/src/pluginhost.cpp b/src/pluginhost.cpp
-index dd7e3eb..0f63888 100644
+index dd7e3eb..7bfd0d1 100644
 --- a/src/pluginhost.cpp
 +++ b/src/pluginhost.cpp
-@@ -6,17 +6,51 @@
+@@ -6,17 +6,52 @@
  #include "pluginhost.h"
  
  #include <QPluginLoader>
@@ -808,10 +821,11 @@ index dd7e3eb..0f63888 100644
 +#include "contactinfoaccessor.h"
 +#include "soundaccessor.h"
 +#include "textutil.h"
++#include "chattabaccessor.h"
  
  /**
   * \brief Constructs a host/wrapper for a plugin.
-@@ -32,12 +66,16 @@
+@@ -32,12 +67,16 @@
   */
  PluginHost::PluginHost(PluginManager* manager, const QString& pluginFile)
  	: manager_(manager)
@@ -830,7 +844,7 @@ index dd7e3eb..0f63888 100644
  {
  	load();	// reads plugin name, etc
  	unload();
-@@ -107,6 +145,26 @@ const QString& PluginHost::version() const
+@@ -107,6 +146,26 @@ const QString& PluginHost::version() const
  }
  
  /**
@@ -857,7 +871,7 @@ index dd7e3eb..0f63888 100644
   * \brief Returns plugin options widget.
   *
   * Always returns null if plugin is not currently loaded.
-@@ -136,21 +194,29 @@ QWidget* PluginHost::optionsWidget() const
+@@ -136,21 +195,29 @@ QWidget* PluginHost::optionsWidget() const
   */
  bool PluginHost::load()
  {
@@ -889,7 +903,7 @@ index dd7e3eb..0f63888 100644
  			//Check it's the right sort of plugin
  			PsiPlugin* psiPlugin = qobject_cast<PsiPlugin*>(plugin);
  			if (psiPlugin) {
-@@ -161,6 +227,13 @@ bool PluginHost::load()
+@@ -161,6 +228,13 @@ bool PluginHost::load()
  				name_ = psiPlugin->name();
  				shortName_ = psiPlugin->shortName();
  				version_ = psiPlugin->version();
@@ -903,7 +917,7 @@ index dd7e3eb..0f63888 100644
  			} else  {
  				qWarning("Attempted to load %s, but it is not a valid plugin.", qPrintable(file_));
  				if (loader_->isLoaded()) {
-@@ -168,6 +241,8 @@ bool PluginHost::load()
+@@ -168,6 +242,8 @@ bool PluginHost::load()
  					loader_->unload();
  				}
  				delete loader_;
@@ -912,7 +926,7 @@ index dd7e3eb..0f63888 100644
  			}
  		}
  	}
-@@ -187,20 +262,24 @@ bool PluginHost::load()
+@@ -187,20 +263,24 @@ bool PluginHost::load()
   */
  bool PluginHost::unload()
  {
@@ -942,7 +956,7 @@ index dd7e3eb..0f63888 100644
  		}
  	}
  	return plugin_ == 0;
-@@ -231,26 +310,135 @@ bool PluginHost::enable()
+@@ -231,26 +311,135 @@ bool PluginHost::enable()
  {
  	if (!enabled_ && load()) {
  		if (!connected_) {
@@ -1078,7 +1092,7 @@ index dd7e3eb..0f63888 100644
  			connected_ = true;
  		}
  
-@@ -271,7 +459,7 @@ bool PluginHost::enable()
+@@ -271,7 +460,7 @@ bool PluginHost::enable()
  bool PluginHost::disable()
  {
  	if (enabled_) {
@@ -1087,7 +1101,7 @@ index dd7e3eb..0f63888 100644
  	}
  	return !enabled_;
  }
-@@ -356,6 +544,16 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
+@@ -356,6 +545,16 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
  }
  
  
@@ -1104,7 +1118,7 @@ index dd7e3eb..0f63888 100644
  //-- for EventFilter ------------------------------------------------
  
  /**
-@@ -365,13 +563,12 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
+@@ -365,13 +564,12 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
   * this will call its processEvent() handler.
   * Handler may then modify the event and may cause the event to be
   * silently discarded.
@@ -1119,7 +1133,7 @@ index dd7e3eb..0f63888 100644
  {
  	bool handled = false;
  	EventFilter *ef = qobject_cast<EventFilter*>(plugin_);
-@@ -406,6 +603,23 @@ bool PluginHost::processMessage(int account, const QString& jidFrom, const QStri
+@@ -406,6 +604,23 @@ bool PluginHost::processMessage(int account, const QString& jidFrom, const QStri
  	return handled;
  }
  
@@ -1143,7 +1157,7 @@ index dd7e3eb..0f63888 100644
  
  //-- StanzaSender ---------------------------------------------------
  
-@@ -456,7 +670,8 @@ void PluginHost::sendMessage(int account, const QString& to, const QString& body
+@@ -456,7 +671,8 @@ void PluginHost::sendMessage(int account, const QString& to, const QString& body
  	//manager_->sendXml(account, m.toStanza(...).toString());
  
  	//TODO(mck): yeah, that's sick..
@@ -1153,7 +1167,7 @@ index dd7e3eb..0f63888 100644
  
  }
  
-@@ -471,6 +686,10 @@ QString PluginHost::uniqueId(int account)
+@@ -471,6 +687,10 @@ QString PluginHost::uniqueId(int account)
  	return manager_->uniqueId(account);
  }
  
@@ -1164,7 +1178,7 @@ index dd7e3eb..0f63888 100644
  
  //-- IqFilter -------------------------------------------------------
  
-@@ -494,7 +713,9 @@ QString PluginHost::uniqueId(int account)
+@@ -494,7 +714,9 @@ QString PluginHost::uniqueId(int account)
  void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filter)
  {
  	if (iqNsFilters_.values(ns).contains(filter)) {
@@ -1175,7 +1189,7 @@ index dd7e3eb..0f63888 100644
  	} else {
  		iqNsFilters_.insert(ns, filter);
  	}
-@@ -519,9 +740,13 @@ void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filt
+@@ -519,9 +741,13 @@ void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filt
   */
  void PluginHost::addIqNamespaceFilter(const QRegExp &ns, IqNamespaceFilter *filter)
  {
@@ -1190,7 +1204,7 @@ index dd7e3eb..0f63888 100644
  	} else {
  		iqNsxFilters_.insert(ns, filter);
  	}
-@@ -570,9 +795,8 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
+@@ -570,9 +796,8 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
  	//
  	//if (!plugin)
  	//	return;
@@ -1202,7 +1216,7 @@ index dd7e3eb..0f63888 100644
  }
  
  /**
-@@ -585,9 +809,11 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
+@@ -585,9 +810,11 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
   * \param  option Option to set
   * \param value Return value
   */
@@ -1216,7 +1230,7 @@ index dd7e3eb..0f63888 100644
  }
  
  /**
-@@ -616,6 +842,442 @@ QVariant PluginHost::getGlobalOption(const QString& option)
+@@ -616,6 +843,458 @@ QVariant PluginHost::getGlobalOption(const QString& option)
  	return PsiOptions::instance()->getOption(option);
  }
  
@@ -1582,6 +1596,22 @@ index dd7e3eb..0f63888 100644
 +	}
 +}
 +
++void PluginHost::setupChatTab(QWidget* tab, int account, const QString& contact)
++{
++	ChatTabAccessor *cta = qobject_cast<ChatTabAccessor*>(plugin_);
++	if(cta) {
++		cta->setupChatTab(tab, account, contact);
++	}
++}
++
++void PluginHost::setupGCTab(QWidget* tab, int account, const QString& contact)
++{
++	ChatTabAccessor *cta = qobject_cast<ChatTabAccessor*>(plugin_);
++	if(cta) {
++		cta->setupGCTab(tab, account, contact);
++	}
++}
++
 +bool PluginHost::isSelf(int account, const QString& jid)
 +{
 +	return manager_->isSelf(account, jid);
@@ -1660,7 +1690,7 @@ index dd7e3eb..0f63888 100644
  //-- helpers --------------------------------------------------------
  
 diff --git a/src/pluginhost.h b/src/pluginhost.h
-index fd5ecb7..842a1da 100644
+index fd5ecb7..77e299f 100644
 --- a/src/pluginhost.h
 +++ b/src/pluginhost.h
 @@ -10,10 +10,28 @@
@@ -1740,7 +1770,7 @@ index fd5ecb7..842a1da 100644
  
  	// IqFilteringHost
  	void addIqNamespaceFilter(const QString& ns, IqNamespaceFilter* filter);
-@@ -70,25 +98,123 @@ public:
+@@ -70,25 +98,129 @@ public:
  
  	// OptionAccessingHost
  	void setPluginOption(const QString& option, const QVariant& value);
@@ -1823,6 +1853,12 @@ index fd5ecb7..842a1da 100644
 +	void addAccountMenu(QMenu *menu, int account);
 +	void addContactMenu(QMenu *menu, int account, const QString& jid);
 +
++	//ChatTabAccessor
++	void setupChatTab(QWidget* tab, int account, const QString& contact);
++
++	// GCTabAccessor
++	void setupGCTab(QWidget* tab, int account, const QString& contact);
++
 +	void applyOptions();
 +	void restoreOptions();
 +
@@ -1867,7 +1903,7 @@ index fd5ecb7..842a1da 100644
  	bool loadPlugin(QObject* pluginObject);
  
 diff --git a/src/pluginmanager.cpp b/src/pluginmanager.cpp
-index 66fe73d..8774675 100644
+index 66fe73d..fb53d2d 100644
 --- a/src/pluginmanager.cpp
 +++ b/src/pluginmanager.cpp
 @@ -8,7 +8,7 @@
@@ -2270,7 +2306,7 @@ index 66fe73d..8774675 100644
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -351,15 +494,306 @@ QString PluginManager::uniqueId(int account)
+@@ -351,15 +494,322 @@ QString PluginManager::uniqueId(int account)
  	return id;
  }
  
@@ -2538,6 +2574,22 @@ index 66fe73d..8774675 100644
 +	}
 +}
 +
++void PluginManager::setupChatTab(QWidget *tab, PsiAccount *account, const QString& contact)
++{
++	int i = accountIds_.value(account);
++	foreach (PluginHost* host, pluginsByPriority_) {
++		host->setupChatTab(tab, i, contact);
++	}
++}
++
++void PluginManager::setupGCTab(QWidget *tab, PsiAccount *account, const QString& contact)
++{
++	int i = accountIds_.value(account);
++	foreach (PluginHost* host, pluginsByPriority_) {
++		host->setupGCTab(tab, i, contact);
++	}
++}
++
 +bool PluginManager::hasInfoProvider(const QString& plugin) const
 +{
 +	if (hosts_.contains(plugin))
@@ -2578,7 +2630,7 @@ index 66fe73d..8774675 100644
  }
  
  /**
-@@ -372,6 +806,199 @@ bool PluginManager::verifyStanza(const QString& stanza)
+@@ -372,6 +822,199 @@ bool PluginManager::verifyStanza(const QString& stanza)
  	return true;
  }
  
@@ -2779,7 +2831,7 @@ index 66fe73d..8774675 100644
  const QString PluginManager::loadOptionPrefix = "plugins.auto-load";
  const QString PluginManager::pluginOptionPrefix = "plugins.options";
 diff --git a/src/pluginmanager.h b/src/pluginmanager.h
-index 7fce15e..71bb09b 100644
+index 7fce15e..1ff60ad 100644
 --- a/src/pluginmanager.h
 +++ b/src/pluginmanager.h
 @@ -11,12 +11,16 @@
@@ -2799,7 +2851,7 @@ index 7fce15e..71bb09b 100644
  
  namespace XMPP {
  	class Client;
-@@ -33,29 +37,50 @@ class PluginManager : public QObject
+@@ -33,29 +37,53 @@ class PluginManager : public QObject
  
  public:
  	static PluginManager* instance();
@@ -2839,6 +2891,9 @@ index 7fce15e..71bb09b 100644
 +	void addAccountMenu(QMenu *menu, PsiAccount* account);
 +	void addContactMenu(QMenu *menu, PsiAccount* account, QString jid);
 +
++	void setupChatTab(QWidget *tab, PsiAccount* account, const QString& contact);
++	void setupGCTab(QWidget *tab, PsiAccount* account, const QString& contact);
++
 +	QString pluginInfo(const QString& plugin) const;
 +	bool hasInfoProvider(const QString& plugin) const;
 +	QIcon icon(const QString& plugin) const;
@@ -2857,7 +2912,7 @@ index 7fce15e..71bb09b 100644
  
  	static PluginManager* instance_;
  
-@@ -63,26 +88,71 @@ private:
+@@ -63,26 +91,71 @@ private:
  	QVector<XMPP::Client*> clients_;
  
  	//account, account id
@@ -3111,6 +3166,30 @@ index 0000000..0ddde3b
 +Q_DECLARE_INTERFACE(ApplicationInfoAccessor, "org.psi-im.ApplicationInfoAccessor/0.1");
 +
 +#endif // APPLICATIONINFOACCESSOR_H
+diff --git a/src/plugins/include/chattabaccessor.h b/src/plugins/include/chattabaccessor.h
+new file mode 100644
+index 0000000..bb3279a
+--- /dev/null
++++ b/src/plugins/include/chattabaccessor.h
+@@ -0,0 +1,18 @@
++#ifndef CHATTABACCESSOR_H
++#define CHATTABACCESSOR_H
++
++class QWidget;
++class QString;
++
++class ChatTabAccessor
++{
++public:
++	virtual ~ChatTabAccessor() {}
++
++	virtual void setupChatTab(QWidget* tab, int account, const QString& contact) = 0;
++	virtual void setupGCTab(QWidget* tab, int account, const QString& contact) = 0;
++};
++
++Q_DECLARE_INTERFACE(ChatTabAccessor, "org.psi-im.ChatTabAccessor/0.1");
++
++#endif // CHATTABACCESSOR_H
 diff --git a/src/plugins/include/contactinfoaccessinghost.h b/src/plugins/include/contactinfoaccessinghost.h
 new file mode 100644
 index 0000000..867bdbf
@@ -3806,10 +3885,10 @@ index 0000000..09dc6d4
 +
 +#endif // TOOLBARICONACCESSOR_H
 diff --git a/src/plugins/plugins.pri b/src/plugins/plugins.pri
-index e8c0a50..20df415 100644
+index e8c0a50..d9f0ae3 100644
 --- a/src/plugins/plugins.pri
 +++ b/src/plugins/plugins.pri
-@@ -10,5 +10,30 @@ HEADERS += \
+@@ -10,5 +10,31 @@ HEADERS += \
  	$$PWD/include/iqfilteringhost.h \
  	$$PWD/include/eventfilter.h \
  	$$PWD/include/optionaccessor.h \
@@ -3841,7 +3920,8 @@ index e8c0a50..20df415 100644
 +	$$PWD/include/contactinfoaccessor.h \
 +	$$PWD/include/contactinfoaccessinghost.h \
 +	$$PWD/include/soundaccessor.h \
-+	$$PWD/include/soundaccessinghost.h
++	$$PWD/include/soundaccessinghost.h \
++	$$PWD/include/chattabaccessor.h
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
 index 2fbe092..07b2e63 100644
 --- a/src/psiaccount.cpp
@@ -4037,18 +4117,32 @@ index 9a1e802..bbc20a1 100644
  
  	int sendMessageEncrypted(const Message &);
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index ea0cb73..470d221 100644
+index ea0cb73..4f3d652 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -48,6 +48,7 @@
+@@ -48,7 +48,9 @@
  #include "xmpp_tasks.h"
  #include "lastactivitytask.h"
  #include "avcall/avcall.h"
+-
++#ifdef PSI_PLUGINS
 +#include "pluginmanager.h"
- 
++#endif
  
  #define MCMDCHAT		"http://psi-im.org/ids/mcmd#chatmain"
-@@ -511,6 +512,9 @@ void PsiChatDlg::initToolBar()
+ 
+@@ -295,6 +297,10 @@ void PsiChatDlg::initUi()
+ 	setMargins();
+ 
+ 	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
++
++#ifdef PSI_PLUGINS
++	PluginManager::instance()->setupChatTab(this, account(), jid().full());
++#endif
+ }
+ 
+ void PsiChatDlg::verticalSplitterMoved(int, int)
+@@ -511,6 +517,9 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->addAction(act_find);
  // -- typeahead
  	ui_.toolbar->addAction(act_html_text);
@@ -4058,7 +4152,7 @@ index ea0cb73..470d221 100644
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(act_icon_);
  	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
-@@ -881,6 +885,12 @@ void PsiChatDlg::buildMenu()
+@@ -881,6 +890,12 @@ void PsiChatDlg::buildMenu()
  
  	pm_settings_->addAction(act_info_);
  	pm_settings_->addAction(act_history_);
