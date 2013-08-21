@@ -12,19 +12,18 @@ index 4c221ac..5a6876c 100644
  
  void GCMainDlg::vcard(const QString& _str)
 diff --git a/src/pluginhost.cpp b/src/pluginhost.cpp
-index fcb8cec..2cf6974 100644
+index fcb8cec..ea6d994 100644
 --- a/src/pluginhost.cpp
 +++ b/src/pluginhost.cpp
-@@ -51,6 +51,8 @@
+@@ -51,6 +51,7 @@
  #include "contactinfoaccessor.h"
  #include "soundaccessor.h"
  #include "textutil.h"
 +#include "chattabaccessor.h"
-+#include "gctabaccessor.h"
  
  /**
   * \brief Constructs a host/wrapper for a plugin.
-@@ -1216,6 +1218,22 @@ void PluginHost::addContactMenu(QMenu *menu, int account, const QString& jid)
+@@ -1216,6 +1217,22 @@ void PluginHost::addContactMenu(QMenu *menu, int account, const QString& jid)
  	}
  }
  
@@ -32,15 +31,15 @@ index fcb8cec..2cf6974 100644
 +{
 +	ChatTabAccessor *cta = qobject_cast<ChatTabAccessor*>(plugin_);
 +	if(cta) {
-+		cta->setupTab(tab, account, contact);
++		cta->setupChatTab(tab, account, contact);
 +	}
 +}
 +
 +void PluginHost::setupGCTab(QWidget* tab, int account, const QString& contact)
 +{
-+	GCTabAccessor *gcta = qobject_cast<GCTabAccessor*>(plugin_);
-+	if(gcta) {
-+		gcta->setupGCTab(tab, account, contact);
++	ChatTabAccessor *cta = qobject_cast<ChatTabAccessor*>(plugin_);
++	if(cta) {
++		cta->setupGCTab(tab, account, contact);
 +	}
 +}
 +
@@ -107,10 +106,10 @@ index 1c22a2e..da0ce1e 100644
  	QIcon icon(const QString& plugin) const;
 diff --git a/src/plugins/include/chattabaccessor.h b/src/plugins/include/chattabaccessor.h
 new file mode 100644
-index 0000000..18be8ca
+index 0000000..bb3279a
 --- /dev/null
 +++ b/src/plugins/include/chattabaccessor.h
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +#ifndef CHATTABACCESSOR_H
 +#define CHATTABACCESSOR_H
 +
@@ -122,35 +121,24 @@ index 0000000..18be8ca
 +public:
 +	virtual ~ChatTabAccessor() {}
 +
-+	virtual void setupTab(QWidget* tab, int account, const QString& contact) = 0;
++	virtual void setupChatTab(QWidget* tab, int account, const QString& contact) = 0;
++	virtual void setupGCTab(QWidget* tab, int account, const QString& contact) = 0;
 +};
 +
 +Q_DECLARE_INTERFACE(ChatTabAccessor, "org.psi-im.ChatTabAccessor/0.1");
 +
 +#endif // CHATTABACCESSOR_H
-diff --git a/src/plugins/include/gctabaccessor.h b/src/plugins/include/gctabaccessor.h
-new file mode 100644
-index 0000000..be2935f
---- /dev/null
-+++ b/src/plugins/include/gctabaccessor.h
-@@ -0,0 +1,17 @@
-+#ifndef GCTABACCESSOR_H
-+#define GCTABACCESSOR_H
-+
-+class QWidget;
-+class QString;
-+
-+class GCTabAccessor
-+{
-+public:
-+	virtual ~GCTabAccessor() {}
-+
-+	virtual void setupGCTab(QWidget* tab, int account, const QString& contact) = 0;
-+};
-+
-+Q_DECLARE_INTERFACE(GCTabAccessor, "org.psi-im.GCTabAccessor/0.1");
-+
-+#endif // GCTABACCESSOR_H
+diff --git a/src/plugins/plugins.pri b/src/plugins/plugins.pri
+index 20df415..d9f0ae3 100644
+--- a/src/plugins/plugins.pri
++++ b/src/plugins/plugins.pri
+@@ -36,4 +36,5 @@ HEADERS += \
+ 	$$PWD/include/contactinfoaccessor.h \
+ 	$$PWD/include/contactinfoaccessinghost.h \
+ 	$$PWD/include/soundaccessor.h \
+-	$$PWD/include/soundaccessinghost.h
++	$$PWD/include/soundaccessinghost.h \
++	$$PWD/include/chattabaccessor.h
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
 index f787ebe..e5cd664 100644
 --- a/src/psichatdlg.cpp
