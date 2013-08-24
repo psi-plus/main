@@ -1,5 +1,5 @@
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index 3d9ac6c..dccb435 100644
+index 3d9ac6c..a8e44f5 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -226,7 +226,7 @@ index 3d9ac6c..dccb435 100644
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -1929,6 +1947,30 @@ void GCMainDlg::setLooks()
+@@ -1929,6 +1947,36 @@ void GCMainDlg::setLooks()
  	ui_.lv_users->setLooks();
  }
  
@@ -244,6 +244,12 @@ index 3d9ac6c..dccb435 100644
 +		}
 +#endif
 +
++		// Hack. separator action can be added only once.
++		if (actionName == "separator") {
++			ui_.toolbar->addSeparator();
++			continue;
++		}
++
 +		IconAction *action = d->actions->action(actionName);
 +		if (action) {
 +			action->addTo(ui_.toolbar);
@@ -257,7 +263,7 @@ index 3d9ac6c..dccb435 100644
  void GCMainDlg::optionsUpdate()
  {
  	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
-@@ -1936,6 +1978,7 @@ void GCMainDlg::optionsUpdate()
+@@ -1936,6 +1984,7 @@ void GCMainDlg::optionsUpdate()
  	delete m;*/
  
  	setLooks();
@@ -265,7 +271,7 @@ index 3d9ac6c..dccb435 100644
  	setShortcuts();
  	d->typeahead->optionsUpdate();
  	// update status icons
-@@ -2061,21 +2104,20 @@ void GCMainDlg::buildMenu()
+@@ -2061,21 +2110,20 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -293,7 +299,7 @@ index 3d9ac6c..dccb435 100644
  		d->pm_settings->addSeparator();
  		PluginManager::instance()->addGCToolBarButton(this, d->pm_settings, account(), jid().full());
  	}
-@@ -2133,7 +2175,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2133,7 +2181,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -302,7 +308,7 @@ index 3d9ac6c..dccb435 100644
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2211,7 +2253,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2211,7 +2259,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -1353,7 +1359,7 @@ index ac3a7ed..a2bf0de 100644
  
  public:
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 4f3d652..6c36d25 100644
+index 4f3d652..c905979 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -48,6 +48,8 @@
@@ -1423,7 +1429,7 @@ index 4f3d652..6c36d25 100644
  
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
-@@ -429,13 +434,45 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
+@@ -429,13 +434,51 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
  		Jid rj = realJid();
  		UserListItem *uli;
  		if (rj.isNull() || ((uli = account()->findFirstRelevant(rj)) && (uli->inList() || uli->isSelf()))) {
@@ -1457,6 +1463,12 @@ index 4f3d652..6c36d25 100644
 +		}
 +#endif
 +
++		// Hack. separator action can be added only once.
++		if (actionName == "separator") {
++			ui_.toolbar->addSeparator();
++			continue;
++		}
++
 +		IconAction *action = actions_->action(actionName);
 +		if (action) {
 +			action->addTo(ui_.toolbar);
@@ -1471,7 +1483,7 @@ index 4f3d652..6c36d25 100644
  void PsiChatDlg::copyUserJid()
  {
  	QApplication::clipboard()->setText(jid().bare());
-@@ -457,54 +494,69 @@ void PsiChatDlg::initToolButtons()
+@@ -457,54 +500,69 @@ void PsiChatDlg::initToolButtons()
  	ui_.vboxLayout1->addLayout(hb3a);
  // -- typeahead
  
@@ -1511,15 +1523,15 @@ index 4f3d652..6c36d25 100644
 -
 -	act_history_ = new IconAction(tr("Message History"), "psi/history", tr("Message History"), 0, this);
 -	connect(act_history_, SIGNAL(triggered()), SLOT(doHistory()));
--
--	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
--	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
 +	ActionList* list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Chat).at(0);
 +	foreach (const QString &name, list->actions()) {
 +		IconAction *action = list->action(name)->copy();
 +		action->setParent(this);
 +		actions_->addAction(name, action);
  
+-	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
+-	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
+-
 -	act_ps_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
 -	connect(act_ps_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 -
@@ -1587,7 +1599,7 @@ index 4f3d652..6c36d25 100644
  }
  
  void PsiChatDlg::initToolBar()
-@@ -512,32 +564,7 @@ void PsiChatDlg::initToolBar()
+@@ -512,32 +570,7 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->setWindowTitle(tr("Chat Toolbar"));
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s, s));
@@ -1621,7 +1633,7 @@ index 4f3d652..6c36d25 100644
  }
  
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -792,18 +819,18 @@ void PsiChatDlg::optionsUpdate()
+@@ -792,18 +825,18 @@ void PsiChatDlg::optionsUpdate()
  void PsiChatDlg::updatePGP()
  {
  	if (account()->hasPGP()) {
@@ -1643,7 +1655,7 @@ index 4f3d652..6c36d25 100644
  	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
  
-@@ -859,7 +886,7 @@ void PsiChatDlg::doClearButton()
+@@ -859,7 +892,7 @@ void PsiChatDlg::doClearButton()
  
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
@@ -1652,7 +1664,7 @@ index 4f3d652..6c36d25 100644
  	ui_.log->setEncryptionEnabled(enabled);
  }
  
-@@ -873,25 +900,25 @@ void PsiChatDlg::buildMenu()
+@@ -873,25 +906,25 @@ void PsiChatDlg::buildMenu()
  {
  	// Dialog menu
  	pm_settings_->clear();
@@ -1689,7 +1701,7 @@ index 4f3d652..6c36d25 100644
  		pm_settings_->addSeparator();
  		PluginManager::instance()->addToolBarButton(this, pm_settings_, account(), jid().full());
  	}
-@@ -905,7 +932,7 @@ void PsiChatDlg::updateCounter()
+@@ -905,7 +938,7 @@ void PsiChatDlg::updateCounter()
  
  bool PsiChatDlg::isEncryptionEnabled() const
  {
@@ -1698,7 +1710,7 @@ index 4f3d652..6c36d25 100644
  }
  
  void PsiChatDlg::appendSysMsg(const QString &str)
-@@ -1004,14 +1031,14 @@ void PsiChatDlg::doPasteAndSend()
+@@ -1004,14 +1037,14 @@ void PsiChatDlg::doPasteAndSend()
  	if(ChatDlg::isActiveTab()) {
  		chatEdit()->paste();
  		doSend();
