@@ -1,17 +1,17 @@
-Index: psi/src/mucaffiliationsmodel.cpp
-===================================================================
---- psi.orig/src/mucaffiliationsmodel.cpp	2013-01-15 14:04:32.396827280 +0400
-+++ psi/src/mucaffiliationsmodel.cpp	2013-01-15 14:04:32.396827280 +0400
+diff --git a/src/mucaffiliationsmodel.cpp b/src/mucaffiliationsmodel.cpp
+index 2671b0f..6df4555 100644
+--- a/src/mucaffiliationsmodel.cpp
++++ b/src/mucaffiliationsmodel.cpp
 @@ -27,7 +27,7 @@
  using namespace XMPP;
-
-
+ 
+ 
 -MUCAffiliationsModel::MUCAffiliationsModel() : QStandardItemModel(Unknown,1)
 +MUCAffiliationsModel::MUCAffiliationsModel() : QStandardItemModel(Unknown,2)
  {
  	QFont font;
  	font.setBold(true);
-@@ -37,8 +37,10 @@
+@@ -37,8 +37,10 @@ MUCAffiliationsModel::MUCAffiliationsModel() : QStandardItemModel(Unknown,1)
  		setData(ind,QVariant(affiliationlistindexToString((AffiliationListIndex) i)));
  		setData(ind,font_variant,Qt::FontRole);
  		insertColumns(0,1,ind);
@@ -20,10 +20,10 @@ Index: psi/src/mucaffiliationsmodel.cpp
  	}
 +	setHorizontalHeaderLabels(QStringList() << tr("JID") << tr("Reason"));
  }
-
+ 
  Qt::ItemFlags MUCAffiliationsModel::flags(const QModelIndex &index) const
-@@ -63,9 +65,13 @@
-
+@@ -63,8 +65,12 @@ Qt::DropActions MUCAffiliationsModel::supportedDropActions() const
+ 
  bool MUCAffiliationsModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int, const QModelIndex &parent)
  {
 -	if (!data || action != Qt::MoveAction || !(data->hasFormat("application/vnd.text.list") || data->hasFormat("text/plain")))
@@ -32,13 +32,11 @@ Index: psi/src/mucaffiliationsmodel.cpp
 +		|| !( data->hasFormat("application/vnd.text.list") || data->hasFormat("text/plain") ) )
 +	{
  		return false;
--
 +	}
-+
+ 
  	// Decode the data
  	QStringList newItems;
- 	int nb_rows = 0;
-@@ -130,7 +136,7 @@
+@@ -130,7 +136,7 @@ QMimeData* MUCAffiliationsModel::mimeData(const QModelIndexList &indexes) const
  	QByteArray encodedData;
  	QDataStream stream(&encodedData, QIODevice::WriteOnly);
  	foreach (QModelIndex index, indexes) {
@@ -47,7 +45,7 @@ Index: psi/src/mucaffiliationsmodel.cpp
  			QString text = data(index, Qt::DisplayRole).toString();
  			stream << text;
  		}
-@@ -220,6 +226,7 @@
+@@ -220,6 +226,7 @@ void MUCAffiliationsModel::addItems(const QList<MUCItem>& items)
  			}
  			insertRows(row,1,list);
  			setData(index(row,0,list),QVariant(item.jid().full()));
@@ -55,21 +53,26 @@ Index: psi/src/mucaffiliationsmodel.cpp
  			MUCItem i(MUCItem::UnknownRole,item.affiliation());
  			i.setJid(item.jid());
  			items_ += i;
-Index: psi/src/mucaffiliationsview.cpp
-===================================================================
---- psi.orig/src/mucaffiliationsview.cpp	2013-01-15 14:04:32.396827280 +0400
-+++ psi/src/mucaffiliationsview.cpp	2013-01-15 14:04:32.396827280 +0400
-@@ -26,11 +26,12 @@
+diff --git a/src/mucaffiliationsview.cpp b/src/mucaffiliationsview.cpp
+index 64c7641..ba3a4d5 100644
+--- a/src/mucaffiliationsview.cpp
++++ b/src/mucaffiliationsview.cpp
+@@ -26,11 +26,17 @@
  MUCAffiliationsView::MUCAffiliationsView(QWidget* parent) : QTreeView(parent)
  {
  	setRootIsDecorated(false);
 -	header()->hide();
++#ifdef HAVE_QT5
 +	header()->setResizeMode(QHeaderView::ResizeToContents);
++#else
++	header()->setSectionResizeMode(QHeaderView::ResizeToContents);
++#endif
++	setItemsExpandable(false);
  	setItemsExpandable(false);
  	setDragEnabled(true);
  	setAcceptDrops(true);
  	setDropIndicatorShown(true);
 +	setSelectionBehavior(QAbstractItemView::SelectRows);
  }
-
+ 
  void MUCAffiliationsView::removeCurrent()
