@@ -1,16 +1,16 @@
-Index: psi/src/contactlistaccountmenu.cpp
-===================================================================
---- psi.orig/src/contactlistaccountmenu.cpp	2013-01-15 14:04:12.804826483 +0400
-+++ psi/src/contactlistaccountmenu.cpp	2013-01-15 14:04:12.796826483 +0400
+diff --git a/src/contactlistaccountmenu.cpp b/src/contactlistaccountmenu.cpp
+index 1ed0166..f8a33be 100644
+--- a/src/contactlistaccountmenu.cpp
++++ b/src/contactlistaccountmenu.cpp
 @@ -32,6 +32,7 @@
  #include "privacy/privacydlg.h"
  #include "psiiconset.h"
  #include "common.h"
 +#include "contactmanager/contactmanagerdlg.h"
-
+ 
  class ContactListAccountMenu::Private : public QObject
  {
-@@ -45,6 +46,7 @@
+@@ -45,6 +46,7 @@ class ContactListAccountMenu::Private : public QObject
  	QAction* setAvatarAction_;
  	QMenu* avatarMenu_;
  	QAction* unsetAvatarAction_;
@@ -18,17 +18,17 @@ Index: psi/src/contactlistaccountmenu.cpp
  	QMenu* bookmarksMenu_;
  	QAction* bookmarksManageAction_;
  	QList<QAction*> bookmarksJoinActions_;
-@@ -95,6 +97,9 @@
+@@ -95,6 +97,9 @@ public:
  		unsetAvatarAction_ = new QAction(tr("Unset Avatar"), this);
  		connect(unsetAvatarAction_, SIGNAL(triggered()), SLOT(unsetAvatar()));
-
+ 
 +		contactManagerAction_ = new IconAction(tr("&Contacts Manager"), this, "psi/action_contacts_manager");
 +		connect(contactManagerAction_, SIGNAL(triggered()), SLOT(contactManager()));
 +
  		bookmarksManageAction_ = new QAction(tr("Manage..."), this);
  		connect(bookmarksManageAction_, SIGNAL(triggered()), SLOT(bookmarksManage()));
-
-@@ -144,6 +149,7 @@
+ 
+@@ -144,6 +149,7 @@ public:
  		menu->addAction(addContactAction_);
  		menu->addAction(serviceDiscoveryAction_);
  		menu->addAction(newMessageAction_);
@@ -36,7 +36,7 @@ Index: psi/src/contactlistaccountmenu.cpp
  		menu->addAction(privacyListsAction_);
  		menu->addSeparator();
  		menu->addAction(xmlConsoleAction_);
-@@ -205,6 +211,7 @@
+@@ -205,6 +211,7 @@ private slots:
  		newMessageAction_->setEnabled(account->account()->isAvailable());
  		addContactAction_->setEnabled(account->account()->isAvailable());
  		serviceDiscoveryAction_->setEnabled(account->account()->isAvailable());
@@ -44,12 +44,10 @@ Index: psi/src/contactlistaccountmenu.cpp
  		privacyListsAction_->setEnabled(account->account()->isAvailable());
  		if (!PsiOptions::instance()->getOption("options.ui.menu.account.admin").toBool()) {
  			adminMenu_->menuAction()->setVisible(false);
-@@ -319,6 +326,19 @@
- 			dlg->show();
- 		} else
+@@ -321,6 +328,19 @@ private slots:
  			bringToFront(dlg);
-+	}
-+
+ 	}
+ 
 +	void contactManager()
 +	{
 +		if (!account)
@@ -61,13 +59,29 @@ Index: psi/src/contactlistaccountmenu.cpp
 +			dlg->show();
 +		} else
 +			bringToFront(dlg);
- 	}
-
++	}
++
  	void xmlConsole()
-Index: psi/src/contactmanager/contactmanagerdlg.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagerdlg.cpp	2013-01-15 14:04:12.796826483 +0400
+ 	{
+ 		if (!account)
+diff --git a/src/contactmanager/contactmanager.pri b/src/contactmanager/contactmanager.pri
+new file mode 100644
+index 0000000..95d9d47
+--- /dev/null
++++ b/src/contactmanager/contactmanager.pri
+@@ -0,0 +1,7 @@
++HEADERS += $$PWD/contactmanagerdlg.h \
++    $$PWD/contactmanagermodel.h \
++	$$PWD/contactmanagerview.h
++SOURCES += $$PWD/contactmanagerdlg.cpp \
++    $$PWD/contactmanagermodel.cpp \
++	$$PWD/contactmanagerview.cpp
++FORMS += $$PWD/contactmanagerdlg.ui
+diff --git a/src/contactmanager/contactmanagerdlg.cpp b/src/contactmanager/contactmanagerdlg.cpp
+new file mode 100644
+index 0000000..ac75af8
+--- /dev/null
++++ b/src/contactmanager/contactmanagerdlg.cpp
 @@ -0,0 +1,318 @@
 +/*
 + * contactmanagerdlg.cpp
@@ -387,10 +401,11 @@ Index: psi/src/contactmanager/contactmanagerdlg.cpp
 +		file.close();
 +	}
 +}
-Index: psi/src/contactmanager/contactmanagerdlg.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagerdlg.h	2013-01-15 14:04:12.796826483 +0400
+diff --git a/src/contactmanager/contactmanagerdlg.h b/src/contactmanager/contactmanagerdlg.h
+new file mode 100644
+index 0000000..4c8a4b8
+--- /dev/null
++++ b/src/contactmanager/contactmanagerdlg.h
 @@ -0,0 +1,60 @@
 +/*
 + * contactmanagerdlg.h
@@ -452,10 +467,11 @@ Index: psi/src/contactmanager/contactmanagerdlg.h
 +};
 +
 +#endif // CONTACTMANAGERDLG_H
-Index: psi/src/contactmanager/contactmanagerdlg.ui
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagerdlg.ui	2013-01-15 14:04:12.796826483 +0400
+diff --git a/src/contactmanager/contactmanagerdlg.ui b/src/contactmanager/contactmanagerdlg.ui
+new file mode 100644
+index 0000000..8fd702a
+--- /dev/null
++++ b/src/contactmanager/contactmanagerdlg.ui
 @@ -0,0 +1,203 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -660,11 +676,12 @@ Index: psi/src/contactmanager/contactmanagerdlg.ui
 +  </connection>
 + </connections>
 +</ui>
-Index: psi/src/contactmanager/contactmanagermodel.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagermodel.cpp	2013-01-15 14:04:12.800826483 +0400
-@@ -0,0 +1,303 @@
+diff --git a/src/contactmanager/contactmanagermodel.cpp b/src/contactmanager/contactmanagermodel.cpp
+new file mode 100644
+index 0000000..a48b52c
+--- /dev/null
++++ b/src/contactmanager/contactmanagermodel.cpp
+@@ -0,0 +1,304 @@
 +/*
 + * contactmanagermodel.cpp
 + * Copyright (C) 2010 Rion
@@ -715,6 +732,7 @@ Index: psi/src/contactmanager/contactmanagermodel.cpp
 +
 +void ContactManagerModel::reloadUsers()
 +{
++	beginResetModel();
 +	clear();
 +	UserList *ul = pa_->userList();
 +	foreach (UserListItem *u, *ul) {
@@ -722,7 +740,7 @@ Index: psi/src/contactmanager/contactmanagermodel.cpp
 +			addContact(u);
 +		}
 +	}
-+	reset();
++	endResetModel();
 +}
 +
 +void ContactManagerModel::clear()
@@ -968,10 +986,11 @@ Index: psi/src/contactmanager/contactmanagermodel.cpp
 +		i++;
 +	}
 +}
-Index: psi/src/contactmanager/contactmanagermodel.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagermodel.h	2013-01-15 14:04:12.800826483 +0400
+diff --git a/src/contactmanager/contactmanagermodel.h b/src/contactmanager/contactmanagermodel.h
+new file mode 100644
+index 0000000..42cdd34
+--- /dev/null
++++ b/src/contactmanager/contactmanagermodel.h
 @@ -0,0 +1,93 @@
 +/*
 + * contactmanagermodel.h
@@ -1066,22 +1085,11 @@ Index: psi/src/contactmanager/contactmanagermodel.h
 +};
 +
 +#endif // CONTACTMANAGERMODEL_H
-Index: psi/src/contactmanager/contactmanager.pri
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanager.pri	2013-01-15 14:04:12.800826483 +0400
-@@ -0,0 +1,7 @@
-+HEADERS += $$PWD/contactmanagerdlg.h \
-+    $$PWD/contactmanagermodel.h \
-+	$$PWD/contactmanagerview.h
-+SOURCES += $$PWD/contactmanagerdlg.cpp \
-+    $$PWD/contactmanagermodel.cpp \
-+	$$PWD/contactmanagerview.cpp
-+FORMS += $$PWD/contactmanagerdlg.ui
-Index: psi/src/contactmanager/contactmanagerview.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagerview.cpp	2013-01-15 14:04:12.800826483 +0400
+diff --git a/src/contactmanager/contactmanagerview.cpp b/src/contactmanager/contactmanagerview.cpp
+new file mode 100644
+index 0000000..9409d7a
+--- /dev/null
++++ b/src/contactmanager/contactmanagerview.cpp
 @@ -0,0 +1,92 @@
 +/*
 + * contactmanagerview.cpp
@@ -1175,10 +1183,11 @@ Index: psi/src/contactmanager/contactmanagerview.cpp
 +		e->ignore();
 +	}
 +}
-Index: psi/src/contactmanager/contactmanagerview.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/contactmanager/contactmanagerview.h	2013-01-15 14:04:12.800826483 +0400
+diff --git a/src/contactmanager/contactmanagerview.h b/src/contactmanager/contactmanagerview.h
+new file mode 100644
+index 0000000..687e715
+--- /dev/null
++++ b/src/contactmanager/contactmanagerview.h
 @@ -0,0 +1,38 @@
 +/*
 + * contactmanagerview.h
@@ -1218,15 +1227,15 @@ Index: psi/src/contactmanager/contactmanagerview.h
 +};
 +
 +#endif // CONTACTMANAGERVIEW_H
-Index: psi/src/src.pri
-===================================================================
---- psi.orig/src/src.pri	2013-01-15 14:04:12.804826483 +0400
-+++ psi/src/src.pri	2013-01-15 14:04:12.800826483 +0400
-@@ -13,6 +13,7 @@
+diff --git a/src/src.pri b/src/src.pri
+index f472ed4..a883010 100644
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -13,6 +13,7 @@ include($$PWD/privacy/privacy.pri)
  include($$PWD/capabilities/capabilities.pri)
  include($$PWD/tabs/tabs.pri)
  include($$PWD/Certificates/Certificates.pri)
 +include($$PWD/contactmanager/contactmanager.pri)
-
+ 
  # tools
  # include($$PWD/tools/trayicon/trayicon.pri)
