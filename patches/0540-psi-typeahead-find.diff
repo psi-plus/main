@@ -1,9 +1,8 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:10.532826391 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:10.524826390 +0400
+diff --git a/options/default.xml b/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -449,6 +449,8 @@
  					<item type="QKeySequence">Ctrl+PgUp</item>
  					<item type="QKeySequence">Ctrl+Shift+Tab</item>
@@ -13,12 +12,11 @@ Index: psi/options/default.xml
  				<find type="QKeySequence" comment="Find text">Ctrl+F</find>
  				<send type="QVariantList" comment="Sends the message">
  					<item type="QKeySequence">Return</item>
-Index: psi/src/chatview_te.cpp
-===================================================================
---- psi.orig/src/chatview_te.cpp	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/chatview_te.cpp	2013-01-15 14:04:10.524826390 +0400
-@@ -452,3 +452,8 @@
-
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -452,3 +452,8 @@ bool ChatView::internalFind(QString str, bool startFromBeginning)
+ 
  	return true;
  }
 +
@@ -26,58 +24,54 @@ Index: psi/src/chatview_te.cpp
 +{
 +	return this;
 +}
-Index: psi/src/chatview_te.h
-===================================================================
---- psi.orig/src/chatview_te.h	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/chatview_te.h	2013-01-15 14:04:10.524826390 +0400
-@@ -61,6 +61,7 @@
- 	void scrollDown();
+diff --git a/src/chatview_te.h b/src/chatview_te.h
+--- a/src/chatview_te.h
++++ b/src/chatview_te.h
+@@ -59,6 +59,7 @@ public:
+ 	void deferredScroll();
  	void doTrackBar();
  	bool internalFind(QString str, bool startFromBeginning = false);
 +	ChatView *textWidget();
-
- protected:
- 	// override the tab/esc behavior
-Index: psi/src/chatview_webkit.cpp
-===================================================================
---- psi.orig/src/chatview_webkit.cpp	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/chatview_webkit.cpp	2013-01-15 14:04:10.524826390 +0400
-@@ -355,4 +355,9 @@
+ 
+ public slots:
+ 	void scrollUp();
+diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
+--- a/src/chatview_webkit.cpp
++++ b/src/chatview_webkit.cpp
+@@ -355,4 +355,9 @@ bool ChatView::internalFind(QString str, bool startFromBeginning)
  	return found;
  }
-
+ 
 +WebView* ChatView::textWidget()
 +{
 +	return webView;
 +}
 +
  #include "chatview_webkit.moc"
-Index: psi/src/chatview_webkit.h
-===================================================================
---- psi.orig/src/chatview_webkit.h	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/chatview_webkit.h	2013-01-15 14:04:10.528826391 +0400
-@@ -65,6 +65,7 @@
+diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
+--- a/src/chatview_webkit.h
++++ b/src/chatview_webkit.h
+@@ -63,6 +63,7 @@ public:
  	void clear();
  	void doTrackBar();
  	bool internalFind(QString str, bool startFromBeginning = false);
 +	WebView * textWidget();
-
- protected:
- 	// override the tab/esc behavior
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:10.528826391 +0400
-@@ -103,7 +103,7 @@
-
-
+ 
+ public slots:
+ 	void scrollUp();
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -103,7 +103,7 @@ static const QString geometryOption = "options.ui.muc.size";
+ 
+ 
  #include "groupchattopicdlg.h"
 -
 +#include "typeaheadfind.h"
  //----------------------------------------------------------------------------
  // StatusPingTask
  //----------------------------------------------------------------------------
-@@ -209,6 +209,7 @@
+@@ -208,6 +208,7 @@ public:
  	QString topic;
  	bool nonAnonymous;		 // got status code 100 ?
  	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark;
@@ -85,28 +79,28 @@ Index: psi/src/groupchatdlg.cpp
  #ifdef WHITEBOARDING
  	IconAction *act_whiteboard;
  #endif
-@@ -228,8 +229,8 @@
+@@ -227,8 +228,8 @@ public:
  	QStringList hist;
  	int histAt;
-
+ 
 -	QPointer<GCFindDlg> findDlg;
 -	QString lastSearch;
 +	//QPointer<GCFindDlg> findDlg;
 +	//QString lastSearch;
-
+ 
  	QPointer<MUCConfigDlg> configDlg;
  	QPointer<GroupchatTopicDlg> topicDlg;
-@@ -607,7 +608,7 @@
+@@ -606,7 +607,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	d->connecting = false;
-
+ 
  	d->histAt = 0;
 -	d->findDlg = 0;
 +	//d->findDlg = 0;
  	d->configDlg = 0;
-
+ 
  	d->state = Private::Connected;
-@@ -641,11 +642,11 @@
-
+@@ -640,11 +641,11 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 
  	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
  	updateIdentityVisibility();
 -
@@ -117,12 +111,12 @@ Index: psi/src/groupchatdlg.cpp
 -
 +*/
  	ui_.tb_emoticons->setIcon(IconsetFactory::icon("psi/smile").icon());
-
+ 
  #ifdef Q_OS_MAC
-@@ -660,9 +661,18 @@
+@@ -659,9 +660,18 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(ui_.lv_users, SIGNAL(action(const QString &, const Status &, int)), SLOT(lv_action(const QString &, const Status &, int)));
  	connect(ui_.lv_users, SIGNAL(insertNick(const QString&)), d, SLOT(insertNick(const QString&)));
-
+ 
 +	// typeahead find bar
 +	QHBoxLayout *hb3a = new QHBoxLayout();
 +	d->typeahead = new TypeAheadFindBar(ui_.log->textWidget(), tr("Find toolbar"), 0);
@@ -131,22 +125,22 @@ Index: psi/src/groupchatdlg.cpp
 +
  	d->act_clear = new IconAction (tr("Clear Chat Window"), "psi/clearChat", tr("Clear Chat Window"), 0, this);
  	connect( d->act_clear, SIGNAL(triggered()), SLOT(doClearButton()));
-
+ 
 +	d->act_find = new IconAction(tr("Find"), "psi/search", tr("&Find"), 0, this, "", true);
 +	connect(d->act_find, SIGNAL(triggered()), d->typeahead, SLOT(toggleVisibility()));
 +
  	d->act_configure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("&Configure Room"), 0, this);
  	connect(d->act_configure, SIGNAL(triggered()), SLOT(configureRoom()));
-
-@@ -705,6 +715,7 @@
-
+ 
+@@ -704,6 +714,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 
  	ui_.toolbar->setIconSize(QSize(16,16));
  	ui_.toolbar->addAction(d->act_clear);
 +	ui_.toolbar->addAction(d->act_find);
  	ui_.toolbar->addAction(d->act_configure);
  #ifdef WHITEBOARDING
  	ui_.toolbar->addAction(d->act_whiteboard);
-@@ -1125,7 +1136,7 @@
+@@ -1124,7 +1135,7 @@ void GCMainDlg::doClearButton()
  		doClear();
  	}
  }
@@ -155,7 +149,7 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::openFind()
  {
  	if(d->findDlg)
-@@ -1136,7 +1147,7 @@
+@@ -1135,7 +1146,7 @@ void GCMainDlg::openFind()
  		d->findDlg->show();
  	}
  }
@@ -164,7 +158,7 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::configureRoom()
  {
  	if(d->configDlg)
-@@ -1150,7 +1161,7 @@
+@@ -1149,7 +1160,7 @@ void GCMainDlg::configureRoom()
  		d->configDlg->show();
  	}
  }
@@ -173,7 +167,7 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::doFind(const QString &str)
  {
  	d->lastSearch = str;
-@@ -1159,7 +1170,7 @@
+@@ -1158,7 +1169,7 @@ void GCMainDlg::doFind(const QString &str)
  	else
  		d->findDlg->error(str);
  }
@@ -182,8 +176,8 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::goDisc()
  {
  	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
-@@ -1739,7 +1750,7 @@
-
+@@ -1738,7 +1749,7 @@ void GCMainDlg::optionsUpdate()
+ 
  	setLooks();
  	setShortcuts();
 -
@@ -191,11 +185,10 @@ Index: psi/src/groupchatdlg.cpp
  	// update status icons
  	ui_.lv_users->updateAll();
  }
-Index: psi/src/groupchatdlg.h
-===================================================================
---- psi.orig/src/groupchatdlg.h	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/groupchatdlg.h	2013-01-15 14:04:10.528826391 +0400
-@@ -115,9 +115,9 @@
+diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
+--- a/src/groupchatdlg.h
++++ b/src/groupchatdlg.h
+@@ -115,9 +115,9 @@ private slots:
  	void mle_returnPressed();
  	void openTopic();
  	void setTopic(const QString &);
@@ -207,10 +200,9 @@ Index: psi/src/groupchatdlg.h
  	void pa_updatedActivity();
  	void goDisc();
  	void goConn();
-Index: psi/src/groupchatdlg.ui
-===================================================================
---- psi.orig/src/groupchatdlg.ui	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/groupchatdlg.ui	2013-01-15 14:04:10.528826391 +0400
+diff --git a/src/groupchatdlg.ui b/src/groupchatdlg.ui
+--- a/src/groupchatdlg.ui
++++ b/src/groupchatdlg.ui
 @@ -96,25 +96,6 @@
             </widget>
            </item>
@@ -237,22 +229,21 @@ Index: psi/src/groupchatdlg.ui
             <widget class="QToolButton" name="tb_emoticons" >
              <property name="toolTip" >
               <string>Select icon</string>
-Index: psi/src/psichatdlg.cpp
-===================================================================
---- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/psichatdlg.cpp	2013-01-15 14:04:10.528826391 +0400
-@@ -309,6 +309,9 @@
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
+@@ -309,6 +309,9 @@ void PsiChatDlg::setShortcuts()
  	ChatDlg::setShortcuts();
-
+ 
  	act_clear_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.clear"));
 +// typeahead find bar
 +	act_find->setShortcuts(ShortcutManager::instance()->shortcuts("chat.find"));
 +// -- typeahead
  	act_info_->setShortcuts(ShortcutManager::instance()->shortcuts("common.user-info"));
  	act_history_->setShortcuts(ShortcutManager::instance()->shortcuts("common.history"));
-
-@@ -336,9 +339,21 @@
-
+ 
+@@ -336,9 +339,21 @@ void PsiChatDlg::updateIdentityVisibility()
+ 
  void PsiChatDlg::initToolButtons()
  {
 +// typeahead find
@@ -264,7 +255,7 @@ Index: psi/src/psichatdlg.cpp
 +
  	act_clear_ = new IconAction(tr("Clear Chat Window"), "psi/clearChat", tr("Clear Chat Window"), 0, this);
  	connect(act_clear_, SIGNAL(triggered()), SLOT(doClearButton()));
-
+ 
 +// typeahead find
 +	act_find = new IconAction(tr("Find"), "psi/search", tr("&Find"), 0, this, "", true);
 +	connect(act_find, SIGNAL(triggered()), typeahead, SLOT(toggleVisibility()));
@@ -273,7 +264,7 @@ Index: psi/src/psichatdlg.cpp
  	connect(account()->psi()->iconSelectPopup(), SIGNAL(textSelected(QString)), this, SLOT(addEmoticon(QString)));
  	act_icon_ = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
  	act_icon_->setMenu(account()->psi()->iconSelectPopup());
-@@ -376,6 +391,9 @@
+@@ -376,6 +391,9 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->setWindowTitle(tr("Chat Toolbar"));
  	ui_.toolbar->setIconSize(QSize(16, 16));
  	ui_.toolbar->addAction(act_clear_);
@@ -283,28 +274,27 @@ Index: psi/src/psichatdlg.cpp
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(act_icon_);
  	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
-@@ -499,6 +517,8 @@
+@@ -499,6 +517,8 @@ void PsiChatDlg::optionsUpdate()
  	smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
-
+ 
  	ChatDlg::optionsUpdate();
 +// typeahead find bar
 +	typeahead->optionsUpdate();
  }
-
+ 
  void PsiChatDlg::updatePGP()
-Index: psi/src/psichatdlg.h
-===================================================================
---- psi.orig/src/psichatdlg.h	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/psichatdlg.h	2013-01-15 14:04:10.528826391 +0400
+diff --git a/src/psichatdlg.h b/src/psichatdlg.h
+--- a/src/psichatdlg.h
++++ b/src/psichatdlg.h
 @@ -8,6 +8,7 @@
  #include "mcmdcompletion.h"
-
+ 
  #include "ui_chatdlg.h"
 +#include "typeaheadfind.h"
-
+ 
  class IconAction;
-
-@@ -78,6 +79,8 @@
+ 
+@@ -78,6 +79,8 @@ private:
  	IconAction* act_file_;
  	IconAction* act_compact_;
  	IconAction* act_voice_;
@@ -313,10 +303,10 @@ Index: psi/src/psichatdlg.h
  	IconAction* act_ps_;
  	IconAction* act_templates_;
  	QAction *act_mini_cmd_;
-Index: psi/src/widgets/typeaheadfind.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/widgets/typeaheadfind.cpp	2013-01-15 14:04:10.528826391 +0400
+diff --git a/src/widgets/typeaheadfind.cpp b/src/widgets/typeaheadfind.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/widgets/typeaheadfind.cpp
 @@ -0,0 +1,290 @@
 +/*
 + * typeaheadfind.cpp - Typeahead find toolbar
@@ -608,10 +598,10 @@ Index: psi/src/widgets/typeaheadfind.cpp
 +{
 +	d->caseSensitive = (state == Qt::Checked);
 +}
-Index: psi/src/widgets/typeaheadfind.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/widgets/typeaheadfind.h	2013-01-15 14:04:10.528826391 +0400
+diff --git a/src/widgets/typeaheadfind.h b/src/widgets/typeaheadfind.h
+new file mode 100644
+--- /dev/null
++++ b/src/widgets/typeaheadfind.h
 @@ -0,0 +1,69 @@
 +/*
 + * typeaheadfind.h - Typeahead find toolbar
@@ -682,11 +672,10 @@ Index: psi/src/widgets/typeaheadfind.h
 +};
 +
 +#endif
-Index: psi/src/widgets/widgets.pri
-===================================================================
---- psi.orig/src/widgets/widgets.pri	2013-01-15 14:04:10.532826391 +0400
-+++ psi/src/widgets/widgets.pri	2013-01-15 14:04:10.528826391 +0400
-@@ -16,7 +16,9 @@
+diff --git a/src/widgets/widgets.pri b/src/widgets/widgets.pri
+--- a/src/widgets/widgets.pri
++++ b/src/widgets/widgets.pri
+@@ -16,7 +16,9 @@ SOURCES += \
  	$$PWD/psitiplabel.cpp \
  	$$PWD/psitabwidget.cpp \
  	$$PWD/psitabbar.cpp \
@@ -694,16 +683,16 @@ Index: psi/src/widgets/widgets.pri
 +	$$PWD/actionlineedit.cpp \
 +	$$PWD/typeaheadfind.cpp
 +
-
+ 
  HEADERS += \
  	$$PWD/stretchwidget.h \
-@@ -41,7 +43,8 @@
+@@ -41,7 +43,8 @@ HEADERS += \
  	$$PWD/psitiplabel.h \
  	$$PWD/psitabwidget.h \
  	$$PWD/psitabbar.h \
 -	$$PWD/actionlineedit.h
 +	$$PWD/actionlineedit.h \
 +	$$PWD/typeaheadfind.h
-
+ 
  FORMS += $$PWD/fancypopup.ui
-
+ 
