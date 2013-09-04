@@ -1,11 +1,10 @@
-Index: psi/src/bookmarkmanager.cpp
-===================================================================
---- psi.orig/src/bookmarkmanager.cpp	2013-01-15 14:04:07.904826284 +0400
-+++ psi/src/bookmarkmanager.cpp	2013-01-15 14:04:07.900826284 +0400
-@@ -138,6 +138,24 @@
+diff --git a/src/bookmarkmanager.cpp b/src/bookmarkmanager.cpp
+--- a/src/bookmarkmanager.cpp
++++ b/src/bookmarkmanager.cpp
+@@ -138,6 +138,24 @@ void BookmarkManager::setIsAvailable(bool available)
  	}
  }
-
+ 
 +bool BookmarkManager::isBookmarked(const XMPP::Jid &j)
 +{
 +	return indexOfConference(j) >= 0;
@@ -27,10 +26,10 @@ Index: psi/src/bookmarkmanager.cpp
  QList<URLBookmark> BookmarkManager::urls() const
  {
  	return urls_;
-@@ -148,6 +166,20 @@
+@@ -148,6 +166,20 @@ QList<ConferenceBookmark> BookmarkManager::conferences() const
  	return conferences_;
  }
-
+ 
 +int BookmarkManager::indexOfConference(const XMPP::Jid &j) const
 +{
 +	if (isAvailable_) {
@@ -48,43 +47,41 @@ Index: psi/src/bookmarkmanager.cpp
  void BookmarkManager::accountStateChanged()
  {
  	if (!account_->isAvailable()) {
-@@ -214,4 +246,5 @@
+@@ -214,4 +246,5 @@ void BookmarkManager::setBookmarks_finished()
  {
  	BookmarkTask* t = static_cast<BookmarkTask*>(sender());
  	Q_UNUSED(t);
 +	emit bookmarksSaved();
  }
-Index: psi/src/bookmarkmanager.h
-===================================================================
---- psi.orig/src/bookmarkmanager.h	2013-01-15 14:04:07.904826284 +0400
-+++ psi/src/bookmarkmanager.h	2013-01-15 14:04:07.900826284 +0400
-@@ -37,18 +37,22 @@
+diff --git a/src/bookmarkmanager.h b/src/bookmarkmanager.h
+--- a/src/bookmarkmanager.h
++++ b/src/bookmarkmanager.h
+@@ -37,18 +37,22 @@ public:
  	BookmarkManager(PsiAccount* account);
-
+ 
  	bool isAvailable() const;
 +	bool isBookmarked(const XMPP::Jid &);
-
+ 
  	QList<URLBookmark> urls() const;
  	QList<ConferenceBookmark> conferences() const;
 +	int indexOfConference(const XMPP::Jid &) const;
-
+ 
  	void setBookmarks(const QList<URLBookmark>&, const QList<ConferenceBookmark>&);
  	void setBookmarks(const QList<URLBookmark>&);
  	void setBookmarks(const QList<ConferenceBookmark>&);
 +	void removeConference(const XMPP::Jid &);
-
+ 
  signals:
  	void availabilityChanged();
  	void urlsChanged(const QList<URLBookmark>&);
  	void conferencesChanged(const QList<ConferenceBookmark>&);
 +	void bookmarksSaved();
-
+ 
  private slots:
  	void getBookmarks_finished();
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:07.904826284 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:07.904826284 +0400
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
 @@ -49,6 +49,9 @@
  #include <QTextDocument> // for TextUtil::escape()
  #include <QToolTip>
@@ -92,7 +89,7 @@ Index: psi/src/groupchatdlg.cpp
 +#include <QCheckBox>
 +#include <QDialogButtonBox>
 +#include <QFormLayout>
-
+ 
  #include "psicon.h"
  #include "psiaccount.h"
 @@ -76,6 +79,7 @@
@@ -103,7 +100,7 @@ Index: psi/src/groupchatdlg.cpp
  #include "mucreasonseditor.h"
  #include "mcmdmanager.h"
  #include "lastactivitytask.h"
-@@ -204,7 +208,7 @@
+@@ -203,7 +207,7 @@ public:
  	QString password;
  	QString topic;
  	bool nonAnonymous;		 // got status code 100 ?
@@ -112,8 +109,8 @@ Index: psi/src/groupchatdlg.cpp
  #ifdef WHITEBOARDING
  	IconAction *act_whiteboard;
  #endif
-@@ -683,6 +687,19 @@
-
+@@ -682,6 +686,19 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ 
  	d->act_templates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
  	d->act_templates->setMenu(getTemplateMenu());
 +
@@ -132,10 +129,10 @@ Index: psi/src/groupchatdlg.cpp
  	ui_.toolbar->setIconSize(QSize(16,16));
  	ui_.toolbar->addAction(d->act_clear);
  	ui_.toolbar->addAction(d->act_configure);
-@@ -895,6 +912,25 @@
+@@ -893,6 +910,25 @@ void GCMainDlg::updateIdentityVisibility()
  	ui_.lb_ident->setVisible(account()->psi()->contactList()->enabledAccounts().count() > 1);
  }
-
+ 
 +void GCMainDlg::updateBookmarkIcon()
 +{
 +	BookmarkManager *bm = account()->bookmarkManager();
@@ -158,18 +155,18 @@ Index: psi/src/groupchatdlg.cpp
  #ifdef WHITEBOARDING
  void GCMainDlg::openWhiteboard()
  {
-@@ -1795,6 +1831,7 @@
- 	if (!PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool())
- 		d->pm_settings->addAction(d->act_ps);
+@@ -1792,6 +1828,7 @@ void GCMainDlg::buildMenu()
+ 	d->pm_settings->addAction(d->act_templates);
+ 	d->pm_settings->addAction(d->act_ps);
  	d->pm_settings->addAction(d->act_nick);
 +	d->pm_settings->addAction(d->act_bookmark);
  }
-
+ 
  void GCMainDlg::chatEditCreated()
-@@ -1853,6 +1890,71 @@
+@@ -1850,6 +1887,71 @@ void GCMainDlg::doPasteAndSend()
  	}
  }
-
+ 
 +void GCMainDlg::doBookmark()
 +{
 +	BookmarkManager *bm = account()->bookmarkManager();
@@ -238,11 +235,10 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::psButtonEnabled()
  {
  	d->act_ps->setEnabled(true);
-Index: psi/src/groupchatdlg.h
-===================================================================
---- psi.orig/src/groupchatdlg.h	2013-01-15 14:04:07.904826284 +0400
-+++ psi/src/groupchatdlg.h	2013-01-15 14:04:07.904826284 +0400
-@@ -130,6 +130,7 @@
+diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
+--- a/src/groupchatdlg.h
++++ b/src/groupchatdlg.h
+@@ -130,6 +130,7 @@ private slots:
  	void unsetConnecting();
  	void action_error(MUCManager::Action, int, const QString&);
  	void updateIdentityVisibility();
@@ -250,7 +246,7 @@ Index: psi/src/groupchatdlg.h
  #ifdef WHITEBOARDING
  	void openWhiteboard();
  #endif
-@@ -137,6 +138,8 @@
+@@ -137,6 +138,8 @@ private slots:
  	void sendButtonMenu();
  	void editTemplates();
  	void doPasteAndSend();
@@ -258,11 +254,10 @@ Index: psi/src/groupchatdlg.h
 +	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();
-
-Index: psi/src/groupchatdlg.ui
-===================================================================
---- psi.orig/src/groupchatdlg.ui	2013-01-15 14:04:07.904826284 +0400
-+++ psi/src/groupchatdlg.ui	2013-01-15 14:04:07.904826284 +0400
+ 
+diff --git a/src/groupchatdlg.ui b/src/groupchatdlg.ui
+--- a/src/groupchatdlg.ui
++++ b/src/groupchatdlg.ui
 @@ -71,10 +71,13 @@
             </widget>
            </item>

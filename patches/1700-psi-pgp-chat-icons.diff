@@ -1,10 +1,7 @@
-Entering 'iris'
-Entering 'src/libpsi'
-Index: psi/src/chatview_te.cpp
-===================================================================
---- psi.orig/src/chatview_te.cpp	2013-01-15 14:04:33.636827330 +0400
-+++ psi/src/chatview_te.cpp	2013-01-15 14:04:33.628827330 +0400
-@@ -46,6 +46,7 @@
+diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
+--- a/src/chatview_te.cpp
++++ b/src/chatview_te.cpp
+@@ -46,6 +46,7 @@ static const char *infomrationalColorOpt = "options.ui.look.colors.messages.info
  ChatView::ChatView(QWidget *parent)
  	: PsiTextView(parent)
  	, isMuc_(false)
@@ -12,7 +9,7 @@ Index: psi/src/chatview_te.cpp
  	, oldTrackBarPosition(0)
  	, dialog_(0)
  {
-@@ -74,12 +75,18 @@
+@@ -74,12 +75,18 @@ ChatView::ChatView(QWidget *parent)
  			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconDelivered = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
@@ -31,10 +28,10 @@ Index: psi/src/chatview_te.cpp
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
  		}
-@@ -109,6 +116,11 @@
+@@ -109,6 +116,11 @@ void ChatView::setDialog(QWidget* dialog)
  	dialog_ = dialog;
  }
-
+ 
 +void ChatView::setEncryptionEnabled(bool enabled)
 +{
 +	isEncryptionEnabled_ = enabled;
@@ -43,7 +40,7 @@ Index: psi/src/chatview_te.cpp
  void ChatView::setSessionData(bool isMuc, const QString &jid, const QString name)
  {
  	isMuc_ = isMuc;
-@@ -149,15 +161,18 @@
+@@ -149,15 +161,18 @@ void ChatView::addLogIconsResources()
  {
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_send"), logIconSend);
@@ -54,7 +51,7 @@ Index: psi/src/chatview_te.cpp
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
 +	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered_pgp"), logIconDeliveredPgp);
  }
-
+ 
  void ChatView::markReceived(QString id)
  {
  	if (useMessageIcons_) {
@@ -63,7 +60,7 @@ Index: psi/src/chatview_te.cpp
  		setLineWrapColumnOrWidth(lineWrapColumnOrWidth());
  	}
  }
-@@ -356,11 +371,14 @@
+@@ -356,11 +371,14 @@ void ChatView::renderMessage(const MessageView &mv)
  	QString timestr = formatTimeStamp(mv.dateTime());
  	QString color = colorString(mv.isLocal(), mv.isSpooled());
  	if (useMessageIcons_ && mv.isAwaitingReceipt()) {
@@ -81,28 +78,27 @@ Index: psi/src/chatview_te.cpp
  	if (mv.isEmote()) {
  		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>");
  	} else {
-Index: psi/src/chatview_te.h
-===================================================================
---- psi.orig/src/chatview_te.h	2013-01-15 14:04:33.636827330 +0400
-+++ psi/src/chatview_te.h	2013-01-15 14:04:33.628827330 +0400
-@@ -64,6 +64,8 @@
- 	bool internalFind(QString str, bool startFromBeginning = false);
- 	ChatView *textWidget();
-
+diff --git a/src/chatview_te.h b/src/chatview_te.h
+--- a/src/chatview_te.h
++++ b/src/chatview_te.h
+@@ -66,6 +66,8 @@ public slots:
+ 	void scrollUp();
+ 	void scrollDown();
+ 
 +	void setEncryptionEnabled(bool enabled);
 +
  protected:
  	// override the tab/esc behavior
  	bool focusNextPrevChild(bool next);
-@@ -93,6 +95,7 @@
-
+@@ -95,6 +97,7 @@ signals:
+ 
  private:
  	bool isMuc_;
 +	bool isEncryptionEnabled_;
  	QString jid_;
  	QString name_;
  	int  oldTrackBarPosition;
-@@ -102,6 +105,9 @@
+@@ -104,6 +107,9 @@ private:
  	QPixmap logIconSend;
  	QPixmap logIconReceive;
  	QPixmap logIconDelivered;
@@ -112,11 +108,10 @@ Index: psi/src/chatview_te.h
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
  	QAction *actQuote_;
-Index: psi/src/chatview_webkit.cpp
-===================================================================
---- psi.orig/src/chatview_webkit.cpp	2013-01-15 14:04:33.636827330 +0400
-+++ psi/src/chatview_webkit.cpp	2013-01-15 14:04:33.628827330 +0400
-@@ -137,6 +137,7 @@
+diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
+--- a/src/chatview_webkit.cpp
++++ b/src/chatview_webkit.cpp
+@@ -137,6 +137,7 @@ ChatView::ChatView(QWidget *parent)
  	, sessionReady_(false)
  	, dialog_(0)
  	, isMuc_(false)
@@ -124,10 +119,10 @@ Index: psi/src/chatview_webkit.cpp
  {
  	jsObject = new ChatViewJSObject(this);
  	webView = new WebView(this);
-@@ -180,6 +181,11 @@
+@@ -180,6 +181,11 @@ void ChatView::init()
  	);
  }
-
+ 
 +void ChatView::setEncryptionEnabled(bool enabled)
 +{
 +	isEncryptionEnabled_ = enabled;
@@ -136,36 +131,35 @@ Index: psi/src/chatview_webkit.cpp
  void ChatView::embedJsObject()
  {
  	ChatViewTheme *theme = currentTheme();
-@@ -196,6 +202,7 @@
+@@ -196,6 +202,7 @@ void ChatView::markReceived(QString id)
  	QVariantMap m;
  	m["type"] = "receipt";
  	m["id"] = id;
 +	m["encrypted"] = isEncryptionEnabled_;
  	sendJsObject(m);
  }
-
-@@ -314,6 +321,7 @@
+ 
+@@ -314,6 +321,7 @@ void ChatView::dispatchMessage(const MessageView &mv)
  	QVariantMap vm = mv.toVariantMap(isMuc_, true);
  	vm["mtype"] = vm["type"];
  	vm["type"] = "message";
 +	vm["encrypted"] = isEncryptionEnabled_;
  	sendJsObject(vm);
  }
-
-Index: psi/src/chatview_webkit.h
-===================================================================
---- psi.orig/src/chatview_webkit.h	2013-01-15 14:04:33.636827330 +0400
-+++ psi/src/chatview_webkit.h	2013-01-15 14:04:33.632827330 +0400
-@@ -67,6 +67,8 @@
- 	bool internalFind(QString str, bool startFromBeginning = false);
- 	WebView * textWidget();
-
+ 
+diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
+--- a/src/chatview_webkit.h
++++ b/src/chatview_webkit.h
+@@ -69,6 +69,8 @@ public slots:
+ 	void scrollUp();
+ 	void scrollDown();
+ 
 +	void setEncryptionEnabled(bool enabled);
 +
  protected:
  	// override the tab/esc behavior
  	bool focusNextPrevChild(bool next);
-@@ -98,6 +100,7 @@
+@@ -100,6 +102,7 @@ private:
  	bool sessionReady_;
  	QPointer<QWidget> dialog_;
  	bool isMuc_;
@@ -173,31 +167,29 @@ Index: psi/src/chatview_webkit.h
  	QString jid_;
  	QString name_;
  	PsiAccount *account_;
-Index: psi/src/psichatdlg.cpp
-===================================================================
---- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:33.636827330 +0400
-+++ psi/src/psichatdlg.cpp	2013-01-15 14:04:33.632827330 +0400
-@@ -782,6 +782,7 @@
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
+@@ -791,6 +791,7 @@ void PsiChatDlg::updatePGP()
  	ui_.tb_pgp->setVisible(account()->hasPGP() &&
  						   !smallChat_ &&
  						   !PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool());
 +	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
-
+ 
  void PsiChatDlg::doClearButton()
-@@ -811,6 +812,7 @@
+@@ -820,6 +821,7 @@ void PsiChatDlg::doClearButton()
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
  	act_pgp_->setChecked(enabled);
 +	ui_.log->setEncryptionEnabled(enabled);
  }
-
+ 
  void PsiChatDlg::toggleSmallChat()
-Index: psi/themes/chatview/psi/classic/index.html
-===================================================================
---- psi.orig/themes/chatview/psi/classic/index.html	2013-01-15 14:04:33.636827330 +0400
-+++ psi/themes/chatview/psi/classic/index.html	2013-01-15 14:04:33.632827330 +0400
-@@ -93,7 +93,7 @@
+diff --git a/themes/chatview/psi/classic/index.html b/themes/chatview/psi/classic/index.html
+--- a/themes/chatview/psi/classic/index.html
++++ b/themes/chatview/psi/classic/index.html
+@@ -92,7 +92,7 @@ window[chatServer.jsNamespace()].theme = function() {
  				var img = document.getElementById("receipt"+shared.cdata.id);
  				if (img) {
  					var sizeUri = messageIconsSize?"?w="+messageIconsSize+"&h="+messageIconsSize:"";
@@ -206,7 +198,7 @@ Index: psi/themes/chatview/psi/classic/index.html
  				}
  			}
  			if (shared.cdata.mtype == "message") {
-@@ -130,6 +130,9 @@
+@@ -132,6 +132,9 @@ window[chatServer.jsNamespace()].theme = function() {
  							icon = shared.cdata.local?(shared.cdata.awaitingReceipt?
  								"psi/notification_chat_send":"psi/notification_chat_delivery_ok")
  								: "psi/notification_chat_receive";

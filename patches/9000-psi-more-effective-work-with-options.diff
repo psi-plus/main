@@ -1,11 +1,9 @@
-Entering 'iris'
-Entering 'src/libpsi'
 diff --git a/src/chatdlg.cpp b/src/chatdlg.cpp
 --- a/src/chatdlg.cpp
 +++ b/src/chatdlg.cpp
-@@ -271,14 +271,15 @@ bool ChatDlg::readyToHide()
+@@ -261,14 +261,15 @@ bool ChatDlg::readyToHide()
  	keepOpen_ = false; // tabdlg calls readyToHide twice on tabdlg close, only display message once.
-
+ 
  	// destroy the dialog if delChats is dcClose
 -	if (PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString() == "instant") {
 +	QString del = PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString();
@@ -22,9 +20,9 @@ diff --git a/src/chatdlg.cpp b/src/chatdlg.cpp
  			setSelfDestruct(60 * 24);
  		}
  	}
-@@ -575,15 +576,16 @@ void ChatDlg::optionsUpdate()
+@@ -565,15 +566,16 @@ void ChatDlg::optionsUpdate()
  	setShortcuts();
-
+ 
  	if (!isTabbed() && isHidden()) {
 -		if (PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString() == "instant") {
 +		QString del = PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString();
@@ -46,7 +44,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
 --- a/src/gcuserview.cpp
 +++ b/src/gcuserview.cpp
 @@ -61,25 +61,26 @@ public:
-
+ 
  	void updateSettings()
  	{
 +		PsiOptions *o = PsiOptions::instance();
@@ -80,34 +78,34 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
 +		avatarSize_ = o->getOption("options.ui.muc.userlist.avatars.size").toInt();
 +		avatarAtLeft_ = o->getOption("options.ui.muc.userlist.avatars.avatars-at-left").toBool();
 +		avatarRadius_ = o->getOption("options.ui.muc.userlist.avatars.radius").toInt();
-
+ 
  		QFont font;
 -		font.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
 +		font.fromString(o->getOption("options.ui.look.font.contactlist").toString());
  		fontHeight_ = QFontMetrics(font).height()+2;
  	}
-
+ 
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -653,8 +653,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -662,8 +662,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(account(), SIGNAL(updatedActivity()), SLOT(pa_updatedActivity()));
  	d->mucManager = new MUCManager(account()->client(), jid());
-
+ 
 -	options_ = PsiOptions::instance();
 -
  	d->pending = 0;
  	d->hPending = 0;
  	d->connecting = false;
-@@ -1460,6 +1458,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
- 		d->act_configure->setEnabled(s.mucItem().affiliation() >= MUCItem::Member);
+@@ -1483,6 +1481,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+ 		d->actions->action("gchat_configure")->setEnabled(s.mucItem().affiliation() >= MUCItem::Member);
  	}
-
+ 
 +	PsiOptions *options_ = PsiOptions::instance();
-
+ 
  	if(s.isAvailable()) {
  		// Available
-@@ -1535,7 +1534,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1558,7 +1557,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -116,10 +114,10 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
  				if (s.status() != contact->s.status() || s.show() != contact->s.show() ||
  						(statusWithPriority && s.priority() != contact->s.priority())) {
  					ui_.log->dispatchMessage(MessageView::statusMessage(
-@@ -1677,12 +1676,13 @@ void GCMainDlg::message(const Message &_m)
+@@ -1700,12 +1699,13 @@ void GCMainDlg::message(const Message &_m)
  		d->nonAnonymous = false;
  	}
-
+ 
 +	PsiOptions *options = PsiOptions::instance();
  	if(!m.subject().isNull()) {
  		QString subject = m.subject();
@@ -131,10 +129,10 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
  			subjectTooltip = TextUtil::emoticonify(subjectTooltip);
  		}
  		ui_.le_topic->setText(subject.replace("\n\n", " || ").replace("\n", " | ").replace("\t", " ").replace(QRegExp("\\s{2,}"), " "));
-@@ -1716,8 +1716,8 @@ void GCMainDlg::message(const Message &_m)
+@@ -1739,8 +1739,8 @@ void GCMainDlg::message(const Message &_m)
  	if (m.body().left(d->self.length()) == d->self)
  		d->lastReferrer = m.from().resource();
-
+ 
 -	if(PsiOptions::instance()->getOption("options.ui.muc.use-highlighting").toBool()) {
 -		QStringList highlightWords = PsiOptions::instance()->getOption("options.ui.muc.highlight-words").toStringList();
 +	if(options->getOption("options.ui.muc.use-highlighting").toBool()) {
@@ -142,20 +140,20 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
  		foreach (QString word, highlightWords) {
  			if(m.body().contains((word), Qt::CaseInsensitive)) {
  				alert = true;
-@@ -1731,10 +1731,10 @@ void GCMainDlg::message(const Message &_m)
+@@ -1754,10 +1754,10 @@ void GCMainDlg::message(const Message &_m)
  			account()->playSound(PsiAccount::eSend);
  	}
  	else {
 -		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
 +		if(alert || (options->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
  			account()->playSound(PsiAccount::eGroupChat);
-
+ 
 -		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
 +		if(alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
  			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
  				XMPP::Jid jid = m.from()/*.withDomain("")*/;
  				MessageEvent *e = new MessageEvent(m, account());
-@@ -1807,9 +1807,8 @@ void GCMainDlg::appendSysMsg(const MessageView &mv)
+@@ -1830,9 +1830,8 @@ void GCMainDlg::appendSysMsg(const MessageView &mv)
  void GCMainDlg::appendMessage(const Message &m, bool alert)
  {
  	MessageView mv(MessageView::Message);
@@ -170,13 +168,13 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
 diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -171,7 +171,6 @@ private:
-
+@@ -172,7 +172,6 @@ private:
+ 
  	void contextMenuEvent(QContextMenuEvent *);
-
+ 
 -	PsiOptions* options_;
  	QDateTime lastMsgTime_;
-
+ 
  	void setMargins();
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
 --- a/src/psiaccount.cpp
@@ -207,7 +205,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  	d->avatarFactory = 0;
 @@ -1358,7 +1355,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	}
-
+ 
  	// Extended presence
 -	if (d->options->getOption("options.extended-presence.notify").toBool()) {
 +	if (PsiOptions::instance()->getOption("options.extended-presence.notify").toBool()) {
@@ -215,17 +213,17 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  		pepNodes += "http://jabber.org/protocol/mood+notify";
  		pepNodes += "http://jabber.org/protocol/activity+notify";
 @@ -1841,7 +1838,7 @@ void PsiAccount::forceDisconnect(bool fast, const XMPP::Status &s)
-
+ 
  	if(loggedIn()) {
  		// Extended Presence
 -		if (d->options->getOption("options.extended-presence.tune.publish").toBool() && !d->lastTune.isNull())
 +		if (PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool() && !d->lastTune.isNull())
  			publishTune(Tune());
-
+ 
  		d->client->removeExtension("ep");
 @@ -2421,7 +2418,7 @@ void PsiAccount::setPEPAvailable(bool b)
  	}
-
+ 
  	// Publish current tune information
 -	if (b && d->psi->tuneManager() && d->options->getOption("options.extended-presence.tune.publish").toBool()) {
 +	if (b && d->psi->tuneManager() && PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool()) {
@@ -249,7 +247,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  			foreach (ChatDlg *cl, findChatDialogs(m.from(), false)) {
  				if (cl->autoSelectContact() || cl->jid().resource().isEmpty() || m.from().resource() == cl->jid().resource()) {
 @@ -3206,7 +3204,7 @@ void PsiAccount::tuneStopped()
-
+ 
  void PsiAccount::tunePlaying(const Tune& tune)
  {
 -	if (loggedIn() && d->options->getOption("options.extended-presence.tune.publish").toBool()) {
@@ -257,7 +255,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  		publishTune(tune);
  	}
  }
-@@ -5015,6 +5013,7 @@ void PsiAccount::createNewPluginEvent(const QString &jid, const QString &descr,
+@@ -5014,6 +5012,7 @@ void PsiAccount::createNewPluginEvent(const QString &jid, const QString &descr,
  // handle an incoming event
  void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  {
@@ -265,7 +263,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  	if (e && activationType != FromXml) {
  		setEnabled();
  	}
-@@ -5112,7 +5111,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5111,7 +5110,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  			return;
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
@@ -274,8 +272,8 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  				foreach (ChatDlg *c, findChatDialogs(e->from(), false)) {
  					if (c->autoSelectContact()  || c->jid().resource().isEmpty() || e->from().resource() == c->jid().resource()) {
  						if (c->autoSelectContact())
-@@ -5127,7 +5126,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
-
+@@ -5126,7 +5125,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+ 
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
 -			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
@@ -283,7 +281,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  				ChatDlg *c = findChatDialogEx(e->from());
  				if (c) {
  					c->setJid(e->from());
-@@ -5163,7 +5162,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5162,7 +5161,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  #endif
  				c->incomingMessage(m);
  				soundType = eChat2;
@@ -292,7 +290,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  					|| (c->isTabbed() && c->getManagingTabDlg()->isHidden()) ) {
  					// to alert the chat also, we put it in the queue
  					me->setSentToChatWindow(true);
-@@ -5171,7 +5170,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5170,7 +5169,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  				else {
  					putToQueue = false;
  #ifdef YAPSI
@@ -301,7 +299,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  						openChat(e->from(), activationType);
  					}
  #endif
-@@ -5259,7 +5258,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5258,7 +5257,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  			}
  			else if (userListItem && userListItem->inList()) {
  #else
@@ -310,7 +308,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  #endif
  				// Check if we want to request auth as well
  				UserListItem *u = d->userList.find(ae->from());
-@@ -5273,7 +5272,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5272,7 +5271,7 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  			}
  		}
  		else if(ae->authType() == "subscribed") {
@@ -319,10 +317,10 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  				putToQueue = false;
  		}
  		else if(ae->authType() == "unsubscribe") {
-@@ -5306,12 +5305,12 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5305,12 +5304,12 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  			r = *(u->priority());
  		}
-
+ 
 -		if ((popupType == PopupManager::AlertChat      && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-chat").toBool())     ||
 -		    (popupType == PopupManager::AlertMessage   && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-message").toBool())  ||
 -		    (popupType == PopupManager::AlertHeadline  && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.incoming-headline").toBool()) ||
@@ -338,7 +336,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  		{
  #ifdef PSI_PLUGINS
  			if(e->type() != PsiEvent::Plugin) {
-@@ -5787,7 +5786,7 @@ bool PsiAccount::groupChatJoin(const QString &host, const QString &room, const Q
+@@ -5786,7 +5785,7 @@ bool PsiAccount::groupChatJoin(const QString &host, const QString &room, const Q
  	else {
  		Status s = d->loginStatus;
  		s.setXSigned("");
@@ -346,14 +344,14 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
 +		return d->client->groupChatJoin(host, room, nick, pass, PsiOptions::instance()->getOption("options.muc.context.maxchars").toInt(),PsiOptions::instance()->getOption("options.muc.context.maxstanzas").toInt(),PsiOptions::instance()->getOption("options.muc.context.seconds").toInt(),s);
  	}
  }
-
-@@ -6313,11 +6312,12 @@ void PsiAccount::processEncryptedMessageDone()
-
+ 
+@@ -6312,11 +6311,12 @@ void PsiAccount::processEncryptedMessageDone()
+ 
  void PsiAccount::optionsUpdate()
  {
 +	PsiOptions *o = PsiOptions::instance();
  	profileUpdateEntry(d->self);
-
+ 
  	// Tune
  #ifdef USE_PEP // Tune cleaning not working. It's implemented in psicon.cpp in PsiCon::optionChanged
 -	bool publish = d->options->getOption("options.extended-presence.tune.publish").toBool();
@@ -361,31 +359,31 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  	if (!d->lastTune.isNull() && !publish) {
  		publishTune(Tune());
  	}
-@@ -6329,19 +6329,19 @@ void PsiAccount::optionsUpdate()
+@@ -6328,19 +6328,19 @@ void PsiAccount::optionsUpdate()
  #endif
-
+ 
  	// Chat states
 -	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
 +	setSendChatState(o->getOption("options.messages.send-composing-events").toBool());
-
+ 
  	//Receipts
 -	setReceipts(PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
 +	setReceipts(o->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
-
+ 
  	// Remote Controlling
 -	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
 +	setRCEnabled(o->getOption("options.external-control.adhoc-remote-control.enable").toBool());
-
+ 
  	// Roster item exchange
 -	d->rosterItemExchangeTask->setIgnoreNonRoster(PsiOptions::instance()->getOption("options.messages.ignore-non-roster-contacts").toBool());
 +	d->rosterItemExchangeTask->setIgnoreNonRoster(o->getOption("options.messages.ignore-non-roster-contacts").toBool());
-
+ 
  	// Caps manager
 -	d->capsManager->setEnabled(PsiOptions::instance()->getOption("options.service-discovery.enable-entity-capabilities").toBool());
 +	d->capsManager->setEnabled(o->getOption("options.service-discovery.enable-entity-capabilities").toBool());
  }
-
-
+ 
+ 
 diff --git a/src/psicon.cpp b/src/psicon.cpp
 --- a/src/psicon.cpp
 +++ b/src/psicon.cpp
@@ -396,29 +394,29 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
 -	if (PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool() && d->autoUpdater)
 +	if (options->getOption("options.auto-update.check-on-startup").toBool() && d->autoUpdater)
  		d->autoUpdater->checkForUpdates();
-
+ 
  	d->iconSelect = new IconSelectPopup(0);
  	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
-
+ 
 -	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	const QString css = options->getOption("options.ui.chat.css").toString();
  	if (!css.isEmpty())
  		d->iconSelect->setStyleSheet(css);
-
+ 
 @@ -546,8 +546,8 @@ bool PsiCon::init()
  	Anim::setMainThread(QThread::currentThread());
-
+ 
  	// setup the main window
 -	d->mainwin = new MainWin(PsiOptions::instance()->getOption("options.ui.contactlist.always-on-top").toBool(), (PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() && PsiOptions::instance()->getOption("options.contactlist.use-toolwindow").toBool()), this);
 -	d->mainwin->setUseDock(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool());
 +	d->mainwin = new MainWin(options->getOption("options.ui.contactlist.always-on-top").toBool(), (options->getOption("options.ui.systemtray.enable").toBool() && options->getOption("options.contactlist.use-toolwindow").toBool()), this);
 +	d->mainwin->setUseDock(options->getOption("options.ui.systemtray.enable").toBool());
  	d->bossKey = new BossKey(d->mainwin);
-
+ 
  	Q_UNUSED(psiConObject);
 @@ -573,8 +573,8 @@ bool PsiCon::init()
  	d->mainwin->setGeometryOptionPath("options.ui.contactlist.saved-window-geometry");
-
+ 
  	if (result &&
 -		!(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() &&
 -		  PsiOptions::instance()->getOption("options.contactlist.hide-on-start").toBool()))
@@ -429,7 +427,7 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
  	}
 @@ -674,15 +674,17 @@ bool PsiCon::init()
  		}
-
+ 
  		// Disable accounts if necessary, and overwrite locked properties
 -		if (PsiOptions::instance()->getOption("options.ui.account.single").toBool() || !PsiOptions::instance()->getOption("options.account.domain").toString().isEmpty()) {
 +		bool single = options->getOption("options.ui.account.single").toBool();
@@ -459,15 +457,15 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
  			}
 @@ -710,7 +712,7 @@ bool PsiCon::init()
  		emit statusMessageChanged(d->contactList->defaultAccount()->status().status());
-
+ 
  	// show tip of the day
 -	if ( PsiOptions::instance()->getOption("options.ui.tip.show").toBool() ) {
 +	if ( options->getOption("options.ui.tip.show").toBool() ) {
  		TipDlg::show(this);
  	}
-
+ 
 @@ -728,11 +730,11 @@ bool PsiCon::init()
-
+ 
  	if(AvCallManager::isSupported()) {
  		options_avcall_update();
 -		AvCallManager::setAudioOutDevice(PsiOptions::instance()->getOption("options.media.devices.audio-output").toString());
@@ -481,14 +479,14 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
 +		AvCallManager::setBasePort(options->getOption("options.p2p.bytestreams.listen-port").toInt());
 +		AvCallManager::setExternalAddress(options->getOption("options.p2p.bytestreams.external-address").toString());
  	}
-
-
+ 
+ 
 @@ -1478,10 +1480,10 @@ void PsiCon::optionChanged(const QString& option)
  void PsiCon::slotApplyOptions()
  {
  	PsiIconset::instance()->reloadRoster();
 +	PsiOptions *o = PsiOptions::instance();
-
+ 
  #ifndef Q_OS_MAC
 -	PsiOptions *o = PsiOptions::instance();
 -	if (!PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool()) {
@@ -507,7 +505,7 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
  #endif
 @@ -1504,16 +1506,16 @@ void PsiCon::slotApplyOptions()
  	updateS5BServerAddresses();
-
+ 
  	if(AvCallManager::isSupported()) {
 -		AvCallManager::setAudioOutDevice(PsiOptions::instance()->getOption("options.media.devices.audio-output").toString());
 -		AvCallManager::setAudioInDevice(PsiOptions::instance()->getOption("options.media.devices.audio-input").toString());
@@ -520,14 +518,14 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
 +		AvCallManager::setBasePort(o->getOption("options.p2p.bytestreams.listen-port").toInt());
 +		AvCallManager::setExternalAddress(o->getOption("options.p2p.bytestreams.external-address").toString());
  	}
-
+ 
  	// mainwin stuff
 -	d->mainwin->setWindowOpts(PsiOptions::instance()->getOption("options.ui.contactlist.always-on-top").toBool(), (PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() && PsiOptions::instance()->getOption("options.contactlist.use-toolwindow").toBool()));
 -	d->mainwin->setUseDock(PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool());
 +	d->mainwin->setWindowOpts(o->getOption("options.ui.contactlist.always-on-top").toBool(), (o->getOption("options.ui.systemtray.enable").toBool() && o->getOption("options.contactlist.use-toolwindow").toBool()));
 +	d->mainwin->setUseDock(o->getOption("options.ui.systemtray.enable").toBool());
  	d->mainwin->buildToolbars();
-
+ 
  	// notify about options change
 @@ -1545,9 +1547,10 @@ void PsiCon::queueChanged()
  void PsiCon::startBounce()
@@ -544,17 +542,17 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
  	}
 @@ -1605,7 +1608,8 @@ void PsiCon::recentGCAdd(const QString &str)
  	recentList.prepend(str);
-
+ 
  	// trim the list if bigger than 10
 -	while(recentList.count() > PsiOptions::instance()->getOption("options.muc.recent-joins.maximum").toInt()) {
 +	int max = PsiOptions::instance()->getOption("options.muc.recent-joins.maximum").toInt();
 +	while(recentList.count() > max) {
  		recentList.takeLast();
  	}
-
+ 
 @@ -1858,17 +1862,18 @@ void PsiCon::updateS5BServerAddresses()
  		slist += (*hit).toString();
-
+ 
  	// add external
 -	if(!PsiOptions::instance()->getOption("options.p2p.bytestreams.external-address").toString().isEmpty()) {
 +	QString extAddr = PsiOptions::instance()->getOption("options.p2p.bytestreams.external-address").toString();
@@ -572,12 +570,12 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
 -			slist += PsiOptions::instance()->getOption("options.p2p.bytestreams.external-address").toString();
 +			slist += extAddr;
  	}
-
+ 
  	// set up the server
 @@ -1880,9 +1885,10 @@ void PsiCon::s5b_init()
  	if(d->s5bServer->isActive())
  		d->s5bServer->stop();
-
+ 
 -	if (PsiOptions::instance()->getOption("options.p2p.bytestreams.listen-port").toInt()) {
 -		if(!d->s5bServer->start(PsiOptions::instance()->getOption("options.p2p.bytestreams.listen-port").toInt())) {
 -			QMessageBox::warning(0, tr("Warning"), tr("Unable to bind to port %1 for Data Transfer.\nThis may mean you are already running another instance of Psi. You may experience problems sending and/or receiving files.").arg(PsiOptions::instance()->getOption("options.p2p.bytestreams.listen-port").toInt()));
@@ -597,7 +595,7 @@ diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate
  static const QString statusIconsetOptionPath = "options.iconsets.status";
 +static const QString allClientsOptionPath = "options.ui.contactlist.show-all-client-icons";
 +static const QString enableGroupsOptionPath = "options.ui.contactlist.enable-groups";
-
+ 
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
 @@ -81,6 +83,8 @@ PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
@@ -607,7 +605,7 @@ diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate
 +	optionChanged(allClientsOptionPath);
 +	optionChanged(enableGroupsOptionPath);
  }
-
+ 
  PsiContactListViewDelegate::~PsiContactListViewDelegate()
 @@ -195,7 +199,7 @@ void PsiContactListViewDelegate::drawContact(QPainter* painter, const QStyleOpti
  		int size = avatarSize_;
@@ -624,7 +622,7 @@ diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate
  	if (showClientIcons_) {
 -		bool showAllClients = PsiOptions::instance()->getOption("options.ui.contactlist.show-all-client-icons").toBool();
  		const QList<QPixmap> pixList = this->clientPixmap(index);
-
+ 
  		for (QList<QPixmap>::ConstIterator it = pixList.begin(); it != pixList.end(); ++it) {
  			const QPixmap &pix = *it;
  			rightPixs.push_back(pix);
@@ -634,7 +632,7 @@ diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate
 +				break;
  		}
  	}
-
+ 
 @@ -577,6 +581,14 @@ void PsiContactListViewDelegate::optionChanged(const QString& option)
  		statusSingle_ = !PsiOptions::instance()->getOption(statusSingleOptionPath).toBool();
  		contactList()->viewport()->update();
@@ -648,7 +646,7 @@ diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate
 +		contactList()->viewport()->update();
 +	}
  }
-
+ 
  void PsiContactListViewDelegate::rosterIconsSizeChanged(int size)
 diff --git a/src/psicontactlistviewdelegate.h b/src/psicontactlistviewdelegate.h
 --- a/src/psicontactlistviewdelegate.h
@@ -659,5 +657,5 @@ diff --git a/src/psicontactlistviewdelegate.h b/src/psicontactlistviewdelegate.h
  	int statusIconSize_;
 +	bool enableGroups_, allClients_;
  };
-
+ 
  #endif
