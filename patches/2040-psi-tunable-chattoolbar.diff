@@ -1,5 +1,5 @@
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index 927d5a0..49471a5 100644
+index e776a52..8af3bfc 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -213,7 +213,7 @@ index 927d5a0..49471a5 100644
  	}
  
  
-@@ -1891,7 +1913,7 @@ void GCMainDlg::setLooks()
+@@ -1896,7 +1918,7 @@ void GCMainDlg::setLooks()
  	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
  	ui_.lv_users->setFont(f);
  
@@ -222,7 +222,7 @@ index 927d5a0..49471a5 100644
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -1919,6 +1941,28 @@ void GCMainDlg::setLooks()
+@@ -1924,6 +1946,28 @@ void GCMainDlg::setLooks()
  	ui_.lv_users->setLooks();
  }
  
@@ -251,7 +251,7 @@ index 927d5a0..49471a5 100644
  void GCMainDlg::optionsUpdate()
  {
  	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
-@@ -1926,6 +1970,7 @@ void GCMainDlg::optionsUpdate()
+@@ -1931,6 +1975,7 @@ void GCMainDlg::optionsUpdate()
  	delete m;*/
  
  	setLooks();
@@ -259,7 +259,7 @@ index 927d5a0..49471a5 100644
  	setShortcuts();
  	d->typeahead->optionsUpdate();
  	// update status icons
-@@ -2051,16 +2096,16 @@ void GCMainDlg::buildMenu()
+@@ -2056,16 +2101,16 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -281,7 +281,7 @@ index 927d5a0..49471a5 100644
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
  }
-@@ -2116,7 +2161,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2121,7 +2166,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -290,7 +290,7 @@ index 927d5a0..49471a5 100644
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2194,7 +2239,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2199,7 +2244,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -300,10 +300,10 @@ index 927d5a0..49471a5 100644
  
  void GCMainDlg::sendTemp(const QString &templText)
 diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
-index 3b958d4..657d751 100644
+index 695e2b9..3552f96 100644
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -164,6 +164,7 @@ private:
+@@ -165,6 +165,7 @@ private:
  	void appendSysMsg(const MessageView &);
  	void appendMessage(const Message &, bool);
  	void setLooks();
@@ -312,7 +312,7 @@ index 3b958d4..657d751 100644
  	void mucKickMsgHelper(const QString &nick, const Status &s, const QString &nickJid, const QString &title,
  			const QString &youSimple, const QString &youBy, const QString &someoneSimple,
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index 8dec9cc..fdf36f2 100644
+index 8dec9cc..cecb0a6 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -397,8 +397,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
@@ -819,7 +819,7 @@ index 95ae0ca..4068b89 100644
    <customwidget>
     <class>IconToolButton</class>
 diff --git a/src/options/opt_toolbars.cpp b/src/options/opt_toolbars.cpp
-index 0e676f1..c205105 100644
+index 0e676f1..cd76b44 100644
 --- a/src/options/opt_toolbars.cpp
 +++ b/src/options/opt_toolbars.cpp
 @@ -23,6 +23,10 @@
@@ -944,7 +944,21 @@ index 0e676f1..c205105 100644
  
  	d->tw_availActions->clear();
  	d->lw_selectedActions->clear();
-@@ -357,7 +401,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -347,9 +391,11 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+ 	ToolbarPrefs tb;
+ 	tb = p->toolbars[base];
+ 
+-	d->le_toolbarName->setText(tb.name);
++	if (item > 1) {
++		d->le_toolbarName->setText(tb.name);
++		d->ck_toolbarLocked->setChecked(tb.locked || !moveable);
++	}
+ 	d->ck_toolbarOn->setChecked(tb.on);
+-	d->ck_toolbarLocked->setChecked(tb.locked || !moveable);
+ 	// d->ck_toolbarStretch->setChecked(tb.stretchable);
+ 
+ 	{
+@@ -357,7 +403,9 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  		QTreeWidget *tw = d->tw_availActions;
  		QTreeWidgetItem *lastRoot = 0;
  
@@ -955,7 +969,7 @@ index 0e676f1..c205105 100644
  			QTreeWidgetItem *root = new QTreeWidgetItem(tw, lastRoot);
  			lastRoot = root;
  			root->setText(0, actionList->name());
-@@ -388,7 +434,7 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
+@@ -388,7 +436,7 @@ void OptionsTabToolbars::toolbarSelectionChanged(int item)
  
  	QStringList::Iterator it = tb.keys.begin();
  	for (; it != tb.keys.end(); ++it) {
@@ -964,7 +978,7 @@ index 0e676f1..c205105 100644
  	}
  	updateArrows();
  
-@@ -520,7 +566,7 @@ void OptionsTabToolbars::toolbarAddAction()
+@@ -520,7 +568,7 @@ void OptionsTabToolbars::toolbarAddAction()
  	if (!item || item->data(0, Qt::UserRole).toString().isEmpty())
  		return;
  
@@ -973,8 +987,22 @@ index 0e676f1..c205105 100644
  	rebuildToolbarKeys();
  	updateArrows();
  }
+@@ -553,9 +601,11 @@ void OptionsTabToolbars::toolbarDataChanged()
+ 	tb = p->toolbars[base];
+ 
+ 	tb.dirty = true;
+-	tb.name = d->le_toolbarName->text();
++	if (n > 1) {
++		tb.name = d->le_toolbarName->text();
++		tb.locked = d->ck_toolbarLocked->isChecked();
++	}
+ 	tb.on = d->ck_toolbarOn->isChecked();
+-	tb.locked = d->ck_toolbarLocked->isChecked();
+ 	// tb.stretchable = d->ck_toolbarStretch->isChecked();
+ 
+ 	p->toolbars[base] = tb;
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
-index d9c2da2..83664d9 100644
+index d9c2da2..abe1a79 100644
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
 @@ -1358,6 +1358,62 @@ bool OptionsMigration::fromFile(const QString &fname)
@@ -1541,7 +1569,7 @@ index 7e0ccb5..f7c4d99 100644
  
  	ActionLineEdit *le_autojid;
 diff --git a/src/psioptions.cpp b/src/psioptions.cpp
-index ede8253..2f48b9a 100644
+index ede8253..48c4228 100644
 --- a/src/psioptions.cpp
 +++ b/src/psioptions.cpp
 @@ -31,10 +31,8 @@
