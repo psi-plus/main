@@ -610,15 +610,21 @@
  
 --- psi.orig/src/chatview_webkit.cpp
 +++ psi/src/chatview_webkit.cpp
-@@ -309,6 +309,8 @@ bool ChatView::handleCopyEvent(QObject *
- // input point of all messages
- void ChatView::dispatchMessage(const MessageView &mv)
- {
-+	if (mv.isHistory())
-+		return;
- 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
- 			&& updateLastMsgTime(mv.dateTime()))
- 	{
+@@ -316,12 +316,14 @@ void ChatView::dispatchMessage(const Mes
+ 		m["date"] = mv.dateTime();
+ 		m["type"] = "message";
+ 		m["mtype"] = "lastDate";
++		m["history"] = mv.isHistory();
+ 		sendJsObject(m);
+ 	}
+ 	QVariantMap vm = mv.toVariantMap(isMuc_, true);
+ 	vm["mtype"] = vm["type"];
+ 	vm["type"] = "message";
+ 	vm["encrypted"] = isEncryptionEnabled_;
++	vm["history"] = mv.isHistory();
+ 	sendJsObject(vm);
+ }
+ 
 --- psi.orig/src/eventdb.cpp
 +++ psi/src/eventdb.cpp
 @@ -28,23 +28,27 @@
@@ -4456,3 +4462,94 @@
  
  	QString getHtml() const;
  	QString getPlainText() const;
+--- psi.orig/themes/chatview/psi/adapter.js
++++ psi/themes/chatview/psi/adapter.js
+@@ -22,6 +22,7 @@ window[chatServer.jsNamespace()].adapter
+ 			scroller : null,
+ 			varHandlers : {},
+ 			prevGrouppingData : null,
++			historyBlock : null,
+ 			groupping : false,
+ 			chatElement : null,
+ 
+@@ -52,11 +53,13 @@ window[chatServer.jsNamespace()].adapter
+ 				return eval("[" + shared.server.colorOption(name) + "][0]")
+ 			},
+ 
+-			appendHtml : function(html, scroll, nextEl) { //scroll[true|false|auto/other]
++			appendHtml : function(html, scroll, nextEl, hist) { //scroll[true|false|auto/other]
+ 				if (typeof(scroll) == 'boolean') {
+ 					shared.scroller.atBottom = scroll;
+ 				}
+-				if (nextEl) {
++				if (hist) {
++					chat.util.appendHtml(shared.getHistoryBlock(), html);
++				} else if (nextEl) {
+ 					chat.util.siblingHtml(nextEl, html);
+ 				} else {
+ 					chat.util.appendHtml(shared.chatElement, html);
+@@ -64,6 +67,15 @@ window[chatServer.jsNamespace()].adapter
+ 				shared.scroller.invalidate();
+ 			},
+ 
++			getHistoryBlock : function() {
++				if (!shared.historyBlock) {
++					shared.historyBlock = document.createElement("div");
++					shared.chatElement.insertBefore(shared.historyBlock, shared.chatElement.firstChild);
++					//shared.chatElement.appendChild(shared.historyBlock);
++				}
++				return shared.historyBlock;
++			},
++
+ 			stopGroupping : function() {
+ 				if (shared.prevGrouppingData) {
+ 					shared.prevGrouppingData.nextEl.parentNode.removeChild(shared.prevGrouppingData.nextEl)
+@@ -214,12 +226,16 @@ window[chatServer.jsNamespace()].adapter
+ 							break;
+ 					}
+ 					if (template) {
+-						shared.appendHtml(template.toString(), data.local?true:null, data.nextOfGroup?
+-							shared.prevGrouppingData.nextEl:null); //force scroll on local messages
+-						shared.stopGroupping();// safe clean up previous data
+-						if (shared.cdata.nextEl) { //convert to DOM
+-							shared.cdata.nextEl = document.getElementById(shared.cdata.nextEl);
+-							shared.prevGrouppingData = shared.cdata;
++						if (data.history) {
++							shared.appendHtml(template.toString(), false, null, true);
++						} else {
++							shared.appendHtml(template.toString(), data.local?true:null, data.nextOfGroup?
++								shared.prevGrouppingData.nextEl:null); //force scroll on local messages
++							shared.stopGroupping();// safe clean up previous data
++							if (shared.cdata.nextEl) { //convert to DOM
++								shared.cdata.nextEl = document.getElementById(shared.cdata.nextEl);
++								shared.prevGrouppingData = shared.cdata;
++							}
+ 						}
+ 					} else {
+ 						throw "Template not found";
+--- psi.orig/themes/chatview/psi/classic/index.html
++++ psi/themes/chatview/psi/classic/index.html
+@@ -99,7 +99,11 @@ window[chatServer.jsNamespace()].theme =
+ 				var template = shared.cdata.emote && shared.templates.messageNC ||
+ 					(shared.cdata.spooled && shared.templates.message || null);
+ 				if (template) {
+-					shared.appendHtml(template.toString(), shared.cdata.local?true:null);
++					if (shared.cdata.history) {
++						shared.appendHtml(template.toString(), false, null, true);
++					} else {
++						shared.appendHtml(template.toString(), shared.cdata.local?true:null);
++					}
+ 					return false;
+ 				}
+ 			}
+@@ -129,6 +133,10 @@ window[chatServer.jsNamespace()].theme =
+ 				if (useMessageIcons) {
+ 					switch (shared.cdata.mtype) {
+ 						case "message":
++							if (shared.cdata.history) {
++								icon = "psi/history";
++								break;
++							}
+ 							icon = shared.cdata.local?(shared.cdata.awaitingReceipt?
+ 								"psi/notification_chat_send":"psi/notification_chat_delivery_ok")
+ 								: "psi/notification_chat_receive";
