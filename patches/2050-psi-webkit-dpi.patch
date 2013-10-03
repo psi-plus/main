@@ -1,0 +1,30 @@
+diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
+index 931980d..64897cd 100644
+--- a/src/chatview_webkit.cpp
++++ b/src/chatview_webkit.cpp
+@@ -30,6 +30,8 @@
+ #include <QFileInfo>
+ #include <QLayout>
+ #include <QPalette>
++#include <QDesktopWidget>
++#include <QApplication>
+ 
+ #include "webview.h"
+ //#include "psiapplication.h"
+@@ -103,9 +105,14 @@ public slots:
+ 			case QFont::Bold: weight = "bolder"; break;
+ 			case QFont::Black: weight = "900"; break;
+ 		}
+-		return QString("{fontFamily:'%1',fontSize:'%2pt',fontStyle:'%3',fontVariant:'%4',fontWeight:'%5'}")
++
++		// Workaround.  WebKit works only with 96dpi
++		// Need to convert point size to pixel size
++		int pixelSize = f.pointSize() * qApp->desktop()->logicalDpiX() / 72.;
++
++		return QString("{fontFamily:'%1',fontSize:'%2px',fontStyle:'%3',fontVariant:'%4',fontWeight:'%5'}")
+ 						 .arg(f.family())
+-						 .arg(f.pointSize())
++						 .arg(pixelSize)
+ 						 .arg(f.style()==QFont::StyleNormal?"normal":(f.style()==QFont::StyleItalic?"italic":"oblique"))
+ 						 .arg(f.capitalization() == QFont::SmallCaps?"small-caps":"normal")
+ 						 .arg(weight);
