@@ -30,7 +30,13 @@ Index: psi/src/chatviewcommon.h
 ===================================================================
 --- psi.orig/src/chatviewcommon.h
 +++ psi/src/chatviewcommon.h
-@@ -41,8 +41,11 @@ protected:
+@@ -36,13 +36,17 @@
+ 	bool updateLastMsgTime(QDateTime t);
+ 	QString getMucNickColor(const QString &, bool,
+ 							QStringList validList = QStringList());
++	QList<QColor> getPalette();
+ 
+ protected:
  	QDateTime _lastMsgTime;
  
  private:
@@ -59,7 +65,7 @@ Index: psi/src/chatviewcommon.cpp
  
  #include "chatviewcommon.h"
  #include "psioptions.h"
-@@ -42,30 +47,91 @@ bool ChatViewCommon::updateLastMsgTime(QDateTime t)
+@@ -42,30 +47,95 @@
  
  QString ChatViewCommon::getMucNickColor(const QString &nick, bool isSelf, QStringList validList)
  {
@@ -131,7 +137,9 @@ Index: psi/src/chatviewcommon.cpp
 +		if (compatibleColors(color, bg)) {
 +			result << color;
 +		}
-+	}
+ 	}
+-	else if(sender == -1 || nickColors.size() == 1) {
+-		return nickColors[nickColors.size()-1];
 +	_palette = result;
 +}
 +
@@ -144,22 +152,24 @@ Index: psi/src/chatviewcommon.cpp
 +	double dV = abs(c1.value()-c2.value());
 +	double dC = sqrt(0.2126*dR*dR + 0.7152*dG*dG + 0.0722*dB*dB);
 +
-+	if (dC < 80. && dV > 100) {
-+		return false;
- 	}
--	else if(sender == -1 || nickColors.size() == 1) {
--		return nickColors[nickColors.size()-1];
-+	else if (dC < 110. && dV <= 100 && dV > 10) {
++	if ((dC < 80. && dV > 100) ||
++		(dC < 110. && dV <= 100 && dV > 10) ||
++		(dC < 125. && dV <= 10)) {
 +		return false;
  	}
 -	else {
 -		int n = sender % (nickColors.size()-1);
 -		return nickColors[n];
-+	else if (dC < 125. && dV <= 10) {
-+		return false;
- 	}
 +
 +	return true;
++}
++
++QList<QColor> ChatViewCommon::getPalette()
++{
++	if (_palette.isEmpty()) {
++		generatePalette();
+ 	}
++	return _palette;
  }
 +
 Index: psi/src/options/opt_general_groupchat.ui
