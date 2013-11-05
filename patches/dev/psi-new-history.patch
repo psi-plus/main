@@ -91,7 +91,7 @@
  
  	mkdir -p $contentsdir/Frameworks
  	for f in $QT_FRAMEWORKS; do
-@@ -81,8 +83,14 @@ if [ "$platform" == "mac" ]; then
+@@ -80,8 +81,14 @@ if [ "$platform" == "mac" ]; then
  	cp -a $deps_base/$qca_mac_dir/lib/qca.framework $contentsdir/Frameworks
  	cleanup_framework $contentsdir/Frameworks/qca.framework qca 2
  	install_name_tool -id @executable_path/../Frameworks/qca.framework/Versions/2/qca $contentsdir/Frameworks/qca.framework/qca
@@ -633,7 +633,7 @@
  
 --- psi.orig/src/chatview_webkit.cpp
 +++ psi/src/chatview_webkit.cpp
-@@ -316,12 +316,14 @@ void ChatView::dispatchMessage(const Mes
+@@ -327,12 +327,14 @@ void ChatView::dispatchMessage(const Mes
  		m["date"] = mv.dateTime();
  		m["type"] = "message";
  		m["mtype"] = "lastDate";
@@ -1307,7 +1307,7 @@
  PsiEvent *EDBFlatFile::File::lineToEvent(const QString &line)
  {
  	// -- read the line --
-@@ -977,3 +961,812 @@ QString EDBFlatFile::File::eventToLine(P
+@@ -977,3 +962,812 @@ QString EDBFlatFile::File::eventToLine(P
  
  	return "";
  }
@@ -1906,7 +1906,7 @@
 +	}
 +	else {
 +		PreparedQuery *query = queryes.getPreparedQuery(QueryJidRowId, false, false);
-+		query->bindValue(":jid", jid.bare());
++		query->bindValue(":jid", jid.full());
 +		query->bindValue(":acc_id", accId);
 +		if (query->exec() && query->next()) {
 +			const qint64 id = query->record().value("id").toLongLong();
@@ -2729,7 +2729,7 @@
  	getLatest();
  }
  
-@@ -284,7 +414,7 @@ void HistoryDlg::findMessages()
+@@ -284,35 +414,38 @@ void HistoryDlg::findMessages()
  	//get the oldest event as a starting point
  	startRequest();
  	d->reqType = TypeFindOldest;
@@ -2738,8 +2738,10 @@
  }
  
  void HistoryDlg::removeHistory()
-@@ -293,26 +423,29 @@ void HistoryDlg::removeHistory()
- 					tr("Are you sure you want to completely remove history for a contact %1?").arg(d->jid.bare())
+ {
+ 	int res = QMessageBox::question(this, tr("Remove history"),
+-					tr("Are you sure you want to completely remove history for a contact %1?").arg(d->jid.bare())
++					tr("Are you sure you want to completely remove history for a contact %1?").arg(d->jid.full())
  					,QMessageBox::Ok | QMessageBox::Cancel);
  	if(res == QMessageBox::Ok) {
 -		getEDBHandle()->erase(d->jid);
