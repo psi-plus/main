@@ -1,8 +1,7 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:13.336826505 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:13.332826505 +0400
-@@ -284,6 +284,11 @@
+diff --git a/options/default.xml b/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
+@@ -283,6 +283,11 @@
  						<status-change-animation2 type="QColor">#969696</status-change-animation2>
  						<status-messages type="QColor">#808080</status-messages>
  					</contactlist>
@@ -14,10 +13,9 @@ Index: psi/options/default.xml
  					<muc>
  						<nick-colors type="QStringList" >
  							<item>Blue</item>
-Index: psi/src/widgets/psitiplabel.cpp
-===================================================================
---- psi.orig/src/widgets/psitiplabel.cpp
-+++ psi/src/widgets/psitiplabel.cpp
+diff --git a/src/widgets/psitiplabel.cpp b/src/widgets/psitiplabel.cpp
+--- a/src/widgets/psitiplabel.cpp
++++ b/src/widgets/psitiplabel.cpp
 @@ -11,6 +11,7 @@
  #include <QTextEdit>
  
@@ -26,29 +24,30 @@ Index: psi/src/widgets/psitiplabel.cpp
  
  PsiTipLabel *PsiTipLabel::instance_ = 0;
  
-@@ -38,6 +39,21 @@ void PsiTipLabel::init(const QString& text)
+@@ -38,6 +39,22 @@ void PsiTipLabel::init(const QString& text)
  	setForegroundRole(QPalette::ToolTipText);
  	setBackgroundRole(QPalette::ToolTipBase);
  	setPalette(QToolTip::palette());
 +
-+	QPalette palette(QToolTip::palette());
 +	enableColoring_ = PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.enable").toBool();
 +	if(enableColoring_){
-+		QString textColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.text").toString());
-+		QString baseColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.background").toString());
-+		if(textColor == baseColor) { //options values are not set
-+			palette.setColor(QPalette::WindowText, palette.color(QPalette::ToolTipText));
-+			palette.setColor(QPalette::Window, palette.color(QPalette::ToolTipBase));
++		QColor textColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.text").toString());
++		QColor baseColor(PsiOptions::instance()->getOption("options.ui.look.colors.tooltip.background").toString());
++		if(textColor.isValid() && baseColor.isValid() && textColor != baseColor) { //looks fine
++			QPalette palette(QToolTip::palette());
++			palette.setColor(QPalette::ToolTipText, textColor);
++			palette.setColor(QPalette::ToolTipBase, baseColor);
++			palette.setColor(QPalette::WindowText, textColor);
++			palette.setColor(QPalette::Window, baseColor);
++			setPalette(palette);
 +		} else {
-+			palette.setColor(QPalette::WindowText, QColor(textColor));
-+			palette.setColor(QPalette::Window, QColor(baseColor));
++			enableColoring_ = false;
 +		}
 +	}
-+	setPalette(palette);
  }
  
  void PsiTipLabel::setText(const QString& text)
-@@ -160,7 +176,11 @@
+@@ -160,7 +177,11 @@ void PsiTipLabel::paintEvent(QPaintEvent *)
  	QStylePainter p(this);
  	QStyleOptionFrame opt;
  	opt.init(this);
@@ -61,15 +60,14 @@ Index: psi/src/widgets/psitiplabel.cpp
  	p.end();
  
  	// stolen from QLabel::paintEvent
-Index: psi/src/widgets/psitiplabel.h
-===================================================================
---- psi.orig/src/widgets/psitiplabel.h	2013-01-15 14:04:13.336826505 +0400
-+++ psi/src/widgets/psitiplabel.h	2013-01-15 14:04:13.332826505 +0400
-@@ -40,6 +40,7 @@
+diff --git a/src/widgets/psitiplabel.h b/src/widgets/psitiplabel.h
+--- a/src/widgets/psitiplabel.h
++++ b/src/widgets/psitiplabel.h
+@@ -40,6 +40,7 @@ private:
  	QString theText_;
  	bool isRichText;
  	int margin;
 +	bool enableColoring_;
  	// int indent;
-
+ 
  	virtual void initUi();
