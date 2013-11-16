@@ -307,14 +307,25 @@
 +};
 --- psi.orig/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp
-@@ -77,6 +77,7 @@
- #include "messageview.h"
+@@ -74,9 +74,9 @@
+ #include "psicontactlist.h"
+ #include "accountlabel.h"
+ #include "psirichtext.h"
+-#include "messageview.h"
  #include "chatview.h"
  #include "urlobject.h"
 +#include "eventdb.h"
  
  #ifdef Q_OS_WIN
  #include <windows.h>
+@@ -96,6 +96,7 @@ ChatDlg* ChatDlg::create(const Jid& jid,
+ ChatDlg::ChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
+ 	: TabbableWidget(jid, pa, tabManager)
+ 	, highlightersInstalled_(false)
++	, delayedMessages(0)
+ {
+ 	pending_ = 0;
+ 	keepOpen_ = false;
 @@ -108,6 +109,8 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
  
  	status_ = -1;
@@ -324,7 +335,16 @@
  	autoSelectContact_ = false;
  	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
  		UserListItem *uli = account()->findFirstRelevant(jid);
-@@ -437,6 +440,40 @@ UserStatus ChatDlg::userStatusFor(const
+@@ -173,6 +176,8 @@ void ChatDlg::init()
+ 
+ ChatDlg::~ChatDlg()
+ {
++	if (delayedMessages)
++		delete delayedMessages;
+ 	account()->dialogUnregister(this);
+ }
+ 
+@@ -437,6 +442,42 @@ UserStatus ChatDlg::userStatusFor(const
  	return u;
  }
  
@@ -332,6 +352,7 @@
 +{
 +	int cnt =PsiOptions::instance()->getOption("options.ui.chat.history.preload-history-size").toInt();
 +	if (cnt > 0) {
++		holdMessages(true);
 +		if (cnt > 100)
 +			cnt = 100;
 +		EDBHandle *h = new EDBHandle(account()->edb());
@@ -356,62 +377,147 @@
 +		PsiEvent *e = item->event();
 +		if (e->type() == PsiEvent::Message) {
 +			MessageEvent *me = static_cast<MessageEvent *> (e);
-+			appendMessage(me->message(), me->originLocal(), true);
++			appendMessage(me->message(), me->originLocal());
 +		}
 +	}
 +	delete h;
++	holdMessages(false);
 +}
 +
  void ChatDlg::ensureTabbedCorrectly()
  {
  	TabbableWidget::ensureTabbedCorrectly();
-@@ -859,7 +896,7 @@ QString ChatDlg::whoNick(bool local) con
- 	return result;
- }
- 
--void ChatDlg::appendMessage(const Message &m, bool local)
-+void ChatDlg::appendMessage(const Message &m, bool local, bool history)
- {
+@@ -492,7 +533,7 @@ void ChatDlg::updateContact(const Jid &j
+ 			if (PsiOptions::instance()->getOption("options.ui.chat.show-status-changes").toBool()
+ 				&& fromPresence && statusChanged)
+ 			{
+-				chatView()->dispatchMessage(MessageView::statusMessage(
++				dispatchMessage(MessageView::statusMessage(
+ 												dispNick_, status_,
+ 												statusString_, priority_));
+ 			}
+@@ -864,17 +905,21 @@ void ChatDlg::appendMessage(const Messag
  	if(trackBar_)
  		doTrackBar();
-@@ -890,7 +927,9 @@ void ChatDlg::appendMessage(const Messag
+ 
++	bool spooled = m.spooled();
++
+ 	// figure out the encryption state
+ 	bool encChanged = false;
+ 	bool encEnabled = false;
+-	if (lastWasEncrypted_ != m.wasEncrypted()) {
+-		encChanged = true;
++	if (!spooled) {
++		if (lastWasEncrypted_ != m.wasEncrypted()) {
++			encChanged = true;
++		}
++		lastWasEncrypted_ = m.wasEncrypted();
++		encEnabled = lastWasEncrypted_;
+ 	}
+-	lastWasEncrypted_ = m.wasEncrypted();
+-	encEnabled = lastWasEncrypted_;
+ 
+ 	if (encChanged) {
+-		chatView()->dispatchMessage(MessageView::fromHtml(
++		dispatchMessage(MessageView::fromHtml(
+ 				encEnabled? QString("<icon name=\"psi/cryptoYes\"> ") + tr("Encryption Enabled"):
+ 							QString("<icon name=\"psi/cryptoNo\"> ") + tr("Encryption Disabled"),
+ 				MessageView::System
+@@ -890,7 +935,9 @@ void ChatDlg::appendMessage(const Messag
  	}
  
  	if (!m.subject().isEmpty()) {
 -		chatView()->dispatchMessage(MessageView::subjectMessage(m.subject()));
 +		MessageView smv = MessageView::subjectMessage(m.subject());
-+		smv.setHistory(history);
-+		chatView()->dispatchMessage(smv);
++		smv.setSpooled(spooled);
++		dispatchMessage(smv);
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -906,6 +945,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -904,9 +951,9 @@ void ChatDlg::appendMessage(const Messag
+ 	mv.setNick(whoNick(local));
+ 	mv.setUserId(local?account()->jid().bare():jid().bare());
  	mv.setDateTime(m.timeStamp());
- 	mv.setSpooled(m.spooled());
+-	mv.setSpooled(m.spooled());
++	mv.setSpooled(spooled);
  	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
-+	mv.setHistory(history);
- 	chatView()->dispatchMessage(mv);
+-	chatView()->dispatchMessage(mv);
++	dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
-@@ -914,11 +954,13 @@ void ChatDlg::appendMessage(const Messag
+ 		UrlList urls = m.urlList();
+@@ -914,11 +961,49 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
 -		chatView()->dispatchMessage(MessageView::urlsMessage(urlsMap));
 +		MessageView umv = MessageView::urlsMessage(urlsMap);
-+		umv.setHistory(history);
-+		chatView()->dispatchMessage(umv);
++		umv.setSpooled(spooled);
++		dispatchMessage(umv);
  	}
++}
++
++void ChatDlg::holdMessages(bool hold)
++{
++	if (hold) {
++		if (!delayedMessages)
++			delayedMessages = new QList<MessageView>();
++	}
++	else if (delayedMessages) {
++		foreach (const MessageView &mv, *delayedMessages)
++		{
++			if (mv.isSpooled())
++				displayMessage(mv);
++		}
++		foreach (const MessageView &mv, *delayedMessages)
++		{
++			if (!mv.isSpooled())
++				displayMessage(mv);
++		}
++		delete delayedMessages;
++		delayedMessages = 0;
++	}
++}
++
++void ChatDlg::dispatchMessage(const MessageView &mv)
++{
++	if (delayedMessages)
++		delayedMessages->append(mv);
++	else
++		displayMessage(mv);
++}
++
++void ChatDlg::displayMessage(const MessageView &mv)
++{
++	chatView()->dispatchMessage(mv);
  
  	// if we're not active, notify the user by changing the title
 -	if (!isActiveTab()) {
-+	if (!history && !isActiveTab()) {
++	MessageView::Type type = mv.type();
++	if (type != MessageView::System && type != MessageView::Status && !mv.isSpooled() && !isActiveTab()) {
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
+@@ -940,7 +1025,7 @@ void ChatDlg::appendMessage(const Messag
+ 	//	messagesRead(jid());
+ 	//}
+ 
+-	if (!local) {
++	if (!mv.isLocal()) {
+ 		keepOpen_ = true;
+ 		QTimer::singleShot(1000, this, SLOT(setKeepOpenFalse()));
+ 	}
 --- psi.orig/src/chatdlg.h
 +++ psi/src/chatdlg.h
-@@ -87,6 +87,7 @@ public:
+@@ -32,6 +32,7 @@
+ #include "advwidget.h"
+ 
+ #include "tabbablewidget.h"
++#include "messageview.h"
+ 
+ 
+ namespace XMPP
+@@ -87,6 +88,7 @@ public:
  	Jid realJid() const;
  	bool autoSelectContact() const {return autoSelectContact_;};
  	static UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource);
@@ -419,7 +525,7 @@
  
  signals:
  	void aInfo(const Jid &);
-@@ -147,6 +148,7 @@ private slots:
+@@ -147,6 +149,7 @@ private slots:
  	void addEmoticon(QString text);
  	void initComposing();
  	void setComposing();
@@ -427,15 +533,24 @@
  
  protected slots:
  	void checkComposing();
-@@ -167,7 +169,7 @@ protected:
- 	virtual void updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence);
+@@ -168,6 +171,9 @@ protected:
  	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
  
--	void appendMessage(const Message &, bool local = false);
-+	void appendMessage(const Message &, bool local = false, bool history = false);
+ 	void appendMessage(const Message &, bool local = false);
++	void holdMessages(bool hold);
++	void dispatchMessage(const MessageView &mv);
++	void displayMessage(const MessageView &mv);
  	virtual bool isEncryptionEnabled() const;
  
  public:
+@@ -216,6 +222,7 @@ private:
+ 	QString eventId_;
+ 	ChatState contactChatState_;
+ 	ChatState lastChatState_;
++	QList<MessageView> *delayedMessages;
+ };
+ 
+ #endif
 --- psi.orig/src/chatview_te.cpp
 +++ psi/src/chatview_te.cpp
 @@ -80,6 +80,7 @@ ChatView::ChatView(QWidget *parent)
@@ -462,61 +577,12 @@
  }
  
  void ChatView::markReceived(QString id)
-@@ -267,9 +270,9 @@ QString ChatView::formatTimeStamp(const
- 	return QString().sprintf("%02d:%02d:%02d", time.time().hour(), time.time().minute(), time.time().second());;
- }
- 
--QString ChatView::colorString(bool local, bool spooled) const
-+QString ChatView::colorString(bool local, bool spooled, bool history) const
- {
--	if (spooled) {
-+	if (spooled && !history) {
- 		return ColorOpt::instance()->color(informationalColorOpt).name();
- 	}
- 
-@@ -296,14 +299,34 @@ void ChatView::appendText(const QString
- 		verticalScrollBar()->setValue(scrollbarValue);
- }
- 
-+void ChatView::appendHistoryText(const QString &text)
-+{
-+	bool doScrollToBottom = atBottom();
-+
-+	// prevent scrolling back to selected text when
-+	// restoring selection
-+	int scrollbarValue = verticalScrollBar()->value();
-+
-+	PsiTextView::appendHistoryText(text);
-+
-+	if (doScrollToBottom)
-+		scrollToBottom();
-+	else
-+		verticalScrollBar()->setValue(scrollbarValue);
-+}
-+
- void ChatView::dispatchMessage(const MessageView &mv)
- {
- 	if ((mv.type() == MessageView::Message || mv.type() == MessageView::Subject)
- 			&& ChatViewCommon::updateLastMsgTime(mv.dateTime()))
- 	{
- 		QString color = ColorOpt::instance()->color(informationalColorOpt).name();
--		appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
--				   QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate)));
-+		QString str = QString(useMessageIcons_?"<img src=\"icon:log_icon_time\" />":"") +
-+				   QString("<font color=\"%1\">*** %2</font>").arg(color).arg(mv.dateTime().date().toString(Qt::ISODate));
-+		if (mv.isHistory())
-+			appendHistoryText(str);
-+		else
-+			appendText(str);
- 	}
- 	switch (mv.type()) {
- 		case MessageView::Message:
-@@ -369,26 +392,50 @@ void ChatView::renderMucMessage(const Me
+@@ -369,26 +372,47 @@ void ChatView::renderMucMessage(const Me
  void ChatView::renderMessage(const MessageView &mv)
  {
  	QString timestr = formatTimeStamp(mv.dateTime());
 -	QString color = colorString(mv.isLocal(), mv.isSpooled());
-+	QString color = colorString(mv.isLocal(), mv.isSpooled(), mv.isHistory());
++	QString color = colorString(mv.isLocal(), false);
  	if (useMessageIcons_ && mv.isAwaitingReceipt()) {
  		document()->addResource(QTextDocument::ImageResource, QUrl(QString("icon:delivery") + mv.messageId()),
  					isEncryptionEnabled_ ? logIconSendPgp : logIconSend);
@@ -529,7 +595,7 @@
 +	QString icon;
 +	if (useMessageIcons_) {
 +		QString sRes;
-+		if (mv.isHistory())
++		if (mv.isSpooled())
 +			sRes = "icon:log_icon_history";
 +		else if (mv.isLocal()) {
 +			if (mv.isAwaitingReceipt())
@@ -559,94 +625,24 @@
 -			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
 +			str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ");
  		}
-+		if (mv.isHistory())
++		if (mv.isSpooled())
 +			str.append(QString("<span style=\"color: %1\">%2</span>").arg(ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name()).arg(mv.formattedText()));
 +		else
 +			str.append(mv.formattedText());
  	}
-+	if (mv.isHistory())
-+		appendHistoryText(str);
-+	else
-+		appendText(str);
++	appendText(str);
  
  	if (mv.isLocal() && PsiOptions::instance()->getOption("options.ui.chat.auto-scroll-to-bottom").toBool() ) {
  		deferredScroll();
-@@ -413,7 +460,11 @@ void ChatView::renderSysMessage(const Me
- 
- void ChatView::renderSubject(const MessageView &mv)
- {
--	appendText(QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") + "<b>" + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText()));
-+	QString text = QString(useMessageIcons_?"<img src=\"icon:log_icon_info\" />":"") + "<b>" + tr("Subject:") + "</b> " + QString("%1").arg(mv.formattedUserText());
-+	if (!mv.isHistory())
-+		appendText(text);
-+	else
-+		appendHistoryText(text);
- }
- 
- void ChatView::renderMucSubject(const MessageView &mv)
-@@ -432,9 +483,17 @@ void ChatView::renderUrls(const MessageV
- {
- 	QMap<QString, QString> urls = mv.urls();
- 	foreach (const QString &key, urls.keys()) {
--		appendText(QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(key))));
-+		QString urlStr = QString("<b>") + tr("URL:") + "</b> " + QString("%1").arg(TextUtil::linkify(TextUtil::escape(key)));
-+		if (!mv.isHistory())
-+			appendText(urlStr);
-+		else
-+			appendHistoryText(urlStr);
- 		if (!urls.value(key).isEmpty()) {
--			appendText(QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(urls.value(key)));
-+			urlStr = QString("<b>") + tr("Desc:") + "</b> " + QString("%1").arg(urls.value(key));
-+			if (!mv.isHistory())
-+				appendText(urlStr);
-+			else
-+				appendHistoryText(urlStr);
- 		}
- 	}
- }
 --- psi.orig/src/chatview_te.h
 +++ psi/src/chatview_te.h
-@@ -54,6 +54,7 @@ public:
- 	void setSessionData(bool isMuc, const QString &jid, const QString name);
- 
- 	void appendText(const QString &text);
-+	void appendHistoryText(const QString &text);
- 	void dispatchMessage(const MessageView &);
- 	bool handleCopyEvent(QObject *object, QEvent *event, ChatEdit *chatEdit);
- 
-@@ -74,7 +75,7 @@ protected:
- 	void keyPressEvent(QKeyEvent *);
- 
- 	QString formatTimeStamp(const QDateTime &time);
--	QString colorString(bool local, bool spooled) const;
-+	QString colorString(bool local, bool spooled, bool history) const;
- 
- 	void renderMucMessage(const MessageView &);
- 	void renderMessage(const MessageView &);
-@@ -112,6 +113,7 @@ private:
+@@ -112,6 +112,7 @@ private:
  	QPixmap logIconDeliveredPgp;
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
 +	QPixmap logIconHistory;
  	QAction *actQuote_;
  };
- 
---- psi.orig/src/chatview_webkit.cpp
-+++ psi/src/chatview_webkit.cpp
-@@ -327,12 +327,14 @@ void ChatView::dispatchMessage(const Mes
- 		m["date"] = mv.dateTime();
- 		m["type"] = "message";
- 		m["mtype"] = "lastDate";
-+		m["history"] = mv.isHistory();
- 		sendJsObject(m);
- 	}
- 	QVariantMap vm = mv.toVariantMap(isMuc_, true);
- 	vm["mtype"] = vm["type"];
- 	vm["type"] = "message";
- 	vm["encrypted"] = isEncryptionEnabled_;
-+	vm["history"] = mv.isHistory();
- 	sendJsObject(vm);
- }
  
 --- psi.orig/src/eventdb.cpp
 +++ psi/src/eventdb.cpp
@@ -4219,35 +4215,6 @@
    <tabstop>tb_find</tabstop>
    <tabstop>msgLog</tabstop>
   </tabstops>
---- psi.orig/src/messageview.cpp
-+++ psi/src/messageview.cpp
-@@ -37,6 +37,7 @@ MessageView::MessageView(Type t)
- 	, _status(0)
- 	, _statusPriority(0)
- 	, _dateTime(QDateTime::currentDateTime())
-+	, _history(false)
- {
- 
- }
---- psi.orig/src/messageview.h
-+++ psi/src/messageview.h
-@@ -89,6 +89,8 @@ public:
- 	inline void setDateTime(const QDateTime &dt) { _dateTime = dt; }
- 	inline const QDateTime &dateTime() const { return _dateTime; }
- 	inline QMap<QString, QString> urls() const { return _urls; }
-+	inline void setHistory(bool history) { _history = history; }
-+	inline bool isHistory() const { return _history; }
- 
- 	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
- 
-@@ -108,6 +110,7 @@ private:
- 	QString _userText; // rich
- 	QDateTime _dateTime;
- 	QMap<QString, QString> _urls;
-+	bool _history;
- };
- 
- #endif
 --- psi.orig/src/psiaccount.cpp
 +++ psi/src/psiaccount.cpp
 @@ -4726,11 +4726,12 @@ void PsiAccount::dj_sendMessage(const Me
@@ -4319,6 +4286,17 @@
  	void queueEvent(PsiEvent* e, ActivationType activationType);
  	void openNextEvent(const UserListItem &, ActivationType activationType);
  	void updateReadNext(const Jid &);
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -942,7 +942,7 @@ bool PsiChatDlg::isEncryptionEnabled() c
+ 
+ void PsiChatDlg::appendSysMsg(const QString &str)
+ {
+-	chatView()->dispatchMessage(MessageView::fromHtml(str, MessageView::System));
++	dispatchMessage(MessageView::fromHtml(str, MessageView::System));
+ }
+ 
+ ChatView* PsiChatDlg::chatView() const
 --- psi.orig/src/psicon.cpp
 +++ psi/src/psicon.cpp
 @@ -356,8 +356,7 @@ PsiCon::PsiCon()
@@ -4378,190 +4356,28 @@
  	$$PWD/searchdlg.cpp \
  	$$PWD/registrationdlg.cpp \
  	$$PWD/psitoolbar.cpp \
---- psi.orig/src/widgets/psirichtext.cpp
-+++ psi/src/widgets/psirichtext.cpp
-@@ -263,13 +263,12 @@ static QString convertIconsToObjectRepla
- static void applyFormatToIcons(QTextDocument *doc, TextIconFormatQueue *queue, QTextCursor &cursor)
- {
- 	QTextCursor searchCursor = cursor;
--	forever {
-+	while (!queue->isEmpty()) {
- 		searchCursor = doc->find(QString(QChar::ObjectReplacementCharacter), searchCursor);
- 		if (searchCursor.isNull()) {
- 			break;
- 		}
- 
--		Q_ASSERT(!queue->isEmpty());
- 		TextIconFormat *format = queue->dequeue();
- 		if (format) {
- 			searchCursor.setCharFormat(*format);
-@@ -396,6 +395,26 @@ void PsiRichText::appendText(QTextDocume
- 
- 	appendTextHelper(doc, text, cursor);
- 
-+	cursor.endEditBlock();
-+}
-+
-+void PsiRichText::appendHistoryText(QTextDocument *doc, QTextCursor &cursor, const QString &text)
-+{
-+	cursor.beginEditBlock();
-+	int pos = cursor.position();
-+	cursor.insertBlock();
-+	if (pos == 0)
-+		cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 0);
-+
-+	// clear trackbar for new blocks
-+	QTextBlockFormat blockFormat = cursor.blockFormat();
-+	blockFormat.setTopMargin(0);
-+	blockFormat.setBottomMargin(0);
-+	blockFormat.clearProperty(QTextFormat::BlockTrailingHorizontalRulerWidth);
-+	cursor.setBlockFormat(blockFormat);
-+
-+	appendTextHelper(doc, text, cursor);
-+
- 	cursor.endEditBlock();
- }
- 
---- psi.orig/src/widgets/psirichtext.h
-+++ psi/src/widgets/psirichtext.h
-@@ -31,6 +31,7 @@ public:
- 	static void setText(QTextDocument *doc, const QString &text);
- 	static void insertIcon(QTextCursor &cursor, const QString &iconName, const QString &iconText);
- 	static void appendText(QTextDocument *doc, QTextCursor &cursor, const QString &text);
-+	static void appendHistoryText(QTextDocument *doc, QTextCursor &cursor, const QString &text);
- 	static QString convertToPlainText(const QTextDocument *doc);
- 	static void addEmoticon(QTextEdit *textEdit, const QString &emoticon);
- 	static void setAllowedImageDirs(const QStringList &);
---- psi.orig/src/widgets/psitextview.cpp
-+++ psi/src/widgets/psitextview.cpp
-@@ -46,10 +46,12 @@ public:
- 	{
- 		anchorOnMousePress = QString();
- 		hadSelectionOnMousePress = false;
-+		lastHistoryBlock = -1;
- 	}
- 
- 	QString anchorOnMousePress;
- 	bool hadSelectionOnMousePress;
-+	int lastHistoryBlock;
- 
- 	QString fragmentToPlainText(const QTextFragment &fragment);
- 	QString blockToPlainText(const QTextBlock &block);
-@@ -169,6 +171,31 @@ void PsiTextView::appendText(const QStri
- 	setTextCursor(cursor);
- }
- 
-+void PsiTextView::appendHistoryText(const QString &text)
-+{
-+	QTextCursor cursor = textCursor();
-+	PsiRichText::Selection selection = PsiRichText::saveSelection(this, cursor);
-+
-+	if (d->lastHistoryBlock != -1) {
-+		QTextBlock block = document()->findBlockByNumber(d->lastHistoryBlock);
-+		if (block.isValid())
-+			cursor.setPosition(block.position() + block.length() - 1, QTextCursor::MoveAnchor);
-+		else {
-+			d->lastHistoryBlock = -1;
-+		}
-+	}
-+	if (d->lastHistoryBlock == -1)
-+		cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 0);
-+
-+	PsiRichText::appendHistoryText(document(), cursor, text);
-+
-+	d->lastHistoryBlock = cursor.block().blockNumber();
-+
-+	PsiRichText::restoreSelection(this, cursor, selection);
-+	setTextCursor(cursor);
-+
-+}
-+
- QString PsiTextView::getTextHelper(bool html) const
- {
- 	PsiTextView *ptv = (PsiTextView *)this;
---- psi.orig/src/widgets/psitextview.h
-+++ psi/src/widgets/psitextview.h
-@@ -38,6 +38,7 @@ public:
- 	bool atBottom();
- 
- 	virtual void appendText(const QString &text);
-+	virtual void appendHistoryText(const QString &text);
- 
- 	QString getHtml() const;
- 	QString getPlainText() const;
 --- psi.orig/themes/chatview/psi/adapter.js
 +++ psi/themes/chatview/psi/adapter.js
-@@ -22,6 +22,7 @@ window[chatServer.jsNamespace()].adapter
- 			scroller : null,
- 			varHandlers : {},
- 			prevGrouppingData : null,
-+			historyBlock : null,
- 			groupping : false,
- 			chatElement : null,
- 
-@@ -52,11 +53,13 @@ window[chatServer.jsNamespace()].adapter
- 				return eval("[" + shared.server.colorOption(name) + "][0]")
- 			},
- 
--			appendHtml : function(html, scroll, nextEl) { //scroll[true|false|auto/other]
-+			appendHtml : function(html, scroll, nextEl, hist) { //scroll[true|false|auto/other]
- 				if (typeof(scroll) == 'boolean') {
- 					shared.scroller.atBottom = scroll;
- 				}
--				if (nextEl) {
-+				if (hist) {
-+					chat.util.appendHtml(shared.getHistoryBlock(), html);
-+				} else if (nextEl) {
- 					chat.util.siblingHtml(nextEl, html);
- 				} else {
- 					chat.util.appendHtml(shared.chatElement, html);
-@@ -64,6 +67,16 @@ window[chatServer.jsNamespace()].adapter
- 				shared.scroller.invalidate();
- 			},
- 
-+			getHistoryBlock : function() {
-+				if (!shared.historyBlock) {
-+					shared.historyBlock = document.createElement("div");
-+					shared.historyBlock.setAttribute("id", "history");
-+					shared.chatElement.insertBefore(shared.historyBlock, shared.chatElement.firstChild);
-+					//shared.chatElement.appendChild(shared.historyBlock);
-+				}
-+				return shared.historyBlock;
-+			},
-+
- 			stopGroupping : function() {
- 				if (shared.prevGrouppingData) {
- 					shared.prevGrouppingData.nextEl.parentNode.removeChild(shared.prevGrouppingData.nextEl)
-@@ -214,12 +227,16 @@ window[chatServer.jsNamespace()].adapter
+@@ -189,7 +189,11 @@ window[chatServer.jsNamespace()].adapter
+ 							}
+ 							if (!template) {
+ 								data.nextOfGroup = false; //can't group w/o template
+-								template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
++								if (data.spooled) {
++									template = shared.templates.spooledMessage;
++								} else {
++									template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
++								}
+ 							}
  							break;
- 					}
- 					if (template) {
--						shared.appendHtml(template.toString(), data.local?true:null, data.nextOfGroup?
--							shared.prevGrouppingData.nextEl:null); //force scroll on local messages
--						shared.stopGroupping();// safe clean up previous data
--						if (shared.cdata.nextEl) { //convert to DOM
--							shared.cdata.nextEl = document.getElementById(shared.cdata.nextEl);
--							shared.prevGrouppingData = shared.cdata;
-+						if (data.history) {
-+							shared.appendHtml(template.toString(), false, null, true);
-+						} else {
-+							shared.appendHtml(template.toString(), data.local?true:null, data.nextOfGroup?
-+								shared.prevGrouppingData.nextEl:null); //force scroll on local messages
-+							shared.stopGroupping();// safe clean up previous data
-+							if (shared.cdata.nextEl) { //convert to DOM
-+								shared.cdata.nextEl = document.getElementById(shared.cdata.nextEl);
-+								shared.prevGrouppingData = shared.cdata;
-+							}
- 						}
- 					} else {
- 						throw "Template not found";
+                         case "status":
 --- psi.orig/themes/chatview/psi/classic/index.html
 +++ psi/themes/chatview/psi/classic/index.html
 @@ -13,6 +13,7 @@ body > div img { vertical-align:bottom;
  body > div > img:first-child { vertical-align:text-bottom; }
  .sent {}
  .received {}
-+#history {}
++.spooledmsg {}
  .infmsg {}
  .usertext {}
  .alert {font-weight:bold;}
@@ -4569,7 +4385,7 @@
  	var cssBody = chat.util.findStyleSheet(document.styleSheets[0], "body").style;
  	var cssSentMsg = chat.util.findStyleSheet(document.styleSheets[0], ".sent").style;
  	var cssReceivedMsg = chat.util.findStyleSheet(document.styleSheets[0], ".received").style;
-+	var cssHistoryMsg = chat.util.findStyleSheet(document.styleSheets[0], "#history").style;
++	var cssSpooledMsg = chat.util.findStyleSheet(document.styleSheets[0], ".spooledmsg").style;
  	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
  	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
  	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
@@ -4577,40 +4393,45 @@
  		cssReceivedMsg.color = shared.colorOption("options.ui.look.colors.messages.received");
  		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
  		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
-+		cssHistoryMsg.color = cssUserText.color;
++		cssSpooledMsg.color = cssUserText.color;
  		cssAlertMsg.color = shared.psiOption("options.ui.look.colors.messages.highlighting");
  		useMessageIcons = shared.psiOption("options.ui.chat.use-message-icons");
  		if (shared.psiOption("options.ui.chat.scaled-message-icons")) {
-@@ -99,7 +102,11 @@ window[chatServer.jsNamespace()].theme =
- 				var template = shared.cdata.emote && shared.templates.messageNC ||
- 					(shared.cdata.spooled && shared.templates.message || null);
- 				if (template) {
--					shared.appendHtml(template.toString(), shared.cdata.local?true:null);
-+					if (shared.cdata.history) {
-+						shared.appendHtml(template.toString(), false, null, true);
-+					} else {
-+						shared.appendHtml(template.toString(), shared.cdata.local?true:null);
-+					}
- 					return false;
- 				}
+@@ -73,7 +76,9 @@ window[chatServer.jsNamespace()].theme =
+ 			receivedMessage: shared.isMuc?
+ 				"<div class='msg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %alertedmessage%</div>"
+ 				: null,
+-			spooledMessage: "<div class='infmsg'>%icon%[%time%] %sender% %message%</div>",
++			spooledMessage: shared.isMuc?
++				"<div class='spooledmsg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %message%</div>"
++				: "<div class='spooledmsg'>%icon%<span class='%sentrec%'>[%time%] %sender%</span> %message%</div>",
+ 			sys: "<div class='infmsg'>%icon%%message%</div>",
+ 			sysMessage: "<div class='infmsg'>%icon%[%time%] *** %message%</div>",
+ 			sysMessageUT: "<div class='infmsg'>%icon%[%time%] *** %message%: <span class='usertext'>%usertext%</span></div>",
+@@ -97,7 +102,7 @@ window[chatServer.jsNamespace()].theme =
  			}
-@@ -119,8 +126,9 @@ window[chatServer.jsNamespace()].theme =
+ 			if (shared.cdata.mtype == "message") {
+ 				var template = shared.cdata.emote && shared.templates.messageNC ||
+-					(shared.cdata.spooled && shared.templates.message || null);
++					(shared.cdata.spooled && shared.templates.spooledMessage || null);
+ 				if (template) {
+ 					shared.appendHtml(template.toString(), shared.cdata.local?true:null);
+ 					return false;
+@@ -119,8 +124,7 @@ window[chatServer.jsNamespace()].theme =
  				return shared.cdata.alert?"<span class='alert'>"+
  					shared.cdata.message+"</span>":shared.cdata.message;
  			},
 -			sentrec : function() {return shared.cdata.spooled?"infmsg":
 -				(shared.cdata.local?"sent":"received");},
-+			sentrec : function() {
-+				return shared.cdata.spooled && !shared.cdata.history ?"infmsg":
-+					(shared.cdata.local?"sent":"received");},
++			sentrec : function() {return shared.cdata.local?"sent":"received";},
  			nickcolor : function() {
  				return shared.session.mucNickColor(shared.cdata.sender, shared.cdata.local);
  			},
-@@ -129,6 +137,10 @@ window[chatServer.jsNamespace()].theme =
+@@ -129,6 +133,10 @@ window[chatServer.jsNamespace()].theme =
  				if (useMessageIcons) {
  					switch (shared.cdata.mtype) {
  						case "message":
-+							if (shared.cdata.history) {
++							if (shared.cdata.spooled) {
 +								icon = "psi/history";
 +								break;
 +							}
