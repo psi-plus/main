@@ -432,7 +432,7 @@
  			//qDebug() << QString("    %1").arg(registry_->features(s).list().join("\n"));
  			f += registry_->features(s).list();
  		}
-@@ -251,11 +251,17 @@ XMPP::Features CapsManager::features(con
+@@ -251,11 +251,19 @@ XMPP::Features CapsManager::features(con
  QString CapsManager::clientName(const Jid& jid) const
  {
  	if (capsEnabled(jid)) {
@@ -441,20 +441,22 @@
 -		const DiscoItem::Identities& i = registry_->identities(CapsSpec(cs.node(),cs.version(),cs.version()));
 -		if (i.count() > 0) {
 -			name = i.first().name;
-+		QString cs_str = cs.flatten(false).first();
-+
 +		QString name;
-+		name = registry_->extensions(cs_str).extensionValue("urn:xmpp:dataforms:softwareinfo", "software");
 +
-+		if (name.isEmpty()) {
-+			const DiscoItem::Identities& i = registry_->identities(cs_str);
-+			if (i.count() > 0) {
-+				name = i.first().name;
++		QString cs_str = cs.flatten(false).first();
++		if (registry_->isRegistered(cs_str)) {
++			name = registry_->extensions(cs_str).extensionValue("urn:xmpp:dataforms:softwareinfo", "software");
++
++			if (name.isEmpty()) {
++				const DiscoItem::Identities& i = registry_->identities(cs_str);
++				if (i.count() > 0) {
++					name = i.first().name;
++				}
 +			}
  		}
  
  		// Try to be intelligent about the name
-@@ -284,5 +290,34 @@ QString CapsManager::clientName(const Ji
+@@ -284,5 +292,38 @@ QString CapsManager::clientName(const Ji
   */
  QString CapsManager::clientVersion(const Jid& jid) const
  {
@@ -462,8 +464,11 @@
 +	if (!capsEnabled(jid))
 +		return QString();
 +
++	QString version;
 +	const CapsSpec &cs = capsSpecs_[jid.full()];
-+	QString version = registry_->extensions(cs.flatten(false).first()).extensionValue("urn:xmpp:dataforms:softwareinfo", "software_version");
++	QString cs_str = cs.flatten(false).first();
++	if (registry_->isRegistered(cs_str))
++		version = registry_->extensions(cs_str).extensionValue("urn:xmpp:dataforms:softwareinfo", "software_version");
 +
 +	if (version.isEmpty())
 +		version = cs.version();
@@ -478,14 +483,15 @@
 +{
 +	QString os_str;
 +	if (capsEnabled(jid)) {
-+		const CapsSpec &cs = capsSpecs_[jid.full()];
-+		XMPP::DiscoExtList el = registry_->extensions(cs.flatten(false).first());
-+		os_str = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os").trimmed();
-+		if (!os_str.isEmpty()) {
-+			QString os_ver = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os_version").trimmed();
-+			if (!os_ver.isEmpty())
-+				os_str.append(" " + os_ver);
-+
++		QString cs_str = capsSpecs_[jid.full()].flatten(false).first();
++		if (registry_->isRegistered(cs_str)) {
++			XMPP::DiscoExtList el = registry_->extensions(cs_str);
++			os_str = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os").trimmed();
++			if (!os_str.isEmpty()) {
++				QString os_ver = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os_version").trimmed();
++				if (!os_ver.isEmpty())
++					os_str.append(" " + os_ver);
++			}
 +		}
 +	}
 +	return os_str;
