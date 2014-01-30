@@ -1,6 +1,6 @@
 --- psi.orig/options/default.xml
 +++ psi/options/default.xml
-@@ -329,6 +329,7 @@ QLineEdit#le_status_text {
+@@ -326,6 +326,7 @@ QLineEdit#le_status_text {
  					<height>420</height>
  				</size>
  				<use-highlighting type="bool">true</use-highlighting><use-nick-coloring type="bool">true</use-nick-coloring><use-hash-nick-coloring type="bool">true</use-hash-nick-coloring><colored-history type="bool">true</colored-history>
@@ -131,28 +131,35 @@
  		return;
  	}
  #endif
-@@ -5088,7 +5088,19 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5087,7 +5087,17 @@ void PsiAccount::handleEvent(PsiEvent* e
  				!(e->type() == PsiEvent::Message &&
  				  ((MessageEvent *)e)->message().body().isEmpty()))
  			{
 -				logEvent(e->from(), e);
-+#ifdef GROUPCHAT
 +				bool isMuc = false;
++#ifdef GROUPCHAT
 +				if(e->type() == PsiEvent::Message) {
 +					MessageEvent *me = (MessageEvent *)e;
 +					if (me->message().type() == "groupchat")
 +						isMuc = true;
 +				}
++#endif
 +				if (!isMuc) {
-+#endif
 +					logEvent(e->from(), e);
-+#ifdef GROUPCHAT
 +				}
-+#endif
  			}
  		}
  	}
-@@ -5197,6 +5209,18 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5129,7 +5139,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		}
+ 
+ 		// Pass message events to chat window
+-		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
++		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty() && m.type() != "groupchat") {
+ 			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
+ 				ChatDlg *c = findChatDialogEx(e->from());
+ 				if (c) {
+@@ -5195,6 +5205,18 @@ void PsiAccount::handleEvent(PsiEvent* e
  			doPopup = true;
  			popupType = PopupManager::AlertHeadline;
  		} // /headline
@@ -171,7 +178,7 @@
  		else if (m.type().isEmpty()) {
  			soundType = eMessage;
  			doPopup = true;
-@@ -5636,11 +5660,18 @@ void PsiAccount::processReadNext(const U
+@@ -5634,11 +5656,18 @@ void PsiAccount::processReadNext(const U
  		return;
  
  	bool isChat = false;
@@ -190,7 +197,7 @@
  	}
  
  	// if it's a chat message, just open the chat window.  there is no need to do
-@@ -5651,6 +5682,17 @@ void PsiAccount::processReadNext(const U
+@@ -5649,6 +5678,17 @@ void PsiAccount::processReadNext(const U
  		return;
  	}
  
@@ -208,7 +215,7 @@
  	// remove from queue
  	e = d->eventQueue->dequeue(u.jid());
  
-@@ -5754,6 +5796,19 @@ void PsiAccount::chatMessagesRead(const
+@@ -5752,6 +5792,19 @@ void PsiAccount::chatMessagesRead(const
  //	}
  }
  
@@ -228,7 +235,7 @@
  void PsiAccount::logEvent(const Jid &j, PsiEvent *e)
  {
  	if (!d->acc.opt_log)
-@@ -5778,6 +5833,7 @@ void PsiAccount::openGroupChat(const Jid
+@@ -5774,6 +5827,7 @@ void PsiAccount::openGroupChat(const Jid
  	GCMainDlg *w = new GCMainDlg(this, j, d->tabManager);
  	w->setPassword(d->client->groupChatPassword(j.domain(), j.node()));
  	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
@@ -260,7 +267,7 @@
  #include "spellchecker/aspellchecker.h"
  #ifdef WEBKIT
  #include "avatars.h"
-@@ -1752,17 +1755,29 @@ void PsiCon::processEvent(PsiEvent *e, A
+@@ -1746,17 +1749,29 @@ void PsiCon::processEvent(PsiEvent *e, A
  	}
  
  	bool isChat = false;
@@ -296,7 +303,7 @@
  	}
  
  	if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled()) {
-@@ -1809,6 +1824,17 @@ void PsiCon::processEvent(PsiEvent *e, A
+@@ -1803,6 +1818,17 @@ void PsiCon::processEvent(PsiEvent *e, A
  	}
  #endif
  	else {
@@ -327,3 +334,14 @@
  	return v_m.from();
  }
  
+--- psi.orig/src/psiiconset.cpp
++++ psi/src/psiiconset.cpp
+@@ -648,7 +648,7 @@ PsiIcon *PsiIconset::event2icon(PsiEvent
+ 		const Message &m = me->message();
+ 		if(m.type() == "headline")
+ 			icon = "psi/headline";
+-		else if(m.type() == "chat")
++		else if(m.type() == "chat" || m.type() == "groupchat")
+ 			icon = "psi/chat";
+ 		else if(m.type() == "error")
+ 			icon = "psi/system";
