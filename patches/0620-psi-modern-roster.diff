@@ -104,7 +104,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 ===================================================================
 --- psi.orig/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:12.552826473 +0400
 +++ psi/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:12.548826473 +0400
-@@ -35,6 +35,18 @@
+@@ -35,6 +35,20 @@
  static const QString contactListBackgroundOptionPath = "options.ui.look.colors.contactlist.background";
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
  static const QString statusSingleOptionPath = "options.ui.contactlist.status-messages.single-line";
@@ -120,10 +120,12 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +static const QString avatarAtLeftOptionPath = "options.ui.contactlist.avatars.avatars-at-left";
 +static const QString showStatusIconsPath = "options.ui.contactlist.show-status-icons";
 +static const QString statusIconsOverAvatarsPath = "options.ui.contactlist.status-icon-over-avatar";
++static const QString allClientsOptionPath = "options.ui.contactlist.show-all-client-icons";
++static const QString enableGroupsOptionPath = "options.ui.contactlist.enable-groups";
 
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
-@@ -53,6 +65,18 @@
+@@ -53,6 +67,20 @@
  	optionChanged(contactListBackgroundOptionPath);
  	optionChanged(showStatusMessagesOptionPath);
  	optionChanged(statusSingleOptionPath);
@@ -139,10 +141,12 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +	optionChanged(avatarAtLeftOptionPath);
 +	optionChanged(showStatusIconsPath);
 +	optionChanged(statusIconsOverAvatarsPath);
++	optionChanged(allClientsOptionPath);
++	optionChanged(enableGroupsOptionPath);
  }
 
  PsiContactListViewDelegate::~PsiContactListViewDelegate()
-@@ -63,7 +87,8 @@
+@@ -63,7 +91,8 @@
 
  int PsiContactListViewDelegate::avatarSize() const
  {
@@ -152,7 +156,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  }
 
  QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
-@@ -91,6 +116,9 @@
+@@ -91,6 +120,9 @@
  		}
  	}
 
@@ -162,7 +166,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  	if (type == ContactListModel::ContactType) {
  		if (!index.data(ContactListModel::PresenceErrorRole).toString().isEmpty())
  			s = STATUS_ERROR;
-@@ -105,6 +133,57 @@
+@@ -105,6 +137,57 @@
  	return PsiIconset::instance()->statusPtr(index.data(ContactListModel::JidRole).toString(), s)->pixmap();
  }
 
@@ -220,7 +224,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  QSize PsiContactListViewDelegate::sizeHint(const QStyleOptionViewItem& /*option*/, const QModelIndex& index) const
  {
  	if (index.isValid()) {
-@@ -128,12 +207,51 @@
+@@ -128,12 +211,51 @@
  	QRect r = option.rect;
 
  	QRect avatarRect(r);
@@ -233,7 +237,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +		int size = avatarSize_;
 +		avatarRect.setSize(QSize(size,size));
 +		if(avatarAtLeft_) {
-+			avatarRect.translate(PsiOptions::instance()->getOption("options.ui.contactlist.enable-groups").toBool() ? -5:-1, 1);
++			avatarRect.translate(enableGroups_ ? -5:-1, 1);
 +			r.setLeft(avatarRect.right() + 3);
 +		}
 +		else {
@@ -277,7 +281,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 
  	QColor textColor;
  	if(index.data(ContactListModel::IsAnimRole).toBool()) {
-@@ -189,6 +307,74 @@
+@@ -189,6 +311,75 @@
  		drawText(painter, o, r, text, index);
  	}
 
@@ -292,7 +296,8 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +			const QPixmap &pix = *it;
 +			rightPixs.push_back(pix);
 +			rightWidths.push_back(pix.width());
-+			if(!showAllClients) break;
++			if(!allClients_)
++				break;
 +		}
 +	}
 +
@@ -352,7 +357,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  #if 0
  	int x;
  	if (d->status_single)
-@@ -346,6 +532,54 @@
+@@ -346,6 +537,62 @@
  		showStatusMessages_ = PsiOptions::instance()->getOption(showStatusMessagesOptionPath).toBool();
  		contactList()->viewport()->update();
  	}
@@ -404,6 +409,14 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +		statusIconsOverAvatars_ = PsiOptions::instance()->getOption(statusIconsOverAvatarsPath).toBool();
 +		contactList()->viewport()->update();
 +	}
++	else if(option == allClientsOptionPath) {
++		allClients_= PsiOptions::instance()->getOption(allClientsOptionPath).toBool();
++		contactList()->viewport()->update();
++	}
++	else if(option == enableGroupsOptionPath) {
++		enableGroups_ = PsiOptions::instance()->getOption(enableGroupsOptionPath).toBool();
++		contactList()->viewport()->update();
++	}
  	else if(option == slimGroupsOptionPath) {
  		slimGroup_ = PsiOptions::instance()->getOption(slimGroupsOptionPath).toBool();
  		contactList()->viewport()->update();
@@ -420,7 +433,7 @@ Index: psi/src/psicontactlistviewdelegate.h
 
  private slots:
  	void optionChanged(const QString& option);
-@@ -63,7 +65,9 @@
+@@ -63,7 +65,10 @@
  	QFontMetrics* fontMetrics_;
  	bool statusSingle_;
  	int rowHeight_;
@@ -428,6 +441,7 @@ Index: psi/src/psicontactlistviewdelegate.h
 +	bool showStatusMessages_, slimGroup_, outlinedGroup_, showClientIcons_, showMoodIcons_, showActivityIcons_, showGeolocIcons_, showTuneIcons_;
 +	bool showAvatars_, useDefaultAvatar_, avatarAtLeft_, showStatusIcons_, statusIconsOverAvatars_;
 +	int avatarSize_, avatarRadius_;
++	bool enableGroups_, allClients_;
  	mutable QHash<QModelIndex, bool> alertingIndexes_;
  };
 

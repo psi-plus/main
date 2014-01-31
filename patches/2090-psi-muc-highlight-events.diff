@@ -10,7 +10,7 @@
  				<service-discovery comment="Service discovery dialog">
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -202,6 +202,7 @@ public:
+@@ -199,6 +199,7 @@ public:
  		dlg = d;
  		nickSeparator = ":";
  		nonAnonymous = false;
@@ -18,7 +18,7 @@
  
  		trackBar = false;
  		mCmdManager.registerProvider(this);
-@@ -240,6 +241,7 @@ public:
+@@ -237,6 +238,7 @@ public:
  	int pending;
  	int hPending; // highlight pending
  	bool connecting;
@@ -26,7 +26,7 @@
  
  	QStringList hist;
  	int histAt;
-@@ -1073,6 +1075,7 @@ void GCMainDlg::activated()
+@@ -1066,6 +1068,7 @@ void GCMainDlg::activated()
  			u->setPending(d->pending, d->hPending);
  			account()->updateEntry(*u);
  		}
@@ -34,7 +34,7 @@
  		invalidateTab();
  	}
  	doFlash(false);
-@@ -1706,7 +1709,7 @@ void GCMainDlg::message(const Message &_
+@@ -1699,7 +1702,7 @@ void GCMainDlg::message(const Message &_
  {
  	Message m = _m;
  	QString from = m.from().resource();
@@ -43,7 +43,7 @@
  
  	if (m.getMUCStatuses().contains(100)) {
  		d->nonAnonymous = true;
-@@ -1756,7 +1759,7 @@ void GCMainDlg::message(const Message &_
+@@ -1749,7 +1752,7 @@ void GCMainDlg::message(const Message &_
  
  	// code to determine if the speaker was addressing this client in chat
  	if(m.body().contains(d->self))
@@ -52,7 +52,7 @@
  
  	if (m.body().left(d->self.length()) == d->self)
  		d->lastReferrer = m.from().resource();
-@@ -1765,7 +1768,7 @@ void GCMainDlg::message(const Message &_
+@@ -1758,7 +1761,7 @@ void GCMainDlg::message(const Message &_
  		QStringList highlightWords = options->getOption("options.ui.muc.highlight-words").toStringList();
  		foreach (QString word, highlightWords) {
  			if(m.body().contains((word), Qt::CaseInsensitive)) {
@@ -61,20 +61,20 @@
  			}
  		}
  	}
-@@ -1776,10 +1779,10 @@ void GCMainDlg::message(const Message &_
+@@ -1769,10 +1772,10 @@ void GCMainDlg::message(const Message &_
  			account()->playSound(PsiAccount::eSend);
  	}
  	else {
--		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
-+		if(d->alert || (PsiOptions::instance()->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
+-		if(alert || (options->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
++		if(d->alert || (options->getOption("options.ui.notifications.sounds.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) )
  			account()->playSound(PsiAccount::eGroupChat);
  
--		if(alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
-+		if(d->alert || (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
+-		if(alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
++		if(d->alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
  			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
  				XMPP::Jid jid = m.from()/*.withDomain("")*/;
  				MessageEvent *e = new MessageEvent(m, account());
-@@ -1792,9 +1795,9 @@ void GCMainDlg::message(const Message &_
+@@ -1785,9 +1788,9 @@ void GCMainDlg::message(const Message &_
  	}
  
  	if(from.isEmpty())
@@ -86,7 +86,7 @@
  }
  
  void GCMainDlg::joined()
-@@ -1831,6 +1834,11 @@ const QDateTime & GCMainDlg::lastMsgTime
+@@ -1824,6 +1827,11 @@ const QDateTime & GCMainDlg::lastMsgTime
  	return d->te_log()->lastMsgTime();
  }
  
@@ -156,7 +156,7 @@
  		// Pass message events to chat window
 -		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
 +		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty() && m.type() != "groupchat") {
- 			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
+ 			if (o->getOption("options.messages.send-composing-events").toBool()) {
  				ChatDlg *c = findChatDialogEx(e->from());
  				if (c) {
 @@ -5195,6 +5205,18 @@ void PsiAccount::handleEvent(PsiEvent* e

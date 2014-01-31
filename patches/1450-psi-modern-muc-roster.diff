@@ -273,7 +273,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  
  static bool caseInsensitiveLessThan(const QString &s1, const QString &s2)
  {
-@@ -54,6 +56,31 @@ public:
+@@ -54,6 +56,32 @@ public:
  	GCUserViewDelegate(QObject* p)
  		: QItemDelegate(p)
  	{
@@ -282,30 +282,31 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
 +
 +	void updateSettings()
 +	{
-+		colorForeground_ = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-foreground");
-+		colorBackground_ = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-background");
-+		colorModerator_ = PsiOptions::instance()->getOption("options.ui.look.colors.muc.role-moderator").value<QColor>();
-+		colorParticipant_ = PsiOptions::instance()->getOption("options.ui.look.colors.muc.role-participant").value<QColor>();
-+		colorVisitor_ = PsiOptions::instance()->getOption("options.ui.look.colors.muc.role-visitor").value<QColor>();
-+		colorNoRole_ = PsiOptions::instance()->getOption("options.ui.look.colors.muc.role-norole").value<QColor>();
-+		showGroups_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.show-groups").toBool();
-+		slimGroups_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.use-slim-group-headings").toBool();
-+		nickColoring_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.nick-coloring").toBool();
-+		showClients_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.show-client-icons").toBool();
-+		showAffiliations_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.show-affiliation-icons").toBool();
-+		showStatusIcons_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.show-status-icons").toBool();
-+		showAvatar_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.avatars.show").toBool();
-+		avatarSize_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.avatars.size").toInt();
-+		avatarAtLeft_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.avatars.avatars-at-left").toBool();
-+		avatarRadius_ = PsiOptions::instance()->getOption("options.ui.muc.userlist.avatars.radius").toInt();
++		PsiOptions *o = PsiOptions::instance();
++		colorForeground_  = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-foreground");
++		colorBackground_  = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-background");
++		colorModerator_   = o->getOption("options.ui.look.colors.muc.role-moderator").value<QColor>();
++		colorParticipant_ = o->getOption("options.ui.look.colors.muc.role-participant").value<QColor>();
++		colorVisitor_     = o->getOption("options.ui.look.colors.muc.role-visitor").value<QColor>();
++		colorNoRole_      = o->getOption("options.ui.look.colors.muc.role-norole").value<QColor>();
++		showGroups_       = o->getOption("options.ui.muc.userlist.show-groups").toBool();
++		slimGroups_       = o->getOption("options.ui.muc.userlist.use-slim-group-headings").toBool();
++		nickColoring_     = o->getOption("options.ui.muc.userlist.nick-coloring").toBool();
++		showClients_      = o->getOption("options.ui.muc.userlist.show-client-icons").toBool();
++		showAffiliations_ = o->getOption("options.ui.muc.userlist.show-affiliation-icons").toBool();
++		showStatusIcons_  = o->getOption("options.ui.muc.userlist.show-status-icons").toBool();
++		showAvatar_       = o->getOption("options.ui.muc.userlist.avatars.show").toBool();
++		avatarSize_       = o->getOption("options.ui.muc.userlist.avatars.size").toInt();
++		avatarAtLeft_     = o->getOption("options.ui.muc.userlist.avatars.avatars-at-left").toBool();
++		avatarRadius_     = o->getOption("options.ui.muc.userlist.avatars.radius").toInt();
 +
 +		QFont font;
-+		font.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
++		font.fromString(o->getOption("options.ui.look.font.contactlist").toString());
 +		fontHeight_ = QFontMetrics(font).height()+2;
  	}
  
  	void paint(QPainter* mp, const QStyleOptionViewItem& option, const QModelIndex& index) const
-@@ -66,52 +93,204 @@ public:
+@@ -66,52 +94,204 @@ public:
  				paintGroup(mp, option, gi);
  			}
  			else {
@@ -524,7 +525,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  };
  
  
-@@ -125,10 +304,21 @@ GCUserViewItem::GCUserViewItem(GCUserViewGroupItem *par)
+@@ -125,10 +305,21 @@ GCUserViewItem::GCUserViewItem(GCUserViewGroupItem *par)
  {
  }
  
@@ -547,7 +548,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  		int rank = rankStatus(s.type()) - rankStatus(item->s.type());
  		if (rank == 0)
  			rank = QString::localeAwareCompare(text(0).toLower(), it.text(0).toLower());
-@@ -224,7 +414,7 @@ void GCUserView::updateAll()
+@@ -224,7 +415,7 @@ void GCUserView::updateAll()
  		int count = j->childCount();
  		for(int num = 0; num < count; num++) {
  			GCUserViewItem *i = (GCUserViewItem*)j->child(num);
@@ -556,7 +557,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  		}
  		j->sortChildren(0, Qt::AscendingOrder);
  	}
-@@ -304,7 +494,7 @@ void GCUserView::updateEntry(const QString &nick, const Status &s)
+@@ -304,7 +495,7 @@ void GCUserView::updateEntry(const QString &nick, const Status &s)
  	}
  
  	lvi->s = s;
@@ -565,7 +566,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  	gr->sortChildren(0, Qt::AscendingOrder);
  }
  
-@@ -369,6 +559,8 @@ bool GCUserView::maybeTip(const QPoint &pos)
+@@ -369,6 +560,8 @@ bool GCUserView::maybeTip(const QPoint &pos)
  	ur.setClient(client_name,client_version,"");
  	//ur.setClient(QString(),QString(),"");
  	u.userResourceList().append(ur);
@@ -574,7 +575,7 @@ diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
  
  	PsiToolTip::showText(mapToGlobal(pos), u.makeTip(), this);
  	return true;
-@@ -573,4 +765,10 @@ void GCUserView::mousePressEvent(QMouseEvent *event)
+@@ -573,4 +766,10 @@ void GCUserView::mousePressEvent(QMouseEvent *event)
  		contextMenuRequested(event->pos());
  }
  
@@ -703,11 +704,12 @@ diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
  
  
  
-@@ -172,6 +173,7 @@ private:
- 	PsiOptions* options_;
+@@ -172,6 +173,8 @@ private:
  
  	void setMargins();
+ 
 +	inline XMPP::Jid jidForNick(const QString &nick) const;
++
  };
  
  class GCFindDlg : public QDialog

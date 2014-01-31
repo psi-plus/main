@@ -197,9 +197,9 @@ Index: psi/src/psiaccount.cpp
  	if(m.type() == "error") {
  		Stanza::Error err = m.error();
 @@ -2730,6 +2730,13 @@
- 		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "chat")
+ 		else if (type == "chat")
  			m.setType("chat");
- 		else if (PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString() == "current-open") {
+ 		else if (type == "current-open") {
 +			c = NULL;
 +			foreach (ChatDlg *cl, findChatDialogs(m.from(), false)) {
 +				if (cl->autoSelectContact() || cl->jid().resource().isEmpty() || m.from().resource() == cl->jid().resource()) {
@@ -267,7 +267,7 @@ Index: psi/src/psiaccount.cpp
 @@ -4886,12 +4919,12 @@
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
- 			if (PsiOptions::instance()->getOption("options.ui.notifications.request-receipts").toBool()) {
+ 			if (o->getOption("options.ui.notifications.request-receipts").toBool()) {
 -				ChatDlg *c = findChatDialog(e->from());
 -				if (!c) {
 -					c = findChatDialog(e->jid());
@@ -286,7 +286,7 @@ Index: psi/src/psiaccount.cpp
 @@ -4901,11 +4934,9 @@
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
- 			if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
+ 			if (o->getOption("options.messages.send-composing-events").toBool()) {
 -				ChatDlg *c = findChatDialog(e->from());
 -				if (!c) {
 -					c = findChatDialog(e->jid());
