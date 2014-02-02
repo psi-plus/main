@@ -170,20 +170,24 @@
  			if (o->getOption("options.messages.send-composing-events").toBool()) {
  				ChatDlg *c = findChatDialogEx(e->from());
  				if (c) {
-@@ -5195,6 +5205,18 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5195,6 +5205,22 @@ void PsiAccount::handleEvent(PsiEvent* e
  			doPopup = true;
  			popupType = PopupManager::AlertHeadline;
  		} // /headline
 +#ifdef GROUPCHAT
 +		else if (m.type() == "groupchat") {
 +			putToQueue = false;
-+			GCMainDlg *c = findDialog<GCMainDlg*>(e->from());
-+			if (c) {
-+				c->message(m);
-+				if (!c->isActiveTab() && c->isLastMessageAlert()
-+					&& o->getOption("options.ui.muc.allow-highlight-events").toBool())
-+					putToQueue = true;
++			bool allowMucEvents = o->getOption("options.ui.muc.allow-highlight-events").toBool();
++			if (activationType != FromXml) {
++				GCMainDlg *c = findDialog<GCMainDlg*>(e->from());
++				if (c) {
++					c->message(m);
++					if (!c->isActiveTab() && c->isLastMessageAlert() && !m.spooled() && allowMucEvents)
++						putToQueue = true;
++				}
 +			}
++			else if (allowMucEvents)
++				putToQueue = true;
 +		} // /groupchat
 +#endif
  		else if (m.type().isEmpty()) {
