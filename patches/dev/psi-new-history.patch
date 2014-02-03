@@ -2463,7 +2463,7 @@
  
  	ui_.calendar->setFirstDayOfWeek(firstDayOfWeekFromLocale());
  
-@@ -135,23 +142,29 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+@@ -135,7 +142,10 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
  	connect(ui_.buttonPrevious, SIGNAL(released()), SLOT(getPrevious()));
  	connect(ui_.buttonNext, SIGNAL(released()), SLOT(getNext()));
  	connect(ui_.buttonRefresh, SIGNAL(released()), SLOT(refresh()));
@@ -2475,8 +2475,9 @@
  	connect(ui_.tb_find, SIGNAL(clicked()), SLOT(findMessages()));
  	connect(ui_.buttonLastest, SIGNAL(released()), SLOT(getLatest()));
  	connect(ui_.buttonEarliest, SIGNAL(released()), SLOT(getEarliest()));
- 	connect(ui_.calendar, SIGNAL(selectionChanged()), SLOT(getDate()));
- 	connect(ui_.calendar, SIGNAL(activated(QDate)), SLOT(getDate()));
+@@ -159,16 +169,19 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	optionUpdated("options.ui.chat.legacy-formatting");
+ 	connect(PsiOptions::instance(), SIGNAL(optionChanged(QString)), SLOT(optionUpdated(QString)));
  
 -	connect(d->pa, SIGNAL(removedContact(PsiContact*)), SLOT(removedContact(PsiContact*)));
 +	connect(pa, SIGNAL(removedContact(PsiContact*)), SLOT(removedContact(PsiContact*)));
@@ -2872,7 +2873,7 @@
 +	delete m;
  }
  
- void HistoryDlg::edb_finished()
+ void HistoryDlg::edbFinished()
 @@ -420,28 +570,22 @@ void HistoryDlg::edb_finished()
  			if (d->reqType == TypeLatest || d->reqType == TypePrevious)
  			{
@@ -3011,7 +3012,7 @@
  }
  
  void HistoryDlg::getDate()
-@@ -533,30 +701,40 @@ void HistoryDlg::getDate()
+@@ -533,23 +701,33 @@ void HistoryDlg::getDate()
  	const QDate date = ui_.calendar->selectedDate();
  	d->reqType = TypeDate;
  	d->date = date;
@@ -3053,19 +3054,17 @@
  			}
  			break;
  		}
+@@ -596,40 +774,54 @@ void HistoryDlg::optionUpdated(
  	}
  }
- 
+ #endif
 -void HistoryDlg::displayResult(const EDBResult r, int direction, int max)
 +void HistoryDlg::displayResult(const EDBResult &r, int direction, int max)
  {
  	int i  = (direction == EDB::Forward) ? r.count() - 1 : 0;
  	int at = 0;
-@@ -566,35 +744,49 @@ void HistoryDlg::displayResult(const EDB
- 	received_color=PsiOptions::instance()->getOption("options.ui.look.colors.messages.received").toString();
- 	bool emoticons  = PsiOptions::instance()->getOption("options.ui.emoticons.use-emoticons").toBool();
- 	bool formatting = PsiOptions::instance()->getOption("options.ui.chat.legacy-formatting").toBool();
--	QString nick    = TextUtil::plain2rich(d->pa->nick());
+ 	ui_.msgLog->clear();
+-	QString nick = TextUtil::plain2rich(d->pa->nick());
 +	bool fAll = d->jid.isEmpty();
  	while (i >= 0 && i <= r.count() - 1 && (max == -1 ? true : at < max))
  	{
@@ -3080,15 +3079,15 @@
 -				QString msg = me->message().body();
 -				msg = TextUtil::linkify(TextUtil::plain2rich(msg));
 -
--				if (emoticons)
+-				if (d->emoticons)
 -					msg = TextUtil::emoticonify(msg);
--				if (formatting)
+-				if (d->formatting)
 -					msg = TextUtil::legacyFormat(msg);
 -
 -				if (me->originLocal())
--					msg = "<span style='color:"+sent_color+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]")+" &lt;"+ nick +"&gt; " + msg + "</span>";
+-					msg = "<span style='color:"+d->sentColor+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]")+" &lt;"+ nick +"&gt; " + msg + "</span>";
 -				else
--					msg = "<span style='color:"+received_color+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
+-					msg = "<span style='color:"+d->receivedColor+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
 -
 -				ui_.msgLog->appendText(msg);
 +		if (e->type() == PsiEvent::Message) {
@@ -3112,21 +3111,21 @@
 +			QString msg = me->message().body();
 +			msg = TextUtil::linkify(TextUtil::plain2rich(msg));
 +
-+			if (emoticons)
++			if (d->emoticons)
 +				msg = TextUtil::emoticonify(msg);
-+			if (formatting)
++			if (d->formatting)
 +				msg = TextUtil::legacyFormat(msg);
  
 +			if (me->originLocal())
 +			{
 +				QString nick = (pa) ? TextUtil::plain2rich(pa->nick()) : tr("deleted");
-+				msg = "<span style='color:" + sent_color + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" + nick
++				msg = "<span style='color:" + d->sentColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" + nick
 +					+ ((fAll) ? QString(" -> %1").arg(TextUtil::plain2rich(from)) : QString())
 +					+ "&gt; " + msg + "</span>";
  			}
 -		}
 +			else
-+				msg = "<span style='color:" + received_color + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
++				msg = "<span style='color:" + d->receivedColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
  
 +			ui_.msgLog->appendText(msg);
 +		}
@@ -3134,7 +3133,7 @@
  		i += (direction == EDB::Forward) ? -1 : +1;
  	}
 @@ -605,11 +797,9 @@ void HistoryDlg::displayResult(const EDB
- UserListItem* HistoryDlg::currentUserListItem()
+ UserListItem* HistoryDlg::currentUserListItem() const
  {
  	UserListItem* u = 0;
 -	QListWidgetItem *i = ui_.jidList->currentItem();
@@ -3176,7 +3175,7 @@
  {
 -	EDBHandle* h = new EDBHandle(d->pa->edb());
 +	EDBHandle* h = new EDBHandle(d->psi->edb());
- 	connect(h, SIGNAL(finished()), SLOT(edb_finished()));
+ 	connect(h, SIGNAL(finished()), SLOT(edbFinished()));
  	return h;
  }
 +
@@ -3214,7 +3213,7 @@
 +	void displayResult(const EDBResult &, int, int max=-1);
  	QFont fontForOption(const QString& option);
  	void listAccounts();
- 	UserListItem* currentUserListItem();
+ 	UserListItem* currentUserListItem() const;
  	void startRequest();
  	void stopRequest();
 -
@@ -4251,9 +4250,9 @@
  				}
  			}
  		}
-@@ -5747,14 +5749,16 @@ void PsiAccount::chatMessagesRead(const
- //	}
+@@ -5804,14 +5806,16 @@ void PsiAccount::groupChatMessagesRead
  }
+ #endif
  
 -void PsiAccount::logEvent(const Jid &j, PsiEvent *e)
 +void PsiAccount::logEvent(const Jid &j, PsiEvent *e, int type)
