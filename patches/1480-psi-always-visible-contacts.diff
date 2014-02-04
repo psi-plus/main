@@ -2,76 +2,16 @@ Index: psi/src/contactlistgroup.cpp
 ===================================================================
 --- psi.orig/src/contactlistgroup.cpp	2013-01-15 14:04:29.140827147 +0400
 +++ psi/src/contactlistgroup.cpp	2013-01-15 14:04:29.128827147 +0400
-@@ -43,6 +43,7 @@ ContactListGroup::ContactListGroup(Conta
- 	, parent_(parent)
- 	, updateOnlineContactsTimer_(0)
- 	, haveOnlineContacts_(false)
-+	, haveAlwaysVisibleContacts_(false)
- 	, onlineContactsCount_(0)
- 	, totalContactsCount_(0)
- {
-@@ -334,6 +334,11 @@
- 	return haveOnlineContacts_;
- }
-
-+bool ContactListGroup::haveAlwaysVisibleContacts() const
-+{
-+	return haveAlwaysVisibleContacts_;
-+}
-+
- int ContactListGroup::onlineContactsCount() const
- {
- 	return onlineContactsCount_;
-@@ -356,6 +361,7 @@
- 		return;
-
- 	bool haveOnlineContacts = false;
-+	bool haveAlwaysVisibleContacts = false;
- 	int onlineContactsCount = 0;
- 	int totalContactsCount = 0;
- 	foreach(ContactListItemProxy* item, items_) {
 @@ -368,6 +374,9 @@
- 				++onlineContactsCount;
- 				// break;
  			}
+ 			if (contact->alerting())
+ 				shouldBeVisible = true;
 +			if (contact->isAlwaysVisible()) {
-+				haveAlwaysVisibleContacts = true;
++				shouldBeVisible = true;
 +			}
  		}
  		else if ((group = dynamic_cast<ContactListGroup*>(item->item()))) {
  			totalContactsCount += group->totalContactsCount();
-@@ -387,6 +396,11 @@
- 		}
- 	}
-
-+	if (haveAlwaysVisibleContacts != haveAlwaysVisibleContacts_) {
-+		haveAlwaysVisibleContacts_ = haveAlwaysVisibleContacts;
-+		model_->updatedGroupVisibility(this);
-+	}
-+
- 	if (onlineContactsCount != onlineContactsCount_ ||
- 	    totalContactsCount != totalContactsCount_)
- 	{
-Index: psi/src/contactlistgroup.h
-===================================================================
---- psi.orig/src/contactlistgroup.h	2013-01-15 14:04:29.140827147 +0400
-+++ psi/src/contactlistgroup.h	2013-01-15 14:04:29.132827147 +0400
-@@ -52,6 +52,7 @@
-
- 	bool isFake() const;
- 	bool haveOnlineContacts() const;
-+	bool haveAlwaysVisibleContacts() const;
- 	virtual int onlineContactsCount() const;
- 	virtual int totalContactsCount() const;
- 	int contactsCount() const;
-@@ -122,6 +123,7 @@
- 	QVector<PsiContact*> contacts_;
- 	QVector<ContactListItemProxy*> items_;
- 	bool haveOnlineContacts_;
-+	bool haveAlwaysVisibleContacts_;
- 	int onlineContactsCount_;
- 	int totalContactsCount_;
-
 Index: psi/src/contactlistproxymodel.cpp
 ===================================================================
 --- psi.orig/src/contactlistproxymodel.cpp	2013-01-15 14:04:29.140827147 +0400
@@ -86,25 +26,6 @@ Index: psi/src/contactlistproxymodel.cpp
 
  		bool show = true;
  		if (psiContact->isHidden()) {
-@@ -112,6 +115,10 @@
- 				if (specialGroupType == ContactListGroup::SpecialType_Transports)
- 					return showTransports();
- 			}
-+			ContactListGroup* group = static_cast<ContactListGroup*>(item);
-+			if (group->haveAlwaysVisibleContacts()) {
-+				return true;
-+			}
-
- 			bool show = true;
- 			if (index.data(Qt::DisplayRole) == PsiContact::hiddenGroupName()) {
-@@ -119,7 +126,6 @@
- 			}
-
- 			if (!showOffline()) {
--				ContactListGroup* group = static_cast<ContactListGroup*>(item);
- 				return show && group->haveOnlineContacts();
- 			}
- 			else {
 Index: psi/src/profiles.h
 ===================================================================
 --- psi.orig/src/profiles.h	2013-01-15 14:04:29.140827147 +0400
