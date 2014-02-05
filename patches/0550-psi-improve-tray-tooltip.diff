@@ -169,15 +169,6 @@ Index: psi/src/mainwin.cpp
  }
 
  QString MainWin::numEventsString(int x) const
-@@ -1419,6 +1490,8 @@
-
- 	buildTrayMenu();
- 	d->tray->setContextMenu(d->trayMenu);
-+
-+	d->tray->iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
- }
-
- void MainWin::doRecvNextEvent()
 @@ -1441,6 +1514,7 @@
  void MainWin::numAccountsChanged()
  {
@@ -208,40 +199,26 @@ Index: psi/src/mainwin.h
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
-Index: psi/src/psitrayicon.cpp
-===================================================================
---- psi.orig/src/psitrayicon.cpp	2013-01-15 14:04:10.892826405 +0400
-+++ psi/src/psitrayicon.cpp	2013-01-15 14:04:10.888826405 +0400
+--- a/src/psitrayicon.cpp
++++ b/src/psitrayicon.cpp
 @@ -2,6 +2,7 @@
  #include <QPixmapCache>
  #include <QApplication> // old
  #include <QSystemTrayIcon>
 +#include <QHelpEvent>
-
+ 
  #include "psitrayicon.h"
  #include "iconset.h"
-@@ -13,13 +14,16 @@
-
- PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
- 	: QObject(parent)
-+	, icon_(NULL)
-+	, trayicon_(new QSystemTrayIcon())
- {
--	icon_ = NULL;
--	trayicon_ = NULL;
--	trayicon_ = new QSystemTrayIcon();
-+
+@@ -18,6 +19,7 @@ PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
  	trayicon_->setContextMenu(popup);
  	setToolTip(tip);
  	connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
 +	trayicon_->installEventFilter(this);
-+
-+	iconsetChanged(PsiOptions::instance()->getOption("options.iconsets.status").toString());
  }
-
+ 
  PsiTrayIcon::~PsiTrayIcon()
-@@ -35,7 +39,11 @@
-
+@@ -37,7 +39,11 @@ void PsiTrayIcon::setContextMenu(QMenu* menu)
+ 
  void PsiTrayIcon::setToolTip(const QString &str)
  {
 +#ifndef HAVE_X11
@@ -250,30 +227,9 @@ Index: psi/src/psitrayicon.cpp
 +	Q_UNUSED(str)
 +#endif
  }
-
- void PsiTrayIcon::setIcon(const PsiIcon *icon, bool alert)
-@@ -78,6 +86,11 @@
- 	return false;
- }
-
-+void PsiTrayIcon::iconsetChanged(const QString &iconset)
-+{
-+	iconset_ = iconset;
-+}
-+
- void PsiTrayIcon::show()
- {
- 	trayicon_->show();
-@@ -179,7 +192,7 @@
- 	if ( !icon_ )
- 		return;
-
--	QString cachedName = "PsiTray/" + PsiOptions::instance()->getOption("options.iconsets.status").toString() + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
-+	QString cachedName = "PsiTray/" + iconset_ + "/" + icon_->name() + "/" + QString::number( icon_->frameNumber() );
-
- 	QPixmap p;
- 	if ( !QPixmapCache::find(cachedName, p) ) {
-@@ -188,3 +201,12 @@
+ 
+ void PsiTrayIcon::setIcon(const PsiIcon *icon, bool /*alert*/)
+@@ -195,3 +201,12 @@ void PsiTrayIcon::animate()
  	}
  	trayicon_->setIcon(p);
  }
@@ -286,34 +242,21 @@ Index: psi/src/psitrayicon.cpp
 +	}
 +	return QObject::eventFilter(obj, event);
 +}
-Index: psi/src/psitrayicon.h
-===================================================================
---- psi.orig/src/psitrayicon.h	2013-01-15 14:04:10.892826405 +0400
-+++ psi/src/psitrayicon.h	2013-01-15 14:04:10.888826405 +0400
-@@ -25,10 +25,13 @@
-
- 	bool isWMDock();
-
-+	void iconsetChanged(const QString& iconset);
-+
- signals:
+--- a/src/psitrayicon.h
++++ b/src/psitrayicon.h
+@@ -29,6 +29,7 @@ signals:
  	void clicked(const QPoint &, int);
  	void doubleClicked(const QPoint &);
  	void closed();
 +	void doToolTip(QObject *, QPoint);
-
+ 
  public slots:
  	void show();
-@@ -41,10 +44,12 @@
+@@ -41,6 +42,7 @@ private slots:
  protected:
  	QPixmap makeIcon();
  	QRgb pixelBlend(QRgb p1, QRgb p2);
 +	bool eventFilter( QObject *, QEvent * );
-
+ 
  private:
  	PsiIcon* icon_;
- 	QSystemTrayIcon* trayicon_;
-+	QString iconset_;
- };
-
-
