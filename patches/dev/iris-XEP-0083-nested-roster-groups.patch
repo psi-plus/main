@@ -1,0 +1,363 @@
+From 5548dc548baa2256658bb013051c5d218c4a994f Mon Sep 17 00:00:00 2001
+From: Ivan Romanov <drizt@land.ru>
+Date: Sat, 8 Mar 2014 20:20:11 +0600
+Subject: [PATCH] XEP-0083
+
+---
+ iris/src/xmpp/xmpp-im/client.cpp        | 47 ++++++++++++++++++++-
+ iris/src/xmpp/xmpp-im/types.cpp         | 34 ++++++++++++++-
+ iris/src/xmpp/xmpp-im/xmpp_client.h     |  2 +
+ iris/src/xmpp/xmpp-im/xmpp_liveroster.h | 10 +++++
+ iris/src/xmpp/xmpp-im/xmpp_roster.h     |  9 +++-
+ iris/src/xmpp/xmpp-im/xmpp_tasks.cpp    | 74 ++++++++++++++++++++++++++++++++-
+ iris/src/xmpp/xmpp-im/xmpp_tasks.h      |  5 +++
+ 7 files changed, 176 insertions(+), 5 deletions(-)
+
+diff --git a/iris/src/xmpp/xmpp-im/client.cpp b/iris/src/xmpp/xmpp-im/client.cpp
+index bebcfa8..20b5ee2 100644
+--- a/iris/src/xmpp/xmpp-im/client.cpp
++++ b/iris/src/xmpp/xmpp-im/client.cpp
+@@ -885,6 +885,19 @@ void Client::rosterRequest()
+ 		return;
+ 
+ 	JT_Roster *r = new JT_Roster(rootTask());
++	connect(r, SIGNAL(finished()), SLOT(slotRosterDelimiterRequestFinished()));
++	r->getGroupsDelimiter();
++	r->go(true);
++}
++
++void Client::slotRosterDelimiterRequestFinished()
++{
++	JT_Roster *r = qobject_cast<JT_Roster*>(sender());
++	d->roster.setGroupsDelimiter(r->groupsDelimiter());
++
++	emit rosterGroupsDelimiterRequestFinished(r->groupsDelimiter());
++
++	r = new JT_Roster(rootTask());
+ 	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
+ 	r->get();
+ 	d->roster.flagAllForDelete(); // mod_groups patch
+@@ -1244,13 +1257,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
+ //---------------------------------------------------------------------------
+ // LiveRoster
+ //---------------------------------------------------------------------------
++class LiveRoster::Private
++{
++public:
++	QString groupsDelimiter;
++};
++
+ LiveRoster::LiveRoster()
+-:QList<LiveRosterItem>()
++	: QList<LiveRosterItem>()
++	, d(new LiveRoster::Private)
+ {
+ }
+ 
+ LiveRoster::~LiveRoster()
+ {
++	delete d;
++}
++
++LiveRoster::LiveRoster(const LiveRoster &other)
++	: QList<LiveRosterItem>(other)
++	, d(new LiveRoster::Private)
++{
++	d->groupsDelimiter = other.d->groupsDelimiter;
++}
++
++LiveRoster &LiveRoster::operator=(const LiveRoster &other)
++{
++	QList<LiveRosterItem>::operator=(other);
++	d->groupsDelimiter = other.d->groupsDelimiter;
++	return *this;
+ }
+ 
+ void LiveRoster::flagAllForDelete()
+@@ -1279,4 +1314,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
+ 	return it;
+ }
+ 
++void LiveRoster::setGroupsDelimiter(const QString &groupsDelimiter)
++{
++	d->groupsDelimiter = groupsDelimiter;
++}
++
++QString LiveRoster::groupsDelimiter() const
++{
++	return d->groupsDelimiter;
++}
++
+ }
+diff --git a/iris/src/xmpp/xmpp-im/types.cpp b/iris/src/xmpp/xmpp-im/types.cpp
+index b0d5d05..e83b0c0 100644
+--- a/iris/src/xmpp/xmpp-im/types.cpp
++++ b/iris/src/xmpp/xmpp-im/types.cpp
+@@ -2846,13 +2846,35 @@ bool RosterItem::fromXml(const QDomElement &item)
+ //---------------------------------------------------------------------------
+ // Roster
+ //---------------------------------------------------------------------------
++class Roster::Private
++{
++public:
++	QString groupsDelimiter;
++};
++
+ Roster::Roster()
+-:QList<RosterItem>()
++	: QList<RosterItem>()
++	, d(new Roster::Private)
+ {
+ }
+ 
+ Roster::~Roster()
+ {
++	delete d;
++}
++
++Roster::Roster(const Roster &other)
++	: QList<RosterItem>(other)
++	, d(new Roster::Private)
++{
++	d->groupsDelimiter = other.d->groupsDelimiter;
++}
++
++Roster &Roster::operator=(const Roster &other)
++{
++	QList<RosterItem>::operator=(other);
++	d->groupsDelimiter = other.d->groupsDelimiter;
++	return *this;
+ }
+ 
+ Roster::Iterator Roster::find(const Jid &j)
+@@ -2875,6 +2897,16 @@ Roster::ConstIterator Roster::find(const Jid &j) const
+ 	return end();
+ }
+ 
++void Roster::setGroupsDelimiter(const QString &groupsDelimiter)
++{
++	d->groupsDelimiter = groupsDelimiter;
++}
++
++QString Roster::groupsDelimiter() const
++{
++	return d->groupsDelimiter;
++}
++
+ 
+ //---------------------------------------------------------------------------
+ // FormField
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_client.h b/iris/src/xmpp/xmpp-im/xmpp_client.h
+index cd57034..45c62ae 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_client.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
+@@ -137,6 +137,7 @@ namespace XMPP
+ 		void activated();
+ 		void disconnected();
+ 		//void authFinished(bool, int, const QString &);
++		void rosterGroupsDelimiterRequestFinished(const QString &);
+ 		void rosterRequestFinished(bool, int, const QString &);
+ 		void rosterItemAdded(const RosterItem &);
+ 		void rosterItemUpdated(const RosterItem &);
+@@ -171,6 +172,7 @@ namespace XMPP
+ 		void streamIncomingXml(const QString &);
+ 		void streamOutgoingXml(const QString &);
+ 
++		void slotRosterDelimiterRequestFinished();
+ 		void slotRosterRequestFinished();
+ 
+ 		// basic daemons
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+index 94e9e4a..31077b1 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+@@ -34,9 +34,19 @@ namespace XMPP
+ 		LiveRoster();
+ 		~LiveRoster();
+ 
++		LiveRoster(const LiveRoster &other);
++		LiveRoster &operator=(const LiveRoster &other);
++
+ 		void flagAllForDelete();
+ 		LiveRoster::Iterator find(const Jid &, bool compareRes=true);
+ 		LiveRoster::ConstIterator find(const Jid &, bool compareRes=true) const;
++
++		void setGroupsDelimiter(const QString &groupsDelimiter);
++		QString groupsDelimiter() const;
++
++	private:
++		class Private;
++		Private *d;
+ 	};
+ }
+ 
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_roster.h b/iris/src/xmpp/xmpp-im/xmpp_roster.h
+index ff00e70..7b1f1dd 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_roster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_roster.h
+@@ -36,11 +36,18 @@ namespace XMPP
+ 		Roster();
+ 		~Roster();
+ 
++		Roster(const Roster &other);
++		Roster &operator=(const Roster &other);
++
+ 		Roster::Iterator find(const Jid &);
+ 		Roster::ConstIterator find(const Jid &) const;
+ 
++		void setGroupsDelimiter(const QString &groupsDelimiter);
++		QString groupsDelimiter() const;
++
+ 	private:
+-		class RosterPrivate *d;
++		class Private;
++		Private *d;
+ 	};
+ }
+ 
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+index fc5663f..d2c8098 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+@@ -367,9 +367,11 @@ public:
+ 	Private() {}
+ 
+ 	Roster roster;
++	QString groupsDelimiter;
+ 	QList<QDomElement> itemList;
+ };
+ 
++
+ JT_Roster::JT_Roster(Task *parent)
+ :Task(parent)
+ {
+@@ -407,7 +409,7 @@ void JT_Roster::set(const Jid &jid, const QString &name, const QStringList &grou
+ 
+ void JT_Roster::remove(const Jid &jid)
+ {
+-	type = 1;
++	type = 2;
+ 	//to = client()->host();
+ 	QDomElement item = doc()->createElement("item");
+ 	item.setAttribute("jid", jid.full());
+@@ -415,10 +417,46 @@ void JT_Roster::remove(const Jid &jid)
+ 	d->itemList += item;
+ }
+ 
++void JT_Roster::getGroupsDelimiter()
++{
++	type = 3;
++	//to = client()->host();
++	iq = createIQ(doc(), "get", to.full(), id());
++
++	QDomElement roster = doc()->createElement("roster");
++	roster.setAttribute("xmlns", "roster:delimiter");
++
++	QDomElement query = doc()->createElement("query");
++	query.setAttribute("xmlns", "jabber:iq:private");
++	query.appendChild(roster);
++
++	iq.appendChild(query);
++}
++
++void JT_Roster::setGroupsDelimiter(const QString &groupsDelimiter)
++{
++	type = 4;
++	//to = client()->host();
++	iq = createIQ(doc(), "set", to.full(), id());
++
++	QDomText text = doc()->createTextNode(groupsDelimiter);
++
++	QDomElement roster = doc()->createElement("roster");
++	roster.setAttribute("xmlns", "roster:delimiter");
++	roster.appendChild(text);
++
++	QDomElement query = doc()->createElement("query");
++	query.setAttribute("xmlns", "jabber:iq:private");
++	query.appendChild(roster);
++
++	iq.appendChild(query);
++}
++
+ void JT_Roster::onGo()
+ {
+-	if(type == 0)
++	if (type == 0) {
+ 		send(iq);
++	}
+ 	else if(type == 1) {
+ 		//to = client()->host();
+ 		iq = createIQ(doc(), "set", to.full(), id());
+@@ -429,6 +467,15 @@ void JT_Roster::onGo()
+ 			query.appendChild(it);
+ 		send(iq);
+ 	}
++	else if (type == 2) {
++		send(iq);
++	}
++	else if (type == 3) {
++		send(iq);
++	}
++	else if (type == 4) {
++		send(iq);
++	}
+ }
+ 
+ const Roster & JT_Roster::roster() const
+@@ -436,6 +483,11 @@ const Roster & JT_Roster::roster() const
+ 	return d->roster;
+ }
+ 
++QString JT_Roster::groupsDelimiter() const
++{
++	return d->groupsDelimiter;
++}
++
+ QString JT_Roster::toString() const
+ {
+ 	if(type != 1)
+@@ -504,6 +556,24 @@ bool JT_Roster::take(const QDomElement &x)
+ 		setSuccess();
+ 		return true;
+ 	}
++	// getGroupsDelimiter
++	else if (type == 3) {
++		QDomElement q = queryTag(x);
++		QDomElement delimiter = q.firstChild().toElement();
++		if (!delimiter.isNull()) {
++			d->groupsDelimiter = delimiter.firstChild().toText().data();
++			setSuccess();
++		}
++		else {
++			setError(x);
++		}
++		return true;
++	}
++	// setGroupsDelimiter
++	else if (type == 4) {
++		setSuccess();
++		return true;
++	}
+ 
+ 	return false;
+ }
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.h b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+index e4afcd0..5b34656 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+@@ -98,7 +98,12 @@ namespace XMPP
+ 		void set(const Jid &, const QString &name, const QStringList &groups);
+ 		void remove(const Jid &);
+ 
++		// XEP-0083
++		void getGroupsDelimiter();
++		void setGroupsDelimiter(const QString &groupsDelimiter);
++
+ 		const Roster & roster() const;
++		QString groupsDelimiter() const;
+ 
+ 		QString toString() const;
+ 		bool fromString(const QString &);
+-- 
+1.8.5.3
+
