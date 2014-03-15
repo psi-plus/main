@@ -1,0 +1,1064 @@
+diff --git a/src/contactlistaccountgroup.cpp b/src/contactlistaccountgroup.cpp
+index 4e994b0..71f1346 100644
+--- a/src/contactlistaccountgroup.cpp
++++ b/src/contactlistaccountgroup.cpp
+@@ -30,14 +30,13 @@
+ #include "contactlistgroupcache.h"
+ 
+ ContactListAccountGroup::ContactListAccountGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount* account)
+-	: ContactListNestedGroup(model, parent, QString())
++	: ContactListNestedGroup(model, parent, account, QString())
+ 	, isRoot_(!account)
+-	, account_(account)
+ {
+-	if (account_) {
++	if (account) {
+ 		model->groupCache()->addGroup(this);
+-		connect(account_, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
+-		connect(account_, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
++		connect(account, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
++		connect(account, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
+ 	}
+ }
+ 
+@@ -57,11 +56,6 @@ void ContactListAccountGroup::clearGroup()
+ 	ContactListNestedGroup::clearGroup();
+ }
+ 
+-PsiAccount* ContactListAccountGroup::account() const
+-{
+-	return account_;
+-}
+-
+ ContactListModel::Type ContactListAccountGroup::type() const
+ {
+ 	return ContactListModel::AccountType;
+@@ -140,7 +134,7 @@ void ContactListAccountGroup::accountUpdated()
+ 
+ 	model()->updatedItem(root->findGroup(this));
+ 
+-	if (account_.isNull() || !account_->enabled()) {
++	if (!account() || !account()->enabled()) {
+ 		clearGroup();
+ 		root->removeAccount(this);
+ 	}
+@@ -148,8 +142,8 @@ void ContactListAccountGroup::accountUpdated()
+ 
+ const QString& ContactListAccountGroup::displayName() const
+ {
+-	if (account_) {
+-		return account_->name();
++	if (account()) {
++		return account()->name();
+ 	}
+ 
+ 	static QString emptyName;
+@@ -163,8 +157,8 @@ QString ContactListAccountGroup::comparisonName() const
+ 
+ QString ContactListAccountGroup::internalGroupName() const
+ {
+-	if (account_) {
+-		return account_->id();
++	if (account()) {
++		return account()->id();
+ 	}
+ 
+ 	return QString();
+diff --git a/src/contactlistaccountgroup.h b/src/contactlistaccountgroup.h
+index b70c7c0..dddac4f 100644
+--- a/src/contactlistaccountgroup.h
++++ b/src/contactlistaccountgroup.h
+@@ -34,7 +34,6 @@ public:
+ 	ContactListAccountGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount* account);
+ 	~ContactListAccountGroup();
+ 
+-	PsiAccount* account() const;
+ 	ContactListAccountGroup* findAccount(PsiAccount* account) const;
+ 
+ 	// reimplemented
+@@ -63,7 +62,6 @@ private slots:
+ 
+ private:
+ 	bool isRoot_;
+-	QPointer<PsiAccount> account_;
+ 	QList<ContactListAccountGroup*> accounts_;
+ };
+ 
+diff --git a/src/contactlistaccountmenu.cpp b/src/contactlistaccountmenu.cpp
+index 092e433..98bbe9f 100644
+--- a/src/contactlistaccountmenu.cpp
++++ b/src/contactlistaccountmenu.cpp
+@@ -21,6 +21,7 @@
+ #include "contactlistaccountmenu.h"
+ 
+ #include <QPointer>
++#include <QInputDialog>
+ 
+ #include "pluginmanager.h"
+ #include "psiiconset.h"
+@@ -36,6 +37,7 @@
+ #include "common.h"
+ #include "contactmanager/contactmanagerdlg.h"
+ #include "mucjoindlg.h"
++#include "userlist.h"
+ 
+ class ContactListAccountMenu::Private : public QObject
+ {
+@@ -58,6 +60,7 @@ class ContactListAccountMenu::Private : public QObject
+ 	QAction* newMessageAction_;
+ 	QAction* xmlConsoleAction_;
+ 	QAction* privacyListsAction_;
++	QAction* groupsDelimiterAction_;
+ 	QAction* modifyAccountAction_;
+ 	QMenu* adminMenu_;
+ 	QAction* adminOnlineUsersAction_;
+@@ -127,6 +130,9 @@ public:
+ 		privacyListsAction_ = new IconAction(tr("Privacy Lists"), this, "psi/eye");
+ 		connect(privacyListsAction_, SIGNAL(triggered()), SLOT(privacyLists()));
+ 
++		groupsDelimiterAction_ = new IconAction(tr("Delimiter of Nested Groups"), this, "");
++		connect(groupsDelimiterAction_, SIGNAL(triggered()), SLOT(groupsDelimiter()));
++
+ 		xmlConsoleAction_ = new IconAction(tr("&XML Console"), this, "psi/xml");
+ 		connect(xmlConsoleAction_, SIGNAL(triggered()), SLOT(xmlConsole()));
+ 
+@@ -165,6 +171,7 @@ public:
+ 		menu->addAction(newMessageAction_);
+ 		menu->addAction(contactManagerAction_);
+ 		menu->addAction(privacyListsAction_);
++		menu->addAction(groupsDelimiterAction_);
+ 		menu->addSeparator();
+ 		menu->addAction(xmlConsoleAction_);
+ 		menu->addSeparator();
+@@ -236,6 +243,7 @@ private slots:
+ 		serviceDiscoveryAction_->setEnabled(account->account()->isAvailable());
+ 		contactManagerAction_->setEnabled(account->account()->isAvailable());
+ 		privacyListsAction_->setEnabled(account->account()->isAvailable());
++		groupsDelimiterAction_->setEnabled(account->account()->isAvailable());
+ 		if (!PsiOptions::instance()->getOption("options.ui.menu.account.admin").toBool()) {
+ 			adminMenu_->menuAction()->setVisible(false);
+ 		}
+@@ -366,6 +374,25 @@ private slots:
+ 			bringToFront(dlg);
+ 	}
+ 
++	void groupsDelimiter()
++	{
++		if (!account)
++			return;
++
++		bool ok = false;
++		QString delimiter = account->account()->userList()->groupsDelimiter();
++		delimiter = QInputDialog::getText(0,
++										  tr("Delimiter of Nested Groups"),
++										  tr("Set a new delimiter of nested groups"),
++										  QLineEdit::Normal,
++										  delimiter,
++										  &ok);
++		if (!ok)
++			return;
++
++		account->account()->actionSetGroupsDelimiter(delimiter);
++	}
++
+ 	void contactManager()
+ 	{
+ 		if (!account)
+diff --git a/src/contactlistdragmodel.cpp b/src/contactlistdragmodel.cpp
+index 8643046..4c4eedf 100644
+--- a/src/contactlistdragmodel.cpp
++++ b/src/contactlistdragmodel.cpp
+@@ -23,6 +23,7 @@
+ #include <QtAlgorithms>
+ #include <QTimer>
+ 
++#include "userlist.h"
+ #include "psioptions.h"
+ #include "psiaccount.h"
+ #include "contactlistgroup.h"
+@@ -296,7 +297,7 @@ bool ContactListDragModel::supportsMimeDataOnIndex(const QMimeData* data, const
+ 		if (group) {
+ 			ContactListItemProxy* item2 = itemProxy(parent);
+ 			ContactListGroup* group2 = item2 ? item2->parent() : 0;
+-			if (group2 && group2->fullName().startsWith(group->fullName() + ContactListGroup::groupDelimiter())) {
++			if (group2 && group2->fullName().startsWith(group->fullName() + group2->groupsDelimiter())) {
+ 				return false;
+ 			}
+ 		}
+@@ -340,22 +341,18 @@ void ContactListDragModel::addOperationsForGroupRename(const QString& currentGro
+ 		for (int i = 0; i < group->itemsCount(); ++i) {
+ 			ContactListItemProxy* itemProxy = group->item(i);
+ 			PsiContact* contact = 0;
+-#ifdef CONTACTLIST_NESTED_GROUPS
+ 			ContactListGroup* childGroup = 0;
+-#endif
+ 			if ((contact = dynamic_cast<PsiContact*>(itemProxy->item()))) {
+ 				operations->addOperation(contact,
+ 										 sourceOperationsForContactGroup(currentGroupName, contact),
+ 										 destinationOperationsForContactGroup(newGroupName, contact));
+ 			}
+-#ifdef CONTACTLIST_NESTED_GROUPS
+-#error needs testing
++			// #error needs testing
+ 			else if ((childGroup = dynamic_cast<ContactListGroup*>(itemProxy->item()))) {
+-				QString theName = childGroup->fullName().split(ContactListGroup::groupDelimiter()).last();
+-				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + ContactListGroup::groupDelimiter()) + theName;
++				QString theName = childGroup->fullName().split(childGroup->groupsDelimiter()).last();
++				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + childGroup->groupsDelimiter()) + theName;
+ 				addOperationsForGroupRename(childGroup->fullName(), newName, operations);
+ 			}
+-#endif
+ 		}
+ 	}
+ }
+@@ -382,7 +379,8 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
+ 
+ 	foreach(ContactListModelSelection::Group group, selection.groups()) {
+ 		QString parentGroupName = getDropGroupName(parent);
+-		if (parentGroupName.startsWith(group.fullName + ContactListGroup::groupDelimiter())) {
++		QString delimiter = account(parent)->userList()->groupsDelimiter();
++		if (parentGroupName.startsWith(group.fullName + delimiter)) {
+ 			qWarning("Dropping group to its descendant is not supported ('%s' -> '%s')", qPrintable(group.fullName), qPrintable(parentGroupName));
+ 			continue;
+ 		}
+@@ -391,8 +389,8 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
+ 			continue;
+ 
+ 		// TODO: unify these two lines with the ones in operationsForGroupRename
+-		QString theName = group.fullName.split(ContactListGroup::groupDelimiter()).last();
+-		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + ContactListGroup::groupDelimiter()) + theName;
++		QString theName = group.fullName.split(delimiter).last();
++		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + delimiter) + theName;
+ 		if (newName == group.fullName)
+ 			continue;
+ 
+@@ -422,33 +420,33 @@ void ContactListDragModel::renameGroup(ContactListGroup* group, const QString& n
+ 	Q_ASSERT(group);
+ 	ContactListModelOperationList operations(ContactListModelOperationList::Move);
+ 
+-	QStringList name = group->fullName().split(ContactListGroup::groupDelimiter());
++	QStringList name = group->fullName().split(group->groupsDelimiter());
+ 	if (name.isEmpty())
+ 		return;
+ 	name.takeLast();
+ 	if (!newName.isEmpty())
+ 		name << newName;
+-	addOperationsForGroupRename(group->fullName(), name.join(ContactListGroup::groupDelimiter()), &operations);
++	addOperationsForGroupRename(group->fullName(), name.join(group->groupsDelimiter()), &operations);
+ 
+ 	performContactOperations(operations, Operation_GroupRename);
+ }
+ 
+-QString ContactListDragModel::processContactSetGroupName(const QString& groupName) const
++QString ContactListDragModel::processContactSetGroupName(const QString& groupName, const QString& groupsDelimiter) const
+ {
+ 	if (accountsEnabled()) {
+-		QStringList split = groupName.split(ContactListGroup::groupDelimiter());
++		QStringList split = groupName.split(groupsDelimiter);
+ 		split.takeFirst();
+-		return split.join(ContactListGroup::groupDelimiter());
++		return split.join(groupsDelimiter);
+ 	}
+ 
+ 	return groupName;
+ }
+ 
+-QStringList ContactListDragModel::processContactSetGroupNames(const QStringList& groups) const
++QStringList ContactListDragModel::processContactSetGroupNames(const QStringList& groups, const QString& groupsDelimiter) const
+ {
+ 	QStringList result;
+ 	foreach(const QString& g, groups) {
+-		result << processContactSetGroupName(g);
++		result << processContactSetGroupName(g, groupsDelimiter);
+ 	}
+ 	return result;
+ }
+@@ -504,7 +502,8 @@ void ContactListDragModel::performContactOperations(const ContactListModelOperat
+ 			}
+ 		}
+ 
+-		psiContact->setGroups(processContactSetGroupNames(groups));
++		QString delimiter = psiContact->account()->userList()->groupsDelimiter();
++		psiContact->setGroups(processContactSetGroupNames(groups, delimiter));
+ 	}
+ 
+ 	contactOperationsPerformed(operations, operationType, groupContactCount);
+@@ -530,9 +529,10 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
+ 			continue;
+ 
+ 		QStringList groups = psiContact->groups();
++		QString delimiter = psiContact->account()->userList()->groupsDelimiter();
+ 
+ 		foreach(ContactListModelOperationList::Operation op, contactOperation.operations) {
+-			groups.removeAll(processContactSetGroupName(op.groupFrom));
++			groups.removeAll(processContactSetGroupName(op.groupFrom, delimiter));
+ 		}
+ 
+ 		if (!groupsEnabled()) {
+@@ -562,8 +562,10 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
+ 				continue;
+ 
+ 			QStringList groups = it.value();
++			QString groupsDelimiter = psiContact->account()->userList()->groupsDelimiter();
++
+ 			if (!groups.isEmpty())
+-				psiContact->setGroups(processContactSetGroupNames(groups));
++				psiContact->setGroups(processContactSetGroupNames(groups, groupsDelimiter));
+ 			else
+ 				psiContact->remove();
+ 		}
+diff --git a/src/contactlistdragmodel.h b/src/contactlistdragmodel.h
+index 3886b60..132831d 100644
+--- a/src/contactlistdragmodel.h
++++ b/src/contactlistdragmodel.h
+@@ -113,8 +113,8 @@ protected:
+ 	virtual QString getDropGroupName(const QModelIndex& parent) const;
+ 	virtual void contactOperationsPerformed(const ContactListModelOperationList& operations, OperationType operationType, const QHash<ContactListGroup*, int>& groupContactCount);
+ 
+-	QString processContactSetGroupName(const QString& groupName) const;
+-	QStringList processContactSetGroupNames(const QStringList& groups) const;
++	QString processContactSetGroupName(const QString& groupName, const QString& groupsDelimiter) const;
++	QStringList processContactSetGroupNames(const QStringList& groups, const QString& groupsDelimiter) const;
+ 	QStringList processContactGetGroupNames(PsiContact* contact) const;
+ 	QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
+ 	QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
+diff --git a/src/contactlistgroup.cpp b/src/contactlistgroup.cpp
+index 47b83c3..f67ed8f 100755
+--- a/src/contactlistgroup.cpp
++++ b/src/contactlistgroup.cpp
+@@ -28,17 +28,17 @@
+ #include "psicontact.h"
+ #include "contactlistgroupstate.h"
+ #include "contactlistgroupcache.h"
++#include "psiaccount.h"
++#include "userlist.h"
+ #ifdef YAPSI
+ #include "fakegroupcontact.h"
+ #endif
+ 
+-static QString GROUP_DELIMITER = "::";
+-
+ /**
+  * Flat group class.
+  */
+-ContactListGroup::ContactListGroup(ContactListModel* model, ContactListGroup* parent)
+-	: ContactListItem()
++ContactListGroup::ContactListGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account)
++	: ContactListItem(account)
+ 	, model_(model)
+ 	, parent_(parent)
+ 	, updateOnlineContactsTimer_(0)
+@@ -83,22 +83,46 @@ QString ContactListGroup::fullName() const
+ 			name.prepend(group->internalGroupName());
+ 		group = group->parent();
+ 	}
+-	return name.join(groupDelimiter());
++	return name.join(groupsDelimiter());
+ }
+ 
+-const QString& ContactListGroup::groupDelimiter()
++bool ContactListGroup::hasGroupsDelimiter() const
+ {
+-	return GROUP_DELIMITER;
++	// No delimiter. Or delimiter is a single digit or letter
++	return groupsDelimiter().indexOf(QRegExp("^[0-9A-z]?$")) == -1;
+ }
+ 
+-void ContactListGroup::setGroupDelimiter(const QString& str)
++QString ContactListGroup::groupsDelimiter() const
+ {
+-	GROUP_DELIMITER = str;
++	return account() ? account()->userList()->groupsDelimiter() : "";
++}
++
++QStringList ContactListGroup::toNestedGroups(const QString &group) const
++{
++	QStringList nestedGroups;
++	if (hasGroupsDelimiter())
++		nestedGroups = group.split(groupsDelimiter());
++	else
++		nestedGroups << group;
++	return nestedGroups;
++}
++
++QString ContactListGroup::fromNestedGroups(const QStringList &nestedGroups) const
++{
++	QString group;
++	if (hasGroupsDelimiter()) {
++		group = nestedGroups.join(groupsDelimiter());
++	}
++	else {
++		Q_ASSERT(nestedGroups.length() == 1);
++		group = nestedGroups.first();
++	}
++	return group;
+ }
+ 
+ QString ContactListGroup::sanitizeGroupName(const QString& name) const
+ {
+-	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
++	return name.split(groupsDelimiter(), QString::SkipEmptyParts).join(groupsDelimiter());
+ }
+ 
+ QStringList ContactListGroup::sanitizeGroupNames(const QStringList& names) const
+@@ -477,7 +501,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
+ 	foreach(ContactListItemProxy* item, items_) {
+ 		ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
+ 		if (group)
+-			contactsHelper(contacts);
++			group->contactsHelper(contacts);
+ 	}
+ }
+ 
+diff --git a/src/contactlistgroup.h b/src/contactlistgroup.h
+index 2d781ab..967732c 100755
+--- a/src/contactlistgroup.h
++++ b/src/contactlistgroup.h
+@@ -38,7 +38,7 @@ class ContactListGroup : public ContactListItem
+ {
+ 	Q_OBJECT
+ public:
+-	ContactListGroup(ContactListModel* model, ContactListGroup* parent);
++	ContactListGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account);
+ 	~ContactListGroup();
+ 
+ 	ContactListItemProxy* item(int index) const;
+@@ -80,8 +80,13 @@ public:
+ 	virtual ContactListItemMenu* contextMenu(ContactListModel* model);
+ 	virtual bool compare(const ContactListItem* other) const;
+ 
+-	static const QString& groupDelimiter();
+-	static void setGroupDelimiter(const QString&);
++	bool hasGroupsDelimiter() const;
++	QString groupsDelimiter() const;
++
++	QStringList toNestedGroups(const QString &group) const;
++	QString fromNestedGroups(const QStringList &nestedGroups) const;
++
++	// static void setGroupsDelimiter(const QString&);
+ 	QString sanitizeGroupName(const QString&) const;
+ 	QStringList sanitizeGroupNames(const QStringList& names) const;
+ 
+diff --git a/src/contactlistgroupstate.cpp b/src/contactlistgroupstate.cpp
+index 99e3667..605159d 100644
+--- a/src/contactlistgroupstate.cpp
++++ b/src/contactlistgroupstate.cpp
+@@ -28,6 +28,8 @@
+ #include "contactlistgroup.h"
+ #include "psioptions.h"
+ #include "xmpp_xmlcommon.h"
++#include "psiaccount.h"
++#include "userlist.h"
+ 
+ static const QString groupStateOptionPath = "options.main-window.contact-list.group-state.%1";
+ 
+@@ -146,9 +148,11 @@ QStringList ContactListGroupState::groupNames(const ContactListModel* model, con
+ 		}
+ 	}
+ 
++	QString groupsDelimiter = model->account(parent)->userList()->groupsDelimiter();
++
+ 	if (result.isEmpty()) {
+ 		for (int len = 1; len < parentName.count() + 1; ++len)
+-			result += QStringList(parentName.mid(0, len)).join(ContactListGroup::groupDelimiter());
++			result += QStringList(parentName.mid(0, len)).join(groupsDelimiter);
+ 	}
+ 
+ 	return result;
+diff --git a/src/contactlistitem.cpp b/src/contactlistitem.cpp
+index 3863929..7b07d73 100644
+--- a/src/contactlistitem.cpp
++++ b/src/contactlistitem.cpp
+@@ -21,15 +21,32 @@
+ #include "contactlistitem.h"
+ 
+ #include "psicontact.h"
++#include "psiaccount.h"
+ 
+-ContactListItem::ContactListItem(QObject* parent)
++class ContactListItem::Private
++{
++public:
++	Private();
++	bool editing;
++	PsiAccount *account;
++};
++
++ContactListItem::Private::Private()
++	: editing(false)
++	, account(0)
++{
++}
++
++ContactListItem::ContactListItem(PsiAccount *account, QObject* parent)
+ 	: QObject(parent)
+-	, editing_(false)
++	, d(new ContactListItem::Private)
+ {
++	d->account = account;
+ }
+ 
+ ContactListItem::~ContactListItem()
+ {
++	delete d;
+ }
+ 
+ bool ContactListItem::isEditable() const
+@@ -90,15 +107,20 @@ QString ContactListItem::comparisonName() const
+ 
+ bool ContactListItem::editing() const
+ {
+-	return editing_;
++	return d->editing;
+ }
+ 
+ void ContactListItem::setEditing(bool editing)
+ {
+-	editing_ = editing;
++	d->editing = editing;
+ }
+ 
+ const QString& ContactListItem::displayName() const
+ {
+ 	return name();
+ }
++
++PsiAccount *ContactListItem::account() const
++{
++	return d->account;
++}
+diff --git a/src/contactlistitem.h b/src/contactlistitem.h
+index 9530ed3..66c015c 100644
+--- a/src/contactlistitem.h
++++ b/src/contactlistitem.h
+@@ -27,11 +27,12 @@
+ #include "contactlistmodel.h"
+ 
+ class ContactListItemMenu;
++class PsiAccount;
+ 
+ class ContactListItem : public QObject
+ {
+ public:
+-	ContactListItem(QObject* parent = 0);
++	ContactListItem(PsiAccount *account, QObject* parent = 0);
+ 	virtual ~ContactListItem();
+ 
+ 	virtual ContactListModel::Type type() const = 0;
+@@ -58,8 +59,11 @@ public:
+ 	virtual bool editing() const;
+ 	virtual void setEditing(bool editing);
+ 
++	PsiAccount *account() const;
++
+ private:
+-	bool editing_;
++	class Private;
++	Private *d;
+ };
+ 
+ #endif
+diff --git a/src/contactlistmodel.cpp b/src/contactlistmodel.cpp
+index 135c387..d4c6668 100755
+--- a/src/contactlistmodel.cpp
++++ b/src/contactlistmodel.cpp
+@@ -68,6 +68,7 @@ ContactListModel::ContactListModel(PsiContactList* contactList)
+ 	connect(updater_, SIGNAL(contactGroupsChanged(PsiContact*)), SLOT(contactGroupsChanged(PsiContact*)));
+ 	connect(updater_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
+ 	connect(updater_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
++	connect(updater_, SIGNAL(groupsDelimiterChanged()), SLOT(invalidateLayout()));
+ 	connect(contactList_, SIGNAL(destroying()), SLOT(destroyingContactList()));
+ 	connect(contactList_, SIGNAL(showOfflineChanged(bool)), SIGNAL(showOfflineChanged()));
+ 	connect(contactList_, SIGNAL(showHiddenChanged(bool)), SIGNAL(showHiddenChanged()));
+@@ -118,9 +119,9 @@ ContactListGroup* ContactListModel::createRootGroup()
+ 		return new ContactListAccountGroup(this, 0, 0);
+ 
+ 	if (!groupsEnabled_)
+-		return new ContactListGroup(this, 0);
++		return new ContactListGroup(this, 0, 0);
+ 
+-	return new ContactListNestedGroup(this, 0, QString());
++	return new ContactListNestedGroup(this, 0, 0, QString());
+ }
+ 
+ bool ContactListModel::groupsEnabled() const
+@@ -214,6 +215,10 @@ void ContactListModel::orderChanged()
+ 	emit layoutChanged();
+ }
+ 
++void ContactListModel::groupsDelimiterChanged()
++{
++}
++
+ void ContactListModel::invalidateLayout()
+ {
+ 	beginBulkUpdate();
+@@ -850,7 +855,7 @@ PsiAccount* ContactListModel::account(const QModelIndex& index) const
+ {
+ 	ContactListItemProxy* item = itemProxy(index);
+ 	if (item) {
+-		PsiContact* contact = dynamic_cast<PsiContact*>(item->item());
++		ContactListItem *contact = item->item();
+ 		if (contact)
+ 			return contact->account();
+ 	}
+diff --git a/src/contactlistmodel.h b/src/contactlistmodel.h
+index f2a1742..b335a48 100644
+--- a/src/contactlistmodel.h
++++ b/src/contactlistmodel.h
+@@ -116,7 +116,6 @@ public:
+ 
+ 	virtual PsiContactList* contactList() const;
+ 
+-	void invalidateLayout();
+ 	ContactListItemProxy* modelIndexToItemProxy(const QModelIndex& index) const;
+ 	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item) const;
+ 	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item, int index) const;
+@@ -195,6 +194,7 @@ signals:
+ public slots:
+ 	void expanded(const QModelIndex&);
+ 	void collapsed(const QModelIndex&);
++	void invalidateLayout();
+ 
+ protected slots:
+ 	void addContact(PsiContact*);
+@@ -207,6 +207,7 @@ protected slots:
+ 
+ 	void destroyingContactList();
+ 	void orderChanged();
++	void groupsDelimiterChanged();
+ 
+ protected slots:
+ 	void beginBulkUpdate();
+diff --git a/src/contactlistmodelupdater.cpp b/src/contactlistmodelupdater.cpp
+index c03fc6a..f0bf510 100644
+--- a/src/contactlistmodelupdater.cpp
++++ b/src/contactlistmodelupdater.cpp
+@@ -42,6 +42,7 @@ ContactListModelUpdater::ContactListModelUpdater(PsiContactList* contactList, QO
+ 	connect(contactList_, SIGNAL(removedContact(PsiContact*)), SLOT(removeContact(PsiContact*)));
+ 	connect(contactList_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
+ 	connect(contactList_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
++	connect(contactList_, SIGNAL(groupsDelimiterChanged()), SIGNAL(groupsDelimiterChanged()));
+ }
+ 
+ ContactListModelUpdater::~ContactListModelUpdater()
+diff --git a/src/contactlistmodelupdater.h b/src/contactlistmodelupdater.h
+index 61fdbf8..260eef9 100644
+--- a/src/contactlistmodelupdater.h
++++ b/src/contactlistmodelupdater.h
+@@ -51,6 +51,7 @@ signals:
+ 	void contactAnim(PsiContact*);
+ 	void contactUpdated(PsiContact*);
+ 	void contactGroupsChanged(PsiContact*);
++	void groupsDelimiterChanged();
+ 
+ 	void beginBulkContactUpdate();
+ 	void endBulkContactUpdate();
+diff --git a/src/contactlistnestedgroup.cpp b/src/contactlistnestedgroup.cpp
+index 27a572e..b3119b5 100644
+--- a/src/contactlistnestedgroup.cpp
++++ b/src/contactlistnestedgroup.cpp
+@@ -26,8 +26,8 @@
+ #include "contactlistitemproxy.h"
+ #include "contactlistspecialgroup.h"
+ 
+-ContactListNestedGroup::ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, QString name)
+-	: ContactListGroup(model, parent)
++ContactListNestedGroup::ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account, QString name)
++	: ContactListGroup(model, parent, account)
+ {
+ 	quietSetName(name);
+ }
+@@ -82,12 +82,8 @@ void ContactListNestedGroup::addContact(PsiContact* contact, QStringList contact
+ 			ContactListGroup::addContact(contact, contactGroups);
+ 		}
+ 		else {
+-			QStringList nestedGroups;
+-#ifdef CONTACTLIST_NESTED_GROUPS
+-			nestedGroups = groupName.split(groupDelimiter());
+-#else
+-			nestedGroups += groupName;
+-#endif
++			QStringList nestedGroups = toNestedGroups(groupName);
++
+ 			if (!name().isEmpty()) {
+ 				QString firstPart = nestedGroups.takeFirst();
+ 				Q_ASSERT(firstPart == name());
+@@ -97,13 +93,13 @@ void ContactListNestedGroup::addContact(PsiContact* contact, QStringList contact
+ 
+ 			ContactListGroup* group = findGroup(nestedGroups.first());
+ 			if (!group) {
+-				group = new ContactListNestedGroup(model(), this, nestedGroups.first());
++				group = new ContactListNestedGroup(model(), this, contact->account(), nestedGroups.first());
+ 				addGroup(group);
+ CL_DEBUG("ContactListNextedGroup(%x)::addContact: %s", this, qPrintable(group->fullName()));
+ 			}
+ 
+ 			QStringList moreGroups;
+-			moreGroups << nestedGroups.join(groupDelimiter());
++			moreGroups << fromNestedGroups(nestedGroups);
+ 			group->addContact(contact, moreGroups);
+ 		}
+ 	}
+@@ -172,11 +168,8 @@ void ContactListNestedGroup::contactGroupsChanged(PsiContact* contact, QStringLi
+ 		}
+ 
+ 		QStringList split;
+-#ifdef CONTACTLIST_NESTED_GROUPS
+-		split = group.split(groupDelimiter());
+-#else
+-		split += group;
+-#endif
++		split = toNestedGroups(group);
++
+ 		if (!name().isEmpty()) {
+ 			QString firstPart = split.takeFirst();
+ 			// hmm, probably should continue as the data should be invalid
+@@ -202,14 +195,10 @@ void ContactListNestedGroup::contactGroupsChanged(PsiContact* contact, QStringLi
+ 		QStringList mergedGroupNames;
+ 		foreach(QStringList i, splitGroupNames)
+ 			if (!i.isEmpty() && i.first() == split.first())
+-				mergedGroupNames += i.join(groupDelimiter());
++				mergedGroupNames += fromNestedGroups(i);
+ 
+ 		foreach(QString i, mergedGroupNames) {
+-#ifdef CONTACTLIST_NESTED_GROUPS
+-			splitGroupNames.removeAll(i.split(groupDelimiter()));
+-#else
+-			splitGroupNames.removeAll(QStringList() << i);
+-#endif
++			splitGroupNames.removeAll(toNestedGroups(i));
+ 		}
+ 
+ 		group->contactGroupsChanged(contact, mergedGroupNames);
+@@ -249,7 +238,7 @@ CL_DEBUG("ContactListNextedGroup(%x)::contactGroupsChanged: removing empty group
+ 			fullGroupName << name();
+ 		fullGroupName += split;
+ 		QStringList tmp;
+-		tmp << fullGroupName.join(groupDelimiter());
++		tmp << fromNestedGroups(fullGroupName);
+ 		addContact(contact, tmp);
+ 	}
+ 
+@@ -269,14 +258,14 @@ CL_DEBUG("ContactListNextedGroup(%x)::contactGroupsChanged: removing empty group
+ #else
+ 	QStringList newNestedGroups = fullName().isEmpty()
+ 	                              ? contactGroups
+-	                              : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupDelimiter())));
++	                              : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupsDelimiter())));
+ 
+ 	QStringList directChildren;
+ 	foreach(QString nnGroup, newNestedGroups) {
+-		QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupDelimiter()).length());
++		QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupsDelimiter()).length());
+ 		if (!unqualifiedName.isEmpty()) {
+ 			// direct children!
+-			directChildren << QString(name().isEmpty() ? "" : name() + groupDelimiter()) + unqualifiedName;
++			directChildren << QString(name().isEmpty() ? "" : name() + groupsDelimiter()) + unqualifiedName;
+ 		}
+ 	}
+ 
+diff --git a/src/contactlistnestedgroup.h b/src/contactlistnestedgroup.h
+index 76b0958..76820f0 100644
+--- a/src/contactlistnestedgroup.h
++++ b/src/contactlistnestedgroup.h
+@@ -27,7 +27,7 @@ class ContactListNestedGroup : public ContactListGroup
+ {
+ 	Q_OBJECT
+ public:
+-	ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, QString name);
++	ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account, QString name);
+ 	~ContactListNestedGroup();
+ 
+ 	virtual bool canContainSpecialGroups() const;
+diff --git a/src/contactlistspecialgroup.cpp b/src/contactlistspecialgroup.cpp
+index b12c751..439a396 100644
+--- a/src/contactlistspecialgroup.cpp
++++ b/src/contactlistspecialgroup.cpp
+@@ -24,7 +24,7 @@
+ #include <QStringList>
+ 
+ ContactListSpecialGroup::ContactListSpecialGroup(ContactListModel* model, ContactListGroup* parent, ContactListGroup::SpecialType type)
+-	: ContactListNestedGroup(model, parent, QString())
++	: ContactListNestedGroup(model, parent, 0, QString())
+ 	, specialType_(type)
+ {
+ 	name_ = QString::fromUtf8("☣special_group_");
+diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
+index 3f90d80..f87f678 100644
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -305,6 +305,8 @@ void UserAccount::fromOptions(OptionsTree *o, QString base)
+ 		allow_plain = XMPP::ClientStream::NoAllowPlain;
+ 	}
+ 
++	roster.setGroupsDelimiter(o->getOption(base + ".roster-cache-groups-delimiter").toString());
++
+ 	QStringList rosterCache = o->getChildOptionNames(base + ".roster-cache", true, true);
+ 	foreach(QString rbase, rosterCache) {
+ 		RosterItem ri;
+@@ -442,6 +444,8 @@ void UserAccount::toOptions(OptionsTree *o, QString base)
+ 			qFatal("unknown allow_plain enum value in UserAccount::toOptions");
+ 	}
+ 
++	o->setOption(base + ".roster-cache-groups-delimiter", roster.groupsDelimiter());
++
+ 	int idx = 0;
+ 	foreach(RosterItem ri, roster) {
+ 		QString rbase = base + ".roster-cache.a" + QString::number(idx++);
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index eef6558..46ecf05 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -23,7 +23,6 @@
+  *
+  */
+ 
+-
+ #include <QFileDialog>
+ #include <QSet>
+ #include <QInputDialog>
+@@ -1107,6 +1106,8 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	d->voiceCaller = 0;
+ 	d->blockTransportPopupList = new BlockTransportPopupList();
+ 
++	d->userList.setGroupsDelimiter(acc.roster.groupsDelimiter());
++
+ 	v_isActive = false;
+ 	isDisconnecting = false;
+ 	notifyOnlineOk = false;
+@@ -1180,6 +1181,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	//connect(d->client, SIGNAL(sslCertReady(const QSSLCert &)), SLOT(client_sslCertReady(const QSSLCert &)));
+ 	//connect(d->client, SIGNAL(closeFinished()), SLOT(client_closeFinished()));
+ 	//connect(d->client, SIGNAL(authFinished(bool, int, const QString &)), SLOT(client_authFinished(bool, int, const QString &)));
++	connect(d->client, SIGNAL(rosterGroupsDelimiterRequestFinished(const QString &)), SLOT(client_rosterRequestGroupsDelimiterFinished(const QString &)));
+ 	connect(d->client, SIGNAL(rosterRequestFinished(bool, int, const QString &)), SLOT(client_rosterRequestFinished(bool, int, const QString &)));
+ 	connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemAdded(const RosterItem &)));
+ 	connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemUpdated(const RosterItem &)));
+@@ -1516,6 +1518,7 @@ const UserAccount & PsiAccount::userAccount() const
+ 	// save the roster and pgp key bindings
+ 	d->acc.roster.clear();
+ 	d->acc.keybind.clear();
++	d->acc.roster.setGroupsDelimiter(d->userList.groupsDelimiter());
+ 	foreach(UserListItem* u, d->userList) {
+ 		if(u->inList())
+ 			d->acc.roster += *u;
+@@ -2333,6 +2336,11 @@ int PsiAccount::currentConnectionErrorCondition() const
+ 	return d->currentConnectionErrorCondition;
+ }
+ 
++void PsiAccount::client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter)
++{
++	d->userList.setGroupsDelimiter(groupsDelimiter);
++}
++
+ void PsiAccount::client_rosterRequestFinished(bool success, int, const QString &)
+ {
+ 	if(success) {
+@@ -3524,6 +3532,22 @@ void PsiAccount::featureActivated(QString feature, Jid jid, QString node)
+ 	}
+ }
+ 
++void PsiAccount::actionSetGroupsDelimiter(const QString &groupsDelimiter)
++{
++	if (groupsDelimiter == d->userList.groupsDelimiter()
++		|| groupsDelimiter.isEmpty()) {
++
++		return;
++	}
++
++	d->userList.setGroupsDelimiter(groupsDelimiter);
++	emit groupsDelimiterChanged();
++
++	JT_Roster *r = new JT_Roster(d->client->rootTask());
++	r->setGroupsDelimiter(groupsDelimiter);
++	r->go(true);
++}
++
+ void PsiAccount::actionManageBookmarks()
+ {
+ 	BookmarkManageDlg *dlg = findDialog<BookmarkManageDlg*>();
+diff --git a/src/psiaccount.h b/src/psiaccount.h
+index a880f09..a6e55cd 100644
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
+@@ -306,6 +306,7 @@ signals:
+ 	void encryptedMessageSent(int, bool, int, const QString &);
+ 	void enabledChanged();
+ 	void startBounce();
++	void groupsDelimiterChanged();
+ 
+ public slots:
+ 	void setStatus(const XMPP::Status &, bool withPriority = false, bool isManualStatus = false);
+@@ -395,6 +396,7 @@ public slots:
+ 	void actionUnsetAvatar();
+ 	void actionQueryVersion(const Jid& j);
+ 	void featureActivated(QString feature, Jid jid, QString node);
++	void actionSetGroupsDelimiter(const QString &groupsDelimiter);
+ 
+ 	void actionAssignKey(const Jid &);
+ 	void actionUnassignKey(const Jid &);
+@@ -414,6 +416,7 @@ private slots:
+ 	void cs_delayedCloseFinished();
+ 	void cs_warning(int);
+ 	void cs_error(int);
++	void client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter);
+ 	void client_rosterRequestFinished(bool, int, const QString &);
+ 	void resolveContactName();
+ 	void client_rosterItemAdded(const RosterItem &);
+diff --git a/src/psicontact.cpp b/src/psicontact.cpp
+index 3b829b2..c84361b 100755
+--- a/src/psicontact.cpp
++++ b/src/psicontact.cpp
+@@ -63,8 +63,7 @@ class PsiContact::Private : public Alertable
+ 	Q_OBJECT
+ public:
+ 	Private(PsiContact* contact)
+-		: account_(0)
+-		, statusTimer_(0)
++		: statusTimer_(0)
+ 		, isValid_(true)
+ 		, isAnimated_(false)
+ 		, isAlwaysVisible_(false)
+@@ -100,7 +99,6 @@ public:
+ 	{
+ 	}
+ 
+-	PsiAccount* account_;
+ 	QTimer* statusTimer_;
+ 	QTimer* animTimer_;
+ 	UserListItem u_;
+@@ -140,7 +138,7 @@ public:
+ #ifdef YAPSI
+ 		reconnecting_ = false;
+ #endif
+-		if (account_ && !account_->notifyOnline())
++		if (contact_->account() && !contact_->account()->notifyOnline())
+ 			oldStatus_ = status_;
+ 		else
+ 			statusTimer_->start();
+@@ -164,12 +162,11 @@ private:
+  * Creates new PsiContact.
+  */
+ PsiContact::PsiContact(const UserListItem& u, PsiAccount* account)
+-	: ContactListItem(account)
++	: ContactListItem(account, account)
+ {
+ 	d = new Private(this);
+-	d->account_ = account;
+-	if (d->account_) {
+-		connect(d->account_->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
++	if (account) {
++		connect(account->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
+ 	}
+ 	connect(VCardFactory::instance(), SIGNAL(vcardChanged(const Jid&)), SLOT(vcardChanged(const Jid&)));
+ 	update(u);
+@@ -178,10 +175,9 @@ PsiContact::PsiContact(const UserListItem& u, PsiAccount* account)
+ }
+ 
+ PsiContact::PsiContact()
+-	: ContactListItem(0)
++	: ContactListItem(0, 0)
+ {
+ 	d = new Private(this);
+-	d->account_ = 0;
+ }
+ 
+ /**
+@@ -195,14 +191,6 @@ PsiContact::~PsiContact()
+ }
+ 
+ /**
+- * Returns account to which a contact belongs.
+- */
+-PsiAccount* PsiContact::account() const
+-{
+-	return d->account_;
+-}
+-
+-/**
+  * TODO: Think of ways to remove this function.
+  */
+ const UserListItem& PsiContact::userListItem() const
+diff --git a/src/psicontact.h b/src/psicontact.h
+index d87d82a..a34032f 100755
+--- a/src/psicontact.h
++++ b/src/psicontact.h
+@@ -45,7 +45,6 @@ public:
+ 	PsiContact(const UserListItem& u, PsiAccount* account);
+ 	~PsiContact();
+ 
+-	PsiAccount* account() const;
+ 	const UserListItem& userListItem() const;
+ 	const UserResourceList& userResourceList() const;
+ 	virtual void update(const UserListItem& u);
+diff --git a/src/psicontactlist.cpp b/src/psicontactlist.cpp
+index d09a3b5..3811627 100644
+--- a/src/psicontactlist.cpp
++++ b/src/psicontactlist.cpp
+@@ -315,6 +315,7 @@ void PsiContactList::link(PsiAccount* account)
+ 	connect(account, SIGNAL(beginBulkContactUpdate()), this, SIGNAL(beginBulkContactUpdate()));
+ 	connect(account, SIGNAL(endBulkContactUpdate()), this, SIGNAL(endBulkContactUpdate()));
+ 	connect(account, SIGNAL(rosterRequestFinished()), this, SIGNAL(rosterRequestFinished()));
++	connect(account, SIGNAL(groupsDelimiterChanged()), this, SIGNAL(groupsDelimiterChanged()));
+ 	accounts_.append(account);
+ 	if (account->enabled())
+ 		addEnabledAccount(account);
+diff --git a/src/psicontactlist.h b/src/psicontactlist.h
+index a82c358..b6e7fe8 100644
+--- a/src/psicontactlist.h
++++ b/src/psicontactlist.h
+@@ -99,6 +99,7 @@ signals:
+ 	void beginBulkContactUpdate();
+ 	void endBulkContactUpdate();
+ 	void rosterRequestFinished();
++	void groupsDelimiterChanged();
+ 
+ 	/**
+ 	 * This signal is emitted when account is loaded from disk or created
+diff --git a/src/src.pri b/src/src.pri
+index c8d1189..b76b39b 100644
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -452,7 +452,6 @@ mac {
+ CONFIG += newcontactlist
+ newcontactlist {
+ 	DEFINES += NEWCONTACTLIST
+-	# DEFINES += CONTACTLIST_NESTED_GROUPS
+ 	HEADERS += \
+ 		$$PWD/contactlistview.h \
+ 		$$PWD/contactlistdragview.h \
+diff --git a/src/userlist.cpp b/src/userlist.cpp
+index 7e1b7e9..11a851a 100644
+--- a/src/userlist.cpp
++++ b/src/userlist.cpp
+@@ -1074,3 +1074,12 @@ UserListItem *UserList::find(const XMPP::Jid &j)
+ 	return 0;
+ }
+ 
++void UserList::setGroupsDelimiter(const QString &groupsDelimiter)
++{
++	_groupsDelimiter = groupsDelimiter;
++}
++
++QString UserList::groupsDelimiter() const
++{
++	return _groupsDelimiter;
++}
+diff --git a/src/userlist.h b/src/userlist.h
+index 2bacecc..ae15c0b 100644
+--- a/src/userlist.h
++++ b/src/userlist.h
+@@ -187,6 +187,12 @@ public:
+ 	~UserList();
+ 
+ 	UserListItem *find(const XMPP::Jid &);
++
++	void setGroupsDelimiter(const QString &groupsDelimiter);
++	QString groupsDelimiter() const;
++
++private:
++	QString _groupsDelimiter;
+ };
+ 
+ #endif
