@@ -2,10 +2,11 @@ Index: psi/options/default.xml
 ===================================================================
 --- psi.orig/options/default.xml	2013-01-15 14:04:21.276826828 +0400
 +++ psi/options/default.xml	2013-01-15 14:04:21.272826828 +0400
-@@ -468,6 +468,7 @@
+@@ -468,6 +468,8 @@
+ 				<show-tab-close-buttons type="bool">true</show-tab-close-buttons>
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">true</use-tabs>
- 				<mouse-middle-button type="QString">close</mouse-middle-button>
++ 				<mouse-middle-button type="QString">close</mouse-middle-button>
 +				<mouse-doubleclick-action type="QString">detach</mouse-doubleclick-action>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
  				<grouping type="QString" comment="A ':' seperated list of groups of kinds of tabs to keep in the same tabset. 'C' for chat and 'M' for mucs. 'A' means using all in one window patch.">CM</grouping>
@@ -14,8 +15,9 @@ Index: psi/src/tabs/tabdlg.cpp
 ===================================================================
 --- psi.orig/src/tabs/tabdlg.cpp	2013-01-15 14:04:21.276826828 +0400
 +++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:21.272826828 +0400
-@@ -449,7 +449,12 @@
-
+@@ -432,13 +454,24 @@ void TabDlg:::detachCurrentTab()
+ }
+ 
  void TabDlg::mouseDoubleClickTab(QWidget* widget)
  {
 -	if(userManagement_)
@@ -27,4 +29,16 @@ Index: psi/src/tabs/tabdlg.cpp
 +	else if(act == "detach" && userManagement_)
  		detachTab(static_cast<TabbableWidget*>(widget));
  }
-
+ 
+ void TabDlg::mouseMiddleClickTab(QWidget* widget) {
+-	closeTab(static_cast<TabbableWidget*>(widget));
++	const QString act = PsiOptions::instance()->getOption("options.ui.tabs.mouse-middle-button").toString();
++	if(act == "hide")
++		hideTab(static_cast<TabbableWidget*>(widget));
++	else if(act == "close")
++		closeTab(static_cast<TabbableWidget*>(widget));
++	else if(act == "detach" && userManagement_)
++		detachTab(static_cast<TabbableWidget*>(widget));
+ }
+ 
+ void TabDlg::detachTab(TabbableWidget* tab)
