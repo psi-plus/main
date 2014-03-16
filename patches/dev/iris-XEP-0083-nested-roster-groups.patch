@@ -1,13 +1,28 @@
 diff --git a/iris/src/xmpp/xmpp-im/client.cpp b/iris/src/xmpp/xmpp-im/client.cpp
-index bebcfa8..20b5ee2 100644
+index bebcfa8..8870775 100644
 --- a/iris/src/xmpp/xmpp-im/client.cpp
 +++ b/iris/src/xmpp/xmpp-im/client.cpp
-@@ -885,6 +885,19 @@ void Client::rosterRequest()
+@@ -879,12 +879,33 @@ void Client::prRoster(const Roster &r)
+ 	importRoster(r);
+ }
+ 
+-void Client::rosterRequest()
++void Client::rosterRequest(bool withGroupsDelimiter)
+ {
+ 	if(!d->active)
  		return;
  
  	JT_Roster *r = new JT_Roster(rootTask());
-+	connect(r, SIGNAL(finished()), SLOT(slotRosterDelimiterRequestFinished()));
-+	r->getGroupsDelimiter();
++	if (withGroupsDelimiter) {
++		connect(r, SIGNAL(finished()), SLOT(slotRosterDelimiterRequestFinished()));
++		r->getGroupsDelimiter();
++	}
++	else {
++		connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
++		r->get();
++		d->roster.flagAllForDelete(); // mod_groups patch
++	}
++
 +	r->go(true);
 +}
 +
@@ -22,7 +37,7 @@ index bebcfa8..20b5ee2 100644
  	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
  	r->get();
  	d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1244,13 +1257,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
+@@ -1244,13 +1265,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -59,7 +74,7 @@ index bebcfa8..20b5ee2 100644
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1279,4 +1314,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
+@@ -1279,4 +1322,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
  	return it;
  }
  
@@ -133,9 +148,18 @@ index b0d5d05..e83b0c0 100644
  //---------------------------------------------------------------------------
  // FormField
 diff --git a/iris/src/xmpp/xmpp-im/xmpp_client.h b/iris/src/xmpp/xmpp-im/xmpp_client.h
-index cd57034..45c62ae 100644
+index cd57034..2bc38c8 100644
 --- a/iris/src/xmpp/xmpp-im/xmpp_client.h
 +++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
+@@ -79,7 +79,7 @@ namespace XMPP
+ 		QString resource() const;
+ 		Jid jid() const;
+ 
+-		void rosterRequest();
++		void rosterRequest(bool withGroupsDelimiter = true);
+ 		void sendMessage(const Message &);
+ 		void sendSubscription(const Jid &, const QString &, const QString& nick = QString());
+ 		void setPresence(const Status &);
 @@ -137,6 +137,7 @@ namespace XMPP
  		void activated();
  		void disconnected();
