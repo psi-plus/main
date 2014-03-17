@@ -440,10 +440,18 @@ index 2d781ab..967732c 100755
  	QStringList sanitizeGroupNames(const QStringList& names) const;
  
 diff --git a/src/contactlistgroupstate.cpp b/src/contactlistgroupstate.cpp
-index 99e3667..605159d 100644
+index 99e3667..f02cb91 100644
 --- a/src/contactlistgroupstate.cpp
 +++ b/src/contactlistgroupstate.cpp
-@@ -28,6 +28,8 @@
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include "contactlistgroupstate.h"
++#include "contactlistgroup.h"
+ 
+ #include <QTimer>
+ #include <QStringList>
+@@ -28,6 +29,8 @@
  #include "contactlistgroup.h"
  #include "psioptions.h"
  #include "xmpp_xmlcommon.h"
@@ -452,16 +460,23 @@ index 99e3667..605159d 100644
  
  static const QString groupStateOptionPath = "options.main-window.contact-list.group-state.%1";
  
-@@ -146,9 +148,11 @@ QStringList ContactListGroupState::groupNames(const ContactListModel* model, con
- 		}
+@@ -147,8 +150,17 @@ QStringList ContactListGroupState::groupNames(const ContactListModel* model, con
  	}
  
-+	QString groupsDelimiter = model->account(parent)->userList()->groupsDelimiter();
-+
  	if (result.isEmpty()) {
- 		for (int len = 1; len < parentName.count() + 1; ++len)
+-		for (int len = 1; len < parentName.count() + 1; ++len)
 -			result += QStringList(parentName.mid(0, len)).join(ContactListGroup::groupDelimiter());
-+			result += QStringList(parentName.mid(0, len)).join(groupsDelimiter);
++		ContactListItemProxy *itemProxy = model->modelIndexToItemProxy(parent);
++		if (itemProxy) {
++			ContactListGroup *groupItem = qobject_cast<ContactListGroup*>(itemProxy->item());
++			QString groupsDelimiter;
++			if (groupItem && groupItem->hasGroupsDelimiter()) {
++				groupsDelimiter = groupItem->groupsDelimiter();
++			}
++
++			for (int len = 1; len < parentName.count() + 1; ++len)
++				result += QStringList(parentName.mid(0, len)).join(groupsDelimiter);
++		}
  	}
  
  	return result;
@@ -558,6 +573,84 @@ index 9530ed3..66c015c 100644
  };
  
  #endif
+diff --git a/src/contactlistitemproxy.cpp b/src/contactlistitemproxy.cpp
+index 1f7aa1f..aaa68db 100644
+--- a/src/contactlistitemproxy.cpp
++++ b/src/contactlistitemproxy.cpp
+@@ -19,19 +19,41 @@
+  */
+ 
+ #include "contactlistitemproxy.h"
+-
+ #include "contactlistgroup.h"
+ #include "contactlistmodel.h"
+ 
++#include <QPointer>
++
++class ContactListItemProxy::Private
++{
++public:
++	QPointer<ContactListItem> item;
++	QPointer<ContactListGroup> parent;
++};
++
+ ContactListItemProxy::ContactListItemProxy(ContactListGroup* parent, ContactListItem* item)
+-	: item_(item)
+-	, parent_(parent)
++	: d(new ContactListItemProxy::Private)
+ {
+ 	Q_ASSERT(item);
+ 	Q_ASSERT(parent);
++
++	d->item = item;
++	d->parent = parent;
++
+ 	parent->model()->contactListItemProxyCreated(this);
+ }
+ 
+ ContactListItemProxy::~ContactListItemProxy()
+ {
++	delete d;
++}
++
++ContactListItem *ContactListItemProxy::item() const
++{
++	return d->item;
++}
++
++ContactListGroup *ContactListItemProxy::parent() const
++{
++	return d->parent;
+ }
+diff --git a/src/contactlistitemproxy.h b/src/contactlistitemproxy.h
+index 498ba21..08c12fb 100644
+--- a/src/contactlistitemproxy.h
++++ b/src/contactlistitemproxy.h
+@@ -22,7 +22,6 @@
+ #define CONTACTLISTITEMPROXY_H
+ 
+ #include <QObject>
+-#include <QPointer>
+ 
+ class ContactListItem;
+ class ContactListGroup;
+@@ -33,12 +32,12 @@ public:
+ 	ContactListItemProxy(ContactListGroup* parent, ContactListItem* item);
+ 	~ContactListItemProxy();
+ 
+-	ContactListItem* item() const { return item_; }
+-	ContactListGroup* parent() const { return parent_; }
++	ContactListItem *item() const;
++	ContactListGroup *parent() const;
+ 
+ private:
+-	QPointer<ContactListItem> item_;
+-	QPointer<ContactListGroup> parent_;
++	class Private;
++	Private *d;
+ };
+ 
+ #endif
 diff --git a/src/contactlistmodel.cpp b/src/contactlistmodel.cpp
 index 135c387..d4c6668 100755
 --- a/src/contactlistmodel.cpp
@@ -603,10 +696,26 @@ index 135c387..d4c6668 100755
  			return contact->account();
  	}
 diff --git a/src/contactlistmodel.h b/src/contactlistmodel.h
-index f2a1742..b335a48 100644
+index f2a1742..d8474b5 100644
 --- a/src/contactlistmodel.h
 +++ b/src/contactlistmodel.h
-@@ -116,7 +116,6 @@ public:
+@@ -27,13 +27,14 @@
+ #include <QHash>
+ #include <QPointer>
+ 
++#include "contactlistitemproxy.h"
++
+ class PsiAccount;
+ class PsiContact;
+ class PsiContactList;
+ class ContactListItem;
+ class ContactListGroup;
+ class ContactListAccountGroup;
+-class ContactListItemProxy;
+ class ContactListGroupState;
+ class ContactListGroupCache;
+ class ContactListModelUpdater;
+@@ -116,7 +117,6 @@ public:
  
  	virtual PsiContactList* contactList() const;
  
@@ -614,7 +723,7 @@ index f2a1742..b335a48 100644
  	ContactListItemProxy* modelIndexToItemProxy(const QModelIndex& index) const;
  	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item) const;
  	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item, int index) const;
-@@ -195,6 +194,7 @@ signals:
+@@ -195,6 +195,7 @@ signals:
  public slots:
  	void expanded(const QModelIndex&);
  	void collapsed(const QModelIndex&);
@@ -622,7 +731,7 @@ index f2a1742..b335a48 100644
  
  protected slots:
  	void addContact(PsiContact*);
-@@ -207,6 +207,7 @@ protected slots:
+@@ -207,6 +208,7 @@ protected slots:
  
  	void destroyingContactList();
  	void orderChanged();
@@ -1029,10 +1138,10 @@ index c8d1189..b76b39b 100644
  		$$PWD/contactlistview.h \
  		$$PWD/contactlistdragview.h \
 diff --git a/src/userlist.cpp b/src/userlist.cpp
-index 7e1b7e9..11a851a 100644
+index 4607c21..31b5599 100644
 --- a/src/userlist.cpp
 +++ b/src/userlist.cpp
-@@ -1074,3 +1074,12 @@ UserListItem *UserList::find(const XMPP::Jid &j)
+@@ -1178,3 +1178,12 @@ UserListItem *UserList::find(const XMPP::Jid &j)
  	return 0;
  }
  
