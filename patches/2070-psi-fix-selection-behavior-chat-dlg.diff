@@ -1,0 +1,110 @@
+--- psi.orig/src/chatview_te.cpp
++++ psi/src/chatview_te.cpp
+@@ -539,3 +539,11 @@ ChatView * ChatView::textWidget()
+ {
+ 	return this;
+ }
++
++QWidget *ChatView::realTextWidget()
++{
++	QWidget *child = childAt(frameRect().center());
++	if (child)
++		return child;
++	return this;
++}
+--- psi.orig/src/chatview_te.h
++++ psi/src/chatview_te.h
+@@ -61,6 +61,7 @@ public:
+ 	void doTrackBar();
+ 	bool internalFind(QString str, bool startFromBeginning = false);
+ 	ChatView *textWidget();
++	QWidget *realTextWidget();
+ 
+ public slots:
+ 	void scrollUp();
+--- psi.orig/src/chatview_webkit.cpp
++++ psi/src/chatview_webkit.cpp
+@@ -379,4 +379,9 @@ WebView* ChatView::textWidget()
+ 	return webView;
+ }
+ 
++QWidget* ChatView::realTextWidget()
++{
++	return webView;
++}
++
+ #include "chatview_webkit.moc"
+--- psi.orig/src/chatview_webkit.h
++++ psi/src/chatview_webkit.h
+@@ -64,6 +64,7 @@ public:
+ 	void doTrackBar();
+ 	bool internalFind(QString str, bool startFromBeginning = false);
+ 	WebView * textWidget();
++	QWidget * realTextWidget();
+ 
+ public slots:
+ 	void scrollUp();
+--- psi.orig/src/psichatdlg.cpp
++++ psi/src/psichatdlg.cpp
+@@ -302,6 +302,8 @@ void PsiChatDlg::initUi()
+ 	setMargins();
+ 
+ 	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
++ 
++	ui_.log->realTextWidget()->installEventFilter(this);
+ }
+ 
+ void PsiChatDlg::verticalSplitterMoved(int, int)
+@@ -999,15 +1001,22 @@ void PsiChatDlg::doMinimize()
+ }
+ 
+ bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
+-	if ( obj == chatEdit() && ev->type() == QEvent::KeyPress ) {
+-		QKeyEvent *e = (QKeyEvent *)ev;
++	if ( obj == chatEdit() ) {
++		if ( ev->type() == QEvent::KeyPress ) {
++			QKeyEvent *e = (QKeyEvent *)ev;
++
++			if ( e->key() == Qt::Key_Tab ) {
++				tabCompletion.tryComplete();
++				return true;
++			}
+ 
+-		if ( e->key() == Qt::Key_Tab ) {
+-			tabCompletion.tryComplete();
+-			return true;
++			tabCompletion.reset();
+ 		}
++	}
+ 
+-		tabCompletion.reset();
++	else if ( obj == ui_.log->realTextWidget() ) {
++		if ( ev->type() == QEvent::MouseButtonPress )
++			chatEdit()->setFocus();
+ 	}
+ 
+ 	return ChatDlg::eventFilter( obj, ev );
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
+@@ -547,6 +547,13 @@ public slots:
+ public:
+ 
+ 	bool eventFilter( QObject *obj, QEvent *ev ) {
++		if (obj == te_log()->realTextWidget())
++		{
++			if (ev->type() == QEvent::MouseButtonPress)
++				mle()->setFocus();
++			return QObject::eventFilter(obj, ev);
++		}
++
+ 		if (te_log()->handleCopyEvent(obj, ev, mle()))
+ 			return true;
+ 
+@@ -878,6 +885,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 	X11WM_CLASS("groupchat");
+ 
+ 	ui_.mle->chatEdit()->setFocus();
++	ui_.log->realTextWidget()->installEventFilter(d);
+ 
+ 	// Connect signals from MUC manager
+ 	connect(d->mucManager,SIGNAL(action_error(MUCManager::Action, int, const QString&)), SLOT(action_error(MUCManager::Action, int, const QString&)));
