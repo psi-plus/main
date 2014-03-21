@@ -2,7 +2,7 @@ diff --git a/iris/src/xmpp/xmpp-im/client.cpp b/iris/src/xmpp/xmpp-im/client.cpp
 index bebcfa8..8870775 100644
 --- a/iris/src/xmpp/xmpp-im/client.cpp
 +++ b/iris/src/xmpp/xmpp-im/client.cpp
-@@ -879,12 +879,33 @@ void Client::prRoster(const Roster &r)
+@@ -879,12 +879,35 @@ void Client::prRoster(const Roster &r)
  	importRoster(r);
  }
  
@@ -31,13 +31,15 @@ index bebcfa8..8870775 100644
 +	JT_Roster *r = qobject_cast<JT_Roster*>(sender());
 +	d->roster.setGroupsDelimiter(r->groupsDelimiter());
 +
-+	emit rosterGroupsDelimiterRequestFinished(r->groupsDelimiter());
++	if (r->success()) {
++		emit rosterGroupsDelimiterRequestFinished(r->groupsDelimiter());
++	}
 +
 +	r = new JT_Roster(rootTask());
  	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
  	r->get();
  	d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1244,13 +1265,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
+@@ -1244,13 +1267,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -74,7 +76,7 @@ index bebcfa8..8870775 100644
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1279,4 +1322,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
+@@ -1279,4 +1324,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
  	return it;
  }
  
@@ -330,9 +332,9 @@ index fc5663f..47fdd0c 100644
  	}
 +	// getGroupsDelimiter
 +	else if (type == 3) {
-+		QDomElement q = queryTag(x);
-+		QDomElement delimiter = q.firstChild().toElement();
-+		if (!delimiter.isNull()) {
++		if(x.attribute("type") == "result") {
++			QDomElement q = queryTag(x);
++			QDomElement delimiter = q.firstChild().toElement();
 +			d->groupsDelimiter = delimiter.firstChild().toText().data();
 +			setSuccess();
 +		}
