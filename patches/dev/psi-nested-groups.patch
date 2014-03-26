@@ -933,6 +933,422 @@ index b12c751..439a396 100644
  	, specialType_(type)
  {
  	name_ = QString::fromUtf8("☣special_group_");
+diff --git a/src/creategroup.ui b/src/creategroup.ui
+new file mode 100644
+index 0000000..ddb9647
+--- /dev/null
++++ b/src/creategroup.ui
+@@ -0,0 +1,159 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>CreateGroupDlg</class>
++ <widget class="QDialog" name="CreateGroupDlg">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>360</width>
++    <height>250</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>Create New Group</string>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <widget class="QLabel" name="label">
++     <property name="text">
++      <string>Choose parent group: </string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QTreeWidget" name="twGroups">
++     <attribute name="headerVisible">
++      <bool>false</bool>
++     </attribute>
++     <column>
++      <property name="text">
++       <string notr="true">1</string>
++      </property>
++     </column>
++    </widget>
++   </item>
++   <item>
++    <widget class="QLabel" name="label_2">
++     <property name="text">
++      <string>Enter the new group name:</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <layout class="QHBoxLayout" name="horizontalLayout">
++     <item>
++      <widget class="QLineEdit" name="lneGroupName"/>
++     </item>
++     <item>
++      <widget class="QPushButton" name="btnAddGroup">
++       <property name="text">
++        <string>Add</string>
++       </property>
++      </widget>
++     </item>
++    </layout>
++   </item>
++   <item>
++    <widget class="QDialogButtonBox" name="buttonBox">
++     <property name="orientation">
++      <enum>Qt::Horizontal</enum>
++     </property>
++     <property name="standardButtons">
++      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
++     </property>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <tabstops>
++  <tabstop>buttonBox</tabstop>
++ </tabstops>
++ <resources/>
++ <connections>
++  <connection>
++   <sender>buttonBox</sender>
++   <signal>accepted()</signal>
++   <receiver>CreateGroupDlg</receiver>
++   <slot>accept()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>227</x>
++     <y>222</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>157</x>
++     <y>249</y>
++    </hint>
++   </hints>
++  </connection>
++  <connection>
++   <sender>buttonBox</sender>
++   <signal>rejected()</signal>
++   <receiver>CreateGroupDlg</receiver>
++   <slot>reject()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>295</x>
++     <y>228</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>286</x>
++     <y>249</y>
++    </hint>
++   </hints>
++  </connection>
++  <connection>
++   <sender>btnAddGroup</sender>
++   <signal>clicked()</signal>
++   <receiver>CreateGroupDlg</receiver>
++   <slot>addGroup()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>313</x>
++     <y>180</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>361</x>
++     <y>166</y>
++    </hint>
++   </hints>
++  </connection>
++  <connection>
++   <sender>lneGroupName</sender>
++   <signal>textChanged(QString)</signal>
++   <receiver>CreateGroupDlg</receiver>
++   <slot>checkGroupName()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>149</x>
++     <y>188</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>356</x>
++     <y>126</y>
++    </hint>
++   </hints>
++  </connection>
++  <connection>
++   <sender>twGroups</sender>
++   <signal>currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)</signal>
++   <receiver>CreateGroupDlg</receiver>
++   <slot>checkGroupName()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>94</x>
++     <y>78</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>360</x>
++     <y>72</y>
++    </hint>
++   </hints>
++  </connection>
++ </connections>
++ <slots>
++  <slot>checkGroupName()</slot>
++  <slot>addGroup()</slot>
++ </slots>
++</ui>
+diff --git a/src/creategroupdlg.cpp b/src/creategroupdlg.cpp
+new file mode 100644
+index 0000000..28e0811
+--- /dev/null
++++ b/src/creategroupdlg.cpp
+@@ -0,0 +1,193 @@
++/*
++ * creategroupdlg.cpp
++ * Copyright (C) 20014  Ivan Romanov <drizt@land.ru>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#include "ui_creategroup.h"
++#include "creategroupdlg.h"
++#include "psicontact.h"
++#include "userlist.h"
++#include "psiaccount.h"
++
++#include <QPushButton>
++#include <QTreeWidgetItem>
++#include <QList>
++#include <QRegExp>
++
++class CreateGroupDlg::Private
++{
++public:
++	CreateGroupDlg *q;
++	Ui::CreateGroupDlg *ui;
++	PsiContact *contact;
++
++	QString fullGroupName()
++	{
++		QStringList groupNameList;
++		groupNameList << ui->lneGroupName->text();
++
++		QTreeWidgetItem *item = ui->twGroups->currentItem();
++		if (item != ui->twGroups->topLevelItem(0)) {
++			while (item != 0) {
++				groupNameList.prepend(item->text(0));
++				item = item->parent();
++			}
++		}
++
++		QString groupsDelimiter = contact->account()->userList()->groupsDelimiter();
++
++		return groupNameList.join(groupsDelimiter);
++	}
++};
++
++CreateGroupDlg::CreateGroupDlg(PsiContact *contact, QWidget *parent)
++	: QDialog(parent)
++	, d(new CreateGroupDlg::Private)
++{
++	d->q = this;
++	d->ui = new Ui::CreateGroupDlg;
++	d->ui->setupUi(this);
++	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
++	d->ui->btnAddGroup->setEnabled(false);
++	d->contact = contact;
++
++	// Fill groups tree
++	QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++
++	QList<QTreeWidgetItem *> items;
++	items << new QTreeWidgetItem((QTreeWidget*)0, QStringList(tr("<None>")));
++
++	// Show only <None> if no delimiter
++	if (groupsDelimiter.indexOf(QRegExp("^[0-9A-z]?$")) == -1) {
++		QStringList groupList = d->contact->account()->groupList();
++		groupList.removeAll("");
++		groupList.removeAll(PsiContact::hiddenGroupName());
++		foreach (const QString &groupName, groupList) {
++			QStringList subGroupList = groupName.split(groupsDelimiter);
++
++			QTreeWidgetItem *parentItem = 0;
++			foreach (const QString &subGroupName, subGroupList) {
++				QList<QTreeWidgetItem*> children;
++				if (parentItem) {
++					for (int i = 0; i < parentItem->childCount(); i++)
++						children << parentItem->child(i);
++				}
++				else {
++					children = items;
++				}
++
++				bool needCreateItem = true;
++
++				for (int i = 0; i < children.length(); i++) {
++					if (children.at(i)->text(0) == subGroupName) {
++						parentItem = children.at(i);
++						needCreateItem = false;
++						break;
++					}
++				}
++
++				if (needCreateItem) {
++					parentItem = new QTreeWidgetItem(parentItem, QStringList(subGroupName));
++					items << parentItem;
++				}
++			}
++		}
++	}
++	d->ui->twGroups->insertTopLevelItems(0, items);
++	d->ui->twGroups->setCurrentItem(items.at(0));
++}
++
++CreateGroupDlg::~CreateGroupDlg()
++{
++	delete d;
++}
++
++void CreateGroupDlg::accept()
++{
++	QDialog::accept();
++	d->contact->setGroups(QStringList() << d->fullGroupName());
++}
++
++void CreateGroupDlg::checkGroupName()
++{
++	bool ok;
++	QString groupName = d->fullGroupName();
++
++	// Subgroup name can't be empty
++	ok = !d->ui->lneGroupName->text().isEmpty();
++
++	// Contact is not added to this group
++	if (ok) {
++		ok = !d->contact->userListItem().groups().contains(groupName);
++	}
++
++	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(ok);
++
++	// Can't create subgroup with delimiter
++	QString subGroupName = d->ui->lneGroupName->text();
++	if (ok) {
++		QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++		if (groupsDelimiter.indexOf(QRegExp("^[0-9A-z]?$")) == -1) {
++			if (subGroupName.contains(groupsDelimiter)) {
++				ok = false;
++			}
++		}
++	}
++
++	// No such subgroup
++	if (ok) {
++		QTreeWidgetItem *item = d->ui->twGroups->currentItem();
++		QList<QTreeWidgetItem*> children;
++
++		if (item == d->ui->twGroups->topLevelItem(0)) {
++			for (int i = 1; i < d->ui->twGroups->topLevelItemCount(); i++)
++				children << d->ui->twGroups->topLevelItem(1);
++		}
++		else {
++			for (int i = 0; i < item->childCount(); i++)
++				children << item->child(i);
++		}
++
++		for (int i = 0; i < children.length(); i++) {
++			if (children.at(i)->text(0) == subGroupName) {
++				ok = false;
++				break;
++			}
++		}
++	}
++	d->ui->btnAddGroup->setEnabled(ok);
++}
++
++void CreateGroupDlg::addGroup()
++{
++	QTreeWidgetItem *item = d->ui->twGroups->currentItem();
++	QString subGroupName = d->ui->lneGroupName->text();
++
++	if (item == d->ui->twGroups->topLevelItem(0)) {
++		item = 0;
++		item = new QTreeWidgetItem(item, QStringList(subGroupName));
++		d->ui->twGroups->addTopLevelItem(item);
++	}
++	else {
++		item = new QTreeWidgetItem(item, QStringList(subGroupName));
++	}
++	d->ui->twGroups->setCurrentItem(item);
++
++	d->ui->lneGroupName->setText("");
++	d->ui->lneGroupName->setFocus();
++}
+diff --git a/src/creategroupdlg.h b/src/creategroupdlg.h
+new file mode 100644
+index 0000000..331067a
+--- /dev/null
++++ b/src/creategroupdlg.h
+@@ -0,0 +1,46 @@
++/*
++ * creategroupdlg.h
++ * Copyright (C) 20014  Ivan Romanov <drizt@land.ru>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#ifndef CREATEGROUPDLG_H
++#define CREATEGROUPDLG_H
++
++#include <QDialog>
++
++class PsiContact;
++
++class CreateGroupDlg : public QDialog
++{
++	Q_OBJECT
++
++public:
++	CreateGroupDlg(PsiContact *contact, QWidget *parent = 0);
++	~CreateGroupDlg();
++
++public slots:
++	void accept();
++	void checkGroupName();
++	void addGroup();
++
++private:
++	class Private;
++	Private *d;
++};
++
++#endif // CREATEGROUPDLG_H
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
 index 3f90d80..f87f678 100644
 --- a/src/psi_profiles.cpp
@@ -1200,11 +1616,69 @@ index a82c358..b6e7fe8 100644
  
  	/**
  	 * This signal is emitted when account is loaded from disk or created
+diff --git a/src/psicontactmenu.cpp b/src/psicontactmenu.cpp
+index 3d93c54..a862713 100644
+--- a/src/psicontactmenu.cpp
++++ b/src/psicontactmenu.cpp
+@@ -51,6 +51,7 @@
+ #endif
+ 
+ #include "groupchatdlg.h"
++#include "creategroupdlg.h"
+ 
+ //----------------------------------------------------------------------------
+ // GroupMenu
+@@ -131,23 +132,8 @@ private slots:
+ 
+ 	void createNewGroup()
+ 	{
+-		while (contact_) {
+-			bool ok = false;
+-			QString newgroup = QInputDialog::getText(0, tr("Create New Group"),
+-			                   tr("Enter the new group name:"),
+-			                   QLineEdit::Normal,
+-			                   QString::null,
+-			                   &ok, 0);
+-			if (!ok)
+-				break;
+-			if (newgroup.isEmpty())
+-				continue;
+-
+-			if (!contact_->userListItem().groups().contains(newgroup)) {
+-				emit groupActivated(newgroup);
+-				break;
+-			}
+-		}
++		CreateGroupDlg dlg(contact_);
++		dlg.exec();
+ 	}
+ };
+ 
 diff --git a/src/src.pri b/src/src.pri
-index c8d1189..b76b39b 100644
+index c8d1189..db60cd9 100644
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -452,7 +452,6 @@ mac {
+@@ -214,7 +214,8 @@ HEADERS += \
+ 	$$PWD/coloropt.h \
+ 	$$PWD/geolocationdlg.h \
+ 	$$PWD/rosteravatarframe.h \
+-	$$PWD/sendbuttonmenu.h
++	$$PWD/sendbuttonmenu.h \
++	$$PWD/creategroupdlg.h
+ 
+ 
+ 
+@@ -357,7 +358,8 @@ SOURCES += \
+ 	$$PWD/coloropt.cpp \
+ 	$$PWD/geolocationdlg.cpp \
+ 	$$PWD/rosteravatarframe.cpp \
+-	$$PWD/sendbuttonmenu.cpp
++	$$PWD/sendbuttonmenu.cpp \
++	$$PWD/creategroupdlg.cpp
+ 
+ unix:!macx:!haiku {
+ 	HEADERS += $$PWD/x11windowsystem.h
+@@ -452,7 +454,6 @@ mac {
  CONFIG += newcontactlist
  newcontactlist {
  	DEFINES += NEWCONTACTLIST
@@ -1212,6 +1686,16 @@ index c8d1189..b76b39b 100644
  	HEADERS += \
  		$$PWD/contactlistview.h \
  		$$PWD/contactlistdragview.h \
+@@ -600,7 +601,8 @@ FORMS += \
+ 	$$PWD/ahcformdlg.ui \
+ 	$$PWD/geolocation.ui \
+ 	$$PWD/rosteravatarframe.ui \
+-	$$PWD/sendbuttontemplateseditor.ui
++	$$PWD/sendbuttontemplateseditor.ui \
++	$$PWD/creategroup.ui
+ 
+ # options dialog
+ include($$PWD/options/options.pri)
 diff --git a/src/userlist.cpp b/src/userlist.cpp
 index 4607c21..31b5599 100644
 --- a/src/userlist.cpp
