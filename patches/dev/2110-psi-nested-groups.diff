@@ -363,7 +363,7 @@ index 3886b60..132831d 100644
  	QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
  	QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
 diff --git a/src/contactlistgroup.cpp b/src/contactlistgroup.cpp
-index 47b83c3..f67ed8f 100755
+index 47b83c3..215c136 100755
 --- a/src/contactlistgroup.cpp
 +++ b/src/contactlistgroup.cpp
 @@ -28,17 +28,17 @@
@@ -388,7 +388,7 @@ index 47b83c3..f67ed8f 100755
  	, model_(model)
  	, parent_(parent)
  	, updateOnlineContactsTimer_(0)
-@@ -83,22 +83,46 @@ QString ContactListGroup::fullName() const
+@@ -83,22 +83,45 @@ QString ContactListGroup::fullName() const
  			name.prepend(group->internalGroupName());
  		group = group->parent();
  	}
@@ -400,8 +400,7 @@ index 47b83c3..f67ed8f 100755
 +bool ContactListGroup::hasGroupsDelimiter() const
  {
 -	return GROUP_DELIMITER;
-+	// No delimiter. Or delimiter is a single digit or letter
-+	return groupsDelimiter().indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1;
++	return account() ? account()->userList()->hasGroupsDelimiter() : false;
  }
  
 -void ContactListGroup::setGroupDelimiter(const QString& str)
@@ -441,7 +440,7 @@ index 47b83c3..f67ed8f 100755
  }
  
  QStringList ContactListGroup::sanitizeGroupNames(const QStringList& names) const
-@@ -477,7 +501,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
+@@ -477,7 +500,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
  	foreach(ContactListItemProxy* item, items_) {
  		ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
  		if (group)
@@ -1100,10 +1099,10 @@ index 0000000..ddb9647
 +</ui>
 diff --git a/src/creategroupdlg.cpp b/src/creategroupdlg.cpp
 new file mode 100644
-index 0000000..28e0811
+index 0000000..2c87918
 --- /dev/null
 +++ b/src/creategroupdlg.cpp
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,196 @@
 +/*
 + * creategroupdlg.cpp
 + * Copyright (C) 20014  Ivan Romanov <drizt@land.ru>
@@ -1173,13 +1172,14 @@ index 0000000..28e0811
 +	d->contact = contact;
 +
 +	// Fill groups tree
-+	QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++	bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
 +
 +	QList<QTreeWidgetItem *> items;
 +	items << new QTreeWidgetItem((QTreeWidget*)0, QStringList(tr("<None>")));
 +
 +	// Show only <None> if no delimiter
-+	if (groupsDelimiter.indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1) {
++	if (hasGroupsDelimiter) {
++		QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
 +		QStringList groupList = d->contact->account()->groupList();
 +		groupList.removeAll("");
 +		groupList.removeAll(PsiContact::hiddenGroupName());
@@ -1248,8 +1248,9 @@ index 0000000..28e0811
 +	// Can't create subgroup with delimiter
 +	QString subGroupName = d->ui->lneGroupName->text();
 +	if (ok) {
-+		QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
-+		if (groupsDelimiter.indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1) {
++		bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
++		if (hasGroupsDelimiter) {
++			QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
 +			if (subGroupName.contains(groupsDelimiter)) {
 +				ok = false;
 +			}
@@ -1698,10 +1699,10 @@ index c8d1189..db60cd9 100644
  # options dialog
  include($$PWD/options/options.pri)
 diff --git a/src/userlist.cpp b/src/userlist.cpp
-index 4607c21..31b5599 100644
+index 4607c21..076d828 100644
 --- a/src/userlist.cpp
 +++ b/src/userlist.cpp
-@@ -1178,3 +1178,12 @@ UserListItem *UserList::find(const XMPP::Jid &j)
+@@ -1178,3 +1178,17 @@ UserListItem *UserList::find(const XMPP::Jid &j)
  	return 0;
  }
  
@@ -1714,17 +1715,26 @@ index 4607c21..31b5599 100644
 +{
 +	return _groupsDelimiter;
 +}
++
++bool UserList::hasGroupsDelimiter() const
++{
++	return groupsDelimiter().indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1;
++}
 diff --git a/src/userlist.h b/src/userlist.h
-index 2bacecc..ae15c0b 100644
+index 2bacecc..271c0b4 100644
 --- a/src/userlist.h
 +++ b/src/userlist.h
-@@ -187,6 +187,12 @@ public:
+@@ -187,6 +187,16 @@ public:
  	~UserList();
  
  	UserListItem *find(const XMPP::Jid &);
 +
 +	void setGroupsDelimiter(const QString &groupsDelimiter);
 +	QString groupsDelimiter() const;
++
++	// If the delimiter is a single alphanumeric character (a-z, A-Z, 0-9) or empty
++	// the situation treats as if nesting were disabled
++	bool hasGroupsDelimiter() const;
 +
 +private:
 +	QString _groupsDelimiter;
