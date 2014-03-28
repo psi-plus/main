@@ -1102,7 +1102,7 @@ new file mode 100644
 index 0000000..2c87918
 --- /dev/null
 +++ b/src/creategroupdlg.cpp
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,207 @@
 +/*
 + * creategroupdlg.cpp
 + * Copyright (C) 20014  Ivan Romanov <drizt@land.ru>
@@ -1216,6 +1216,7 @@ index 0000000..2c87918
 +	}
 +	d->ui->twGroups->insertTopLevelItems(0, items);
 +	d->ui->twGroups->setCurrentItem(items.at(0));
++	d->ui->lneGroupName->setFocus();
 +}
 +
 +CreateGroupDlg::~CreateGroupDlg()
@@ -1257,14 +1258,14 @@ index 0000000..2c87918
 +
 +	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(ok);
 +
++	// Can't create subgroup if no delimiter
++	if (ok) {
++		ok = hasGroupsDelimiter;
++	}
++
 +	// Can't create subgroup with delimiter
 +	if (ok) {
-+		if (hasGroupsDelimiter) {
-+			QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
-+			if (subGroupName.contains(groupsDelimiter)) {
-+				ok = false;
-+			}
-+		}
++		ok = !subGroupName.contains(groupsDelimiter);
 +	}
 +
 +	// No such subgroup
@@ -1274,7 +1275,7 @@ index 0000000..2c87918
 +
 +		if (item == d->ui->twGroups->topLevelItem(0)) {
 +			for (int i = 1; i < d->ui->twGroups->topLevelItemCount(); i++)
-+				children << d->ui->twGroups->topLevelItem(1);
++				children << d->ui->twGroups->topLevelItem(i);
 +		}
 +		else {
 +			for (int i = 0; i < item->childCount(); i++)
