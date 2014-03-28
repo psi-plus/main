@@ -1,3 +1,15 @@
+diff --git a/options/default.xml b/options/default.xml
+index d296818..e64df95 100644
+--- a/options/default.xml
++++ b/options/default.xml
+@@ -275,6 +275,7 @@ QLineEdit#le_status_text {
+ 						<margin type="int">0</margin>
+ 					</avatar>
+ 				</roster-avatar-frame>
++				<default-groups-delimiter comment="Default nested groups delimiter will be used if no delimiter on the server" type="QString">::</default-groups-delimiter>
+ 			</contactlist>
+ 			<menu comment="Options for the menu">
+ 				<account comment="Options for the account-specific menu">
 diff --git a/src/accountmodify.ui b/src/accountmodify.ui
 index 24029da..6565052 100644
 --- a/src/accountmodify.ui
@@ -1413,7 +1425,7 @@ index 3f90d80..f87f678 100644
  	foreach(RosterItem ri, roster) {
  		QString rbase = base + ".roster-cache.a" + QString::number(idx++);
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
-index eef6558..b017d44 100644
+index eef6558..deeda43 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -23,7 +23,6 @@
@@ -1449,19 +1461,32 @@ index eef6558..b017d44 100644
  	foreach(UserListItem* u, d->userList) {
  		if(u->inList())
  			d->acc.roster += *u;
-@@ -2333,6 +2336,11 @@ int PsiAccount::currentConnectionErrorCondition() const
+@@ -2333,6 +2336,24 @@ int PsiAccount::currentConnectionErrorCondition() const
  	return d->currentConnectionErrorCondition;
  }
  
 +void PsiAccount::client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter)
 +{
-+	d->userList.setGroupsDelimiter(groupsDelimiter);
++	if (!groupsDelimiter.isEmpty()) {
++		d->userList.setGroupsDelimiter(groupsDelimiter);
++	}
++	else {
++		QString defaultGroupsDelimiter = PsiOptions::instance()->getOption("options.ui.contactlist.default-groups-delimiter").toString();
++
++		// Not empty delimiter can be set in options before login. Need to reset it in any case.
++		d->userList.setGroupsDelimiter(defaultGroupsDelimiter);
++
++		// Prevent excessed iq
++		if (!defaultGroupsDelimiter.isEmpty()) {
++			actionSetGroupsDelimiter(defaultGroupsDelimiter);
++		}
++	}
 +}
 +
  void PsiAccount::client_rosterRequestFinished(bool success, int, const QString &)
  {
  	if(success) {
-@@ -3486,6 +3494,35 @@ void PsiAccount::doDisco()
+@@ -3486,6 +3507,35 @@ void PsiAccount::doDisco()
  	actionDisco(d->jid.domain(), "");
  }
  
@@ -1497,7 +1522,7 @@ index eef6558..b017d44 100644
  void PsiAccount::actionDisco(const Jid &j, const QString &node)
  {
  	DiscoDlg *w = new DiscoDlg(this, j, node);
-@@ -3524,6 +3561,22 @@ void PsiAccount::featureActivated(QString feature, Jid jid, QString node)
+@@ -3524,6 +3574,22 @@ void PsiAccount::featureActivated(QString feature, Jid jid, QString node)
  	}
  }
  
