@@ -1102,7 +1102,7 @@ new file mode 100644
 index 0000000..2c87918
 --- /dev/null
 +++ b/src/creategroupdlg.cpp
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,206 @@
 +/*
 + * creategroupdlg.cpp
 + * Copyright (C) 20014  Ivan Romanov <drizt@land.ru>
@@ -1238,6 +1238,18 @@ index 0000000..2c87918
 +	// Subgroup name can't be empty
 +	ok = !d->ui->lneGroupName->text().isEmpty();
 +
++	QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++	bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
++	QString subGroupName = d->ui->lneGroupName->text();
++
++	// Subgroup name can't start or end with delimiter
++	// or has repeated delimiters
++	if (hasGroupsDelimiter &&
++		(subGroupName.split(groupsDelimiter)).contains("")) {
++
++		ok = false;
++	}
++
 +	// Contact is not added to this group
 +	if (ok) {
 +		ok = !d->contact->userListItem().groups().contains(groupName);
@@ -1246,9 +1258,7 @@ index 0000000..2c87918
 +	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(ok);
 +
 +	// Can't create subgroup with delimiter
-+	QString subGroupName = d->ui->lneGroupName->text();
 +	if (ok) {
-+		bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
 +		if (hasGroupsDelimiter) {
 +			QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
 +			if (subGroupName.contains(groupsDelimiter)) {
