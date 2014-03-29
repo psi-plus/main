@@ -396,7 +396,7 @@ index 3886b60..d318fc0 100644
  	QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
  	QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
 diff --git a/src/contactlistgroup.cpp b/src/contactlistgroup.cpp
-index 47b83c3..50a9524 100755
+index 47b83c3..bb90b8f 100755
 --- a/src/contactlistgroup.cpp
 +++ b/src/contactlistgroup.cpp
 @@ -28,17 +28,17 @@
@@ -442,19 +442,17 @@ index 47b83c3..50a9524 100755
 +bool ContactListGroup::hasGroupsDelimiter() const
 +{
 +	return account() ? account()->userList()->hasGroupsDelimiter() : false;
- }
- 
--const QString& ContactListGroup::groupDelimiter()
++}
++
 +QString ContactListGroup::groupsDelimiter() const
- {
--	return GROUP_DELIMITER;
++{
 +	return account() ? account()->userList()->groupsDelimiter() : "";
  }
  
--void ContactListGroup::setGroupDelimiter(const QString& str)
+-const QString& ContactListGroup::groupDelimiter()
 +QStringList ContactListGroup::toNestedGroups(const QString &group) const
  {
--	GROUP_DELIMITER = str;
+-	return GROUP_DELIMITER;
 +	QStringList nestedGroups;
 +	if (hasGroupsDelimiter())
 +		nestedGroups = group.split(groupsDelimiter());
@@ -463,10 +461,10 @@ index 47b83c3..50a9524 100755
 +	return nestedGroups;
  }
  
--QString ContactListGroup::sanitizeGroupName(const QString& name) const
+-void ContactListGroup::setGroupDelimiter(const QString& str)
 +QString ContactListGroup::fromNestedGroups(const QStringList &nestedGroups) const
  {
--	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
+-	GROUP_DELIMITER = str;
 +	QString group;
 +	if (hasGroupsDelimiter()) {
 +		group = nestedGroups.join(groupsDelimiter());
@@ -475,10 +473,12 @@ index 47b83c3..50a9524 100755
 +		group = nestedGroups.join("");
 +	}
 +	return group;
-+}
-+
+ }
+ 
+-QString ContactListGroup::sanitizeGroupName(const QString& name) const
 +QString ContactListGroup::sanitizeGroupName(const QString &name) const
-+{
+ {
+-	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
 +	if (!hasGroupsDelimiter()) {
 +		return name;
 +	}
@@ -494,7 +494,15 @@ index 47b83c3..50a9524 100755
  		sanitized.append(sanitizeGroupName(name));
  	}
  	return sanitized;
-@@ -477,7 +503,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
+@@ -420,6 +446,7 @@ void ContactListGroup::updateOnlineContactsFlag()
+ 		onlineContactsCount_ = onlineContactsCount;
+ 		totalContactsCount_ = totalContactsCount;
+ 		if (parent()) {
++			parent()->updateOnlineContactsFlag();
+ 			model()->updatedItem(parent()->findGroup(this));
+ 		}
+ 	}
+@@ -477,7 +504,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
  	foreach(ContactListItemProxy* item, items_) {
  		ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
  		if (group)
