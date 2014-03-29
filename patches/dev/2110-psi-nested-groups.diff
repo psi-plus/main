@@ -245,7 +245,7 @@ index b70c7c0..dddac4f 100644
  };
  
 diff --git a/src/contactlistdragmodel.cpp b/src/contactlistdragmodel.cpp
-index 8643046..4c4eedf 100644
+index 8643046..5de16ad 100644
 --- a/src/contactlistdragmodel.cpp
 +++ b/src/contactlistdragmodel.cpp
 @@ -23,6 +23,7 @@
@@ -283,7 +283,7 @@ index 8643046..4c4eedf 100644
  			else if ((childGroup = dynamic_cast<ContactListGroup*>(itemProxy->item()))) {
 -				QString theName = childGroup->fullName().split(ContactListGroup::groupDelimiter()).last();
 -				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + ContactListGroup::groupDelimiter()) + theName;
-+				QString theName = childGroup->fullName().split(childGroup->groupsDelimiter()).last();
++				QString theName = childGroup->toNestedGroups(childGroup->fullName()).last();
 +				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + childGroup->groupsDelimiter()) + theName;
  				addOperationsForGroupRename(childGroup->fullName(), newName, operations);
  			}
@@ -291,119 +291,112 @@ index 8643046..4c4eedf 100644
  		}
  	}
  }
-@@ -382,7 +379,8 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
+@@ -382,7 +379,9 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
  
  	foreach(ContactListModelSelection::Group group, selection.groups()) {
  		QString parentGroupName = getDropGroupName(parent);
 -		if (parentGroupName.startsWith(group.fullName + ContactListGroup::groupDelimiter())) {
++		bool hasDelimiter = account(parent)->userList()->hasGroupsDelimiter();
 +		QString delimiter = account(parent)->userList()->groupsDelimiter();
 +		if (parentGroupName.startsWith(group.fullName + delimiter)) {
  			qWarning("Dropping group to its descendant is not supported ('%s' -> '%s')", qPrintable(group.fullName), qPrintable(parentGroupName));
  			continue;
  		}
-@@ -391,8 +389,8 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
+@@ -391,8 +390,8 @@ bool ContactListDragModel::dropMimeData(const QMimeData* data, Qt::DropAction ac
  			continue;
  
  		// TODO: unify these two lines with the ones in operationsForGroupRename
 -		QString theName = group.fullName.split(ContactListGroup::groupDelimiter()).last();
 -		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + ContactListGroup::groupDelimiter()) + theName;
-+		QString theName = group.fullName.split(delimiter).last();
++		QString theName = group.fullName.split(hasDelimiter ? delimiter : "").last();
 +		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + delimiter) + theName;
  		if (newName == group.fullName)
  			continue;
  
-@@ -422,33 +420,33 @@ void ContactListDragModel::renameGroup(ContactListGroup* group, const QString& n
+@@ -422,37 +421,17 @@ void ContactListDragModel::renameGroup(ContactListGroup* group, const QString& n
  	Q_ASSERT(group);
  	ContactListModelOperationList operations(ContactListModelOperationList::Move);
  
 -	QStringList name = group->fullName().split(ContactListGroup::groupDelimiter());
-+	QStringList name = group->fullName().split(group->groupsDelimiter());
++	QStringList name = group->toNestedGroups(group->fullName());
  	if (name.isEmpty())
  		return;
  	name.takeLast();
  	if (!newName.isEmpty())
  		name << newName;
 -	addOperationsForGroupRename(group->fullName(), name.join(ContactListGroup::groupDelimiter()), &operations);
-+	addOperationsForGroupRename(group->fullName(), name.join(group->groupsDelimiter()), &operations);
++	addOperationsForGroupRename(group->fullName(), group->fromNestedGroups(name), &operations);
  
  	performContactOperations(operations, Operation_GroupRename);
  }
  
 -QString ContactListDragModel::processContactSetGroupName(const QString& groupName) const
-+QString ContactListDragModel::processContactSetGroupName(const QString& groupName, const QString& groupsDelimiter) const
- {
- 	if (accountsEnabled()) {
+-{
+-	if (accountsEnabled()) {
 -		QStringList split = groupName.split(ContactListGroup::groupDelimiter());
-+		QStringList split = groupName.split(groupsDelimiter);
- 		split.takeFirst();
+-		split.takeFirst();
 -		return split.join(ContactListGroup::groupDelimiter());
-+		return split.join(groupsDelimiter);
- 	}
- 
- 	return groupName;
- }
- 
+-	}
+-
+-	return groupName;
+-}
+-
 -QStringList ContactListDragModel::processContactSetGroupNames(const QStringList& groups) const
-+QStringList ContactListDragModel::processContactSetGroupNames(const QStringList& groups, const QString& groupsDelimiter) const
- {
- 	QStringList result;
- 	foreach(const QString& g, groups) {
+-{
+-	QStringList result;
+-	foreach(const QString& g, groups) {
 -		result << processContactSetGroupName(g);
-+		result << processContactSetGroupName(g, groupsDelimiter);
- 	}
- 	return result;
- }
-@@ -504,7 +502,8 @@ void ContactListDragModel::performContactOperations(const ContactListModelOperat
+-	}
+-	return result;
+-}
+-
+ QStringList ContactListDragModel::processContactGetGroupNames(PsiContact* contact) const
+ {
+ 	QStringList groups;
+@@ -504,7 +483,7 @@ void ContactListDragModel::performContactOperations(const ContactListModelOperat
  			}
  		}
  
 -		psiContact->setGroups(processContactSetGroupNames(groups));
-+		QString delimiter = psiContact->account()->userList()->groupsDelimiter();
-+		psiContact->setGroups(processContactSetGroupNames(groups, delimiter));
++		psiContact->setGroups(groups);
  	}
  
  	contactOperationsPerformed(operations, operationType, groupContactCount);
-@@ -530,9 +529,10 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
- 			continue;
- 
+@@ -532,7 +511,7 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
  		QStringList groups = psiContact->groups();
-+		QString delimiter = psiContact->account()->userList()->groupsDelimiter();
  
  		foreach(ContactListModelOperationList::Operation op, contactOperation.operations) {
 -			groups.removeAll(processContactSetGroupName(op.groupFrom));
-+			groups.removeAll(processContactSetGroupName(op.groupFrom, delimiter));
++			groups.removeAll(op.groupFrom);
  		}
  
  		if (!groupsEnabled()) {
-@@ -562,8 +562,10 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
+@@ -562,8 +541,9 @@ QList<PsiContact*> ContactListDragModel::removeIndexesHelper(const QMimeData* da
  				continue;
  
  			QStringList groups = it.value();
-+			QString groupsDelimiter = psiContact->account()->userList()->groupsDelimiter();
 +
  			if (!groups.isEmpty())
 -				psiContact->setGroups(processContactSetGroupNames(groups));
-+				psiContact->setGroups(processContactSetGroupNames(groups, groupsDelimiter));
++				psiContact->setGroups(groups);
  			else
  				psiContact->remove();
  		}
 diff --git a/src/contactlistdragmodel.h b/src/contactlistdragmodel.h
-index 3886b60..132831d 100644
+index 3886b60..d318fc0 100644
 --- a/src/contactlistdragmodel.h
 +++ b/src/contactlistdragmodel.h
-@@ -113,8 +113,8 @@ protected:
+@@ -113,8 +113,6 @@ protected:
  	virtual QString getDropGroupName(const QModelIndex& parent) const;
  	virtual void contactOperationsPerformed(const ContactListModelOperationList& operations, OperationType operationType, const QHash<ContactListGroup*, int>& groupContactCount);
  
 -	QString processContactSetGroupName(const QString& groupName) const;
 -	QStringList processContactSetGroupNames(const QStringList& groups) const;
-+	QString processContactSetGroupName(const QString& groupName, const QString& groupsDelimiter) const;
-+	QStringList processContactSetGroupNames(const QStringList& groups, const QString& groupsDelimiter) const;
  	QStringList processContactGetGroupNames(PsiContact* contact) const;
  	QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
  	QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
 diff --git a/src/contactlistgroup.cpp b/src/contactlistgroup.cpp
-index 47b83c3..215c136 100755
+index 47b83c3..50a9524 100755
 --- a/src/contactlistgroup.cpp
 +++ b/src/contactlistgroup.cpp
 @@ -28,17 +28,17 @@
@@ -428,59 +421,80 @@ index 47b83c3..215c136 100755
  	, model_(model)
  	, parent_(parent)
  	, updateOnlineContactsTimer_(0)
-@@ -83,22 +83,45 @@ QString ContactListGroup::fullName() const
- 			name.prepend(group->internalGroupName());
+@@ -76,35 +76,61 @@ QString ContactListGroup::internalGroupName() const
+ 
+ QString ContactListGroup::fullName() const
+ {
+-	QStringList name;
++	QStringList nestedGroups;
+ 	const ContactListGroup* group = this;
+ 	while (group) {
+-		if (!group->internalGroupName().isEmpty())
+-			name.prepend(group->internalGroupName());
++		if (!group->internalGroupName().isEmpty() && group->type() != ContactListModel::AccountType)
++			nestedGroups.prepend(group->internalGroupName());
  		group = group->parent();
  	}
 -	return name.join(groupDelimiter());
-+	return name.join(groupsDelimiter());
- }
- 
--const QString& ContactListGroup::groupDelimiter()
++	return fromNestedGroups(nestedGroups);
++}
++
 +bool ContactListGroup::hasGroupsDelimiter() const
- {
--	return GROUP_DELIMITER;
++{
 +	return account() ? account()->userList()->hasGroupsDelimiter() : false;
  }
  
--void ContactListGroup::setGroupDelimiter(const QString& str)
+-const QString& ContactListGroup::groupDelimiter()
 +QString ContactListGroup::groupsDelimiter() const
  {
--	GROUP_DELIMITER = str;
+-	return GROUP_DELIMITER;
 +	return account() ? account()->userList()->groupsDelimiter() : "";
-+}
-+
+ }
+ 
+-void ContactListGroup::setGroupDelimiter(const QString& str)
 +QStringList ContactListGroup::toNestedGroups(const QString &group) const
-+{
+ {
+-	GROUP_DELIMITER = str;
 +	QStringList nestedGroups;
 +	if (hasGroupsDelimiter())
 +		nestedGroups = group.split(groupsDelimiter());
 +	else
 +		nestedGroups << group;
 +	return nestedGroups;
-+}
-+
+ }
+ 
+-QString ContactListGroup::sanitizeGroupName(const QString& name) const
 +QString ContactListGroup::fromNestedGroups(const QStringList &nestedGroups) const
-+{
+ {
+-	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
 +	QString group;
 +	if (hasGroupsDelimiter()) {
 +		group = nestedGroups.join(groupsDelimiter());
 +	}
 +	else {
-+		Q_ASSERT(nestedGroups.length() == 1);
-+		group = nestedGroups.first();
++		group = nestedGroups.join("");
 +	}
 +	return group;
- }
- 
- QString ContactListGroup::sanitizeGroupName(const QString& name) const
- {
--	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
++}
++
++QString ContactListGroup::sanitizeGroupName(const QString &name) const
++{
++	if (!hasGroupsDelimiter()) {
++		return name;
++	}
++
 +	return name.split(groupsDelimiter(), QString::SkipEmptyParts).join(groupsDelimiter());
  }
  
  QStringList ContactListGroup::sanitizeGroupNames(const QStringList& names) const
-@@ -477,7 +500,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
+ {
+ 	QStringList sanitized;
+-	foreach(QString name, names) {
++	foreach(const QString &name, names) {
+ 		sanitized.append(sanitizeGroupName(name));
+ 	}
+ 	return sanitized;
+@@ -477,7 +503,7 @@ void ContactListGroup::contactsHelper(QList<PsiContact*>* contacts) const
  	foreach(ContactListItemProxy* item, items_) {
  		ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
  		if (group)
