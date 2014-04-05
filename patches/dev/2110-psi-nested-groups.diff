@@ -776,17 +776,6 @@ index 135c387..d4c6668 100755
  }
  
  bool ContactListModel::groupsEnabled() const
-@@ -214,6 +215,10 @@ void ContactListModel::orderChanged()
- 	emit layoutChanged();
- }
- 
-+void ContactListModel::groupsDelimiterChanged()
-+{
-+}
-+
- void ContactListModel::invalidateLayout()
- {
- 	beginBulkUpdate();
 @@ -850,7 +855,7 @@ PsiAccount* ContactListModel::account(const QModelIndex& index) const
  {
  	ContactListItemProxy* item = itemProxy(index);
@@ -832,14 +821,6 @@ index f2a1742..d8474b5 100644
  
  protected slots:
  	void addContact(PsiContact*);
-@@ -207,6 +208,7 @@ protected slots:
- 
- 	void destroyingContactList();
- 	void orderChanged();
-+	void groupsDelimiterChanged();
- 
- protected slots:
- 	void beginBulkUpdate();
 diff --git a/src/contactlistmodelupdater.cpp b/src/contactlistmodelupdater.cpp
 index c03fc6a..f0bf510 100644
 --- a/src/contactlistmodelupdater.cpp
@@ -1544,14 +1525,16 @@ index eef6558..beaa5fc 100644
  void PsiAccount::actionDisco(const Jid &j, const QString &node)
  {
  	DiscoDlg *w = new DiscoDlg(this, j, node);
-@@ -3524,6 +3574,16 @@ void PsiAccount::featureActivated(QString feature, Jid jid, QString node)
+@@ -3524,6 +3574,18 @@ void PsiAccount::featureActivated(QString feature, Jid jid, QString node)
  	}
  }
  
 +void PsiAccount::actionSetGroupsDelimiter(const QString &groupsDelimiter)
 +{
-+	d->userList.setGroupsDelimiter(groupsDelimiter);
-+	emit groupsDelimiterChanged();
++	if (d->userList.groupsDelimiter() != groupsDelimiter) {
++		d->userList.setGroupsDelimiter(groupsDelimiter);
++		emit groupsDelimiterChanged();
++	}
 +
 +	JT_Roster *r = new JT_Roster(d->client->rootTask());
 +	r->setGroupsDelimiter(groupsDelimiter);
