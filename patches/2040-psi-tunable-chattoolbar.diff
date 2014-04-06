@@ -1,6 +1,7 @@
+diff --git a/options/default.xml b/options/default.xml
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -568,6 +568,27 @@
+@@ -564,6 +564,27 @@ QLineEdit#le_status_text {
  				<help_about_qt type="QKeySequence" comment="About Qt"></help_about_qt>
  				<help_diag_qcaplugin type="QKeySequence" comment="QCA plugin diag"></help_diag_qcaplugin>
  				<help_diag_qcakeystore type="QKeySequence" comment="QCA key store diag"></help_diag_qcakeystore>
@@ -29,7 +30,6 @@
  			<chat comment="Shortcuts in the chat dialog">
  				<next-tab type="QVariantList" comment="Switch to the next tab">
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index e776a52..8af3bfc 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
@@ -65,7 +65,7 @@ index e776a52..8af3bfc 100644
  	QAction *act_copy_muc_jid;
  	TypeAheadFindBar *typeahead;
  //#ifdef WHITEBOARDING
-@@ -680,8 +688,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -678,8 +686,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.lb_ident->setAccount(account());
  	ui_.lb_ident->setShowJid(false);
  	ui_.log->setSessionData(true, jid().full(), jid().full()); //FIXME change conference name
@@ -77,7 +77,7 @@ index e776a52..8af3bfc 100644
  	if (!d->tabmode && !isBorder()) {
  		d->winHeader_ = new PsiWindowHeader(this);
  		ui_.vboxLayout1->insertWidget(0, d->winHeader_);
-@@ -714,7 +723,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -712,7 +721,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
  	ui_.lv_users->setMainDlg(this);
  	ui_.lv_users->model()->setSupportedDragActions(Qt::CopyAction);
@@ -86,21 +86,21 @@ index e776a52..8af3bfc 100644
  		ui_.lv_users->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
  	}
  	connect(ui_.lv_users, SIGNAL(action(const QString &, const Status &, int)), SLOT(lv_action(const QString &, const Status &, int)));
-@@ -725,28 +734,54 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -724,28 +733,54 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	hb3a->addWidget( d->typeahead );
  	ui_.vboxLayout1->addLayout(hb3a);
  
 -	d->act_clear = new IconAction (tr("Clear Chat Window"), "psi/clearChat", tr("Clear Chat Window"), 0, this);
 -	connect( d->act_clear, SIGNAL(triggered()), SLOT(doClearButton()));
--
--	d->act_find = new IconAction(tr("Find"), "psi/search", tr("&Find"), 0, this, "", true);
--	connect(d->act_find, SIGNAL(triggered()), d->typeahead, SLOT(toggleVisibility()));
 +	ActionList* actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Groupchat).at(0);
 +	foreach (const QString &name, actList->actions()) {
 +		IconAction *action = actList->action(name)->copy();
 +		action->setParent(this);
 +		d->actions->addAction(name, action);
  
+-	d->act_find = new IconAction(tr("Find"), "psi/search", tr("&Find"), 0, this, "", true);
+-	connect(d->act_find, SIGNAL(triggered()), d->typeahead, SLOT(toggleVisibility()));
+-
 -	d->act_configure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("&Configure Room"), 0, this);
 -	connect(d->act_configure, SIGNAL(triggered()), SLOT(configureRoom()));
 +		if (name == "gchat_clear") {
@@ -155,7 +155,7 @@ index e776a52..8af3bfc 100644
  	d->act_nick = new QAction(this);
  	d->act_nick->setText(tr("Change Nickname..."));
  	connect(d->act_nick, SIGNAL(triggered()), d, SLOT(doNick()));
-@@ -760,12 +795,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -759,12 +794,6 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(d->act_minimize, SIGNAL(triggered()), SLOT(doMinimize()));
  	addAction(d->act_minimize);
  
@@ -168,7 +168,7 @@ index e776a52..8af3bfc 100644
  	d->act_bookmark = new IconAction(this);
  	connect(d->act_bookmark, SIGNAL(triggered()), SLOT(doBookmark()));
  	ui_.le_topic->addAction(d->act_bookmark);
-@@ -785,19 +814,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -784,19 +813,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s,s));
@@ -189,7 +189,7 @@ index e776a52..8af3bfc 100644
  	ui_.toolbar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
  
  	// Common actions
-@@ -835,10 +855,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -834,10 +854,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(ui_.vsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(verticalSplitterMoved(int,int)));
  
  	// resize the horizontal splitter
@@ -203,7 +203,7 @@ index e776a52..8af3bfc 100644
  	if(leftRoster)
  		list << d->rosterSize << d->logSize;
  	else
-@@ -850,8 +870,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -849,8 +869,8 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
  	// resize the vertical splitter
@@ -214,7 +214,7 @@ index e776a52..8af3bfc 100644
  	setVSplitterPosition(d->logHeight, d->chateditHeight);
  
  	X11WM_CLASS("groupchat");
-@@ -863,6 +883,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -862,6 +882,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(d->mucManager, SIGNAL(action_success(MUCManager::Action)), ui_.lv_users, SLOT(update()));
  
  	setLooks();
@@ -222,7 +222,7 @@ index e776a52..8af3bfc 100644
  	setShortcuts();
  	invalidateTab();
  	setConnecting();
-@@ -973,8 +994,9 @@ void GCMainDlg::ensureTabbedCorrectly()
+@@ -972,8 +993,9 @@ void GCMainDlg::ensureTabbedCorrectly()
  
  void GCMainDlg::setShortcuts()
  {
@@ -234,7 +234,7 @@ index e776a52..8af3bfc 100644
  	d->act_send->setShortcuts(ShortcutManager::instance()->shortcuts("chat.send"));
  	if (!isTabbed()) {
  		d->act_close->setShortcuts(ShortcutManager::instance()->shortcuts("common.close"));
-@@ -1451,7 +1473,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1455,7 +1477,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		if (d->configDlg) {
  			d->configDlg->setRoleAffiliation(s.mucItem().role(),s.mucItem().affiliation());
  		}
@@ -242,8 +242,8 @@ index e776a52..8af3bfc 100644
 +		d->actions->action("gchat_configure")->setEnabled(s.mucItem().affiliation() >= MUCItem::Member);
  	}
  
- 
-@@ -1896,7 +1918,7 @@ void GCMainDlg::setLooks()
+ 	PsiOptions *options_ = PsiOptions::instance();
+@@ -1901,7 +1923,7 @@ void GCMainDlg::setLooks()
  	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
  	ui_.lv_users->setFont(f);
  
@@ -252,7 +252,7 @@ index e776a52..8af3bfc 100644
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -1924,6 +1946,28 @@ void GCMainDlg::setLooks()
+@@ -1929,6 +1951,28 @@ void GCMainDlg::setLooks()
  	ui_.lv_users->setLooks();
  }
  
@@ -281,7 +281,7 @@ index e776a52..8af3bfc 100644
  void GCMainDlg::optionsUpdate()
  {
  	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
-@@ -1931,6 +1975,7 @@ void GCMainDlg::optionsUpdate()
+@@ -1936,6 +1980,7 @@ void GCMainDlg::optionsUpdate()
  	delete m;*/
  
  	setLooks();
@@ -289,7 +289,7 @@ index e776a52..8af3bfc 100644
  	setShortcuts();
  	d->typeahead->optionsUpdate();
  	// update status icons
-@@ -2056,16 +2101,16 @@ void GCMainDlg::buildMenu()
+@@ -2061,16 +2106,16 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -311,7 +311,7 @@ index e776a52..8af3bfc 100644
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
  }
-@@ -2121,7 +2166,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2126,7 +2171,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -320,7 +320,7 @@ index e776a52..8af3bfc 100644
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2199,7 +2244,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2204,7 +2249,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -330,10 +330,9 @@ index e776a52..8af3bfc 100644
  
  void GCMainDlg::sendTemp(const QString &templText)
 diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
-index 695e2b9..3552f96 100644
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -165,6 +165,7 @@ private:
+@@ -166,6 +166,7 @@ private:
  	void appendSysMsg(const MessageView &);
  	void appendMessage(const Message &, bool);
  	void setLooks();
@@ -342,7 +341,6 @@ index 695e2b9..3552f96 100644
  	void mucKickMsgHelper(const QString &nick, const Status &s, const QString &nickJid, const QString &title,
  			const QString &youSimple, const QString &youBy, const QString &someoneSimple,
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index 8dec9cc..cecb0a6 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -397,8 +397,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
@@ -374,7 +372,6 @@ index 8dec9cc..cecb0a6 100644
  		if (allInOne) {
  			if (d && d->viewToolBar && (d->viewToolBar->base() == base))
 diff --git a/src/options/opt_lookfeel_toolbars.ui b/src/options/opt_lookfeel_toolbars.ui
-index 95ae0ca..4068b89 100644
 --- a/src/options/opt_lookfeel_toolbars.ui
 +++ b/src/options/opt_lookfeel_toolbars.ui
 @@ -1,45 +1,44 @@
@@ -849,7 +846,6 @@ index 95ae0ca..4068b89 100644
    <customwidget>
     <class>IconToolButton</class>
 diff --git a/src/options/opt_toolbars.cpp b/src/options/opt_toolbars.cpp
-index 805a50c..48d0f1e 100644
 --- a/src/options/opt_toolbars.cpp
 +++ b/src/options/opt_toolbars.cpp
 @@ -23,6 +23,10 @@
@@ -1032,7 +1028,6 @@ index 805a50c..48d0f1e 100644
  
  	p->toolbars[n] = tb;
 diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
-index d9c2da2..abe1a79 100644
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
 @@ -1358,6 +1358,62 @@ bool OptionsMigration::fromFile(const QString &fname)
@@ -1099,7 +1094,6 @@ index d9c2da2..abe1a79 100644
  		if (opt.startsWith("options.status.presets.") ||
  			opt.startsWith("options.iconsets.service-status.") ||
 diff --git a/src/psiactionlist.cpp b/src/psiactionlist.cpp
-index ee1399f..116726d 100644
 --- a/src/psiactionlist.cpp
 +++ b/src/psiactionlist.cpp
 @@ -59,6 +59,8 @@ private:
@@ -1189,7 +1183,6 @@ index ee1399f..116726d 100644
  
  void PsiActionList::Private::optionsChanged()
 diff --git a/src/psiactionlist.h b/src/psiactionlist.h
-index ac3a7ed..a2bf0de 100644
 --- a/src/psiactionlist.h
 +++ b/src/psiactionlist.h
 @@ -35,8 +35,8 @@ public:
@@ -1204,7 +1197,6 @@ index ac3a7ed..a2bf0de 100644
  
  public:
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 6e92cee..d351ca9 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -48,7 +48,8 @@
@@ -1558,7 +1550,6 @@ index 6e92cee..d351ca9 100644
  
  void PsiChatDlg::sendTemp(const QString &templText)
 diff --git a/src/psichatdlg.h b/src/psichatdlg.h
-index 7e0ccb5..f7c4d99 100644
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
 @@ -11,7 +11,7 @@
@@ -1601,7 +1592,6 @@ index 7e0ccb5..f7c4d99 100644
  
  	ActionLineEdit *le_autojid;
 diff --git a/src/psioptions.cpp b/src/psioptions.cpp
-index ede8253..48c4228 100644
 --- a/src/psioptions.cpp
 +++ b/src/psioptions.cpp
 @@ -31,10 +31,8 @@
@@ -1656,7 +1646,6 @@ index ede8253..48c4228 100644
  PsiOptions* PsiOptions::defaults_ = NULL;
 -
 diff --git a/src/widgets/iconaction.cpp b/src/widgets/iconaction.cpp
-index a2186c4..71eccc0 100644
 --- a/src/widgets/iconaction.cpp
 +++ b/src/widgets/iconaction.cpp
 @@ -57,7 +57,7 @@ public:

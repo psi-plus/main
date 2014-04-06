@@ -1,7 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:03.368826100 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:03.364826099 +0400
+diff --git a/options/default.xml b/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -153,7 +153,16 @@
  					<self-contact type="bool">true</self-contact>
  				</show>
@@ -20,14 +19,13 @@ Index: psi/options/default.xml
  				<toolbars/>
  				<toolbars-state type="QByteArray"/>
  				<use-left-click type="bool">false</use-left-click>
-Index: psi/src/options/opt_application.cpp
-===================================================================
---- psi.orig/src/options/opt_application.cpp	2013-01-15 14:04:03.368826100 +0400
-+++ psi/src/options/opt_application.cpp	2013-01-15 14:04:03.364826099 +0400
-@@ -39,16 +39,6 @@
+diff --git a/src/options/opt_application.cpp b/src/options/opt_application.cpp
+--- a/src/options/opt_application.cpp
++++ b/src/options/opt_application.cpp
+@@ -39,16 +39,6 @@ QWidget *OptionsTabApplication::widget()
  	w = new OptApplicationUI();
  	OptApplicationUI *d = (OptApplicationUI *)w;
-
+ 
 -	d->ck_alwaysOnTop->setWhatsThis(
 -		tr("Makes the main Psi window always be in front of other windows."));
 -	d->ck_autoRosterSize->setWhatsThis(
@@ -41,19 +39,19 @@ Index: psi/src/options/opt_application.cpp
  	// docklet
  	d->ck_docklet->setWhatsThis(
  		tr("Makes Psi use a docklet icon, also known as system tray icon."));
-@@ -62,8 +52,6 @@
+@@ -62,8 +52,6 @@ QWidget *OptionsTabApplication::widget()
  		"window use a small titlebar."));
-
+ 
  #ifdef Q_OS_MAC
 -	d->ck_alwaysOnTop->hide();
 -	d->ck_showMenubar->hide();
  	d->gb_docklet->hide();
  #endif
-
-@@ -95,11 +83,6 @@
-
+ 
+@@ -95,11 +83,6 @@ void OptionsTabApplication::applyOptions()
+ 
  	OptApplicationUI *d = (OptApplicationUI *)w;
-
+ 
 -	PsiOptions::instance()->setOption("options.ui.contactlist.always-on-top", d->ck_alwaysOnTop->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.contactlist.automatically-resize-roster", d->ck_autoRosterSize->isChecked());
 -	PsiOptions::instance()->setOption("options.ui.contactlist.use-left-click", d->ck_useleft->isChecked());
@@ -61,23 +59,22 @@ Index: psi/src/options/opt_application.cpp
 -
  	// Auto-update
  	PsiOptions::instance()->setOption("options.auto-update.check-on-startup", d->ck_autoUpdate->isChecked());
-
-@@ -124,11 +107,6 @@
-
+ 
+@@ -124,11 +107,6 @@ void OptionsTabApplication::restoreOptions()
+ 
  	OptApplicationUI *d = (OptApplicationUI *)w;
-
+ 
 -	d->ck_alwaysOnTop->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.always-on-top").toBool() );
 -	d->ck_autoRosterSize->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.automatically-resize-roster").toBool() );
 -	d->ck_showMenubar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool() );
 -	d->ck_useleft->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.use-left-click").toBool() );
 -	d->ck_useleft->setVisible(false); //currently useless
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
-
+ 
  	// docklet
-Index: psi/src/options/opt_application.ui
-===================================================================
---- psi.orig/src/options/opt_application.ui	2013-01-15 14:04:03.368826100 +0400
-+++ psi/src/options/opt_application.ui	2013-01-15 14:04:03.364826099 +0400
+diff --git a/src/options/opt_application.ui b/src/options/opt_application.ui
+--- a/src/options/opt_application.ui
++++ b/src/options/opt_application.ui
 @@ -14,37 +14,6 @@
    </property>
    <layout class="QVBoxLayout" >
@@ -126,59 +123,11 @@ Index: psi/src/options/opt_application.ui
 -  <tabstop>ck_showMenubar</tabstop>
    <tabstop>ck_docklet</tabstop>
    <tabstop>ck_dockDCstyle</tabstop>
-   <tabstop>ck_dockHideMW</tabstop>       
-Index: psi/src/options/optionsdlg.cpp
-===================================================================
---- psi.orig/src/options/optionsdlg.cpp	2013-01-15 14:04:03.368826100 +0400
-+++ psi/src/options/optionsdlg.cpp	2013-01-15 14:04:03.364826099 +0400
-@@ -39,6 +39,7 @@
- // tabs
- #include "opt_toolbars.h"
- #include "opt_application.h"
-+#include "opt_roster.h"
- #include "opt_appearance.h"
- #include "opt_chat.h"
- #include "opt_events.h"
-@@ -270,6 +271,7 @@
- 	OptionsTabApplication* applicationTab = new OptionsTabApplication(this);
- 	applicationTab->setHaveAutoUpdater(psi->haveAutoUpdater());
- 	tabs.append( applicationTab );
-+	tabs.append( new OptionsTabRoster(this) );
- 	tabs.append( new OptionsTabChat(this) );
- 	tabs.append( new OptionsTabEvents(this) );
- 	tabs.append( new OptionsTabPopups(this) );
-Index: psi/src/options/options.pri
-===================================================================
---- psi.orig/src/options/options.pri	2013-01-15 14:04:03.368826100 +0400
-+++ psi/src/options/options.pri	2013-01-15 14:04:03.368826100 +0400
-@@ -12,6 +12,7 @@
- # additional tabs
- HEADERS += \
- 	$$PWD/opt_application.h \
-+	$$PWD/opt_roster.h \
- 	$$PWD/opt_chat.h \
- 	$$PWD/opt_events.h \
- 	$$PWD/opt_popups.h \
-@@ -30,6 +31,7 @@
-
- SOURCES += \
- 	$$PWD/opt_application.cpp \
-+	$$PWD/opt_roster.cpp \
- 	$$PWD/opt_chat.cpp \
- 	$$PWD/opt_events.cpp \
- 	$$PWD/opt_popups.cpp \
-@@ -48,6 +50,7 @@
-
- FORMS += \
- 	$$PWD/opt_application.ui \
-+	$$PWD/opt_roster.ui \
- 	$$PWD/opt_chat.ui \
- 	$$PWD/opt_events.ui \
- 	$$PWD/opt_popups.ui \
-Index: psi/src/options/opt_roster.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/options/opt_roster.cpp	2013-01-15 14:04:03.368826100 +0400
+   <tabstop>ck_dockHideMW</tabstop>
+diff --git a/src/options/opt_roster.cpp b/src/options/opt_roster.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/options/opt_roster.cpp
 @@ -0,0 +1,103 @@
 +#include "opt_roster.h"
 +#include "common.h"
@@ -283,10 +232,10 @@ Index: psi/src/options/opt_roster.cpp
 +	d->sb_avatarsSize->setValue( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.size").toInt() );
 +	d->sb_avatarsRadius->setValue( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.radius").toInt() );
 +}
-Index: psi/src/options/opt_roster.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/options/opt_roster.h	2013-01-15 14:04:03.368826100 +0400
+diff --git a/src/options/opt_roster.h b/src/options/opt_roster.h
+new file mode 100644
+--- /dev/null
++++ b/src/options/opt_roster.h
 @@ -0,0 +1,24 @@
 +#ifndef OPT_ROSTER_H
 +#define OPT_ROSTER_H
@@ -312,10 +261,11 @@ Index: psi/src/options/opt_roster.h
 +};
 +
 +#endif
-Index: psi/src/options/opt_roster.ui
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/options/opt_roster.ui	2013-01-15 14:04:03.368826100 +0400
+diff --git a/src/options/opt_roster.ui b/src/options/opt_roster.ui
+new file mode 100644
+index 0000000..9fa822e
+--- /dev/null
++++ b/src/options/opt_roster.ui
 @@ -0,0 +1,208 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -525,3 +475,49 @@ Index: psi/src/options/opt_roster.ui
 + <resources/>
 + <connections/>
 +</ui>
+diff --git a/src/options/options.pri b/src/options/options.pri
+--- a/src/options/options.pri
++++ b/src/options/options.pri
+@@ -12,6 +12,7 @@ FORMS += \
+ # additional tabs
+ HEADERS += \
+ 	$$PWD/opt_application.h \
++	$$PWD/opt_roster.h \
+ 	$$PWD/opt_chat.h \
+ 	$$PWD/opt_events.h \
+ 	$$PWD/opt_popups.h \
+@@ -30,6 +31,7 @@ HEADERS += $$PWD/opt_tree.h
+ 
+ SOURCES += \
+ 	$$PWD/opt_application.cpp \
++	$$PWD/opt_roster.cpp \
+ 	$$PWD/opt_chat.cpp \
+ 	$$PWD/opt_events.cpp \
+ 	$$PWD/opt_popups.cpp \
+@@ -48,6 +50,7 @@ SOURCES += $$PWD/opt_tree.cpp
+ 
+ FORMS += \
+ 	$$PWD/opt_application.ui \
++	$$PWD/opt_roster.ui \
+ 	$$PWD/opt_chat.ui \
+ 	$$PWD/opt_events.ui \
+ 	$$PWD/opt_popups.ui \
+diff --git a/src/options/optionsdlg.cpp b/src/options/optionsdlg.cpp
+--- a/src/options/optionsdlg.cpp
++++ b/src/options/optionsdlg.cpp
+@@ -39,6 +39,7 @@
+ // tabs
+ #include "opt_toolbars.h"
+ #include "opt_application.h"
++#include "opt_roster.h"
+ #include "opt_appearance.h"
+ #include "opt_chat.h"
+ #include "opt_events.h"
+@@ -270,6 +271,7 @@ void OptionsDlg::Private::createTabs()
+ 	OptionsTabApplication* applicationTab = new OptionsTabApplication(this);
+ 	applicationTab->setHaveAutoUpdater(psi->haveAutoUpdater());
+ 	tabs.append( applicationTab );
++	tabs.append( new OptionsTabRoster(this) );
+ 	tabs.append( new OptionsTabChat(this) );
+ 	tabs.append( new OptionsTabEvents(this) );
+ 	tabs.append( new OptionsTabPopups(this) );

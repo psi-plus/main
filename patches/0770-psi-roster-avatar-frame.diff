@@ -1,8 +1,7 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:16.272826624 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:16.264826624 +0400
-@@ -210,6 +210,7 @@
+diff --git a/options/default.xml b/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
+@@ -209,6 +209,7 @@ QLineEdit#le_status_text {
  				<lockdown-roster type="bool">false</lockdown-roster>
  				<raise-on-new-event type="bool">false</raise-on-new-event>
  				<quit-on-close type="bool">false</quit-on-close>
@@ -10,7 +9,7 @@ Index: psi/options/default.xml
  				<show>
  					<agent-contacts type="bool">true</agent-contacts>
  					<away-contacts type="bool">true</away-contacts>
-@@ -256,6 +257,12 @@
+@@ -255,6 +256,12 @@ QLineEdit#le_status_text {
  				<saved-window-geometry-screen type="int">0</saved-window-geometry-screen>
  				<saved-window-geometry-maximized type="bool">false</saved-window-geometry-maximized>
  				<saved-window-geometry-fullscreen type="bool">false</saved-window-geometry-fullscreen>
@@ -23,41 +22,40 @@ Index: psi/options/default.xml
  			</contactlist>
  			<menu comment="Options for the menu">
  				<account comment="Options for the account-specific menu">
-Index: psi/src/mainwin.cpp
-===================================================================
---- psi.orig/src/mainwin.cpp	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/mainwin.cpp	2013-01-15 14:04:16.268826624 +0400
+diff --git a/src/mainwin.cpp b/src/mainwin.cpp
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
 @@ -78,6 +78,9 @@
  #include "psimedia/psimedia.h"
  #include "avcall/avcall.h"
-
+ 
 +#include "rosteravatarframe.h"
 +#include "avatars.h"
 +
  using namespace XMPP;
-
+ 
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
-@@ -125,6 +128,8 @@
+@@ -125,6 +128,8 @@ public:
  	EventNotifierAction* eventNotifier;
  	PsiCon* psi;
  	MainWin* mainWin;
 +	RosterAvatarFrame* rosterAvatar;
 +	QPointer<PsiAccount> defaultAccount;
-
+ 
  	QLineEdit* searchText;
  	QToolButton* searchPb;
-@@ -306,6 +311,7 @@
+@@ -306,6 +311,7 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  	d->trayMenu = 0;
  	d->statusTip = "";
  	d->nickname = "";
 +	d->defaultAccount = 0;
-
+ 
  	QWidget *rosterBar = new QWidget(this);
  	bool allInOne = false;
-@@ -398,6 +404,16 @@
+@@ -398,6 +404,16 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  	d->searchWidget->setVisible(false);
  #endif
-
+ 
 +
 +	// create rosteravatarframe
 +	d->rosterAvatar = new RosterAvatarFrame(this);
@@ -71,15 +69,15 @@ Index: psi/src/mainwin.cpp
  	//add contact view
  #ifndef NEWCONTACTLIST
  	d->vb_roster->addWidget(cvlist);
-@@ -510,6 +526,7 @@
+@@ -510,6 +526,7 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
  #endif
  	d->optionsButton->setMenu( d->optionsMenu );
  	d->statusButton->setMenu( d->statusMenu );
 +	d->rosterAvatar->setStatusMenu( d->statusMenu );
-
+ 
  	buildToolbars();
  	// setUnifiedTitleAndToolBarOnMac(true);
-@@ -560,6 +577,9 @@
+@@ -560,6 +577,9 @@ void MainWin::optionChanged(const QString& option)
  			setStyleSheet(css);
  		}
  	}
@@ -87,25 +85,25 @@ Index: psi/src/mainwin.cpp
 +		d->rosterAvatar->setVisible(PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool());
 +	}
  }
-
+ 
  void MainWin::registerAction( IconAction* action )
-@@ -1298,6 +1318,7 @@
+@@ -1298,6 +1318,7 @@ void MainWin::decorateButton(int status)
  		else {
  			d->statusButton->setIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
  			d->statusGroup->setPsiIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
 +			d->rosterAvatar->setStatusIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE)->icon());
  		}
-
+ 
  		setWindowIcon(PsiIconset::instance()->status(STATUS_OFFLINE).impix());
-@@ -1306,6 +1327,7 @@
+@@ -1306,6 +1327,7 @@ void MainWin::decorateButton(int status)
  		d->statusButton->setText(status2txt(status));
  		d->statusButton->setIcon(PsiIconset::instance()->statusPtr(status));
  		d->statusGroup->setPsiIcon(PsiIconset::instance()->statusPtr(status));
 +		d->rosterAvatar->setStatusIcon(PsiIconset::instance()->statusPtr(status)->icon());
-
+ 
  		setWindowIcon(PsiIconset::instance()->status(status).impix());
  	}
-@@ -1607,6 +1629,38 @@
+@@ -1605,6 +1627,38 @@ void MainWin::numAccountsChanged()
  {
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
  	setTrayToolTip();
@@ -142,54 +140,51 @@ Index: psi/src/mainwin.cpp
 +		d->rosterAvatar->setAvatar(IconsetFactory::iconPixmap("psi/default_avatar"));
 +	}
  }
-
+ 
  void MainWin::accountFeaturesChanged()
-Index: psi/src/mainwin.h
-===================================================================
---- psi.orig/src/mainwin.h	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/mainwin.h	2013-01-15 14:04:16.268826624 +0400
-@@ -83,6 +83,7 @@
-
+diff --git a/src/mainwin.h b/src/mainwin.h
+--- a/src/mainwin.h
++++ b/src/mainwin.h
+@@ -83,6 +83,7 @@ protected:
+ 
  signals:
  	void statusChanged(int);
 +	void statusMessageChanged(QString);
  	void changeProfile();
  	void blankMessage();
  	void closeProgram();
-@@ -153,6 +154,9 @@
-
+@@ -153,6 +154,9 @@ private slots:
+ 
  	void optionChanged(const QString&);
-
+ 
 +	void nickChanged();
 +	void avatarChanged();
 +
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
-Index: psi/src/options/opt_roster.cpp
-===================================================================
---- psi.orig/src/options/opt_roster.cpp	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/options/opt_roster.cpp	2013-01-15 14:04:16.268826624 +0400
-@@ -65,6 +65,7 @@
+diff --git a/src/options/opt_roster.cpp b/src/options/opt_roster.cpp
+--- a/src/options/opt_roster.cpp
++++ b/src/options/opt_roster.cpp
+@@ -65,6 +65,7 @@ void OptionsTabRoster::applyOptions()
  	PsiOptions::instance()->setOption("options.ui.contactlist.use-left-click", d->ck_useleft->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-menubar", d->ck_showMenubar->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.disable-scrollbar", d->ck_disableScrollbar->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.contactlist.show-roster-avatar-frame", d->ck_roster_avatar->isChecked());
-
+ 
  	//enabled icons
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
-@@ -93,6 +94,7 @@
+@@ -93,6 +94,7 @@ void OptionsTabRoster::restoreOptions()
  	d->ck_useleft->setVisible(false);
  	d->ck_showMenubar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-menubar").toBool() );
  	d->ck_disableScrollbar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.disable-scrollbar").toBool() );
 +	d->ck_roster_avatar->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-roster-avatar-frame").toBool() );
-
+ 
  	//enabled icons
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
-Index: psi/src/options/opt_roster.ui
-===================================================================
---- psi.orig/src/options/opt_roster.ui	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/options/opt_roster.ui	2013-01-15 14:04:16.268826624 +0400
+diff --git a/src/options/opt_roster.ui b/src/options/opt_roster.ui
+--- a/src/options/opt_roster.ui
++++ b/src/options/opt_roster.ui
 @@ -62,6 +62,16 @@
      </widget>
     </item>
@@ -207,11 +202,10 @@ Index: psi/src/options/opt_roster.ui
      <widget class="QGroupBox" name="gb_docklet">
       <property name="title">
        <string>Icons</string>
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:16.268826624 +0400
-@@ -548,6 +548,7 @@
+diff --git a/src/psicon.cpp b/src/psicon.cpp
+--- a/src/psicon.cpp
++++ b/src/psicon.cpp
+@@ -548,6 +548,7 @@ bool PsiCon::init()
  	connect(d->mainwin, SIGNAL(doGroupChat()), SLOT(doGroupChat()));
  	connect(d->mainwin, SIGNAL(blankMessage()), SLOT(doNewBlankMessage()));
  	connect(d->mainwin, SIGNAL(statusChanged(int)), SLOT(statusMenuChanged(int)));
@@ -219,16 +213,16 @@ Index: psi/src/psicon.cpp
  	connect(d->mainwin, SIGNAL(doOptions()), SLOT(doOptions()));
  	connect(d->mainwin, SIGNAL(doToolbars()), SLOT(doToolbars()));
  	connect(d->mainwin, SIGNAL(doFileTransDlg()), SLOT(doFileTransDlg()));
-@@ -684,6 +685,8 @@
+@@ -682,6 +683,8 @@ bool PsiCon::init()
  	foreach(PsiAccount* account, d->contactList->accounts()) {
  		account->autoLogin();
  	}
 +	if(d->contactList->defaultAccount())
 +		emit statusMessageChanged(d->contactList->defaultAccount()->status().status());
-
+ 
  	// show tip of the day
- 	if ( PsiOptions::instance()->getOption("options.ui.tip.show").toBool() ) {
-@@ -1126,6 +1129,16 @@
+ 	if ( options->getOption("options.ui.tip.show").toBool() ) {
+@@ -1132,6 +1135,16 @@ void PsiCon::setGlobalStatus(const Status &s, bool withPriority, bool isManualSt
  	foreach(PsiAccount* account, d->contactList->enabledAccounts())
  		if (allOffline || account->isActive())
  			account->setStatus(s, withPriority, isManualStatus);
@@ -243,21 +237,20 @@ Index: psi/src/psicon.cpp
 +	s.setStatus(message);
 +	setGlobalStatus(s, false, true);
  }
-
+ 
  void PsiCon::pa_updatedActivity()
-Index: psi/src/psicon.h
-===================================================================
---- psi.orig/src/psicon.h	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/psicon.h	2013-01-15 14:04:16.268826624 +0400
-@@ -139,6 +139,7 @@
+diff --git a/src/psicon.h b/src/psicon.h
+--- a/src/psicon.h
++++ b/src/psicon.h
+@@ -140,6 +140,7 @@ signals:
  	void accountActivityChanged();
  	void emitOptionsUpdate();
  	void restoringSavedChatsChanged();
 +	void statusMessageChanged(QString);
-
+ 
  public slots:
  	void setGlobalStatus(const Status &, bool withPriority = false, bool isManualStatus = false);
-@@ -156,6 +157,7 @@
+@@ -157,6 +158,7 @@ public slots:
  	void doOptions();
  	void doFileTransDlg();
  	void statusMenuChanged(int);
@@ -265,10 +258,11 @@ Index: psi/src/psicon.h
  	void pa_updatedActivity();
  	void pa_updatedAccount();
  	void slotApplyOptions();
-Index: psi/src/rosteravatarframe.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/rosteravatarframe.cpp	2013-01-15 14:04:16.268826624 +0400
+diff --git a/src/rosteravatarframe.cpp b/src/rosteravatarframe.cpp
+new file mode 100644
+index 0000000..883658a
+--- /dev/null
++++ b/src/rosteravatarframe.cpp
 @@ -0,0 +1,148 @@
 +/*
 + * rosteravatarframe.cpp
@@ -418,10 +412,11 @@ Index: psi/src/rosteravatarframe.cpp
 +	if (option == "options.ui.contactlist.roster-avatar-frame.avatar.margin")
 +		layout()->setMargin(PsiOptions::instance()->getOption("options.ui.contactlist.roster-avatar-frame.avatar.margin").toInt());
 +}
-Index: psi/src/rosteravatarframe.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/rosteravatarframe.h	2013-01-15 14:04:16.268826624 +0400
+diff --git a/src/rosteravatarframe.h b/src/rosteravatarframe.h
+new file mode 100644
+index 0000000..8399eab
+--- /dev/null
++++ b/src/rosteravatarframe.h
 @@ -0,0 +1,65 @@
 +/*
 + * rosteravatarframe.h
@@ -488,10 +483,10 @@ Index: psi/src/rosteravatarframe.h
 +};
 +
 +#endif
-Index: psi/src/rosteravatarframe.ui
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/rosteravatarframe.ui	2013-01-15 14:04:16.268826624 +0400
+diff --git a/src/rosteravatarframe.ui b/src/rosteravatarframe.ui
+new file mode 100644
+--- /dev/null
++++ b/src/rosteravatarframe.ui
 @@ -0,0 +1,165 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -658,31 +653,30 @@ Index: psi/src/rosteravatarframe.ui
 + <resources/>
 + <connections/>
 +</ui>
-Index: psi/src/src.pri
-===================================================================
---- psi.orig/src/src.pri	2013-01-15 14:04:16.272826624 +0400
-+++ psi/src/src.pri	2013-01-15 14:04:16.268826624 +0400
-@@ -209,6 +209,7 @@
+diff --git a/src/src.pri b/src/src.pri
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -210,6 +210,7 @@ HEADERS += \
  	$$PWD/psicli.h \
  	$$PWD/coloropt.h \
  	$$PWD/geolocationdlg.h \
 +	$$PWD/rosteravatarframe.h \
  	$$PWD/sendbuttonmenu.h
-
-
-@@ -349,6 +350,7 @@
+ 
+ 
+@@ -349,6 +350,7 @@ SOURCES += \
  	$$PWD/vcardphotodlg.cpp \
  	$$PWD/coloropt.cpp \
  	$$PWD/geolocationdlg.cpp \
 +	$$PWD/rosteravatarframe.cpp \
  	$$PWD/sendbuttonmenu.cpp
-
-
-@@ -583,6 +585,7 @@
+ 
+ 
+@@ -583,6 +585,7 @@ FORMS += \
  	$$PWD/ahcommanddlg.ui \
  	$$PWD/ahcformdlg.ui \
  	$$PWD/geolocation.ui \
 +	$$PWD/rosteravatarframe.ui \
  	$$PWD/sendbuttontemplateseditor.ui
-
+ 
  # options dialog

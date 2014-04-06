@@ -1,9 +1,6 @@
-Entering 'iris'
-Entering 'src/libpsi'
-Index: psi/src/mainwin.cpp
-===================================================================
---- psi.orig/src/mainwin.cpp	2013-01-15 14:04:10.892826405 +0400
-+++ psi/src/mainwin.cpp	2013-01-15 14:04:10.888826405 +0400
+diff --git a/src/mainwin.cpp b/src/mainwin.cpp
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
 @@ -47,6 +47,7 @@
  #include "common.h"
  #include "showtextdlg.h"
@@ -21,29 +18,29 @@ Index: psi/src/mainwin.cpp
  #include "psitrayicon.h"
  #include "psitoolbar.h"
  #include "aboutdlg.h"
-@@ -142,6 +145,8 @@
+@@ -142,6 +145,8 @@ public:
  	void registerActions();
  	IconAction* getAction( QString name );
  	void updateMenu(QStringList actions, QMenu* menu);
 +
 +	QString ToolTipText;
  };
-
+ 
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
-@@ -710,7 +715,8 @@
+@@ -710,7 +715,8 @@ void MainWin::setUseDock(bool use)
  		connect(d->tray, SIGNAL(clicked(const QPoint &, int)), SLOT(trayClicked(const QPoint &, int)));
  		connect(d->tray, SIGNAL(doubleClicked(const QPoint &)), SLOT(trayDoubleClicked()));
  		d->tray->setIcon(PsiIconset::instance()->statusPtr(STATUS_OFFLINE));
 -		d->tray->setToolTip(ApplicationInfo::name());
 +		setTrayToolTip();
 +		connect(d->tray, SIGNAL(doToolTip(QObject *, QPoint)), this, SLOT(doTrayToolTip(QObject *, QPoint)));
-
+ 
  		updateReadNext(d->nextAnim, d->nextAmount);
-
-@@ -1093,12 +1099,87 @@
+ 
+@@ -1093,12 +1099,87 @@ void MainWin::buildTrayMenu()
  #endif
  }
-
+ 
 -void MainWin::setTrayToolTip(int status)
 +void MainWin::setTrayToolTip()
  {
@@ -128,18 +125,18 @@ Index: psi/src/mainwin.cpp
 +{
 +	PsiToolTip::showText(p, d->ToolTipText);
  }
-
+ 
  void MainWin::decorateButton(int status)
-@@ -1109,6 +1190,8 @@
+@@ -1109,6 +1190,8 @@ void MainWin::decorateButton(int status)
  		action->setChecked ( d->statusActions[action] == status );
  	}
-
+ 
 +	setTrayToolTip();
 +
  	if(d->lastStatus == status) {
  		return;
  	}
-@@ -1295,20 +1378,7 @@
+@@ -1295,20 +1378,7 @@ void MainWin::setTrayToolTip(const Status& status, bool, bool)
  	if (!d->tray) {
  		return;
  	}
@@ -159,46 +156,46 @@ Index: psi/src/mainwin.cpp
 -	d->tray->setToolTip(s);
 +	setTrayToolTip();
  }
-
+ 
  void MainWin::trayClicked(const QPoint &, int button)
-@@ -1383,6 +1453,7 @@
-
+@@ -1383,6 +1453,7 @@ void MainWin::updateReadNext(PsiIcon* anim, int amount)
+ 
  	updateTray();
  	updateCaption();
 +	setTrayToolTip();
  }
-
+ 
  QString MainWin::numEventsString(int x) const
-@@ -1441,6 +1514,7 @@
+@@ -1441,6 +1512,7 @@ PsiTrayIcon *MainWin::psiTrayIcon()
  void MainWin::numAccountsChanged()
  {
  	d->statusButton->setEnabled(d->psi->contactList()->haveEnabledAccounts());
 +	setTrayToolTip();
  }
-
+ 
  void MainWin::accountFeaturesChanged()
-Index: psi/src/mainwin.h
-===================================================================
---- psi.orig/src/mainwin.h	2013-01-15 14:04:10.892826405 +0400
-+++ psi/src/mainwin.h	2013-01-15 14:04:10.888826405 +0400
-@@ -101,7 +101,7 @@
+diff --git a/src/mainwin.h b/src/mainwin.h
+--- a/src/mainwin.h
++++ b/src/mainwin.h
+@@ -101,7 +101,7 @@ private slots:
  	void buildMainMenu();
  	void buildToolsMenu();
-
+ 
 -	void setTrayToolTip(int);
 +	void setTrayToolTip();
-
+ 
  	void activatedStatusAction(int);
-
-@@ -145,6 +145,8 @@
+ 
+@@ -145,6 +145,8 @@ private slots:
  	void registerAction( IconAction * );
  	void splitterMoved();
-
+ 
 +	void doTrayToolTip(QObject *, QPoint);
 +
  public slots:
  	void setWindowIcon(const QPixmap&);
  	void showNoFocus();
+diff --git a/src/psitrayicon.cpp b/src/psitrayicon.cpp
 --- a/src/psitrayicon.cpp
 +++ b/src/psitrayicon.cpp
 @@ -2,6 +2,7 @@
@@ -209,7 +206,7 @@ Index: psi/src/mainwin.h
  
  #include "psitrayicon.h"
  #include "iconset.h"
-@@ -18,6 +19,7 @@ PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
+@@ -19,6 +20,7 @@ PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
  	trayicon_->setContextMenu(popup);
  	setToolTip(tip);
  	connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
@@ -217,7 +214,7 @@ Index: psi/src/mainwin.h
  }
  
  PsiTrayIcon::~PsiTrayIcon()
-@@ -37,7 +39,11 @@ void PsiTrayIcon::setContextMenu(QMenu* menu)
+@@ -38,7 +40,11 @@ void PsiTrayIcon::setContextMenu(QMenu* menu)
  
  void PsiTrayIcon::setToolTip(const QString &str)
  {
@@ -228,8 +225,8 @@ Index: psi/src/mainwin.h
 +#endif
  }
  
- void PsiTrayIcon::setIcon(const PsiIcon *icon, bool /*alert*/)
-@@ -195,3 +201,12 @@ void PsiTrayIcon::animate()
+ void PsiTrayIcon::setIcon(const PsiIcon *icon, bool alert)
+@@ -193,3 +199,12 @@ void PsiTrayIcon::animate()
  	}
  	trayicon_->setIcon(p);
  }
@@ -242,6 +239,7 @@ Index: psi/src/mainwin.h
 +	}
 +	return QObject::eventFilter(obj, event);
 +}
+diff --git a/src/psitrayicon.h b/src/psitrayicon.h
 --- a/src/psitrayicon.h
 +++ b/src/psitrayicon.h
 @@ -29,6 +29,7 @@ signals:
