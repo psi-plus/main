@@ -1,44 +1,3 @@
-Entering 'iris'
-Entering 'src/libpsi'
-diff --git a/src/chatdlg.cpp b/src/chatdlg.cpp
---- a/src/chatdlg.cpp
-+++ b/src/chatdlg.cpp
-@@ -76,6 +76,7 @@
- #include "psirichtext.h"
- #include "messageview.h"
- #include "chatview.h"
-+#include "urlobject.h"
- 
- #ifdef Q_OS_WIN
- #include <windows.h>
-@@ -112,8 +113,16 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
- 	sendComposingEvents_ = false;
- 	isComposing_ = false;
- 	composingTimer_ = 0;
-+	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
- }
- 
-+void ChatDlg::vcard(const QString& string)
-+{
-+	QString str = string;
-+	str.remove(0, str.indexOf(":")+1);
-+	XMPP::Jid jd(str);
-+	account()->actionInfo(jd);
-+}
- void ChatDlg::init()
- {
- 	initUi();
-diff --git a/src/chatdlg.h b/src/chatdlg.h
---- a/src/chatdlg.h
-+++ b/src/chatdlg.h
-@@ -107,6 +107,7 @@ public slots:
- 	void incomingMessage(const Message &);
- 	virtual void updateAvatar() = 0;
- 	void updateAvatar(const Jid&);
-+	void vcard(const QString& str);
- 
- protected slots:
- 	void doInfo();
 diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
 --- a/src/chatview_te.cpp
 +++ b/src/chatview_te.cpp
@@ -116,7 +75,7 @@ diff --git a/src/chatview_te.h b/src/chatview_te.h
 diff --git a/src/chatview_webkit.cpp b/src/chatview_webkit.cpp
 --- a/src/chatview_webkit.cpp
 +++ b/src/chatview_webkit.cpp
-@@ -219,6 +219,15 @@ void ChatView::setSessionData(bool isMuc, const QString &jid, const QString name
+@@ -230,6 +230,15 @@ void ChatView::setSessionData(bool isMuc, const QString &jid, const QString name
  			SLOT(init()));
  }
  
@@ -156,7 +115,7 @@ diff --git a/src/chatview_webkit.h b/src/chatview_webkit.h
 diff --git a/src/desktoputil.cpp b/src/desktoputil.cpp
 --- a/src/desktoputil.cpp
 +++ b/src/desktoputil.cpp
-@@ -84,6 +84,7 @@ static bool doOpenUrl(const QUrl& url)
+@@ -87,6 +87,7 @@ static bool doOpenUrl(const QUrl& url)
   */
  bool DesktopUtil::openUrl(const QString& url)
  {
@@ -250,7 +209,7 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
  GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	: TabbableWidget(j.bare(), pa, tabManager)
  {
-@@ -595,6 +618,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -593,6 +616,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.log->setAccount(account());
  #endif
  
@@ -260,30 +219,11 @@ diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
  	connect(ui_.pb_topic, SIGNAL(clicked()), SLOT(openTopic()));
  	PsiToolTip::install(ui_.le_topic);
  
-@@ -697,6 +723,15 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
- 	setShortcuts();
- 	invalidateTab();
- 	setConnecting();
-+	connect(URLObject::getInstance(), SIGNAL(vcardsig(QString)), SLOT(vcard(QString)));
-+}
-+
-+void GCMainDlg::vcard(const QString& _str)
-+{
-+	QString str = _str;
-+	str.remove(0, str.indexOf(":")+1);
-+	XMPP::Jid jd(str);
-+	account()->actionInfo(jd);
- }
- 
- GCMainDlg::~GCMainDlg()
 diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -103,8 +103,11 @@ public slots:
- 	virtual void ensureTabbedCorrectly();
- 
+@@ -107,6 +107,8 @@ public slots:
  	void optionsUpdate();
-+	void vcard(const QString& str);
  
  private slots:
 +	void showNM(const QString&);
@@ -291,6 +231,19 @@ diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
  	void scrollUp();
  	void scrollDown();
  	void mle_returnPressed();
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -4239,6 +4239,9 @@ void PsiAccount::openUri(const QUrl &uriToOpen)
+ 		} else {
+ 			dj_newMessage(entity, body, subject, "");
+ 		}
++	} else if (querytype == "vcard") {
++		actionInfo(entity);
++
+ 		// thread, from, id
+ 	//} else if (querytype == "pubsub") {
+ 	//	// action, node
 diff --git a/src/webview.cpp b/src/webview.cpp
 --- a/src/webview.cpp
 +++ b/src/webview.cpp
@@ -323,23 +276,12 @@ diff --git a/src/widgets/urlobject.cpp b/src/widgets/urlobject.cpp
  
 +		tr = qApp->translate("URLLabel", "User Info");
 +		act_info = new IconAction(tr, "psi/vCard", tr, 0, this);
-+		connect(act_info, SIGNAL(triggered()), SLOT(vcard()));
++		connectXmppAction(act_info, "vcard");
 +
  		connect(&xmppActionMapper, SIGNAL(mapped(const QString&)), SLOT(xmppAction(const QString&)));
  	}
  
-@@ -130,6 +134,10 @@ public slots:
- 		popupCopy(link);
- 	}
- 
-+	void vcard() {
-+		emit urlObject->vcardsig(link);
-+	}
-+
- 	void xmppAction(const QString& lnk, const QString& query) {
- 		QUrl uri(lnk);
- 		if (!query.isEmpty()) {
-@@ -210,6 +218,7 @@ QMenu *URLObject::createPopupMenu(const QString &lnk)
+@@ -210,6 +214,7 @@ QMenu *URLObject::createPopupMenu(const QString &lnk)
  		if (service == "x-psi-atstyle") {
  			m->addSeparator();
  		}
@@ -347,17 +289,6 @@ diff --git a/src/widgets/urlobject.cpp b/src/widgets/urlobject.cpp
  		m->addAction(d->act_xmpp);
  		m->addAction(d->act_chat);
  		m->addAction(d->act_send_message);
-diff --git a/src/widgets/urlobject.h b/src/widgets/urlobject.h
---- a/src/widgets/urlobject.h
-+++ b/src/widgets/urlobject.h
-@@ -47,6 +47,7 @@ public:
- 
- signals:
- 	void openURL(QString);
-+	void vcardsig(QString);
- 
- public:
- 	class Private;
 diff --git a/themes/chatview/psi/classic/index.html b/themes/chatview/psi/classic/index.html
 --- a/themes/chatview/psi/classic/index.html
 +++ b/themes/chatview/psi/classic/index.html
