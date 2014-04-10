@@ -1,5 +1,5 @@
 diff --git a/options/default.xml b/options/default.xml
-index d296818..e64df95 100644
+index 8a0791d..53208b4 100644
 --- a/options/default.xml
 +++ b/options/default.xml
 @@ -275,6 +275,7 @@ QLineEdit#le_status_text {
@@ -753,7 +753,7 @@ index 498ba21..08c12fb 100644
  
  #endif
 diff --git a/src/contactlistmodel.cpp b/src/contactlistmodel.cpp
-index 135c387..d4c6668 100755
+index 135c387..0cdbf55 100755
 --- a/src/contactlistmodel.cpp
 +++ b/src/contactlistmodel.cpp
 @@ -68,6 +68,7 @@ ContactListModel::ContactListModel(PsiContactList* contactList)
@@ -776,7 +776,32 @@ index 135c387..d4c6668 100755
  }
  
  bool ContactListModel::groupsEnabled() const
-@@ -850,7 +855,7 @@ PsiAccount* ContactListModel::account(const QModelIndex& index) const
+@@ -645,10 +646,24 @@ bool ContactListModel::setData(const QModelIndex& index, const QVariant& data, i
+ 			//}
+ 		}
+ 		else if ((group = dynamic_cast<ContactListGroup*>(item->item()))) {
++			bool hasGroupsDelimiter = group->hasGroupsDelimiter();
++			QString groupsDelimiter = group->groupsDelimiter();
+ 			if (name.isEmpty()) {
+ 				QMessageBox::information(0, tr("Error"), tr("You can't set a blank group name."));
+ 				return false;
+ 			}
++			else if (hasGroupsDelimiter && name.startsWith(groupsDelimiter)) {
++				QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the begin of group name."));
++				return false;
++			}
++			else if (hasGroupsDelimiter && name.endsWith(groupsDelimiter)) {
++				QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the end of group name."));
++				return false;
++			}
++			else if (hasGroupsDelimiter && name.split(groupsDelimiter).contains("")) {
++				QMessageBox::information(0, tr("Error"), tr("You can't use repeating delimiter in the group name."));
++				return false;
++			}
+ 			// else {
+ 				// // make sure we don't have it already
+ 				// if (group->account()->groupList().contains(name)) {
+@@ -850,7 +865,7 @@ PsiAccount* ContactListModel::account(const QModelIndex& index) const
  {
  	ContactListItemProxy* item = itemProxy(index);
  	if (item) {
@@ -786,7 +811,7 @@ index 135c387..d4c6668 100755
  			return contact->account();
  	}
 diff --git a/src/contactlistmodel.h b/src/contactlistmodel.h
-index f2a1742..d8474b5 100644
+index f2a1742..b5a7204 100644
 --- a/src/contactlistmodel.h
 +++ b/src/contactlistmodel.h
 @@ -27,13 +27,14 @@
@@ -1142,7 +1167,7 @@ index 0000000..ddb9647
 +</ui>
 diff --git a/src/creategroupdlg.cpp b/src/creategroupdlg.cpp
 new file mode 100644
-index 0000000..0a4829a
+index 0000000..e2c34ae
 --- /dev/null
 +++ b/src/creategroupdlg.cpp
 @@ -0,0 +1,207 @@
@@ -1355,7 +1380,7 @@ index 0000000..0a4829a
 +}
 diff --git a/src/creategroupdlg.h b/src/creategroupdlg.h
 new file mode 100644
-index 0000000..331067a
+index 0000000..4878dc0
 --- /dev/null
 +++ b/src/creategroupdlg.h
 @@ -0,0 +1,46 @@
@@ -1428,7 +1453,7 @@ index 3f90d80..f87f678 100644
  	foreach(RosterItem ri, roster) {
  		QString rbase = base + ".roster-cache.a" + QString::number(idx++);
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
-index eef6558..beaa5fc 100644
+index ca3523a..3ec984c 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -23,7 +23,6 @@
