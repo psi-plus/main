@@ -342,9 +342,9 @@
  {
 +	if (delayedMessages)
 +		delete delayedMessages;
+ 	if (account()->isGCContact(jid()))
+ 		account()->gcContactDecRef(jid());
  	account()->dialogUnregister(this);
- }
- 
 @@ -437,6 +443,43 @@ UserStatus ChatDlg::userStatusFor(const
  	return u;
  }
@@ -359,7 +359,7 @@
 +		EDBHandle *h = new EDBHandle(account()->edb());
 +		connect(h, SIGNAL(finished()), this, SLOT(getHistory()));
 +		Jid j = jid();
-+		if (!account()->findGCContact(j))
++		if (!account()->isGCContact(j))
 +			j = jid().bare();
 +		int start = account()->eventQueue()->count(jid(), false);
 +		h->get(account()->id(), j, QDateTime(), EDB::Backward, start, cnt);
@@ -4237,9 +4237,9 @@
  
  	// don't log groupchat, private messages, or encrypted messages
  	if(log) {
--		if(m.type() != "groupchat" && m.xencrypted().isEmpty() && !findGCContact(m.to())) {
-+		if(m.type() != "groupchat" && m.xencrypted().isEmpty()/* && !findGCContact(m.to())*/) {
-+			int type = findGCContact(m.to()) ? EDB::GroupChatContact : EDB::Contact;
+-		if(m.type() != "groupchat" && m.xencrypted().isEmpty() && !isGCContact(m.to())) {
++		if(m.type() != "groupchat" && m.xencrypted().isEmpty()/* && !isGCContact(m.to())*/) {
++			int type = isGCContact(m.to()) ? EDB::GroupChatContact : EDB::Contact;
  			MessageEvent *me = new MessageEvent(m, this);
  			me->setOriginLocal(true);
  			me->setTimeStamp(QDateTime::currentDateTime());
@@ -4252,8 +4252,8 @@
  
  			// don't log private messages
  			if (!found &&
--				!findGCContact(e->from()) &&
-+				//!findGCContact(e->from()) &&
+-				!isGCContact(e->from()) &&
++				//!isGCContact(e->from()) &&
  				!(e->type() == PsiEvent::Message &&
  				  ((MessageEvent *)e)->message().body().isEmpty()))
  			{
@@ -4262,7 +4262,7 @@
  #endif
  				if (!isMuc) {
 -					logEvent(e->from(), e);
-+					int type = findGCContact(e->from()) ? EDB::GroupChatContact : EDB::Contact;
++					int type = isGCContact(e->from()) ? EDB::GroupChatContact : EDB::Contact;
 +					logEvent(e->from(), e, type);
  				}
  			}
