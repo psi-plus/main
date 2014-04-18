@@ -1,8 +1,6 @@
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:30.872827218 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:30.872827218 +0400
-@@ -1469,6 +1469,7 @@
+--- git.temp.orig/src/groupchatdlg.cpp
++++ git.temp/src/groupchatdlg.cpp
+@@ -1462,6 +1462,7 @@ void GCMainDlg::presence(const QString &
  			// Status change
  			if ( !d->connecting && options_->getOption("options.muc.show-role-affiliation").toBool() ) {
  				QString message;
@@ -10,7 +8,7 @@ Index: psi/src/groupchatdlg.cpp
  				if (contact->s.mucItem().role() != s.mucItem().role() && s.mucItem().role() != MUCItem::NoRole) {
  					if (contact->s.mucItem().affiliation() != s.mucItem().affiliation()) {
  						message = tr("%1 is now %2 and %3").arg(nick).arg(MUCManager::roleToString(s.mucItem().role(),true)).arg(MUCManager::affiliationToString(s.mucItem().affiliation(),true));
-@@ -1476,9 +1477,15 @@
+@@ -1469,9 +1470,15 @@ void GCMainDlg::presence(const QString &
  					else {
  						message = tr("%1 is now %2").arg(nick).arg(MUCManager::roleToString(s.mucItem().role(),true));
  					}
@@ -24,9 +22,9 @@ Index: psi/src/groupchatdlg.cpp
 +				if(!reason.isEmpty()) {
 +					message += tr(" (Reason: %1)").arg(reason);
  				}
-
+ 
  				if (!message.isEmpty()) {
-@@ -1925,20 +1932,45 @@
+@@ -1923,20 +1930,45 @@ void GCMainDlg::lv_action(const QString
  		GCUserViewItem *contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
  		d->mucManager->ban(contact->s.mucItem().jid());
  	}
@@ -85,9 +83,9 @@ Index: psi/src/groupchatdlg.cpp
  	}
  	else if(x >= 100 && x<300) {
  		// Kick || Ban with reason
-@@ -1966,26 +1998,6 @@
+@@ -1964,26 +1996,6 @@ void GCMainDlg::lv_action(const QString
  		}
-
+ 
  	}
 -	else if(x == 15) {
 -		GCUserViewItem *contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
@@ -110,12 +108,10 @@ Index: psi/src/groupchatdlg.cpp
 -			d->mucManager->setAffiliation(contact->s.mucItem().jid(), MUCItem::Owner);
 -	}
  }
-
+ 
  void GCMainDlg::contextMenuEvent(QContextMenuEvent *)
-Index: psi/src/mucreasonseditor.cpp
-===================================================================
---- psi.orig/src/mucreasonseditor.cpp	2013-01-15 14:04:30.872827218 +0400
-+++ psi/src/mucreasonseditor.cpp	2013-01-15 14:04:30.872827218 +0400
+--- git.temp.orig/src/mucreasonseditor.cpp
++++ git.temp/src/mucreasonseditor.cpp
 @@ -1,48 +1,82 @@
 +/*
 + * mucreasonseditor.cpp
@@ -142,8 +138,8 @@ Index: psi/src/mucreasonseditor.cpp
  #include "common.h"
  #include "psioptions.h"
 +#include "ui_mucreasonseditor.h"
-
-
+ 
+ 
  MUCReasonsEditor::MUCReasonsEditor(QWidget* parent)
  	: QDialog(parent)
 +	, ui_(new Ui::MUCReasonsEditor)
@@ -157,13 +153,12 @@ Index: psi/src/mucreasonseditor.cpp
 +	connect(ui_->btnRemove, SIGNAL(clicked()), SLOT(removeButtonClicked()));
 +	connect(ui_->lstReasons, SIGNAL(currentTextChanged(QString)), SLOT(currentChanged(QString)));
  }
-
+ 
  MUCReasonsEditor::~MUCReasonsEditor()
--{
-+{
+ {
 +	delete ui_;
  }
-
+ 
  void MUCReasonsEditor::accept()
  {
  	save();
@@ -171,7 +166,7 @@ Index: psi/src/mucreasonseditor.cpp
 +	reason_ = ui_->txtReason->text();
  	QDialog::accept();
  }
-
+ 
 -void MUCReasonsEditor::on_btnAdd_clicked()
 +void MUCReasonsEditor::currentChanged(const QString &r)
 +{
@@ -187,7 +182,7 @@ Index: psi/src/mucreasonseditor.cpp
 -	ui_.lstReasons->addItem(reason_);
 +	ui_->lstReasons->addItem(reason_);
  }
-
+ 
 -void MUCReasonsEditor::on_btnRemove_clicked()
 +void MUCReasonsEditor::removeButtonClicked()
  {
@@ -202,7 +197,7 @@ Index: psi/src/mucreasonseditor.cpp
 +			delete item;
  	}
  }
-
+ 
  void MUCReasonsEditor::save()
  {
  	QStringList reasons;
@@ -214,10 +209,8 @@ Index: psi/src/mucreasonseditor.cpp
 +		reasons.append(ui_->lstReasons->item(i)->text());
  	PsiOptions::instance()->setOption("options.muc.reasons", reasons);
  }
-Index: psi/src/mucreasonseditor.h
-===================================================================
---- psi.orig/src/mucreasonseditor.h	2013-01-15 14:04:30.872827218 +0400
-+++ psi/src/mucreasonseditor.h	2013-01-15 14:04:30.872827218 +0400
+--- git.temp.orig/src/mucreasonseditor.h
++++ git.temp/src/mucreasonseditor.h
 @@ -1,9 +1,32 @@
 +/*
 + * mucreasonseditor.cpp
@@ -242,17 +235,17 @@ Index: psi/src/mucreasonseditor.h
 +
  #ifndef MUCREASONSEDITOR_H
  #define MUCREASONSEDITOR_H
-
+ 
  #include <QDialog>
-
+ 
 -#include "ui_mucreasonseditor.h"
 +namespace Ui {
 +	class MUCReasonsEditor;
 +}
-
+ 
  class MUCReasonsEditor: public QDialog
  {
-@@ -12,13 +35,17 @@
+@@ -12,13 +35,17 @@ public:
  	MUCReasonsEditor(QWidget* parent = 0);
  	~MUCReasonsEditor();
  	QString reason() const { return reason_; }

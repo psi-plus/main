@@ -1,18 +1,16 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:36.864827461 +0400
-@@ -1216,6 +1216,7 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -1209,6 +1209,7 @@ PsiAccount::PsiAccount(const UserAccount
  	d->sxeManager = new SxeManager(d->client, this);
  	 // Initialize Whiteboard manager
  	d->wbManager = new WbManager(d->client, this, d->sxeManager);
 +	connect(d->wbManager, SIGNAL(wbRequest(Jid,int)),SLOT(wbRequest(Jid,int)));
  #endif
-
+ 
  	// Avatars
-@@ -1554,7 +1555,12 @@
+@@ -1547,7 +1548,12 @@ VoiceCaller* PsiAccount::voiceCaller() c
  {
  	return d->voiceCaller;
  }
@@ -26,10 +24,10 @@ Index: psi/src/psiaccount.cpp
  PrivacyManager* PsiAccount::privacyManager() const
  {
  	return d->privacyManager;
-@@ -2729,6 +2735,19 @@
+@@ -2728,6 +2734,19 @@ void PsiAccount::client_messageReceived(
  	processIncomingMessage(_m);
  }
-
+ 
 +#ifdef WHITEBOARDING
 +void PsiAccount::wbRequest(const Jid &j, int id)
 +{
@@ -46,7 +44,7 @@ Index: psi/src/psiaccount.cpp
  /**
   * Handles the passed Message \param m. Also message's type could be modified
   * here, if certain options are set.
-@@ -5139,6 +5158,13 @@
+@@ -5139,6 +5158,13 @@ void PsiAccount::handleEvent(PsiEvent* e
  	else if(e->type() == PsiEvent::HttpAuth) {
  		soundType = eSystem;
  	}
@@ -60,21 +58,19 @@ Index: psi/src/psiaccount.cpp
  	else if(e->type() == PsiEvent::File) {
  		soundType = eIncomingFT;
  		doPopup = true;
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:36.868827462 +0400
-@@ -91,6 +91,9 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -91,6 +91,9 @@ class GoogleFileTransfer;
  #endif
  class PsiIcon;
  class QIcon;
 +#ifdef WHITEBOARDING
 +class WbManager;
 +#endif
-
+ 
  // sick sick remove this someday please!
  struct GCContact;
-@@ -135,6 +138,9 @@
+@@ -135,6 +138,9 @@ public:
  	PrivacyManager* privacyManager() const;
  	CapsManager* capsManager() const;
  	VoiceCaller* voiceCaller() const;
@@ -84,21 +80,19 @@ Index: psi/src/psiaccount.h
  	Status status() const;
  	static Status loggedOutStatus();
  	int defaultPriority(const XMPP::Status &);
-@@ -436,6 +442,10 @@
- 	void reconnect();
+@@ -437,6 +443,10 @@ private slots:
  	void disconnect();
  	void enableNotifyOnline();
-+
+ 
 +#ifdef WHITEBOARDING
 +	void wbRequest(const Jid& j, int id);
 +#endif
-
++
  	void itemPublished(const Jid&, const QString&, const PubSubItem&);
  	void itemRetracted(const Jid&, const QString&, const PubSubRetraction&);
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:36.868827462 +0400
+ 
+--- git.temp.orig/src/psicon.cpp
++++ git.temp/src/psicon.cpp
 @@ -112,6 +112,9 @@
  #include "alertmanager.h"
  #include "bosskey.h"
@@ -106,10 +100,10 @@ Index: psi/src/psicon.cpp
 +#ifdef WHITEBOARDING
 +#include "whiteboarding/wbmanager.h"
 +#endif
-
+ 
  #include "AutoUpdater/AutoUpdater.h"
  #ifdef HAVE_SPARKLE
-@@ -1779,6 +1782,16 @@
+@@ -1772,6 +1775,16 @@ void PsiCon::processEvent(PsiEvent *e, A
  		// as the event could be deleted just above, we're using cached account and from values
  		account->openChat(from, activationType);
  	}
@@ -126,12 +120,10 @@ Index: psi/src/psicon.cpp
  	else {
  		// search for an already opened eventdlg
  		EventDlg *w = e->account()->findDialog<EventDlg*>(u->jid());
-Index: psi/src/psievent.h
-===================================================================
---- psi.orig/src/psievent.h	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/psievent.h	2013-01-15 14:04:36.868827462 +0400
-@@ -53,6 +53,9 @@
-
+--- git.temp.orig/src/psievent.h
++++ git.temp/src/psievent.h
+@@ -53,6 +53,9 @@ public:
+ 
  	enum {
  		Message,
 +#ifdef WHITEBOARDING
@@ -140,10 +132,10 @@ Index: psi/src/psievent.h
  		Auth,
  		PGP,
  		File,
-@@ -174,6 +177,26 @@
+@@ -174,6 +177,26 @@ private:
  	QString v_at;
  };
-
+ 
 +#ifdef WHITEBOARDING
 +class SxeEvent : public MessageEvent
 +{
@@ -167,25 +159,23 @@ Index: psi/src/psievent.h
  // request pgp passphrase
  class PGPEvent : public PsiEvent
  {
-Index: psi/src/sxe/sxemanager.cpp
-===================================================================
---- psi.orig/src/sxe/sxemanager.cpp	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/sxe/sxemanager.cpp	2013-01-15 14:04:36.868827462 +0400
-@@ -50,9 +50,9 @@
+--- git.temp.orig/src/sxe/sxemanager.cpp
++++ git.temp/src/sxe/sxemanager.cpp
+@@ -50,9 +50,9 @@ SxeManager::SxeManager(Client* client, P
  	connect(&negotiationTimer_, SIGNAL(timeout()), SLOT(negotiationTimeout()));
  }
-
+ 
 -void SxeManager::addInvitationCallback(bool (*callback)(const Jid &peer, const QList<QString> &features)) {
 -	invitationCallbacks_ += callback;
 -}
 +//void SxeManager::addInvitationCallback(bool (*callback)(const Jid &peer, const QList<QString> &features)) {
 +//	invitationCallbacks_ += callback;
 +//}
-
+ 
  void SxeManager::messageReceived(const Message &message) {
  	// only process messages that contain a <sxe/> with a nonempty
-@@ -269,8 +269,9 @@
-
+@@ -269,8 +269,9 @@ bool SxeManager::processNegotiationAsJoi
+ 
  		// check if one of the invitation callbacks accepts the invitation.
  		const QString sessionId = negotiation->sessionId;
 -		foreach(bool (*callback)(const Jid &peer, const QList<QString> &features), invitationCallbacks_) {
@@ -196,7 +186,7 @@ Index: psi/src/sxe/sxemanager.cpp
  			if (!negotiations_.contains(sessionId, negotiation)) { //FIXME that's wrong. negotiation can be replaced with new one with the same address
  				return false;
  			}
-@@ -279,7 +280,8 @@
+@@ -279,7 +280,8 @@ bool SxeManager::processNegotiationAsJoi
  				negotiation->state = SxeNegotiation::InvitationAccepted;
  				return true;
  			}
@@ -206,11 +196,9 @@ Index: psi/src/sxe/sxemanager.cpp
  		// othewise abort negotiation
  		abortNegotiation(negotiation);
  		return false;
-Index: psi/src/sxe/sxemanager.h
-===================================================================
---- psi.orig/src/sxe/sxemanager.h	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/sxe/sxemanager.h	2013-01-15 14:04:36.868827462 +0400
-@@ -101,8 +101,8 @@
+--- git.temp.orig/src/sxe/sxemanager.h
++++ git.temp/src/sxe/sxemanager.h
+@@ -101,8 +101,8 @@ public:
  	 *  If such session doesn't exits, returns 0.
  	 */
  	QPointer<SxeSession> findSession(const QString &session);
@@ -221,16 +209,16 @@ Index: psi/src/sxe/sxemanager.h
  	/*! \brief Starts a new session negotiation to the specified contact with given list of features.*/
  	void startNewSession(const Jid &target, const Jid &ownJid, bool groupChat, const QDomDocument &initialDoc, QList<QString> features = QList<QString>());
  	/*! \brief Join an existing session.*/
-@@ -118,6 +118,8 @@
+@@ -118,6 +118,8 @@ signals:
  	/*! \brief Emitted when \a an invitation to \a jid was declined and joining an alternative session \a session was suggested.*/
  	void alternativeSession(const Jid &jid, const QString &session);
-
+ 
 +	void invitationCallback(const Jid &peer, const QList<QString> &features, bool* result);
 +
  private:
  	/*! \brief Process a message that contains a negotiation element.
  	 *  Returns a pointer to the new session if negotiation finished.
-@@ -163,8 +165,8 @@
+@@ -163,8 +165,8 @@ private:
  	QList<DetectedSession> DetectedSessions_;
  	/*! \brief A list of Jids corresponding to self.*/
  	QList<QString> ownJids_;
@@ -241,16 +229,14 @@ Index: psi/src/sxe/sxemanager.h
  	/*! \brief A counter used for including a unique id in each sent sxe element.*/
  	int sxeId_;
  	/*! \brief A list of messages waiting to be sent out.*/
-Index: psi/src/whiteboarding/wbmanager.cpp
-===================================================================
---- psi.orig/src/whiteboarding/wbmanager.cpp	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/whiteboarding/wbmanager.cpp	2013-01-15 14:04:36.868827462 +0400
+--- git.temp.orig/src/whiteboarding/wbmanager.cpp
++++ git.temp/src/whiteboarding/wbmanager.cpp
 @@ -32,8 +32,45 @@
-
+ 
  using namespace XMPP;
-
+ 
 -// -----------------------------------------------------------------------------
-
+ 
 +class WbRequest
 +{
 +public:
@@ -292,33 +278,33 @@ Index: psi/src/whiteboarding/wbmanager.cpp
  WbManager::WbManager(XMPP::Client* client, PsiAccount* pa, SxeManager* sxemanager) {
  	pa_ = pa;
  	sxemanager_ = sxemanager;
-@@ -41,12 +78,14 @@
+@@ -41,12 +78,14 @@ WbManager::WbManager(XMPP::Client* clien
  	client->addExtension("whiteboard", Features(WBNS));
-
+ 
  	connect(sxemanager_, SIGNAL(sessionNegotiated(SxeSession*)), SLOT(createWbDlg(SxeSession*)));
 -	sxemanager_->addInvitationCallback(WbManager::checkInvitation);
 +	//sxemanager_->addInvitationCallback(WbManager::checkInvitation);
 +	connect(sxemanager, SIGNAL(invitationCallback(Jid,QList<QString>,bool*)), this, SLOT(checkInvitation(Jid,QList<QString>,bool*)));
  }
-
+ 
  WbManager::~WbManager()
  {
  	qDeleteAll(dialogs_);
 +	qDeleteAll(requests_);
  }
-
+ 
  void WbManager::openWhiteboard(const Jid &target, const Jid &ownJid, bool groupChat, bool promptInitialDoc) {
-@@ -143,13 +182,33 @@
+@@ -143,13 +182,33 @@ void WbManager::createWbDlg(SxeSession*
  	}
  }
-
+ 
 -bool WbManager::checkInvitation(const Jid &peer, const QList<QString> &features) {
 -	if(!features.contains(WBNS))
 -		return false;
 +void WbManager::checkInvitation(const Jid &peer, const QList<QString> &features, bool* result) {
 +	if(*result)
 +		return;
-
+ 
 -	return (QMessageBox::Yes == QMessageBox::question(NULL,
 +	if(!features.contains(WBNS)) {
 +		*result = false;
@@ -346,29 +332,27 @@ Index: psi/src/whiteboarding/wbmanager.cpp
 +		}
 +	}
 +}
-Index: psi/src/whiteboarding/wbmanager.h
-===================================================================
---- psi.orig/src/whiteboarding/wbmanager.h	2013-01-15 14:04:36.872827462 +0400
-+++ psi/src/whiteboarding/wbmanager.h	2013-01-15 14:04:36.868827462 +0400
-@@ -37,6 +37,7 @@
+--- git.temp.orig/src/whiteboarding/wbmanager.h
++++ git.temp/src/whiteboarding/wbmanager.h
+@@ -37,6 +37,7 @@ namespace XMPP {
  }
-
+ 
  using namespace XMPP;
 +class WbRequest;
-
+ 
  /*! \brief The manager for whiteboard dialogs.
   *  The manager listen to SxeManager to pick up any new sessions negotiated by
-@@ -58,7 +59,8 @@
+@@ -58,7 +59,8 @@ public:
  	WbManager(XMPP::Client* client, PsiAccount* pa, SxeManager* sxemanager);
  	~WbManager();
  	/*! \brief Returns true if features contains WBNS and the user wishes to accept the invitation. */
 -    static bool checkInvitation(const Jid &peer, const QList<QString> &features);
 +	//static bool checkInvitation(const Jid &peer, const QList<QString> &features);
 +	void requestActivated(int id);
-
+ 
  public slots:
  	/*! \brief Opens the existing dialog to the specified contact or starts a new session negotiation if necessary.*/
-@@ -75,13 +77,20 @@
+@@ -75,13 +77,20 @@ private:
  	/*! \brief A list of dialogs of established sessions.*/
  	QList<WbDlg*> dialogs_;
  	/*! \brief A pointer to the SxeManager used for negotiating sessions.*/
@@ -379,7 +363,7 @@ Index: psi/src/whiteboarding/wbmanager.h
 +
 +signals:
 +	void wbRequest(const Jid &peer, int id);
-
+ 
  private slots:
  	/*! \brief Removes and deletes the dialog for the given session.*/
  	void removeDialog(WbDlg* dialog);
@@ -388,5 +372,5 @@ Index: psi/src/whiteboarding/wbmanager.h
 +
 +	void  checkInvitation(const Jid &peer, const QList<QString> &features, bool* result);
  };
-
+ 
  #endif

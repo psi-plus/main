@@ -1,7 +1,5 @@
-Index: psi/src/chatdlg.ui
-===================================================================
---- psi.orig/src/chatdlg.ui	2013-01-15 14:04:05.688826194 +0400
-+++ psi/src/chatdlg.ui	2013-01-15 14:04:05.688826194 +0400
+--- git.temp.orig/src/chatdlg.ui
++++ git.temp/src/chatdlg.ui
 @@ -132,6 +132,22 @@
            </widget>
           </item>
@@ -25,19 +23,17 @@ Index: psi/src/chatdlg.ui
            <widget class="QToolButton" name="tb_pgp" >
             <property name="toolTip" >
              <string>Toggle encryption</string>
-Index: psi/src/gcuserview.cpp
-===================================================================
---- psi.orig/src/gcuserview.cpp	2013-01-15 14:04:05.688826194 +0400
-+++ psi/src/gcuserview.cpp	2013-01-15 14:04:05.688826194 +0400
+--- git.temp.orig/src/gcuserview.cpp
++++ git.temp/src/gcuserview.cpp
 @@ -36,6 +36,7 @@
  #include "common.h"
  #include "psioptions.h"
  #include "coloropt.h"
 +#include "avcall/avcall.h"
-
+ 
  static bool caseInsensitiveLessThan(const QString &s1, const QString &s2)
  {
-@@ -414,6 +415,11 @@
+@@ -414,6 +415,11 @@ void GCUserView::doContextMenu(QTreeWidg
  	act = new QAction(IconsetFactory::icon("psi/start-chat").icon(), tr("Open &Chat Window"), pm);
  	pm->addAction(act);
  	act->setData(1);
@@ -47,13 +43,11 @@ Index: psi/src/gcuserview.cpp
 +		act->setData(5);
 +	}
  	pm->addSeparator();
-
+ 
  	// Kick and Ban submenus
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:05.688826194 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:05.688826194 +0400
-@@ -1675,6 +1675,9 @@
+--- git.temp.orig/src/groupchatdlg.cpp
++++ git.temp/src/groupchatdlg.cpp
+@@ -1675,6 +1675,9 @@ void GCMainDlg::lv_action(const QString
  	else if(x == 4) {
  		account()->invokeGCFile(jid().withResource(nick));
  	}
@@ -63,19 +57,17 @@ Index: psi/src/groupchatdlg.cpp
  	else if(x == 10) {
  		d->mucManager->kick(nick);
  	}
-Index: psi/src/psichatdlg.cpp
-===================================================================
---- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:05.688826194 +0400
-+++ psi/src/psichatdlg.cpp	2013-01-15 14:04:05.688826194 +0400
+--- git.temp.orig/src/psichatdlg.cpp
++++ git.temp/src/psichatdlg.cpp
 @@ -43,6 +43,7 @@
  #include "jidutil.h"
  #include "xmpp_tasks.h"
  #include "lastactivitytask.h"
 +#include "avcall/avcall.h"
-
-
+ 
+ 
  #define MCMDCHAT		"http://psi-im.org/ids/mcmd#chatmain"
-@@ -254,6 +255,7 @@
+@@ -254,6 +255,7 @@ void PsiChatDlg::setLooks()
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
  		ui_.toolbar->hide();
@@ -83,7 +75,7 @@ Index: psi/src/psichatdlg.cpp
  	}
  	else {
  		ui_.lb_status->show();
-@@ -262,11 +264,13 @@
+@@ -262,11 +264,13 @@ void PsiChatDlg::setLooks()
  			ui_.toolbar->show();
  			ui_.tb_actions->hide();
  			ui_.tb_emoticons->hide();
@@ -96,18 +88,18 @@ Index: psi/src/psichatdlg.cpp
 +			ui_.tb_voice->setVisible(AvCallManager::isSupported());
  		}
  	}
-
-@@ -323,7 +327,8 @@
-
+ 
+@@ -323,7 +327,8 @@ void PsiChatDlg::initToolButtons()
+ 
  	act_voice_ = new IconAction(tr("Voice Call"), "psi/voice", tr("Voice Call"), 0, this);
  	connect(act_voice_, SIGNAL(triggered()), SLOT(doVoice()));
 -	act_voice_->setEnabled(false);
 +	//act_voice_->setEnabled(false);
 +	ui_.tb_voice->setDefaultAction(act_voice_);
-
+ 
  	act_file_ = new IconAction(tr("Send File"), "psi/upload", tr("Send File"), 0, this);
  	connect(act_file_, SIGNAL(triggered()), SLOT(doFile()));
-@@ -354,7 +359,7 @@
+@@ -354,7 +359,7 @@ void PsiChatDlg::initToolBar()
  	}
  	ui_.toolbar->addAction(act_info_);
  	ui_.toolbar->addAction(act_history_);
@@ -116,17 +108,17 @@ Index: psi/src/psichatdlg.cpp
  		ui_.toolbar->addAction(act_voice_);
  	}
  }
-@@ -373,7 +378,7 @@
+@@ -373,7 +378,7 @@ void PsiChatDlg::capsChanged()
  	if (resource.isEmpty() && ul && !ul->userResourceList().isEmpty()) {
  		resource = (*(ul->userResourceList().priority())).name();
  	}
 -	act_voice_->setEnabled(!account()->capsManager()->isEnabled() || (ul && ul->isAvailable() && account()->capsManager()->features(jid().withResource(resource)).canVoice()));
 +	//act_voice_->setEnabled(!account()->capsManager()->isEnabled() || (ul && ul->isAvailable() && account()->capsManager()->features(jid().withResource(resource)).canVoice()));
  }
-
+ 
  void PsiChatDlg::activated()
-@@ -526,8 +531,9 @@
-
+@@ -526,8 +531,9 @@ void PsiChatDlg::buildMenu()
+ 
  	pm_settings_->addAction(act_icon_);
  	pm_settings_->addAction(act_file_);
 -	if (account()->voiceCaller())
@@ -136,11 +128,9 @@ Index: psi/src/psichatdlg.cpp
 +	}
  	pm_settings_->addAction(act_pgp_);
  	pm_settings_->addSeparator();
-
-Index: psi/src/psicontactmenu.cpp
-===================================================================
---- psi.orig/src/psicontactmenu.cpp	2013-01-15 14:04:05.688826194 +0400
-+++ psi/src/psicontactmenu.cpp	2013-01-15 14:04:05.688826194 +0400
+ 
+--- git.temp.orig/src/psicontactmenu.cpp
++++ git.temp/src/psicontactmenu.cpp
 @@ -38,6 +38,7 @@
  #include "userlist.h"
  #include "statusdlg.h"
@@ -149,7 +139,7 @@ Index: psi/src/psicontactmenu.cpp
  #ifdef HAVE_PGPUTIL
  #include "pgputil.h"
  #endif
-@@ -413,7 +414,9 @@
+@@ -413,7 +414,9 @@ public:
  		menu_->addMenu(openWhiteboardToMenu_);
  		menu_->addMenu(executeCommandMenu_);
  		menu_->addMenu(activeChatsMenu_);

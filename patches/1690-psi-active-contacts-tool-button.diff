@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:33.260827315 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:33.252827315 +0400
-@@ -534,6 +534,7 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -533,6 +533,7 @@ QLineEdit#le_status_text {
  				<show_self type="QKeySequence" comment="Show Self"></show_self>
  				<show_statusmsg type="QKeySequence" comment="Show Status Message"></show_statusmsg>
  				<publish_tune type="QKeySequence" comment="Publish Tune"></publish_tune>
@@ -10,10 +8,8 @@ Index: psi/options/default.xml
  				<status_all type="QKeySequence" comment="Status All"></status_all>
  				<status_group type="QKeySequence" comment="Status Group"></status_group>
  				<status_chat type="QKeySequence" comment="Status Chat"></status_chat>
-Index: psi/src/activecontactsmenu.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/activecontactsmenu.cpp	2013-01-15 14:04:33.252827315 +0400
+--- /dev/null
++++ git.temp/src/activecontactsmenu.cpp
 @@ -0,0 +1,70 @@
 +/*
 + * activecontactsmenu.cpp
@@ -85,10 +81,8 @@ Index: psi/src/activecontactsmenu.cpp
 +
 +
 +#include "activecontactsmenu.moc"
-Index: psi/src/activecontactsmenu.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/activecontactsmenu.h	2013-01-15 14:04:33.252827315 +0400
+--- /dev/null
++++ git.temp/src/activecontactsmenu.h
 @@ -0,0 +1,38 @@
 +/*
 + * activecontactsmenu.h
@@ -128,19 +122,17 @@ Index: psi/src/activecontactsmenu.h
 +};
 +
 +#endif
-Index: psi/src/mainwin.cpp
-===================================================================
---- psi.orig/src/mainwin.cpp	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/mainwin.cpp	2013-01-15 14:04:33.252827315 +0400
+--- git.temp.orig/src/mainwin.cpp
++++ git.temp/src/mainwin.cpp
 @@ -74,6 +74,7 @@
  #include "mooddlg.h"
  #include "activitydlg.h"
  #include "geolocationdlg.h"
 +#include "activecontactsmenu.h"
-
+ 
  #include "mainwin_p.h"
-
-@@ -660,6 +661,8 @@
+ 
+@@ -660,6 +661,8 @@ void MainWin::registerAction( IconAction
  	} actionlist[] = {
  		{ "choose_status", activated, this, SLOT( actChooseStatusActivated() ) },
  		{ "reconnect_all", activated, this, SLOT( actReconnectActivated() ) },
@@ -149,10 +141,10 @@ Index: psi/src/mainwin.cpp
  #ifndef NEWCONTACTLIST
  		{ "show_offline", toggled, cvlist, SLOT( setShowOffline(bool) ) },
  		{ "show_away",    toggled, cvlist, SLOT( setShowAway(bool) ) },
-@@ -1247,6 +1250,14 @@
+@@ -1247,6 +1250,14 @@ void MainWin::actSetGeolocActivated()
  	}
  }
-
+ 
 +void MainWin::actActiveContacts()
 +{
 +	ActiveContactsMenu* acm = new ActiveContactsMenu(d->psi, this);
@@ -164,26 +156,22 @@ Index: psi/src/mainwin.cpp
  void MainWin::activatedAccOption(PsiAccount* pa, int x)
  {
  	if(x == 0) {
-Index: psi/src/mainwin.h
-===================================================================
---- psi.orig/src/mainwin.h	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/mainwin.h	2013-01-15 14:04:33.252827315 +0400
-@@ -148,6 +148,7 @@
+--- git.temp.orig/src/mainwin.h
++++ git.temp/src/mainwin.h
+@@ -148,6 +148,7 @@ private slots:
  	void actSetMoodActivated();
  	void actSetActivityActivated();
  	void actSetGeolocActivated();
 +	void actActiveContacts();
-
+ 
  	bool showDockMenu(const QPoint &);
  	void dockActivated();
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:33.256827315 +0400
-@@ -3305,6 +3305,17 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -3302,6 +3302,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
  	return findDialogs<ChatDlg*>(jid, compareResource);
  }
-
+ 
 +QList<PsiContact*> PsiAccount::activeContacts() const
 +{
 +	QList<PsiContact*> ret;
@@ -198,27 +186,23 @@ Index: psi/src/psiaccount.cpp
  QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
  {
  	return d->findDialog(mo, jid, compareResource);
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:33.256827315 +0400
-@@ -166,6 +166,8 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -166,6 +166,8 @@ public:
  	ChatDlg* findChatDialogEx(const Jid& jid) const;
  	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
-
+ 
 +	QList<PsiContact*> activeContacts() const;
 +
  	template<typename T>
  	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const {
  		return static_cast<T>(findDialog(((T)0)->staticMetaObject, jid, compareResource));
-Index: psi/src/psiactionlist.cpp
-===================================================================
---- psi.orig/src/psiactionlist.cpp	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psiactionlist.cpp	2013-01-15 14:04:33.256827315 +0400
-@@ -190,9 +190,13 @@
+--- git.temp.orig/src/psiactionlist.cpp
++++ git.temp/src/psiactionlist.cpp
+@@ -190,9 +190,13 @@ void PsiActionList::Private::createMainW
  		IconAction *eventNotifier = new EventNotifierAction(this, "EventNotifierAction");
  		eventNotifier->setWhatsThis (tr("Special item that displays number of pending events"));
-
+ 
 +		IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 +		actActiveContacts->setWhatsThis (tr("Simple way to find contacts with opened chats"));
 +
@@ -229,11 +213,9 @@ Index: psi/src/psiactionlist.cpp
  			{ "event_notifier", eventNotifier },
  			{ "", 0 }
  		};
-Index: psi/src/psichatdlg.cpp
-===================================================================
---- psi.orig/src/psichatdlg.cpp	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psichatdlg.cpp	2013-01-15 14:04:33.256827315 +0400
-@@ -32,6 +32,7 @@
+--- git.temp.orig/src/psichatdlg.cpp
++++ git.temp/src/psichatdlg.cpp
+@@ -33,6 +33,7 @@
  #include "messageview.h"
  #include "iconselect.h"
  #include "avatars.h"
@@ -241,28 +223,28 @@ Index: psi/src/psichatdlg.cpp
  #include "psitooltip.h"
  #include "psioptions.h"
  #include "coloropt.h"
-@@ -484,6 +485,9 @@
-
+@@ -494,6 +495,9 @@ void PsiChatDlg::initToolButtons()
+ 
  	act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
  	act_templates_->setMenu(getTemplateMenu());
 +
 +	act_active_contacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 +	connect(act_active_contacts, SIGNAL(triggered()), SLOT(actActiveContacts()));
  }
-
+ 
  void PsiChatDlg::initToolBar()
-@@ -513,6 +517,7 @@
+@@ -522,6 +526,7 @@ void PsiChatDlg::initToolBar()
  		ui_.toolbar->addAction(act_voice_);
  	}
  	ui_.toolbar->addAction(act_add_contact);
 +	ui_.toolbar->addAction(act_active_contacts);
  }
-
+ 
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -665,6 +670,14 @@
+@@ -674,6 +679,14 @@ void PsiChatDlg::updateJidWidget(const Q
  	internal_change = false;
  }
-
+ 
 +void PsiChatDlg::actActiveContacts()
 +{
 +	ActiveContactsMenu* acm = new ActiveContactsMenu(account()->psi(), this);
@@ -274,33 +256,29 @@ Index: psi/src/psichatdlg.cpp
  void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString)
  {
  	Q_UNUSED(statusString);
-Index: psi/src/psichatdlg.h
-===================================================================
---- psi.orig/src/psichatdlg.h	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psichatdlg.h	2013-01-15 14:04:33.256827315 +0400
-@@ -59,6 +59,7 @@
+--- git.temp.orig/src/psichatdlg.h
++++ git.temp/src/psichatdlg.h
+@@ -60,6 +60,7 @@ private slots:
  	void contactChanged();
  	QString makeContactName(const QString &name, const Jid &jid) const;
  	void doSwitchJidMode();
 +	void actActiveContacts();
-
+ 
  private:
  	void initToolBar();
-@@ -107,6 +108,7 @@
-
+@@ -108,6 +109,7 @@ private:
+ 
  	ActionLineEdit *le_autojid;
  	IconAction *act_autojid;
 +	IconAction *act_active_contacts;
-
+ 
  	MCmdManager mCmdManager_;
  	MCmdSimpleSite mCmdSite_;
-Index: psi/src/psicontact.cpp
-===================================================================
---- psi.orig/src/psicontact.cpp	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psicontact.cpp	2013-01-15 14:04:33.256827315 +0400
-@@ -540,6 +540,17 @@
+--- git.temp.orig/src/psicontact.cpp
++++ git.temp/src/psicontact.cpp
+@@ -540,6 +540,17 @@ bool PsiContact::isAnimated() const
  }
-
+ 
  /**
 + * Returns true if there is opened chat with this contact
 + */
@@ -316,24 +294,20 @@ Index: psi/src/psicontact.cpp
   * Contact should always be visible if it's alerting.
   */
  bool PsiContact::shouldBeVisible() const
-Index: psi/src/psicontact.h
-===================================================================
---- psi.orig/src/psicontact.h	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/psicontact.h	2013-01-15 14:04:33.256827315 +0400
-@@ -66,6 +66,8 @@
-
+--- git.temp.orig/src/psicontact.h
++++ git.temp/src/psicontact.h
+@@ -66,6 +66,8 @@ public:
+ 
  	virtual bool isAnimated() const;
-
+ 
 +	bool isActiveContact() const;
 +
  	void activate();
-
+ 
  	virtual void setEditing(bool editing);
-Index: psi/src/src.pri
-===================================================================
---- psi.orig/src/src.pri	2013-01-15 14:04:33.260827315 +0400
-+++ psi/src/src.pri	2013-01-15 14:04:33.256827315 +0400
-@@ -128,6 +128,7 @@
+--- git.temp.orig/src/src.pri
++++ git.temp/src/src.pri
+@@ -130,6 +130,7 @@ HEADERS += \
  	$$PWD/statusdlg.h \
  	$$PWD/statuscombobox.h \
  	$$PWD/eventdlg.h \
@@ -341,7 +315,7 @@ Index: psi/src/src.pri
  	$$PWD/chatdlg.h \
  	$$PWD/psichatdlg.h \
  	$$PWD/chatsplitter.h \
-@@ -275,6 +276,7 @@
+@@ -276,6 +277,7 @@ SOURCES += \
  	$$PWD/statusdlg.cpp \
  	$$PWD/statuscombobox.cpp \
  	$$PWD/eventdlg.cpp \

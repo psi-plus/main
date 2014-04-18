@@ -1,10 +1,8 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:24.580826962 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:24.576826962 +0400
-@@ -291,6 +291,7 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -290,6 +290,7 @@ QLineEdit#le_status_text {
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -12,36 +10,34 @@ Index: psi/options/default.xml
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  				<show-initial-joins comment="Show joins on your MUC join (with status and priority, depends on options)" type="bool">false</show-initial-joins>
  				<log-width type="int">500</log-width>
-Index: psi/src/mucjoindlg.cpp
-===================================================================
---- psi.orig/src/mucjoindlg.cpp	2013-01-15 14:04:24.580826962 +0400
-+++ psi/src/mucjoindlg.cpp	2013-01-15 14:04:24.576826962 +0400
-@@ -48,6 +48,8 @@
+--- git.temp.orig/src/mucjoindlg.cpp
++++ git.temp/src/mucjoindlg.cpp
+@@ -48,6 +48,8 @@ MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiA
  	joinButton_ = ui_.buttonBox->addButton(tr("&Join"), QDialogButtonBox::AcceptRole);
  	joinButton_->setDefault(true);
-
+ 
 +	reason_ = MucCustomJoin;
 +
  	updateIdentity(pa);
-
+ 
  	ui_.cb_ident->setController(controller_);
-@@ -176,11 +178,13 @@
+@@ -176,11 +178,13 @@ void MUCJoinDlg::updateBookmarks(PsiAcco
  	}
  }
-
+ 
 -void MUCJoinDlg::doJoin()
 +void MUCJoinDlg::doJoin(MucJoinReason r)
  {
  	if (!account_ || !account_->checkConnected(this))
  		return;
-
+ 
 +	reason_ = r;
 +
  	QString host = ui_.le_host->text();
  	QString room = ui_.le_room->text();
  	QString nick = ui_.le_nick->text();
-@@ -244,6 +248,9 @@
-
+@@ -246,6 +250,9 @@ void MUCJoinDlg::joined()
+ 
  void MUCJoinDlg::error(int, const QString &str)
  {
 +	if(!isVisible())
@@ -49,14 +45,12 @@ Index: psi/src/mucjoindlg.cpp
 +
  	ui_.busy->stop();
  	setWidgetsEnabled(true);
-
-Index: psi/src/mucjoindlg.h
-===================================================================
---- psi.orig/src/mucjoindlg.h	2013-01-15 14:04:24.580826962 +0400
-+++ psi/src/mucjoindlg.h	2013-01-15 14:04:24.576826962 +0400
-@@ -36,6 +36,12 @@
+ 
+--- git.temp.orig/src/mucjoindlg.h
++++ git.temp/src/mucjoindlg.h
+@@ -36,6 +36,12 @@ class MUCJoinDlg : public QDialog
  	Q_OBJECT
-
+ 
  public:
 +
 +	enum MucJoinReason {
@@ -66,17 +60,17 @@ Index: psi/src/mucjoindlg.h
 +
  	MUCJoinDlg(PsiCon *, PsiAccount *);
  	~MUCJoinDlg();
-
-@@ -48,11 +54,15 @@
-
+ 
+@@ -48,11 +54,15 @@ public:
+ 
  public slots:
  	void done(int);
 -	void doJoin();
 +	void doJoin(MucJoinReason reason = MucCustomJoin);
-
+ 
  	// reimplemented
  	void accept();
-
+ 
 +public:
 +	MucJoinReason getReason() const { return reason_; };
 +
@@ -84,19 +78,17 @@ Index: psi/src/mucjoindlg.h
  private slots:
  	void updateIdentity(PsiAccount *);
  	void updateIdentityVisibility();
-@@ -67,6 +77,7 @@
+@@ -67,6 +77,7 @@ private:
  	PsiAccount* account_;
  	QPushButton* joinButton_;
  	XMPP::Jid jid_;
 +	MucJoinReason reason_;
-
+ 
  	void disableWidgets();
  	void enableWidgets();
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:24.580826962 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:24.576826962 +0400
-@@ -130,7 +130,6 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -129,7 +129,6 @@
  #include "systeminfo.h"
  #include "avatars.h"
  #include "ahcommanddlg.h"
@@ -104,7 +96,7 @@ Index: psi/src/psiaccount.cpp
  #include "ahcservermanager.h"
  #include "rc.h"
  #include "tabdlg.h"
-@@ -2321,7 +2320,7 @@
+@@ -2320,7 +2319,7 @@ void PsiAccount::bookmarksAvailabilityCh
  	foreach(ConferenceBookmark c, d->bookmarkManager->conferences()) {
  		if (!findDialog<GCMainDlg*>(Jid(c.jid().bare())) && c.autoJoin()) {
  			if  (!joinSkip.contains(c.jid().full().toUpper()))
@@ -113,19 +105,19 @@ Index: psi/src/psiaccount.cpp
  		}
  	}
  #endif
-@@ -3358,7 +3357,7 @@
+@@ -3355,7 +3354,7 @@ void PsiAccount::actionJoin(const Jid& m
  			   false);
  }
-
+ 
 -void PsiAccount::actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately)
 +void PsiAccount::actionJoin(const ConferenceBookmark& bookmark, bool connectImmediately, MUCJoinDlg::MucJoinReason reason)
  {
  #ifdef GROUPCHAT
  	MUCJoinDlg* w = new MUCJoinDlg(psi(), this);
-@@ -3367,9 +3366,11 @@
+@@ -3364,9 +3363,11 @@ void PsiAccount::actionJoin(const Confer
  	w->setNick(bookmark.nick().isEmpty() ? JIDUtil::nickOrJid(this->nick(), d->jid.node()) : bookmark.nick());
  	w->setPassword(bookmark.password());
-
+ 
 -	w->show();
 +	if(reason != MUCJoinDlg::MucAutoJoin
 +	   || !PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool())
@@ -136,10 +128,10 @@ Index: psi/src/psiaccount.cpp
  	}
  #else
  	Q_UNUSED(bookmark);
-@@ -5501,16 +5502,18 @@
+@@ -5499,16 +5500,18 @@ void PsiAccount::edb_finished()
  	delete h;
  }
-
+ 
 -void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType)
 +void PsiAccount::openGroupChat(const Jid &j, ActivationType activationType, MUCJoinDlg::MucJoinReason reason)
  {
@@ -158,14 +150,14 @@ Index: psi/src/psiaccount.cpp
 +	}
  #endif
  }
-
-@@ -5585,10 +5588,17 @@
+ 
+@@ -5589,10 +5592,17 @@ void PsiAccount::client_groupChatJoined(
  	MUCJoinDlg *w = findDialog<MUCJoinDlg*>(j);
  	if(!w)
  		return;
 +	MUCJoinDlg::MucJoinReason r = w->getReason();
  	w->joined();
-
+ 
 -	// TODO: Correctly handle auto-join groupchats
 -	openGroupChat(j, UserAction);
 +	openGroupChat(j, UserAction, r);
@@ -178,20 +170,18 @@ Index: psi/src/psiaccount.cpp
 +
  #endif
  }
-
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:24.580826962 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:24.576826962 +0400
+ 
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
 @@ -35,6 +35,7 @@
  #include "mood.h"
  #include "activity.h"
  #include "geolocation.h"
 +#include "mucjoindlg.h"
-
+ 
  namespace XMPP
  {
-@@ -198,7 +199,7 @@
+@@ -198,7 +199,7 @@ public:
  	void showXmlConsole();
  	void openAddUserDlg();
  	void openAddUserDlg(const XMPP::Jid &jid, const QString &nick, const QString &group);
@@ -200,7 +190,7 @@ Index: psi/src/psiaccount.h
  	bool groupChatJoin(const QString &host, const QString &room, const QString &nick, const QString& pass, bool nohistory = false);
  	void groupChatSetStatus(const QString &host, const QString &room, const Status &);
  	void groupChatChangeNick(const QString &host, const QString &room, const QString& nick, const Status &);
-@@ -361,7 +362,7 @@
+@@ -361,7 +362,7 @@ public slots:
  	void actionSearch(const Jid &);
  	void actionManageBookmarks();
  	void actionJoin(const Jid& mucJid, const QString& password = QString());
@@ -209,16 +199,14 @@ Index: psi/src/psiaccount.h
  	void actionDisco(const Jid &, const QString &);
  	void actionInvite(const Jid &, const QString &);
  	void actionVoice(const Jid&);
-Index: psi/src/tabs/tabbablewidget.cpp
-===================================================================
---- psi.orig/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:24.580826962 +0400
-+++ psi/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:24.576826962 +0400
-@@ -47,7 +47,7 @@
+--- git.temp.orig/src/tabs/tabbablewidget.cpp
++++ git.temp/src/tabs/tabbablewidget.cpp
+@@ -47,7 +47,7 @@ TabbableWidget::TabbableWidget(const Jid
  		TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
  	}
  	++TabbableWidget::chatsCount;
 -	QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
 +	//QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
  }
-
+ 
  void TabbableWidget::ensureTabbedCorrectly()

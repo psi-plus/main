@@ -1,32 +1,26 @@
-Index: psi/src/passphrasedlg.cpp
-===================================================================
---- psi.orig/src/passphrasedlg.cpp	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/passphrasedlg.cpp	2013-01-15 14:04:27.444827078 +0400
-@@ -42,3 +42,7 @@
+--- git.temp.orig/src/passphrasedlg.cpp
++++ git.temp/src/passphrasedlg.cpp
+@@ -42,3 +42,7 @@ QString PassphraseDlg::getPassphrase() c
  	return ui_.le_pass->text();
  }
-
+ 
 +bool PassphraseDlg::rememberPassPhrase() const
 +{
 +	return ui_.cb_savePass->isChecked();
 +}
-Index: psi/src/passphrasedlg.h
-===================================================================
---- psi.orig/src/passphrasedlg.h	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/passphrasedlg.h	2013-01-15 14:04:27.444827078 +0400
-@@ -32,6 +32,7 @@
+--- git.temp.orig/src/passphrasedlg.h
++++ git.temp/src/passphrasedlg.h
+@@ -32,6 +32,7 @@ public:
  	void promptPassphrase(const QString& name);
-
+ 
  	QString getPassphrase() const;
 +	bool rememberPassPhrase() const;
-
+ 
  private:
  	Ui::Passphrase ui_;
-Index: psi/src/passphrase.ui
-===================================================================
---- psi.orig/src/passphrase.ui	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/passphrase.ui	2013-01-15 14:04:27.444827078 +0400
-@@ -74,6 +74,13 @@
+--- git.temp.orig/src/passphrase.ui
++++ git.temp/src/passphrase.ui
+@@ -74,6 +74,13 @@ Please enter your passphrase below:</str
                    </property>
                  </widget>
                </item>
@@ -40,11 +34,9 @@ Index: psi/src/passphrase.ui
              </layout>
            </item>
          </layout>
-Index: psi/src/pgputil.cpp
-===================================================================
---- psi.orig/src/pgputil.cpp	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/pgputil.cpp	2013-01-15 14:04:27.444827078 +0400
-@@ -92,6 +92,9 @@
+--- git.temp.orig/src/pgputil.cpp
++++ git.temp/src/pgputil.cpp
+@@ -92,6 +92,9 @@ void PGPUtil::passphraseDone(int result)
  		QString passphrase = passphraseDlg_->getPassphrase();
  		if (!currentEntryId_.isEmpty()) {
  			passphrases_[currentEntryId_] = passphrase;
@@ -54,10 +46,10 @@ Index: psi/src/pgputil.cpp
  		}
  		qcaEventHandler_->submitPassword(currentEventId_,passphrase.toUtf8());
  	}
-@@ -283,6 +286,11 @@
+@@ -283,6 +286,11 @@ void PGPUtil::removePassphrase(const QSt
  	passphrases_.remove(id);
  }
-
+ 
 +void PGPUtil::addPassphrase(const QString &id, const QString &pass)
 +{
 +	passphrases_.insert(id, pass);
@@ -66,50 +58,44 @@ Index: psi/src/pgputil.cpp
  void PGPUtil::keyStoreAvailable(const QString& k)
  {
  	QCA::KeyStore* ks = new QCA::KeyStore(k, &qcaKeyStoreManager_);
-Index: psi/src/pgputil.h
-===================================================================
---- psi.orig/src/pgputil.h	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/pgputil.h	2013-01-15 14:04:27.444827078 +0400
-@@ -40,9 +40,11 @@
+--- git.temp.orig/src/pgputil.h
++++ git.temp/src/pgputil.h
+@@ -40,9 +40,11 @@ public:
  	bool equals(QCA::PGPKey, QCA::PGPKey);
-
+ 
  	void removePassphrase(const QString& id);
 +	void addPassphrase(const QString& id, const QString& pass);
-
+ 
  signals:
  	void pgpKeysUpdated();
 +	void newPassPhase(const QString&, const QString&);
-
+ 
  protected:
  	PGPUtil();
-Index: psi/src/profiles.h
-===================================================================
---- psi.orig/src/profiles.h	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/profiles.h	2013-01-15 14:04:27.444827078 +0400
-@@ -78,6 +78,7 @@
+--- git.temp.orig/src/profiles.h
++++ git.temp/src/profiles.h
+@@ -80,6 +80,7 @@ public:
  	QMap<QString, GroupData> groupState;
-
+ 
  	QCA::PGPKey pgpSecretKey;
 +	QString pgpPassPhrase;
-
+ 
  	VarList keybind;
-
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:27.444827078 +0400
-@@ -1197,6 +1197,7 @@
+ 
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -1190,6 +1190,7 @@ PsiAccount::PsiAccount(const UserAccount
  	//connect(d->psi, SIGNAL(pgpToggled(bool)), SLOT(pgpToggled(bool)));
  #ifdef HAVE_PGPUTIL
  	connect(&PGPUtil::instance(), SIGNAL(pgpKeysUpdated()), SLOT(pgpKeysUpdated()));
 +	connect(&PGPUtil::instance(), SIGNAL(newPassPhase(QString,QString)), SLOT(newPgpPassPhase(QString,QString)));
  #endif
-
+ 
  	d->setEnabled(enabled());
-@@ -5785,10 +5786,23 @@
+@@ -5789,10 +5790,23 @@ void PsiAccount::pgpKeysUpdated()
  #endif
  }
-
+ 
 +void PsiAccount::newPgpPassPhase(const QString &id, const QString &pass)
 +{
 +	const QString pgpSecretKeyID = (d->acc.pgpSecretKey.isNull() ? "" : d->acc.pgpSecretKey.keyId());
@@ -128,9 +114,9 @@ Index: psi/src/psiaccount.cpp
 +	}
 +#endif
  	QByteArray plain = d->loginStatus.status().toUtf8();
-
+ 
  	PGPTransaction *t = new PGPTransaction(new QCA::OpenPGP());
-@@ -5812,6 +5826,7 @@
+@@ -5816,6 +5830,7 @@ void PsiAccount::pgp_signFinished()
  	else {
  		// Clear passphrase from cache
  		if (t->errorCode() == QCA::SecureMessage::ErrorPassphrase) {
@@ -138,23 +124,19 @@ Index: psi/src/psiaccount.cpp
  			QCA::KeyStoreEntry ke = PGPUtil::instance().getSecretKeyStoreEntry(d->cur_pgpSecretKey.keyId());
  			if (!ke.isNull())
  				PGPUtil::instance().removePassphrase(ke.id());
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:27.448827079 +0400
-@@ -471,6 +471,7 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -471,6 +471,7 @@ protected:
  private slots:
  	void eventFromXml(PsiEvent* e);
  	void simulateContactOffline(const XMPP::Jid& contact);
 +	void newPgpPassPhase(const QString& id, const QString& pass);
-
+ 
  private:
  	void handleEvent(PsiEvent* e, ActivationType activationType);
-Index: psi/src/psi_profiles.cpp
-===================================================================
---- psi.orig/src/psi_profiles.cpp	2013-01-15 14:04:27.448827079 +0400
-+++ psi/src/psi_profiles.cpp	2013-01-15 14:04:27.448827079 +0400
-@@ -255,6 +255,11 @@
+--- git.temp.orig/src/psi_profiles.cpp
++++ git.temp/src/psi_profiles.cpp
+@@ -259,6 +259,11 @@ void UserAccount::fromOptions(OptionsTre
  		QCA::KeyStoreEntry e = PGPUtil::instance().getSecretKeyStoreEntry(pgpSecretKeyID);
  		if (!e.isNull())
  			pgpSecretKey = e.pgpSecretKey();
@@ -165,8 +147,8 @@ Index: psi/src/psi_profiles.cpp
 +		}
  	}
  #endif
-
-@@ -382,8 +387,10 @@
+ 
+@@ -389,8 +394,10 @@ void UserAccount::toOptions(OptionsTree
  	o->setOption(base + ".priority", priority);
  	if (!pgpSecretKey.isNull()) {
  		o->setOption(base + ".pgp-secret-key-id", pgpSecretKey.keyId());
@@ -177,7 +159,7 @@ Index: psi/src/psi_profiles.cpp
  	}
  	switch (allow_plain) {
  		case XMPP::ClientStream::NoAllowPlain:
-@@ -554,6 +561,11 @@
+@@ -559,6 +566,11 @@ void UserAccount::fromXml(const QDomElem
  		QCA::KeyStoreEntry e = PGPUtil::instance().getSecretKeyStoreEntry(pgpSecretKeyID);
  		if (!e.isNull())
  			pgpSecretKey = e.pgpSecretKey();
@@ -188,4 +170,4 @@ Index: psi/src/psi_profiles.cpp
 +		}
  	}
  #endif
-
+ 

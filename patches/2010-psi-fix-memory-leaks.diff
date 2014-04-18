@@ -1,5 +1,5 @@
---- psi.orig/iris/src/irisnet/corelib/objectsession.cpp
-+++ psi/iris/src/irisnet/corelib/objectsession.cpp
+--- git.temp.orig/iris/src/irisnet/corelib/objectsession.cpp
++++ git.temp/iris/src/irisnet/corelib/objectsession.cpp
 @@ -148,6 +148,8 @@ public:
  		callTrigger->disconnect(this);
  		callTrigger->setParent(0);
@@ -7,7 +7,7 @@
 +		qDeleteAll(pendingCalls);
 +		pendingCalls.clear();
  	}
-
+ 
  	void addPendingCall(MethodCall *call)
 @@ -240,6 +242,7 @@ void ObjectSession::reset()
  	d->invalidateWatchers();
@@ -16,9 +16,9 @@
 +	qDeleteAll(d->pendingCalls);
  	d->pendingCalls.clear();
  }
-
---- psi.orig/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
-+++ psi/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
+ 
+--- git.temp.orig/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
++++ git.temp/iris/src/irisnet/noncore/cutestuff/bsocket.cpp
 @@ -137,6 +137,8 @@ BSocket::BSocket(QObject *parent)
  BSocket::~BSocket()
  {
@@ -27,9 +27,9 @@
 +		delete d->resolver;
  	delete d;
  }
-
---- psi.orig/iris/src/xmpp/xmpp-core/securestream.cpp
-+++ psi/iris/src/xmpp/xmpp-core/securestream.cpp
+ 
+--- git.temp.orig/iris/src/xmpp/xmpp-core/securestream.cpp
++++ git.temp/iris/src/xmpp/xmpp-core/securestream.cpp
 @@ -382,6 +382,12 @@ public:
  		}
  		return false;
@@ -41,16 +41,16 @@
 +		layers.clear();
 +	}
  };
-
+ 
  SecureStream::SecureStream(ByteStream *s)
 @@ -401,6 +407,7 @@ SecureStream::SecureStream(ByteStream *s
-
+ 
  SecureStream::~SecureStream()
  {
 +	d->deleteLayers();
  	delete d;
  }
-
+ 
 @@ -573,9 +580,7 @@ void SecureStream::layer_tlsClosed(const
  {
  	setOpenMode(QIODevice::NotOpen);
@@ -61,7 +61,7 @@
 +	d->deleteLayers();
  	tlsClosed();
  }
-
+ 
 @@ -628,9 +633,7 @@ void SecureStream::layer_error(int x)
  	d->errorCode = x;
  	setOpenMode(QIODevice::NotOpen);
@@ -73,12 +73,12 @@
  	if(type == SecureLayer::TLS)
  		setError(ErrTLS);
  	else if(type == SecureLayer::SASL)
---- psi.orig/src/contactlistnestedgroup.cpp
-+++ psi/src/contactlistnestedgroup.cpp
+--- git.temp.orig/src/contactlistnestedgroup.cpp
++++ git.temp/src/contactlistnestedgroup.cpp
 @@ -47,6 +47,20 @@ CL_DEBUG("~ContactListNextedGroup(%x): %
  	qDeleteAll(groups_);
  	groups_.clear();
-
+ 
 +	QHashIterator<ContactListGroup::SpecialType, QPointer<ContactListGroup> > it(specialGroups_);
 +	while (it.hasNext())
 +	{
@@ -95,31 +95,31 @@
 +
  	ContactListGroup::clearGroup();
  }
-
---- psi.orig/src/psiaccount.cpp
-+++ psi/src/psiaccount.cpp
-@@ -1382,6 +1382,8 @@ PsiAccount::~PsiAccount()
+ 
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -1370,6 +1370,8 @@ PsiAccount::~PsiAccount()
  {
  	logout(true, loggedOutStatus());
-
+ 
 +	setRCEnabled(false);
 +
  	emit accountDestroyed();
  	// nuke all related dialogs
  	deleteAllDialogs();
-@@ -1418,6 +1420,9 @@ PsiAccount::~PsiAccount()
-
+@@ -1406,6 +1408,9 @@ PsiAccount::~PsiAccount()
+ 
  	delete d->blockTransportPopupList;
-
+ 
 +	qDeleteAll(d->userList);
 +	d->userList.clear();
 +
  	d->contactList->unlink(this);
  	delete d;
-
---- psi.orig/src/psievent.cpp
-+++ psi/src/psievent.cpp
-@@ -1106,7 +1106,11 @@ void EventQueue::printContent() const
+ 
+--- git.temp.orig/src/psievent.cpp
++++ git.temp/src/psievent.cpp
+@@ -1059,7 +1059,11 @@ void EventQueue::printContent() const
  void EventQueue::clear()
  {
  	while(!list_.isEmpty())
@@ -132,7 +132,7 @@
  
  	emit queueChanged();
  }
-@@ -1125,6 +1129,7 @@ void EventQueue::clear(const Jid &j, boo
+@@ -1078,6 +1082,7 @@ void EventQueue::clear(const Jid &j, boo
  				GlobalEventQueue::instance()->dequeue(ei);
  			}
  			it = list_.erase(it);

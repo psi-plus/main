@@ -1,7 +1,5 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:01.292826015 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:01.288826015 +0400
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
 @@ -362,6 +362,52 @@
  			</tabs>
  		</ui>
@@ -55,47 +53,45 @@ Index: psi/options/default.xml
  			<chat comment="Shortcuts in the chat dialog">
  				<next-tab type="QVariantList" comment="Switch to the next tab">
  					<item type="QKeySequence">Ctrl+PgDown</item>
-Index: psi/src/psiactionlist.cpp
-===================================================================
---- psi.orig/src/psiactionlist.cpp	2013-01-15 14:04:01.292826015 +0400
-+++ psi/src/psiactionlist.cpp	2013-01-15 14:04:01.288826015 +0400
+--- git.temp.orig/src/psiactionlist.cpp
++++ git.temp/src/psiactionlist.cpp
 @@ -19,15 +19,20 @@
   */
-
+ 
  #include "psiactionlist.h"
 +#include "shortcutmanager.h"
-
+ 
  #include <QObject>
  #include <QPointer>
 +#include <map>
 +#include <utility>
-
+ 
  #include "iconset.h"
  #include "psioptions.h"
-
+ 
  #include "mainwin_p.h"
-
+ 
 +using namespace std;
 +
  //----------------------------------------------------------------------------
  // PsiActionList::Private
  //----------------------------------------------------------------------------
-@@ -43,6 +48,7 @@
+@@ -43,6 +48,7 @@ private:
  	PsiActionList *list;
  	PsiCon *psi;
  	QPointer<ActionList> statusActionList;
 +	map<QString,IconAction*> actionmap;
-
+ 
  	void createCommon();
  	void createMainWin();
-@@ -90,13 +96,21 @@
-
+@@ -90,13 +96,21 @@ PsiActionList::Private::~Private()
+ 
  ActionList* PsiActionList::Private::createActionList( QString name, int id, ActionNames *actionlist )
  {
 +	static const QStringList skipList = QStringList() << "separator" << "spacer";
 +
  	ActionList *actions = new ActionList( name, id, false );
-
+ 
  	QString aName;
  	for ( int i = 0; !(aName = QString(actionlist[i].name)).isEmpty(); i++ ) {
  		IconAction *action = actionlist[i].action;
@@ -108,9 +104,9 @@ Index: psi/src/psiactionlist.cpp
 +			}
 +		}
  	}
-
+ 
  	list->addList( actions );
-@@ -411,6 +425,11 @@
+@@ -411,6 +425,11 @@ void PsiActionList::Private::optionsChan
  	statusActionList->action("status_chat")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.chat").toBool());
  	statusActionList->action("status_xa")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.xa").toBool());
  	statusActionList->action("status_invisible")->setVisible(PsiOptions::instance()->getOption("options.ui.menu.status.invisible").toBool());
@@ -120,5 +116,5 @@ Index: psi/src/psiactionlist.cpp
 +		 i->second->setShortcuts(ShortcutManager::instance()->shortcuts("alist." + i->first));
 +	}
  }
-
+ 
  //----------------------------------------------------------------------------

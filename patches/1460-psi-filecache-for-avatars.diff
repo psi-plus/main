@@ -1,20 +1,18 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/src/avatars.cpp
-===================================================================
---- psi.orig/src/avatars.cpp	2013-01-15 14:04:28.956827140 +0400
-+++ psi/src/avatars.cpp	2013-01-15 14:04:28.956827140 +0400
+--- git.temp.orig/src/avatars.cpp
++++ git.temp/src/avatars.cpp
 @@ -50,6 +50,7 @@
  #include "vcardfactory.h"
  #include "pepmanager.h"
  #include "pixmaputil.h"
 +#include "filecache.h"
-
+ 
  #define MAX_AVATAR_SIZE 96
  #define MAX_AVATAR_DISPLAY_SIZE 64
-@@ -84,6 +85,34 @@
+@@ -84,6 +85,34 @@ static QByteArray scaleAvatar(const QByt
  //------------------------------------------------------------------------------
-
+ 
  //------------------------------------------------------------------------------
 +//  AvatarFileCache
 +//------------------------------------------------------------------------------
@@ -46,15 +44,15 @@ Index: psi/src/avatars.cpp
 +//------------------------------------------------------------------------------
  //  Avatar: Base class for avatars.
  //------------------------------------------------------------------------------
-
-@@ -178,14 +207,15 @@
-
+ 
+@@ -178,14 +207,15 @@ void CachedAvatar::updateHash(const QStr
+ 
  bool CachedAvatar::isCached(const QString& h)
  {
 -	return QDir(AvatarFactory::getCacheDir()).exists(h);
 +	return AvatarFileCache::instance()->get(h);
  }
-
+ 
  void CachedAvatar::loadFromCache(const QString& h)
  {
  	// printf("Loading avatar from cache\n");
@@ -65,7 +63,7 @@ Index: psi/src/avatars.cpp
  	if (pixmap().isNull()) {
  		qWarning("CachedAvatar::loadFromCache(): Null pixmap. Unsupported format ?");
  	}
-@@ -194,16 +224,7 @@
+@@ -194,16 +224,7 @@ void CachedAvatar::loadFromCache(const Q
  void CachedAvatar::saveToCache(const QByteArray& data)
  {
  	QString hash = QCA::Hash("sha1").hashToString(data);
@@ -81,5 +79,5 @@ Index: psi/src/avatars.cpp
 -
 +	AvatarFileCache::instance()->append(hash, "img", data);
  }
-
+ 
  //------------------------------------------------------------------------------

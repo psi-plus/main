@@ -1,17 +1,15 @@
-Index: psi/src/discodlg.cpp
-===================================================================
---- psi.orig/src/discodlg.cpp	2013-01-15 14:04:31.900827260 +0400
-+++ psi/src/discodlg.cpp	2013-01-15 14:04:31.896827259 +0400
-@@ -919,7 +919,7 @@
+--- git.temp.orig/src/discodlg.cpp
++++ git.temp/src/discodlg.cpp
+@@ -919,7 +919,7 @@ public: // data
  	IconAction *actBrowse, *actBack, *actForward, *actRefresh, *actStop;
-
+ 
  	// custom actions, that will be added to toolbar and context menu
 -	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
 +	IconAction *actRegister, *actUnregister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
-
+ 
  	typedef QList<History*> HistoryList;
  	HistoryList backHistory, forwardHistory;
-@@ -1024,6 +1024,9 @@
+@@ -1024,6 +1024,9 @@ DiscoDlg::Private::Private(DiscoDlg *par
  	actRegister = new IconAction (tr("Register"), "psi/register", tr("&Register"), 0, dlg);
  	connect (actRegister, SIGNAL(triggered()), sm, SLOT(map()));
  	sm->setMapping(actRegister, Features::FID_Register);
@@ -21,15 +19,15 @@ Index: psi/src/discodlg.cpp
  	actSearch = new IconAction (tr("Search"), "psi/search", tr("&Search"), 0, dlg);
  	connect (actSearch, SIGNAL(triggered()), sm, SLOT(map()));
  	sm->setMapping(actSearch, Features::FID_Search);
-@@ -1061,6 +1064,7 @@
+@@ -1061,6 +1064,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
  	// custom actions
  	toolBar->addSeparator();
  	toolBar->addAction(actRegister);
 +	toolBar->addAction(actUnregister);
  	toolBar->addAction(actSearch);
  	toolBar->addAction(actJoin);
-
-@@ -1237,6 +1241,7 @@
+ 
+@@ -1237,6 +1241,7 @@ void DiscoDlg::Private::enableButtons(co
  	// custom actions
  	Features f = it.features();
  	actRegister->setEnabled( f.canRegister() );
@@ -37,28 +35,17 @@ Index: psi/src/discodlg.cpp
  	actSearch->setEnabled( f.canSearch() );
  	actJoin->setEnabled( f.canGroupchat() );
  	actAdd->setEnabled( itemSelected );
-@@ -1364,6 +1369,7 @@
+@@ -1364,6 +1369,7 @@ bool DiscoDlg::Private::eventFilter (QOb
  			// custom actions
  			p.addSeparator();
  			actRegister->addTo(&p);
 +			actUnregister->addTo(&p);
  			actSearch->addTo(&p);
  			actJoin->addTo(&p);
-
-@@ -1372,7 +1378,7 @@
- 			actVCard->addTo(&p);
- 			actAHCommand->addTo(&p);
- 			actQueryVersion->addTo(&p);
--
-+
- 			// popup with all available features
- 			QMenu *fm = new QMenu(&p);
- 			QHash<QAction*, int> actions;
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:31.900827260 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:31.896827259 +0400
-@@ -3397,8 +3397,12 @@
+ 
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -3394,8 +3394,12 @@ void PsiAccount::featureActivated(QStrin
  		actionExecuteCommand(jid, node);
  	else if ( f.canDisco() )
  		actionDisco(jid, node);
@@ -73,10 +60,10 @@ Index: psi/src/psiaccount.cpp
  	else if ( f.haveVCard() )
  		actionInfo(jid);
  	else if ( f.id() == Features::FID_Add ) {
-@@ -4433,6 +4437,13 @@
+@@ -4429,6 +4433,13 @@ void PsiAccount::actionRegister(const Ji
  	}
  }
-
+ 
 +void PsiAccount::actionUnregister(const Jid &j)
 +{
 +	JT_UnRegister *ju = new JT_UnRegister(d->client->rootTask());
@@ -87,8 +74,8 @@ Index: psi/src/psiaccount.cpp
  void PsiAccount::actionSearch(const Jid &j)
  {
  	if(!checkConnected())
-@@ -4799,9 +4810,7 @@
-
+@@ -4798,9 +4809,7 @@ void PsiAccount::dj_remove(const Jid &j)
+ 
  		// if it looks like a transport, unregister (but not if it is the server!!)
  		if(u->isTransport() && !Jid(d->client->host()).compare(u->jid())) {
 -			JT_UnRegister *ju = new JT_UnRegister(d->client->rootTask());
@@ -98,11 +85,9 @@ Index: psi/src/psiaccount.cpp
  		}
  	}
  }
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:31.900827260 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:31.896827259 +0400
-@@ -363,6 +363,7 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -363,6 +363,7 @@ public slots:
  	void actionGroupsSet(const Jid &, const QStringList &);
  	void actionHistoryBox(PsiEvent *);
  	void actionRegister(const Jid &);

@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:12.552826473 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:12.548826473 +0400
-@@ -166,12 +166,16 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -165,12 +165,16 @@
  				<disable-scrollbar type="bool">true</disable-scrollbar>
  				<avatars>
  					<show type="bool">true</show>
@@ -19,10 +17,8 @@ Index: psi/options/default.xml
  				<show-tune-icons type="bool">true</show-tune-icons>
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
-Index: psi/src/contactlistmodel.cpp
-===================================================================
---- psi.orig/src/contactlistmodel.cpp	2013-01-15 14:04:12.552826473 +0400
-+++ psi/src/contactlistmodel.cpp	2013-01-15 14:04:12.548826473 +0400
+--- git.temp.orig/src/contactlistmodel.cpp
++++ git.temp/src/contactlistmodel.cpp
 @@ -38,6 +38,7 @@
  #include "contactlistmodelupdater.h"
  #include "contactlistspecialgroup.h"
@@ -31,7 +27,7 @@ Index: psi/src/contactlistmodel.cpp
  #ifdef YAPSI
  #include "yacommon.h"
  #endif
-@@ -524,6 +525,36 @@
+@@ -524,6 +525,36 @@ QVariant ContactListModel::contactData(c
  	else if (role == PhaseRole) {
  		return QVariant(false);
  	}
@@ -68,11 +64,9 @@ Index: psi/src/contactlistmodel.cpp
  #ifdef YAPSI
  	else if (role == Qt::ForegroundRole) {
  		return QVariant(Ya::statusColor(contact->status().type()));
-Index: psi/src/contactlistmodel.h
-===================================================================
---- psi.orig/src/contactlistmodel.h	2013-01-15 14:04:12.552826473 +0400
-+++ psi/src/contactlistmodel.h	2013-01-15 14:04:12.548826473 +0400
-@@ -78,6 +78,12 @@
+--- git.temp.orig/src/contactlistmodel.h
++++ git.temp/src/contactlistmodel.h
+@@ -78,6 +78,12 @@ public:
  		AlertPictureRole = Qt::UserRole + 11,
  		IsAnimRole = Qt::UserRole + 21,
  		PhaseRole = Qt::UserRole + 22,
@@ -82,14 +76,12 @@ Index: psi/src/contactlistmodel.h
 +		ClientRole = Qt::UserRole + 26,
 +		TuneRole = Qt::UserRole + 27,
 +		AvatarRole = Qt::UserRole + 28,
-
+ 
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
-Index: psi/src/contactlistviewdelegate.cpp
-===================================================================
---- psi.orig/src/contactlistviewdelegate.cpp	2013-01-15 14:04:12.552826473 +0400
-+++ psi/src/contactlistviewdelegate.cpp	2013-01-15 14:04:12.548826473 +0400
-@@ -197,7 +197,9 @@
+--- git.temp.orig/src/contactlistviewdelegate.cpp
++++ git.temp/src/contactlistviewdelegate.cpp
+@@ -197,7 +197,9 @@ void ContactListViewDelegate::drawText(Q
  		txt = option.fontMetrics.elidedText(text, option.textElideMode, rect.width());
  #endif
  		painter->save();
@@ -98,13 +90,11 @@ Index: psi/src/contactlistviewdelegate.cpp
 +		txtRect.setHeight(option.fontMetrics.height());
 +		painter->setClipRect(txtRect);
  	}
-
+ 
  	// painter->save();
-Index: psi/src/psicontactlistviewdelegate.cpp
-===================================================================
---- psi.orig/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:12.552826473 +0400
-+++ psi/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:12.548826473 +0400
-@@ -35,6 +35,20 @@
+--- git.temp.orig/src/psicontactlistviewdelegate.cpp
++++ git.temp/src/psicontactlistviewdelegate.cpp
+@@ -35,6 +35,20 @@ static const QString outlinedGroupsOptio
  static const QString contactListBackgroundOptionPath = "options.ui.look.colors.contactlist.background";
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
  static const QString statusSingleOptionPath = "options.ui.contactlist.status-messages.single-line";
@@ -122,10 +112,10 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +static const QString statusIconsOverAvatarsPath = "options.ui.contactlist.status-icon-over-avatar";
 +static const QString allClientsOptionPath = "options.ui.contactlist.show-all-client-icons";
 +static const QString enableGroupsOptionPath = "options.ui.contactlist.enable-groups";
-
+ 
  PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
  	: ContactListViewDelegate(parent)
-@@ -53,6 +67,20 @@
+@@ -53,6 +67,20 @@ PsiContactListViewDelegate::PsiContactLi
  	optionChanged(contactListBackgroundOptionPath);
  	optionChanged(showStatusMessagesOptionPath);
  	optionChanged(statusSingleOptionPath);
@@ -144,32 +134,32 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +	optionChanged(allClientsOptionPath);
 +	optionChanged(enableGroupsOptionPath);
  }
-
+ 
  PsiContactListViewDelegate::~PsiContactListViewDelegate()
-@@ -63,7 +91,8 @@
-
+@@ -63,7 +91,8 @@ PsiContactListViewDelegate::~PsiContactL
+ 
  int PsiContactListViewDelegate::avatarSize() const
  {
 -	return rowHeight_;
 +	return showAvatars_ ?
 +		qMax(avatarSize_ + 2, rowHeight_) : rowHeight_;
  }
-
+ 
  QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
-@@ -91,6 +120,9 @@
+@@ -91,6 +120,9 @@ QPixmap PsiContactListViewDelegate::stat
  		}
  	}
-
+ 
 +	if (!showStatusIcons_)
 +		return QPixmap();
 +
  	if (type == ContactListModel::ContactType) {
  		if (!index.data(ContactListModel::PresenceErrorRole).toString().isEmpty())
  			s = STATUS_ERROR;
-@@ -105,6 +137,57 @@
+@@ -105,6 +137,57 @@ QPixmap PsiContactListViewDelegate::stat
  	return PsiIconset::instance()->statusPtr(index.data(ContactListModel::JidRole).toString(), s)->pixmap();
  }
-
+ 
 +QList<QPixmap> PsiContactListViewDelegate::clientPixmap(const QModelIndex& index) const
 +{
 +	QList<QPixmap> pixList;
@@ -224,9 +214,9 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  QSize PsiContactListViewDelegate::sizeHint(const QStyleOptionViewItem& /*option*/, const QModelIndex& index) const
  {
  	if (index.isValid()) {
-@@ -128,12 +211,51 @@
+@@ -128,12 +211,51 @@ void PsiContactListViewDelegate::drawCon
  	QRect r = option.rect;
-
+ 
  	QRect avatarRect(r);
 -	const QPixmap statusPixmap = this->statusPixmap(index);
 -	avatarRect.translate(1, 1);
@@ -254,7 +244,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +		else {
 +			avatarRect.setTop(avatarRect.top() - h);
 +		}
-
+ 
 -	r.setLeft(avatarRect.right() + 3);
 +		if(!avatarPixmap.isNull()) {
 +			painter->drawPixmap(avatarRect.topLeft(), avatarPixmap);
@@ -278,7 +268,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
 +		painter->drawPixmap(statusRect.topLeft(), statusPixmap);
 +	} else
 +		r.setLeft(r.left() + 3);
-
+ 
  	QColor textColor;
  	if(index.data(ContactListModel::IsAnimRole).toBool()) {
 @@ -189,6 +311,74 @@ void PsiContactListViewDelegate::drawCon
@@ -356,7 +346,7 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  #if 0
  	int x;
  	if (d->status_single)
-@@ -346,6 +537,62 @@
+@@ -346,6 +536,62 @@ void PsiContactListViewDelegate::optionC
  		showStatusMessages_ = PsiOptions::instance()->getOption(showStatusMessagesOptionPath).toBool();
  		contactList()->viewport()->update();
  	}
@@ -419,20 +409,18 @@ Index: psi/src/psicontactlistviewdelegate.cpp
  	else if(option == slimGroupsOptionPath) {
  		slimGroup_ = PsiOptions::instance()->getOption(slimGroupsOptionPath).toBool();
  		contactList()->viewport()->update();
-Index: psi/src/psicontactlistviewdelegate.h
-===================================================================
---- psi.orig/src/psicontactlistviewdelegate.h	2013-01-15 14:04:12.552826473 +0400
-+++ psi/src/psicontactlistviewdelegate.h	2013-01-15 14:04:12.548826473 +0400
-@@ -52,6 +52,8 @@
+--- git.temp.orig/src/psicontactlistviewdelegate.h
++++ git.temp/src/psicontactlistviewdelegate.h
+@@ -52,6 +52,8 @@ protected:
  	virtual QRect editorRect(const QRect& nameRect) const;
-
+ 
  	virtual QPixmap statusPixmap(const QModelIndex& index) const;
 +	virtual QList<QPixmap> clientPixmap(const QModelIndex& index) const;
 +	virtual QPixmap avatarIcon(const QModelIndex& index) const;
-
+ 
  private slots:
  	void optionChanged(const QString& option);
-@@ -63,7 +65,10 @@
+@@ -63,7 +65,10 @@ private:
  	QFontMetrics* fontMetrics_;
  	bool statusSingle_;
  	int rowHeight_;
@@ -443,4 +431,4 @@ Index: psi/src/psicontactlistviewdelegate.h
 +	bool enableGroups_, allClients_;
  	mutable QHash<QModelIndex, bool> alertingIndexes_;
  };
-
+ 

@@ -1,57 +1,51 @@
-Index: psi/src/discodlg.cpp
-===================================================================
---- psi.orig/src/discodlg.cpp	2013-01-15 14:04:07.084826251 +0400
-+++ psi/src/discodlg.cpp	2013-01-15 14:04:07.076826250 +0400
-@@ -885,7 +885,7 @@
+--- git.temp.orig/src/discodlg.cpp
++++ git.temp/src/discodlg.cpp
+@@ -885,7 +885,7 @@ public: // data
  	IconAction *actBrowse, *actBack, *actForward, *actRefresh, *actStop;
-
+ 
  	// custom actions, that will be added to toolbar and context menu
 -	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd;
 +	IconAction *actRegister, *actSearch, *actJoin, *actAHCommand, *actVCard, *actAdd, *actQueryVersion;
-
+ 
  	typedef QList<History*> HistoryList;
  	HistoryList backHistory, forwardHistory;
-@@ -1003,6 +1003,9 @@
+@@ -1003,6 +1003,9 @@ DiscoDlg::Private::Private(DiscoDlg *par
  	actAdd = new IconAction (tr("Add to roster"), "psi/addContact", tr("&Add to roster"), 0, dlg);
  	connect (actAdd, SIGNAL(triggered()), sm, SLOT(map()));
  	sm->setMapping(actAdd, Features::FID_Add);
 +	actQueryVersion = new IconAction (tr("Query version"), "psi/info", tr("&Query version"), 0, dlg);
 +	connect (actQueryVersion, SIGNAL(triggered()), sm, SLOT(map()));
 +	sm->setMapping(actQueryVersion, Features::FID_QueryVersion);
-
+ 
  	// create toolbar
  	toolBar = new QToolBar(tr("Service Discovery toolbar"), dlg);
-@@ -1028,6 +1031,7 @@
+@@ -1028,6 +1031,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
  	toolBar->addAction(actAdd);
  	toolBar->addAction(actVCard);
  	toolBar->addAction(actAHCommand);
 +	toolBar->addAction(actQueryVersion);
-
+ 
  	// select protocol
  	if (PsiOptions::instance()->getOption("options.ui.show-deprecated.service-discovery.protocol-selector").toBool()) {
-@@ -1201,6 +1205,7 @@
+@@ -1201,6 +1205,7 @@ void DiscoDlg::Private::enableButtons(co
  	actAdd->setEnabled( itemSelected );
  	actVCard->setEnabled( f.haveVCard() );
  	actAHCommand->setEnabled( f.canCommand() );
 +	actQueryVersion->setEnabled( f.hasVersion() );
  }
-
+ 
  void DiscoDlg::Private::itemSelected (QTreeWidgetItem *item)
-@@ -1329,7 +1334,8 @@
+@@ -1329,6 +1334,7 @@ bool DiscoDlg::Private::eventFilter (QOb
  			actAdd->addTo(&p);
  			actVCard->addTo(&p);
  			actAHCommand->addTo(&p);
--
 +			actQueryVersion->addTo(&p);
-+
+ 
  			// popup with all available features
  			QMenu *fm = new QMenu(&p);
- 			QHash<QAction*, int> actions;
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:07.084826251 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:07.076826250 +0400
-@@ -3255,6 +3255,9 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -3251,6 +3251,9 @@ void PsiAccount::featureActivated(QStrin
  		QStringList sl;
  		dj_add(jid, QString::null, sl, true);
  	}
@@ -59,12 +53,12 @@ Index: psi/src/psiaccount.cpp
 +		actionQueryVersion(jid);
 +	}
  }
-
+ 
  void PsiAccount::actionManageBookmarks()
-@@ -3754,6 +3757,25 @@
+@@ -3749,6 +3752,25 @@ void PsiAccount::actionSendFiles(const J
  	sendFiles(j, l);
  }
-
+ 
 +void PsiAccount::actionQueryVersion(const Jid& j)
 +{
 +	JT_ClientVersion *task = new JT_ClientVersion(d->client->rootTask());
@@ -87,23 +81,21 @@ Index: psi/src/psiaccount.cpp
  void PsiAccount::actionExecuteCommand(const Jid& j, const QString& node)
  {
  	Jid j2 = j;
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:07.084826251 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:07.076826250 +0400
-@@ -364,6 +364,7 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -364,6 +364,7 @@ public slots:
  	void actionSetActivity();
  	void actionSetAvatar();
  	void actionUnsetAvatar();
 +	void actionQueryVersion(const Jid& j);
  	void featureActivated(QString feature, Jid jid, QString node);
-
+ 
  	void actionAssignKey(const Jid &);
-@@ -436,6 +437,7 @@
-
+@@ -436,6 +437,7 @@ private slots:
+ 
  	void processReadNext(const UserListItem &);
  	void processReadNext(const Jid &);
 +	void queryVersionFinished();
-
+ 
  protected:
  	bool validRosterExchangeItem(const RosterExchangeItem&);

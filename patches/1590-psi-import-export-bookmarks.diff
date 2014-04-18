@@ -1,25 +1,23 @@
-Index: psi/src/bookmarkmanagedlg.cpp
-===================================================================
---- psi.orig/src/bookmarkmanagedlg.cpp	2013-01-15 14:04:31.496827243 +0400
-+++ psi/src/bookmarkmanagedlg.cpp	2013-01-15 14:04:31.492827243 +0400
+--- git.temp.orig/src/bookmarkmanagedlg.cpp
++++ git.temp/src/bookmarkmanagedlg.cpp
 @@ -23,10 +23,13 @@
  #include <QStandardItemModel>
  #include <QPushButton>
  #include <QAction>
 +#include <QFile>
 +#include <QMessageBox>
-
+ 
  #include "bookmarkmanager.h"
  #include "psiaccount.h"
  #include "iconset.h"
 +#include "fileutil.h"
-
+ 
  BookmarkManageDlg::BookmarkManageDlg(PsiAccount* account)
  	: QDialog()
-@@ -47,6 +50,11 @@
+@@ -47,6 +50,11 @@ BookmarkManageDlg::BookmarkManageDlg(Psi
  	removeBookmarkAction->setShortcuts(QKeySequence::Delete);
  	ui_.listView->addAction(removeBookmarkAction);
-
+ 
 +	ui_.pb_import->setIcon(IconsetFactory::icon("psi/cm_import").icon());
 +	ui_.pb_export->setIcon(IconsetFactory::icon("psi/cm_export").icon());
 +	connect(ui_.pb_import, SIGNAL(clicked()), SLOT(importBookmarks()));
@@ -28,7 +26,7 @@ Index: psi/src/bookmarkmanagedlg.cpp
  	addButton_    = ui_.bookmarkButtonBox->addButton(tr("&Add"),    QDialogButtonBox::ActionRole);
  	removeButton_ = ui_.bookmarkButtonBox->addButton(tr("&Remove"), QDialogButtonBox::DestructiveRole);
  	joinButton_   = ui_.bookmarkButtonBox->addButton(tr("&Join"),   QDialogButtonBox::ActionRole);
-@@ -221,3 +229,57 @@
+@@ -221,3 +229,57 @@ void BookmarkManageDlg::appendItem(QStan
  	item->setDropEnabled(false);
  	model_->invisibleRootItem()->appendRow(item);
  }
@@ -86,23 +84,19 @@ Index: psi/src/bookmarkmanagedlg.cpp
 +		file.write(doc.toString().toLocal8Bit());
 +	}
 +}
-Index: psi/src/bookmarkmanagedlg.h
-===================================================================
---- psi.orig/src/bookmarkmanagedlg.h	2013-01-15 14:04:31.496827243 +0400
-+++ psi/src/bookmarkmanagedlg.h	2013-01-15 14:04:31.492827243 +0400
-@@ -68,6 +68,8 @@
+--- git.temp.orig/src/bookmarkmanagedlg.h
++++ git.temp/src/bookmarkmanagedlg.h
+@@ -68,6 +68,8 @@ private slots:
  	void joinCurrentRoom();
  	void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint);
  	void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
 +	void importBookmarks();
 +	void exportBookmarks();
-
+ 
  private:
  	Ui::BookmarkManage ui_;
-Index: psi/src/bookmarkmanage.ui
-===================================================================
---- psi.orig/src/bookmarkmanage.ui	2013-01-15 14:04:31.496827243 +0400
-+++ psi/src/bookmarkmanage.ui	2013-01-15 14:04:31.492827243 +0400
+--- git.temp.orig/src/bookmarkmanage.ui
++++ git.temp/src/bookmarkmanage.ui
 @@ -118,13 +118,50 @@
       </property>
      </widget>

@@ -1,8 +1,6 @@
-Index: psi/src/contactlistmodel.cpp
-===================================================================
---- psi.orig/src/contactlistmodel.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/contactlistmodel.cpp	2013-01-15 14:04:21.488826836 +0400
-@@ -561,6 +561,9 @@
+--- git.temp.orig/src/contactlistmodel.cpp
++++ git.temp/src/contactlistmodel.cpp
+@@ -561,6 +561,9 @@ QVariant ContactListModel::contactData(c
  	else if (role == MucMessagesRole) {
  		return QVariant(contact->userListItem().pending());
  	}
@@ -12,23 +10,19 @@ Index: psi/src/contactlistmodel.cpp
  #ifdef YAPSI
  	else if (role == Qt::ForegroundRole) {
  		return QVariant(Ya::statusColor(contact->status().type()));
-Index: psi/src/contactlistmodel.h
-===================================================================
---- psi.orig/src/contactlistmodel.h	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/contactlistmodel.h	2013-01-15 14:04:21.488826836 +0400
-@@ -86,6 +86,7 @@
+--- git.temp.orig/src/contactlistmodel.h
++++ git.temp/src/contactlistmodel.h
+@@ -86,6 +86,7 @@ public:
  		AvatarRole = Qt::UserRole + 28,
  		IsMucRole = Qt::UserRole + 29,
  		MucMessagesRole = Qt::UserRole + 30,
 +		BlockRole = Qt::UserRole + 31,
-
+ 
  		// groups
  		ExpandedRole = Qt::UserRole + 12,
-Index: psi/src/privacy/privacydlg.cpp
-===================================================================
---- psi.orig/src/privacy/privacydlg.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/privacydlg.cpp	2013-01-15 14:04:21.488826836 +0400
-@@ -48,11 +48,11 @@
+--- git.temp.orig/src/privacy/privacydlg.cpp
++++ git.temp/src/privacy/privacydlg.cpp
+@@ -48,11 +48,11 @@ PrivacyDlg::PrivacyDlg(const QString& ac
  	connect(ui_.cb_default,SIGNAL(activated(int)),SLOT(default_selected(int)));
  	connect(ui_.cb_lists,SIGNAL(activated(int)),SLOT(list_selected(int)));
  	connect(ui_.cb_lists,SIGNAL(currentIndexChanged(int)),SLOT(list_changed(int)));
@@ -41,12 +35,12 @@ Index: psi/src/privacy/privacydlg.cpp
 -	connect(manager_,SIGNAL(changeList_success()),SLOT(changeList_succeeded()));
 +	connect(manager_,SIGNAL(changeList_success(QString)),SLOT(changeList_succeeded(QString)));
  	connect(manager_,SIGNAL(changeList_error()),SLOT(changeList_failed()));
-
+ 
  	connect(ui_.pb_newList,SIGNAL(clicked()),SLOT(newList()));
-@@ -252,8 +252,29 @@
+@@ -252,8 +252,29 @@ void PrivacyDlg::list_failed()
  	setWidgetsEnabled(true);
  }
-
+ 
 -void PrivacyDlg::changeList_succeeded()
 +void PrivacyDlg::changeActiveList_succeeded(QString name)
  {
@@ -74,11 +68,9 @@ Index: psi/src/privacy/privacydlg.cpp
  	// If we just deleted a list, select the first list
  	if (model_.list().isEmpty()) {
  		ui_.cb_lists->setCurrentIndex(0);
-Index: psi/src/privacy/privacydlg.h
-===================================================================
---- psi.orig/src/privacy/privacydlg.h	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/privacydlg.h	2013-01-15 14:04:21.488826836 +0400
-@@ -55,9 +55,11 @@
+--- git.temp.orig/src/privacy/privacydlg.h
++++ git.temp/src/privacy/privacydlg.h
+@@ -55,9 +55,11 @@ protected slots:
  	void list_selected(int i);
  	void list_changed(int);
  	void list_failed();
@@ -91,14 +83,12 @@ Index: psi/src/privacy/privacydlg.h
  	void change_failed();
  	void close();
  	void addRule();
-Index: psi/src/privacy/privacylist.cpp
-===================================================================
---- psi.orig/src/privacy/privacylist.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/privacylist.cpp	2013-01-15 14:04:21.488826836 +0400
-@@ -51,6 +51,12 @@
+--- git.temp.orig/src/privacy/privacylist.cpp
++++ git.temp/src/privacy/privacylist.cpp
+@@ -51,6 +51,12 @@ void PrivacyList::insertItem(int index,
  	reNumber();
  }
-
+ 
 +void PrivacyList::appendItem(const PrivacyListItem& item)
 +{
 +	insertItem(items_.count(), item);
@@ -108,11 +98,9 @@ Index: psi/src/privacy/privacylist.cpp
  void PrivacyList::reNumber()
  {
  	unsigned int order = 100;
-Index: psi/src/privacy/privacylist.h
-===================================================================
---- psi.orig/src/privacy/privacylist.h	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/privacylist.h	2013-01-15 14:04:21.488826836 +0400
-@@ -43,6 +43,7 @@
+--- git.temp.orig/src/privacy/privacylist.h
++++ git.temp/src/privacy/privacylist.h
+@@ -43,6 +43,7 @@ public:
  	const PrivacyListItem& item(int index) const { return items_.at(index); }
  	void removeItem(int index) { items_.removeAt(index); }
  	void insertItem(int index, const PrivacyListItem& item);
@@ -120,13 +108,11 @@ Index: psi/src/privacy/privacylist.h
  	bool moveItemUp(int index);
  	bool moveItemDown(int index);
  	bool onlyBlockItems() const;
-Index: psi/src/privacy/privacymanager.h
-===================================================================
---- psi.orig/src/privacy/privacymanager.h	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/privacymanager.h	2013-01-15 14:04:21.488826836 +0400
-@@ -40,11 +40,11 @@
+--- git.temp.orig/src/privacy/privacymanager.h
++++ git.temp/src/privacy/privacymanager.h
+@@ -40,11 +40,11 @@ public:
  	virtual void requestList(const QString& name) = 0;
-
+ 
  signals:
 -	void changeDefaultList_success();
 +	void changeDefaultList_success(QString);
@@ -139,10 +125,8 @@ Index: psi/src/privacy/privacymanager.h
  	void changeList_error();
  	void defaultListAvailable(const PrivacyList&);
  	void defaultListError();
-Index: psi/src/privacy/psiprivacymanager.cpp
-===================================================================
---- psi.orig/src/privacy/psiprivacymanager.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/psiprivacymanager.cpp	2013-01-15 14:04:21.488826836 +0400
+--- git.temp.orig/src/privacy/psiprivacymanager.cpp
++++ git.temp/src/privacy/psiprivacymanager.cpp
 @@ -23,12 +23,30 @@
  #include "xmpp_xmlcommon.h"
  #include "xmpp_task.h"
@@ -155,9 +139,9 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +#include "psicon.h"
 +#include "contactupdatesmanager.h"
 +#include "psiaccount.h"
-
+ 
  #define PRIVACY_NS "jabber:iq:privacy"
-
+ 
 +static const QString BLOCKED_LIST_NAME = "blocked";
 +
 +static XMPP::Jid processJid(const XMPP::Jid& jid)
@@ -172,35 +156,33 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +}
 +
  using namespace XMPP;
-
+ 
  // -----------------------------------------------------------------------------
-@@ -46,9 +64,12 @@
+@@ -46,8 +64,11 @@ public:
  			return false;
-
+ 
  		QString ns = queryNS(e);
 -		if(ns == "jabber:iq:privacy") {
 -			// TODO: Do something with update
--
 +		if (ns == PRIVACY_NS) {
 +			QDomElement listTag = queryTag(e).firstChildElement("list");
 +			if (!listTag.isNull()) {
 +				emit privacyListChanged(listTag.attribute("name"));
 +			}
-+
+ 
  			// Confirm receipt
  			QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
- 			send(iq);
-@@ -57,6 +78,9 @@
-
+@@ -57,6 +78,9 @@ public:
+ 
  		return false;
  	}
 +
 +signals:
 +	void privacyListChanged(const QString& name);
  };
-
+ 
  // -----------------------------------------------------------------------------
-@@ -205,6 +229,9 @@
+@@ -205,6 +229,9 @@ public:
  		}
  		return true;
  	}
@@ -208,12 +190,12 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +		return list_.name();
 +	}
  };
-
+ 
  class GetPrivacyListTask : public Task
-@@ -262,14 +289,38 @@
-
+@@ -261,14 +288,38 @@ public:
+ 
  // -----------------------------------------------------------------------------
-
+ 
 -PsiPrivacyManager::PsiPrivacyManager(XMPP::Task* rootTask) : rootTask_(rootTask), getDefault_waiting_(false), block_waiting_(false)
 -{
 -   listener_ = new PrivacyListListener(rootTask_);
@@ -237,7 +219,7 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +	connect(this, SIGNAL(changeActiveList_success(QString)), SLOT(newChangeActiveList_success()));
 +	connect(this, SIGNAL(changeActiveList_error()), SLOT(newChangeActiveList_error()));
  }
-
+ 
  PsiPrivacyManager::~PsiPrivacyManager()
  {
  	delete listener_;
@@ -250,28 +232,28 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +	if (!name.isEmpty())
 +		requestList(name);
  }
-
+ 
  void PsiPrivacyManager::requestListNames()
-@@ -379,7 +430,7 @@
+@@ -378,7 +429,7 @@ void PsiPrivacyManager::changeDefaultLis
  	}
-
+ 
  	if (t->success()) {
 -		emit changeDefaultList_success();
 +		emit changeDefaultList_success(t->name());
  	}
  	else {
  		emit changeDefaultList_error();
-@@ -388,6 +439,7 @@
-
+@@ -387,6 +438,7 @@ void PsiPrivacyManager::changeDefaultLis
+ 
  void PsiPrivacyManager::changeActiveList(const QString& name)
  {
 +	tmpActiveListName_ = name;
  	SetPrivacyListsTask* t = new SetPrivacyListsTask(rootTask_);
  	t->setActive(name);
  	connect(t,SIGNAL(finished()),SLOT(changeActiveList_finished()));
-@@ -403,7 +455,8 @@
+@@ -402,7 +454,8 @@ void PsiPrivacyManager::changeActiveList
  	}
-
+ 
  	if (t->success()) {
 -		emit changeActiveList_success();
 +		blockedListName_ = tmpActiveListName_ .isEmpty() ? BLOCKED_LIST_NAME : tmpActiveListName_ ;
@@ -279,19 +261,19 @@ Index: psi/src/privacy/psiprivacymanager.cpp
  	}
  	else {
  		emit changeActiveList_error();
-@@ -427,7 +480,7 @@
+@@ -426,7 +479,7 @@ void PsiPrivacyManager::changeList_finis
  	}
-
+ 
  	if (t->success()) {
 -		emit changeList_success();
 +		emit changeList_success(t->name());
  	}
  	else {
  		emit changeList_error();
-@@ -468,4 +521,229 @@
+@@ -467,4 +520,229 @@ void PsiPrivacyManager::receiveList()
  	}
  }
-
+ 
 +
 +bool PsiPrivacyManager::isAvailable() const
 +{
@@ -518,18 +500,16 @@ Index: psi/src/privacy/psiprivacymanager.cpp
 +
 +
  #include "psiprivacymanager.moc"
-Index: psi/src/privacy/psiprivacymanager.h
-===================================================================
---- psi.orig/src/privacy/psiprivacymanager.h	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/privacy/psiprivacymanager.h	2013-01-15 14:04:21.488826836 +0400
+--- git.temp.orig/src/privacy/psiprivacymanager.h
++++ git.temp/src/privacy/psiprivacymanager.h
 @@ -23,11 +23,16 @@
-
+ 
  #include <QObject>
  #include <QStringList>
 +#include <QHash>
-
+ 
  #include "privacymanager.h"
-
+ 
 +#include "xmpp_jid.h"
 +
  class QString;
@@ -539,17 +519,17 @@ Index: psi/src/privacy/psiprivacymanager.h
  class PrivacyListListener;
  namespace XMPP {
  	class Task;
-@@ -39,7 +44,7 @@
+@@ -39,7 +44,7 @@ class PsiPrivacyManager : public Privacy
  	Q_OBJECT
-
+ 
  public:
 -	PsiPrivacyManager(XMPP::Task* rootTask);
 +	PsiPrivacyManager(PsiAccount* account, XMPP::Task* rootTask);
  	virtual ~PsiPrivacyManager();
-
+ 
  	void requestListNames();
-@@ -80,6 +85,52 @@
-
+@@ -80,6 +85,52 @@ private:
+ 
  	QStringList block_targets_;
  	bool block_waiting_;
 +
@@ -599,25 +579,21 @@ Index: psi/src/privacy/psiprivacymanager.h
 +	QString blockedListName_, tmpActiveListName_;
 +	bool isAuthorized(const XMPP::Jid& jid) const;
  };
-
+ 
  #endif
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:21.488826836 +0400
-@@ -1103,7 +1103,7 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -1099,7 +1099,7 @@ PsiAccount::PsiAccount(const UserAccount
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
-
+ 
  	// Privacy manager
 -	d->privacyManager = new PsiPrivacyManager(d->client->rootTask());
 +	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-
+ 
  	// Caps manager
  	d->capsManager = new CapsManager(d->client->jid(), capsRegistry, new IrisProtocol::DiscoInfoQuerier(d->client));
-Index: psi/src/psicontact.cpp
-===================================================================
---- psi.orig/src/psicontact.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/psicontact.cpp	2013-01-15 14:04:21.488826836 +0400
+--- git.temp.orig/src/psicontact.cpp
++++ git.temp/src/psicontact.cpp
 @@ -44,6 +44,8 @@
  #include "yacommon.h"
  #include "yaprofile.h"
@@ -627,8 +603,8 @@ Index: psi/src/psicontact.cpp
  #endif
  #include "contactlistgroup.h"
  #include "desktoputil.h"
-@@ -680,6 +682,10 @@
-
+@@ -680,6 +682,10 @@ void PsiContact::toggleBlockedStateConfi
+ 
  	bool blocked = privacyManager->isContactBlocked(jid());
  	blockContactConfirmationHelper(!blocked);
 +#else
@@ -637,9 +613,9 @@ Index: psi/src/psicontact.cpp
 +	blockContactConfirmationHelper(!blocked);
  #endif
  }
-
-@@ -694,8 +700,8 @@
-
+ 
+@@ -694,8 +700,8 @@ void PsiContact::blockContactConfirmatio
+ 
  	privacyManager->setContactBlocked(jid(), block);
  #else
 -	// FIXME
@@ -648,8 +624,8 @@ Index: psi/src/psicontact.cpp
 +	privacyManager->setContactBlocked(jid(), block);
  #endif
  }
-
-@@ -837,6 +843,10 @@
+ 
+@@ -837,6 +843,10 @@ void PsiContact::addRemoveAuthBlockAvail
  		YaPrivacyManager* privacyManager = dynamic_cast<YaPrivacyManager*>(account()->privacyManager());
  		Q_ASSERT(privacyManager);
  		*blockButton = *blockButton && privacyManager->isAvailable();
@@ -660,7 +636,7 @@ Index: psi/src/psicontact.cpp
  #endif
  	}
  }
-@@ -937,6 +947,10 @@
+@@ -937,6 +947,10 @@ bool PsiContact::isBlocked() const
  	return account() && privacyManager(account()) &&
  	       privacyManager(account())->isContactBlocked(jid());
  #else
@@ -671,50 +647,46 @@ Index: psi/src/psicontact.cpp
  	return false;
  #endif
  }
-Index: psi/src/psicontactlistviewdelegate.cpp
-===================================================================
---- psi.orig/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/psicontactlistviewdelegate.cpp	2013-01-15 14:04:21.488826836 +0400
-@@ -278,6 +278,7 @@
-
+--- git.temp.orig/src/psicontactlistviewdelegate.cpp
++++ git.temp/src/psicontactlistviewdelegate.cpp
+@@ -282,6 +282,7 @@ void PsiContactListViewDelegate::drawCon
+ 
  	QStyleOptionViewItemV2 o = option;
  	o.font = *font_;
 +	o.font.setItalic(index.data(ContactListModel::BlockRole).toBool());
  	o.fontMetrics = *fontMetrics_;
  	QPalette palette = o.palette;
  	palette.setColor(QPalette::Text, textColor);
-Index: psi/src/psicontactmenu.cpp
-===================================================================
---- psi.orig/src/psicontactmenu.cpp	2013-01-15 14:04:21.492826836 +0400
-+++ psi/src/psicontactmenu.cpp	2013-01-15 14:04:21.492826836 +0400
+--- git.temp.orig/src/psicontactmenu.cpp
++++ git.temp/src/psicontactmenu.cpp
 @@ -45,6 +45,8 @@
-
+ 
  #ifdef YAPSI
  #include "yaprofile.h"
 +#else
 +#include "psiprivacymanager.h"
  #endif
-
+ 
  #include "groupchatdlg.h"
-@@ -254,6 +256,7 @@
+@@ -254,6 +256,7 @@ public:
  	QAction* mucHideAction_;
  	QAction* mucShowAction_;
  	QAction* mucLeaveAction_;
 +	QAction* blockAction_;
-
+ 
  #endif
-
-@@ -421,6 +424,9 @@
+ 
+@@ -421,6 +424,9 @@ public:
  		connect(mucLeaveAction_, SIGNAL(triggered()), SLOT(mucLeave()));
  		mucLeaveAction_->setShortcuts(ShortcutManager::instance()->shortcuts("common.close"));
-
+ 
 +		blockAction_ = new IconAction(tr("Block"), "psi/stop", tr("Block"), 0, this, 0, true);
 +		connect(blockAction_, SIGNAL(triggered(bool)), SLOT(block(bool)));
 +
  		if (!contact_->isConference()) {
  			menu_->addAction(addAuthAction_);
  			menu_->addSeparator();
-@@ -445,6 +451,7 @@
+@@ -445,6 +451,7 @@ public:
  			menu_->addMenu(groupMenu_);
  			menu_->addAction(transportLogonAction_);
  			menu_->addAction(transportLogoffAction_);
@@ -722,7 +694,7 @@ Index: psi/src/psicontactmenu.cpp
  			authMenu_ = menu_->addMenu(tr("Authorization"));
  			authMenu_->addAction(authResendAction_);
  			authMenu_->addAction(authRerequestAction_);
-@@ -467,6 +474,7 @@
+@@ -467,6 +474,7 @@ public:
  			menu_->addAction(mucLeaveAction_);
  			menu_->addSeparator();
  			menu_->addAction(customStatusAction_);
@@ -730,14 +702,14 @@ Index: psi/src/psicontactmenu.cpp
  		}
  #endif
  	}
-@@ -485,9 +493,14 @@
-
+@@ -485,9 +493,14 @@ private slots:
+ 
  	void updateActions()
  	{
 -		if (!contact_ or contact_->isConference())
 +		if (!contact_)
  			return;
-
+ 
 +		if(contact_->isConference()) {
 +			updateBlockActionState();
 +			return;
@@ -746,7 +718,7 @@ Index: psi/src/psicontactmenu.cpp
  #ifdef YAPSI
  		YaProfile* profile = YaProfile::create(contact_->account(), contact_->jid());
  		openHistoryAction_->setEnabled(contact_->historyAvailable());
-@@ -550,6 +563,7 @@
+@@ -550,6 +563,7 @@ private slots:
  			authMenu_->menuAction()->setVisible(false);
  		}
  		authMenu_->setEnabled(contact_->account()->isAvailable());
@@ -754,10 +726,10 @@ Index: psi/src/psicontactmenu.cpp
  		removeAction_->setVisible(!PsiOptions::instance()->getOption("options.ui.contactlist.lockdown-roster").toBool()  && !contact_->isSelf());
  		removeAction_->setEnabled(contact_->removeAvailable());
  		if (!PsiOptions::instance()->getOption("options.ui.menu.contact.custom-picture").toBool()) {
-@@ -630,6 +644,14 @@
+@@ -630,6 +644,14 @@ private slots:
  		contact_->setGroups(QStringList() << group);
  	}
-
+ 
 +	void block(bool )
 +	{
 +		if (!contact_)
@@ -769,7 +741,7 @@ Index: psi/src/psicontactmenu.cpp
  	void addAuth()
  	{
  		if (!contact_)
-@@ -836,6 +858,16 @@
+@@ -836,6 +858,16 @@ private slots:
  		contact_->account()->actionOpenChatSpecific(jid);
  	}
  #endif
@@ -784,5 +756,5 @@ Index: psi/src/psicontactmenu.cpp
 +		blockAction_->setText(blockAction_->isChecked() ? tr("Unblock") : tr("Block"));
 +	}
  };
-
+ 
  PsiContactMenu::PsiContactMenu(PsiContact* contact, ContactListModel* model)

@@ -1,21 +1,19 @@
-Index: psi/src/discodlg.cpp
-===================================================================
---- psi.orig/src/discodlg.cpp	2013-01-15 14:04:31.108827227 +0400
-+++ psi/src/discodlg.cpp	2013-01-15 14:04:31.104827227 +0400
-@@ -707,6 +707,9 @@
+--- git.temp.orig/src/discodlg.cpp
++++ git.temp/src/discodlg.cpp
+@@ -707,6 +707,9 @@ class DiscoListView : public QTreeWidget
  public:
  	DiscoListView(QWidget *parent);
-
+ 
 +public slots:
 +	void updateItemsVisibility(const QString& filter);
 +
  protected:
  	bool maybeTip(const QPoint &);
-
-@@ -837,6 +840,37 @@
+ 
+@@ -837,6 +840,37 @@ bool DiscoListView::eventFilter(QObject*
  	return QTreeWidget::eventFilter(o, e);
  }
-
+ 
 +// returns false if parent item should not be hidden (it has visible children)
 +static bool updateItemsRecursively(QTreeWidgetItem* parent, const QString& filter)
 +{
@@ -50,9 +48,9 @@ Index: psi/src/discodlg.cpp
  //----------------------------------------------------------------------------
  // DiscoDlg::Private
  //----------------------------------------------------------------------------
-@@ -951,9 +985,11 @@
+@@ -951,9 +985,11 @@ DiscoDlg::Private::Private(DiscoDlg *par
  	replaceWidget(lv_discoOld, dlg->lv_disco);
-
+ 
  	dlg->lv_disco->installEventFilter (this);
 -	connect(dlg->lv_disco, SIGNAL(currentItemChanged (QTreeWidgetItem *, QTreeWidgetItem *)), SLOT(itemSelected (QTreeWidgetItem *)));;
 +	dlg->le_filter->installEventFilter(this);
@@ -61,10 +59,10 @@ Index: psi/src/discodlg.cpp
 -	connect(dlg->lv_disco, SIGNAL(itemDoubleClicked (QTreeWidgetItem *, int)), SLOT(itemDoubleclicked (QTreeWidgetItem *)));;
 +	connect(dlg->lv_disco, SIGNAL(itemDoubleClicked (QTreeWidgetItem *, int)), SLOT(itemDoubleclicked (QTreeWidgetItem *)));
 +	connect(dlg->le_filter, SIGNAL(textChanged(QString)), dlg->lv_disco, SLOT(updateItemsVisibility(QString)));
-
+ 
  	// protocol actions
  	QSignalMapper *pm = new QSignalMapper(this);
-@@ -1360,6 +1396,13 @@
+@@ -1360,6 +1396,13 @@ bool DiscoDlg::Private::eventFilter (QOb
  			return true;
  		}
  	}
@@ -75,13 +73,11 @@ Index: psi/src/discodlg.cpp
 +			return true;
 +		}
 +	}
-
+ 
  	return false;
  }
-Index: psi/src/disco.ui
-===================================================================
---- psi.orig/src/disco.ui	2013-01-15 14:04:31.108827227 +0400
-+++ psi/src/disco.ui	2013-01-15 14:04:31.104827227 +0400
+--- git.temp.orig/src/disco.ui
++++ git.temp/src/disco.ui
 @@ -120,6 +120,20 @@
        <widget class="QTreeWidget" name="lv_disco" />
       </item>

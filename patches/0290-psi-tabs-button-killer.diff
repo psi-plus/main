@@ -1,9 +1,7 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:04.880826161 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:04.876826161 +0400
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
 @@ -376,6 +376,7 @@
  				<group-state comment="Saved state data of the tabsets defined by options.ui.tabs.grouping"/>
  				<tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
@@ -12,19 +10,17 @@ Index: psi/options/default.xml
  			</tabs>
  		</ui>
  		<shortcuts comment="Shortcuts">
-Index: psi/src/options/opt_chat.cpp
-===================================================================
---- psi.orig/src/options/opt_chat.cpp	2013-01-15 14:04:04.880826161 +0400
-+++ psi/src/options/opt_chat.cpp	2013-01-15 14:04:04.876826161 +0400
-@@ -103,6 +103,7 @@
+--- git.temp.orig/src/options/opt_chat.cpp
++++ git.temp/src/options/opt_chat.cpp
+@@ -103,6 +103,7 @@ void OptionsTabChat::applyOptions()
  	PsiOptions::instance()->setOption("options.ui.chat.alert-for-already-open-chats", d->ck_alertOpenChats->isChecked());
  	PsiOptions::instance()->setOption("options.ui.chat.raise-chat-windows-on-new-messages", d->ck_raiseChatWindow->isChecked());
  	PsiOptions::instance()->setOption("options.ui.chat.use-small-chats", d->ck_smallChats->isChecked());
 +	PsiOptions::instance()->setOption("options.ui.tabs.show-tab-buttons", d->ck_showTabButtons->isChecked());
-
+ 
  	QString delafter;
  	switch (bg_delChats->buttons().indexOf( bg_delChats->checkedButton() )) {
-@@ -179,6 +180,7 @@
+@@ -179,6 +180,7 @@ void OptionsTabChat::restoreOptions()
  	d->ck_alertOpenChats->setChecked( PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() );
  	d->ck_raiseChatWindow->setChecked( PsiOptions::instance()->getOption("options.ui.chat.raise-chat-windows-on-new-messages").toBool() );
  	d->ck_smallChats->setChecked( PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool() );
@@ -32,10 +28,8 @@ Index: psi/src/options/opt_chat.cpp
  	d->ck_tabChats->setChecked( PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool() );
  	d->cb_tabGrouping->setEnabled(PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool());
  	QString tabGrouping = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString();
-Index: psi/src/options/opt_chat.ui
-===================================================================
---- psi.orig/src/options/opt_chat.ui	2013-01-15 14:04:04.880826161 +0400
-+++ psi/src/options/opt_chat.ui	2013-01-15 14:04:04.876826161 +0400
+--- git.temp.orig/src/options/opt_chat.ui
++++ git.temp/src/options/opt_chat.ui
 @@ -120,6 +120,13 @@
      </layout>
     </item>
@@ -50,13 +44,11 @@ Index: psi/src/options/opt_chat.ui
      <widget class="QCheckBox" name="ck_autoResize" >
       <property name="text" >
        <string>Auto-resize text input field</string>
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:04.880826161 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:04.880826161 +0400
-@@ -1318,7 +1318,8 @@
+--- git.temp.orig/src/psicon.cpp
++++ git.temp/src/psicon.cpp
+@@ -1324,7 +1324,8 @@ void PsiCon::optionChanged(const QString
  	}
-
+ 
  	if (option == "options.ui.tabs.use-tabs" ||
 -		option == "options.ui.tabs.grouping") {
 +		option == "options.ui.tabs.grouping" ||
@@ -64,27 +56,23 @@ Index: psi/src/psicon.cpp
  		QMessageBox::information(0, tr("Information"), tr("Some of the options you changed will only have full effect upon restart."));
  		//notifyRestart = false;
  	}
-Index: psi/src/tabs/tabdlg.cpp
-===================================================================
---- psi.orig/src/tabs/tabdlg.cpp	2013-01-15 14:04:04.880826161 +0400
-+++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:04.880826161 +0400
-@@ -781,7 +781,7 @@
+--- git.temp.orig/src/tabs/tabdlg.cpp
++++ git.temp/src/tabs/tabdlg.cpp
+@@ -781,7 +781,7 @@ void TabDlg::setUserManagementEnabled(bo
  	}
-
+ 
  	userManagement_ = enabled;
 -	tabWidget_->setTabButtonsShown(enabled);
 +	tabWidget_->setTabButtonsShown(PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool());
  	tabWidget_->setDragsEnabled(enabled);
  }
-
-Index: psi/src/widgets/psitabwidget.cpp
-===================================================================
---- psi.orig/src/widgets/psitabwidget.cpp	2013-01-15 14:04:04.880826161 +0400
-+++ psi/src/widgets/psitabwidget.cpp	2013-01-15 14:04:04.880826161 +0400
-@@ -75,6 +75,10 @@
-
+ 
+--- git.temp.orig/src/widgets/psitabwidget.cpp
++++ git.temp/src/widgets/psitabwidget.cpp
+@@ -75,6 +75,10 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+ 
  	setTabPosition(QTabWidget::North);
-
+ 
 +	if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool()){
 +		closeButton_->hide();
 +		downButton_->hide();

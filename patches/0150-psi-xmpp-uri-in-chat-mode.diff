@@ -1,13 +1,11 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/src/chatdlg.cpp
-===================================================================
---- psi.orig/src/chatdlg.cpp	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/chatdlg.cpp	2013-01-15 14:04:01.460826022 +0400
-@@ -1006,6 +1006,12 @@
+--- git.temp.orig/src/chatdlg.cpp
++++ git.temp/src/chatdlg.cpp
+@@ -989,6 +989,12 @@ void ChatDlg::addEmoticon(QString text)
  	PsiRichText::addEmoticon(chatEdit(), text);
  }
-
+ 
 +void ChatDlg::setText(const QString& text)
 +{
 +	chatEdit()->clear();
@@ -17,34 +15,30 @@ Index: psi/src/chatdlg.cpp
  /**
   * Records that the user is composing
   */
-Index: psi/src/chatdlg.h
-===================================================================
---- psi.orig/src/chatdlg.h	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/chatdlg.h	2013-01-15 14:04:01.464826022 +0400
-@@ -72,6 +72,7 @@
-
+--- git.temp.orig/src/chatdlg.h
++++ git.temp/src/chatdlg.h
+@@ -72,6 +72,7 @@ public:
+ 
  public:
  	PsiAccount* account() const;
 +	void setText(const QString& );
-
+ 
  signals:
  	void aInfo(const Jid &);
-Index: psi/src/common.cpp
-===================================================================
---- psi.orig/src/common.cpp	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/common.cpp	2013-01-15 14:04:01.464826022 +0400
+--- git.temp.orig/src/common.cpp
++++ git.temp/src/common.cpp
 @@ -25,6 +25,7 @@
  #include "psiiconset.h"
  #include "applicationinfo.h"
  #include "psioptions.h"
 +#include "tabdlg.h"
-
+ 
  #include <QUrl>
  #include <QProcess>
-@@ -380,6 +381,32 @@
+@@ -381,6 +382,32 @@ void closeDialogs(QWidget *w)
  	}
  }
-
+ 
 +TabbableWidget* findActiveTab()
 +{
 +	QWidget* chat = QApplication::activeWindow();
@@ -74,19 +68,17 @@ Index: psi/src/common.cpp
  #ifdef HAVE_X11
  #include <X11/Xlib.h>
  #include <X11/Xutil.h> // needed for WM_CLASS hinting
-Index: psi/src/common.h
-===================================================================
---- psi.orig/src/common.h	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/common.h	2013-01-15 14:04:01.464826022 +0400
+--- git.temp.orig/src/common.h
++++ git.temp/src/common.h
 @@ -29,6 +29,7 @@
  #include <QColor>
-
+ 
  class QMenu;
 +class TabbableWidget;
-
+ 
  #include "statuspreset.h"
-
-@@ -147,6 +148,7 @@
+ 
+@@ -147,6 +148,7 @@ void clearMenu(QMenu *m); // deletes all
  void bringToFront(QWidget *w, bool grabFocus = true);
  void replaceWidget(QWidget *, QWidget *);
  void closeDialogs(QWidget *);
@@ -94,22 +86,20 @@ Index: psi/src/common.h
  #ifdef HAVE_X11
  #include <QWidget>
  #include "x11info.h"
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:01.464826022 +0400
-@@ -3907,7 +3907,7 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -3902,7 +3902,7 @@ void PsiAccount::actionHistoryBox(PsiEve
  	w->show();
  }
-
+ 
 -void PsiAccount::actionOpenChat(const Jid &j)
 +void PsiAccount::actionOpenChat(const Jid &j, const QString & body)
  {
  	UserListItem *u = find(j);
  	if(!u) {
-@@ -3941,9 +3941,9 @@
+@@ -3936,9 +3936,9 @@ void PsiAccount::actionOpenChat(const Ji
  	}
-
+ 
  	if(!res.isEmpty())
 -		openChat(j.withResource(res), UserAction);
 +		openChat(j.withResource(res), UserAction, body);
@@ -117,9 +107,9 @@ Index: psi/src/psiaccount.cpp
 -		openChat(j, UserAction);
 +		openChat(j, UserAction, body);
  }
-
+ 
  // unlike actionOpenChat(), this function will work on jids that aren't
-@@ -4247,11 +4247,11 @@
+@@ -4242,11 +4242,11 @@ void PsiAccount::openUri(const QUrl &uri
  		QString subject = uri.queryItemValue("subject");
  		QString body = uri.queryItemValue("body");
  		QString type = uri.queryItemValue("type");
@@ -133,16 +123,16 @@ Index: psi/src/psiaccount.cpp
  		} else {
  			dj_newMessage(entity, body, subject, "");
  		}
-@@ -5226,7 +5226,7 @@
+@@ -5223,7 +5223,7 @@ void PsiAccount::processChats(const Jid
  	processChatsHelper(j, true);
  }
-
+ 
 -void PsiAccount::openChat(const Jid& j, ActivationType activationType)
 +void PsiAccount::openChat(const Jid& j, ActivationType activationType, const QString& body)
  {
  	ChatDlg* chat = ensureChatDlg(j);
  	chat->ensureTabbedCorrectly();
-@@ -5242,6 +5242,9 @@
+@@ -5239,6 +5239,9 @@ void PsiAccount::openChat(const Jid& j,
  			QTimer::singleShot(1000, dlg, SLOT(showTabWithoutActivation()));
  		}
  	}
@@ -150,13 +140,11 @@ Index: psi/src/psiaccount.cpp
 +		chat->setText(body);
 +	}
  }
-
+ 
  void PsiAccount::chatMessagesRead(const Jid &j)
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:01.464826022 +0400
-@@ -329,7 +329,7 @@
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
+@@ -329,7 +329,7 @@ public slots:
  	void actionRename(const Jid &, const QString &);
  	void actionGroupRename(const QString &, const QString &);
  	void actionHistory(const Jid &);
@@ -165,20 +153,18 @@ Index: psi/src/psiaccount.h
  	void actionOpenSavedChat(const Jid &);
  	void actionOpenChat2(const Jid &);
  	void actionOpenChatSpecific(const Jid &);
-@@ -504,7 +504,7 @@
-
+@@ -504,7 +504,7 @@ private:
+ 
  	void processChatsHelper(const Jid& jid, bool removeEvents);
  	void processChats(const Jid &);
 -	void openChat(const Jid &, ActivationType activationType);
 +	void openChat(const Jid &, ActivationType activationType, const QString & body = QString());
  	EventDlg *ensureEventDlg(const Jid &);
  	friend class PsiCon;
-
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:01.464826022 +0400
-@@ -1227,7 +1227,14 @@
+ 
+--- git.temp.orig/src/psicon.cpp
++++ git.temp/src/psicon.cpp
+@@ -1233,7 +1233,14 @@ void PsiCon::openUri(const QUrl &uri)
  	// authority
  	PsiAccount *pa = 0;
  	//if (uri.authority().isEmpty()) {
@@ -194,11 +180,9 @@ Index: psi/src/psicon.cpp
  		if (!pa) {
  			QMessageBox::critical(0, tr("Error"), QString("You need to have an account configured and enabled to open URIs (links)."));
  			return;
-Index: psi/src/tabs/tabdlg.cpp
-===================================================================
---- psi.orig/src/tabs/tabdlg.cpp	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:01.464826022 +0400
-@@ -812,3 +812,8 @@
+--- git.temp.orig/src/tabs/tabdlg.cpp
++++ git.temp/src/tabs/tabdlg.cpp
+@@ -812,3 +812,8 @@ void TabDlg::setSimplifiedCaptionEnabled
  	simplifiedCaption_ = enabled;
  	updateCaption();
  }
@@ -207,15 +191,13 @@ Index: psi/src/tabs/tabdlg.cpp
 +{
 +	return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
 +}
-Index: psi/src/tabs/tabdlg.h
-===================================================================
---- psi.orig/src/tabs/tabdlg.h	2013-01-15 14:04:01.468826022 +0400
-+++ psi/src/tabs/tabdlg.h	2013-01-15 14:04:01.464826022 +0400
-@@ -86,6 +86,7 @@
+--- git.temp.orig/src/tabs/tabdlg.h
++++ git.temp/src/tabs/tabdlg.h
+@@ -86,6 +86,7 @@ public:
  	void setUserManagementEnabled(bool enabled); // default enabled
  	void setTabBarShownForSingles(bool enabled); // default enabled
  	void setSimplifiedCaptionEnabled(bool enabled); // default disabled
 +	TabbableWidget* getCurrentTab() const;
-
+ 
  protected:
  	void setShortcuts();

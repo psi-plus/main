@@ -1,24 +1,22 @@
-Index: psi/src/mucjoindlg.cpp
-===================================================================
---- psi.orig/src/mucjoindlg.cpp	2013-01-15 14:04:20.760826807 +0400
-+++ psi/src/mucjoindlg.cpp	2013-01-15 14:04:20.756826807 +0400
+--- git.temp.orig/src/mucjoindlg.cpp
++++ git.temp/src/mucjoindlg.cpp
 @@ -29,6 +29,7 @@
  #include "mucjoindlg.h"
  #include "psicontactlist.h"
  #include "groupchatdlg.h"
 +#include "bookmarkmanager.h"
-
+ 
  MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiAccount* pa)
  	: QDialog(0)
-@@ -66,6 +67,7 @@
-
+@@ -66,6 +67,7 @@ MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiA
+ 
  	setWindowTitle(CAP(windowTitle()));
  	connect(ui_.cb_recent, SIGNAL(activated(int)), SLOT(recent_activated(int)));
 +	connect(ui_.cb_bookmarks, SIGNAL(activated(int)), SLOT(bookmarksActivated(int)));
  	if (!ui_.cb_recent->count()) {
  		ui_.cb_recent->setEnabled(false);
  		ui_.le_host->setFocus();
-@@ -73,6 +75,13 @@
+@@ -73,6 +75,13 @@ MUCJoinDlg::MUCJoinDlg(PsiCon* psi, PsiA
  	else {
  		recent_activated(0);
  	}
@@ -29,22 +27,22 @@ Index: psi/src/mucjoindlg.cpp
 +	else {
 +		bookmarksActivated(0);
 +	}
-
+ 
  	setWidgetsEnabled(true);
  	adjustSize();
-@@ -110,6 +119,8 @@
+@@ -110,6 +119,8 @@ void MUCJoinDlg::updateIdentity(PsiAccou
  		return;
  	}
-
+ 
 +	updateBookmarks(account_);
 +
  	connect(account_, SIGNAL(disconnected()), this, SLOT(pa_disconnected()));
  }
-
-@@ -138,6 +149,33 @@
+ 
+@@ -138,6 +149,33 @@ void MUCJoinDlg::recent_activated(int x)
  	ui_.le_nick->setText(jid.resource());
  }
-
+ 
 +void MUCJoinDlg::bookmarksActivated(int x)
 +{
 +	Jid jid(ui_.cb_bookmarks->itemData(x).toString());
@@ -75,7 +73,7 @@ Index: psi/src/mucjoindlg.cpp
  void MUCJoinDlg::doJoin()
  {
  	if (!account_ || !account_->checkConnected(this))
-@@ -189,6 +227,7 @@
+@@ -191,6 +229,7 @@ void MUCJoinDlg::setWidgetsEnabled(bool
  {
  	ui_.cb_ident->setEnabled(enabled);
  	ui_.cb_recent->setEnabled(enabled && ui_.cb_recent->count() > 0);
@@ -83,23 +81,19 @@ Index: psi/src/mucjoindlg.cpp
  	ui_.gb_info->setEnabled(enabled);
  	joinButton_->setEnabled(enabled);
  }
-Index: psi/src/mucjoindlg.h
-===================================================================
---- psi.orig/src/mucjoindlg.h	2013-01-15 14:04:20.760826807 +0400
-+++ psi/src/mucjoindlg.h	2013-01-15 14:04:20.756826807 +0400
-@@ -58,6 +58,8 @@
+--- git.temp.orig/src/mucjoindlg.h
++++ git.temp/src/mucjoindlg.h
+@@ -58,6 +58,8 @@ private slots:
  	void updateIdentityVisibility();
  	void pa_disconnected();
  	void recent_activated(int);
 +	void bookmarksActivated(int);
 +	void updateBookmarks(PsiAccount *pa);
-
+ 
  private:
  	Ui::MUCJoin ui_;
-Index: psi/src/mucjoin.ui
-===================================================================
---- psi.orig/src/mucjoin.ui	2013-01-15 14:04:20.760826807 +0400
-+++ psi/src/mucjoin.ui	2013-01-15 14:04:20.756826807 +0400
+--- git.temp.orig/src/mucjoin.ui
++++ git.temp/src/mucjoin.ui
 @@ -27,7 +27,7 @@
     <item row="0" column="1">
      <widget class="AccountsComboBox" name="cb_ident"/>

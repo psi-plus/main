@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:15.920826610 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:15.912826610 +0400
-@@ -498,6 +498,9 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -496,6 +496,9 @@ QLineEdit#le_status_text {
  				<status_dnd type="QKeySequence" comment="Status DND"></status_dnd>
  				<status_invisible type="QKeySequence" comment="Status Invisible"></status_invisible>
  				<status_offline type="QKeySequence" comment="Status Offline"></status_offline>
@@ -12,14 +10,12 @@ Index: psi/options/default.xml
  				<help_readme type="QKeySequence" comment="README"></help_readme>
  				<help_tip type="QKeySequence" comment="Tips"></help_tip>
  				<help_online_forum type="QKeySequence" comment="Psi Forum (Online)"></help_online_forum>
-Index: psi/src/activitydlg.cpp
-===================================================================
---- psi.orig/src/activitydlg.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/activitydlg.cpp	2013-01-15 14:04:15.912826610 +0400
+--- git.temp.orig/src/activitydlg.cpp
++++ git.temp/src/activitydlg.cpp
 @@ -27,9 +27,11 @@
  #include "pepmanager.h"
  #include "psiiconset.h"
-
+ 
 -ActivityDlg::ActivityDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
 +ActivityDlg::ActivityDlg(QList<PsiAccount*> list) : QDialog(0), pa_(list)
  {
@@ -29,15 +25,15 @@ Index: psi/src/activitydlg.cpp
  	ui_.setupUi(this);
  	setModal(false);
  	connect(ui_.cb_general_type, SIGNAL(currentIndexChanged(const QString&)), SLOT(loadSpecificActivities(const QString&)));
-@@ -37,6 +39,7 @@
+@@ -37,6 +39,7 @@ ActivityDlg::ActivityDlg(PsiAccount* pa)
  	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setActivity()));
-
+ 
  	ui_.cb_general_type->addItem(tr("<unset>"));
 +	PsiAccount* pa = pa_.first();
  	Activity::Type at = pa->activity().type();
  	int i=1;
  	foreach(ActivityCatalog::Entry e, ActivityCatalog::instance()->entries()) {
-@@ -62,7 +65,8 @@
+@@ -62,7 +65,8 @@ void ActivityDlg::loadSpecificActivities
  	}
  	else {
  		ui_.cb_specific_type->addItem(tr("<unset>"));
@@ -47,10 +43,10 @@ Index: psi/src/activitydlg.cpp
  		int i=1;
  		ActivityCatalog* ac = ActivityCatalog::instance();
  		foreach(ActivityCatalog::Entry e, ac->entries()) {
-@@ -88,18 +92,20 @@
+@@ -88,18 +92,20 @@ void ActivityDlg::setActivity()
  	QString generalActivityStr  = ui_.cb_general_type->currentText();
  	QString specificActivityStr = ui_.cb_specific_type->currentText();
-
+ 
 -	if (generalActivityStr == tr("<unset>")) {
 -		pa_->pepManager()->retract("http://jabber.org/protocol/activity", "current");
 -	}
@@ -79,36 +75,32 @@ Index: psi/src/activitydlg.cpp
  	}
  	close();
  }
-Index: psi/src/activitydlg.h
-===================================================================
---- psi.orig/src/activitydlg.h	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/activitydlg.h	2013-01-15 14:04:15.912826610 +0400
-@@ -32,7 +32,7 @@
+--- git.temp.orig/src/activitydlg.h
++++ git.temp/src/activitydlg.h
+@@ -32,7 +32,7 @@ class ActivityDlg : public QDialog
  	Q_OBJECT
-
+ 
  public:
 -	ActivityDlg(PsiAccount*);
 +	ActivityDlg(QList<PsiAccount*>);
-
+ 
  protected slots:
  	void setActivity();
-@@ -40,7 +40,7 @@
-
+@@ -40,7 +40,7 @@ protected slots:
+ 
  private:
  	Ui::Activity ui_;
 -	PsiAccount* pa_;
 +	QList<PsiAccount*> pa_;
  };
-
+ 
  #endif
-Index: psi/src/geolocationdlg.cpp
-===================================================================
---- psi.orig/src/geolocationdlg.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/geolocationdlg.cpp	2013-01-15 14:04:15.912826610 +0400
+--- git.temp.orig/src/geolocationdlg.cpp
++++ git.temp/src/geolocationdlg.cpp
 @@ -28,16 +28,19 @@
  #include "geolocation.h"
  #include <QLineEdit>
-
+ 
 -GeoLocationDlg::GeoLocationDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
 +GeoLocationDlg::GeoLocationDlg(QList<PsiAccount*> list) : QDialog(0), pa_(list)
  {
@@ -120,17 +112,17 @@ Index: psi/src/geolocationdlg.cpp
  	connect(ui_.pb_cancel, SIGNAL(clicked()), SLOT(close()));
   	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setGeoLocation()));
  	connect(ui_.pb_reset, SIGNAL(clicked()), SLOT(reset()));
-
+ 
 -	GeoLocation geoloc = pa_->geolocation();
 +	PsiAccount *pa = pa_.first();
 +	GeoLocation geoloc = pa->geolocation();
  	if(geoloc.isNull())
  		return;
-
-@@ -155,11 +158,13 @@
+ 
+@@ -155,11 +158,13 @@ void GeoLocationDlg::setGeoLocation()
  	if(!ui_.le_text->text().isEmpty())
  		geoloc.setText(ui_.le_text->text());
-
+ 
 -	if (geoloc.isNull()) {
 - 		pa_->pepManager()->retract("http://jabber.org/protocol/geoloc", "current");
 -	}
@@ -146,32 +138,28 @@ Index: psi/src/geolocationdlg.cpp
  	}
  	close();
  }
-Index: psi/src/geolocationdlg.h
-===================================================================
---- psi.orig/src/geolocationdlg.h	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/geolocationdlg.h	2013-01-15 14:04:15.912826610 +0400
-@@ -31,7 +31,7 @@
+--- git.temp.orig/src/geolocationdlg.h
++++ git.temp/src/geolocationdlg.h
+@@ -31,7 +31,7 @@ class GeoLocationDlg : public QDialog
  	Q_OBJECT
-
+ 
  public:
 -	GeoLocationDlg(PsiAccount*);
 +	GeoLocationDlg(QList<PsiAccount*>);
-
+ 
  protected slots:
  	void setGeoLocation();
-@@ -39,7 +39,7 @@
-
+@@ -39,7 +39,7 @@ protected slots:
+ 
  private:
  	Ui::GeoLocation ui_;
 - 	PsiAccount* pa_;
 +	QList<PsiAccount*> pa_;
  };
-
+ 
  #endif // GEOLOCATIONDLG_H
-Index: psi/src/mainwin.cpp
-===================================================================
---- psi.orig/src/mainwin.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/mainwin.cpp	2013-01-15 14:04:15.916826610 +0400
+--- git.temp.orig/src/mainwin.cpp
++++ git.temp/src/mainwin.cpp
 @@ -69,6 +69,9 @@
  #ifdef NEWCONTACTLIST
  #include "psirosterwidget.h"
@@ -179,21 +167,21 @@ Index: psi/src/mainwin.cpp
 +#include "mooddlg.h"
 +#include "activitydlg.h"
 +#include "geolocationdlg.h"
-
+ 
  #include "mainwin_p.h"
-
-@@ -147,6 +150,10 @@
+ 
+@@ -147,6 +150,10 @@ public:
  	void updateMenu(QStringList actions, QMenu* menu);
-
+ 
  	QString ToolTipText;
 +
 +	QPointer<MoodDlg> moodDlg;
 +	QPointer<ActivityDlg> activityDlg;
 +	QPointer<GeoLocationDlg> geolocationDlg;
  };
-
+ 
  MainWin::Private::Private(PsiCon* _psi, MainWin* _mainWin) : splitter(0), mainTabs(0), viewToolBar(0), isLeftRoster(false), psi(_psi), mainWin(_mainWin)
-@@ -605,6 +612,9 @@
+@@ -605,6 +612,9 @@ void MainWin::registerAction( IconAction
  		{ "menu_play_sounds",    toggled,   this, SLOT( actPlaySoundsActivated(bool) ) },
  #ifdef USE_PEP
  		{ "publish_tune",        toggled,   this, SLOT( actPublishTuneActivated(bool) ) },
@@ -201,12 +189,12 @@ Index: psi/src/mainwin.cpp
 +		{ "set_activity",        activated,   this, SLOT( actSetActivityActivated() ) },
 +		{ "set_geoloc",		 activated,   this, SLOT( actSetGeolocActivated() ) },
  #endif
-
+ 
  		{ "event_notifier", SIGNAL( clicked(int) ), this, SLOT( statusClicked(int) ) },
-@@ -1089,6 +1099,60 @@
+@@ -1089,6 +1099,60 @@ void MainWin::actEnableGroupsActivated (
  	PsiOptions::instance()->setOption("options.ui.contactlist.enable-groups", state);
  }
-
+ 
 +void MainWin::actSetMoodActivated()
 +{
 +	QList<PsiAccount*> l;
@@ -264,28 +252,24 @@ Index: psi/src/mainwin.cpp
  void MainWin::activatedAccOption(PsiAccount* pa, int x)
  {
  	if(x == 0) {
-Index: psi/src/mainwin.h
-===================================================================
---- psi.orig/src/mainwin.h	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/mainwin.h	2013-01-15 14:04:15.916826610 +0400
-@@ -135,6 +135,9 @@
+--- git.temp.orig/src/mainwin.h
++++ git.temp/src/mainwin.h
+@@ -135,6 +135,9 @@ private slots:
  	void actTipActivated();
  	void actDiagQCAPluginActivated();
  	void actDiagQCAKeyStoreActivated();
 +	void actSetMoodActivated();
 +	void actSetActivityActivated();
 +	void actSetGeolocActivated();
-
+ 
  	bool showDockMenu(const QPoint &);
  	void dockActivated();
-Index: psi/src/mooddlg.cpp
-===================================================================
---- psi.orig/src/mooddlg.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/mooddlg.cpp	2013-01-15 14:04:15.916826610 +0400
+--- git.temp.orig/src/mooddlg.cpp
++++ git.temp/src/mooddlg.cpp
 @@ -27,16 +27,19 @@
  #include "pepmanager.h"
  #include "psiiconset.h"
-
+ 
 -MoodDlg::MoodDlg(PsiAccount* pa)
 -	: QDialog(0), pa_(pa)
 +MoodDlg::MoodDlg(QList<PsiAccount*> list)
@@ -298,13 +282,13 @@ Index: psi/src/mooddlg.cpp
  	setModal(false);
  	connect(ui_.pb_cancel, SIGNAL(clicked()), SLOT(close()));
  	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setMood()));
-
+ 
  	ui_.cb_type->addItem(tr("<unset>"));
 +	PsiAccount *pa = pa_.first();
  	Mood::Type mt = pa->mood().type();
  	int i=1;
  	foreach(MoodCatalog::Entry e, MoodCatalog::instance()->entries()) {
-@@ -53,11 +56,14 @@
+@@ -53,11 +56,14 @@ MoodDlg::MoodDlg(PsiAccount* pa)
  void MoodDlg::setMood()
  {
  	QString moodstr = ui_.cb_type->currentText();
@@ -324,33 +308,29 @@ Index: psi/src/mooddlg.cpp
  	}
  	close();
  }
-Index: psi/src/mooddlg.h
-===================================================================
---- psi.orig/src/mooddlg.h	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/mooddlg.h	2013-01-15 14:04:15.916826610 +0400
-@@ -32,14 +32,14 @@
+--- git.temp.orig/src/mooddlg.h
++++ git.temp/src/mooddlg.h
+@@ -32,14 +32,14 @@ class MoodDlg : public QDialog
  	Q_OBJECT
-
+ 
  public:
 -	MoodDlg(PsiAccount*);
 +	MoodDlg(QList<PsiAccount*>);
-
+ 
  protected slots:
  	void setMood();
-
+ 
  private:
  	Ui::Mood ui_;
 -	PsiAccount* pa_;
 +	QList<PsiAccount*> pa_;
  };
-
+ 
  #endif
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:15.916826610 +0400
-@@ -3808,19 +3808,25 @@
-
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -3803,19 +3803,25 @@ void PsiAccount::actionExecuteCommandSpe
+ 
  void PsiAccount::actionSetMood()
  {
 -	MoodDlg *w = new MoodDlg(this);
@@ -359,7 +339,7 @@ Index: psi/src/psiaccount.cpp
 +	MoodDlg *w = new MoodDlg(list);
  	w->show();
  }
-
+ 
  void PsiAccount::actionSetActivity()
  {
 -	ActivityDlg *w = new ActivityDlg(this);
@@ -368,7 +348,7 @@ Index: psi/src/psiaccount.cpp
 +	ActivityDlg *w = new ActivityDlg(list);
  	w->show();
  }
-
+ 
  void PsiAccount::actionSetGeoLocation()
  {
 -	GeoLocationDlg *w = new GeoLocationDlg(this);
@@ -377,15 +357,13 @@ Index: psi/src/psiaccount.cpp
 +	GeoLocationDlg *w = new GeoLocationDlg(list);
  	w->show();
  }
-
-Index: psi/src/psiactionlist.cpp
-===================================================================
---- psi.orig/src/psiactionlist.cpp	2013-01-15 14:04:15.920826610 +0400
-+++ psi/src/psiactionlist.cpp	2013-01-15 14:04:15.916826610 +0400
-@@ -275,8 +275,20 @@
+ 
+--- git.temp.orig/src/psiactionlist.cpp
++++ git.temp/src/psiactionlist.cpp
+@@ -275,8 +275,20 @@ void PsiActionList::Private::createMainW
  		IconAction *actPublishTune = new IconAction (tr("Publish Tune"), "psi/publishTune", tr("Publish &Tune"), 0, this, 0, true);
  		actPublishTune->setWhatsThis (tr("Toggles whether the currently playing tune should be published or not"));
-
+ 
 +		IconAction *actSetMood = new IconAction (tr("Set Mood"), "mood/", tr("Set Mood"), 0, this);
 +		actSetMood->setWhatsThis (tr("Set Mood for all active accounts"));
 +
@@ -403,4 +381,4 @@ Index: psi/src/psiactionlist.cpp
 +			{ "set_geoloc",		actSetGeoloc },
  			{ "", 0 }
  		};
-
+ 

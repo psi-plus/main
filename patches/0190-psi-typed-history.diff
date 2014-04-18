@@ -1,7 +1,5 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:02.456826062 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:02.452826062 +0400
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
 @@ -425,6 +425,10 @@
  				</send>
  				<clear type="QKeySequence" comment="Clear the text"/>
@@ -13,35 +11,29 @@ Index: psi/options/default.xml
  			</chat>
  			<contactlist comment="Shortcuts in the contactlist">
  				<assign-custom-avatar type="QKeySequence" comment="Assign a custom avatar to the selected contact"/>
-Index: psi/src/chatdlg.cpp
-===================================================================
---- psi.orig/src/chatdlg.cpp	2013-01-15 14:04:02.456826062 +0400
-+++ psi/src/chatdlg.cpp	2013-01-15 14:04:02.452826062 +0400
-@@ -695,6 +695,7 @@
+--- git.temp.orig/src/chatdlg.cpp
++++ git.temp/src/chatdlg.cpp
+@@ -678,6 +678,7 @@ void ChatDlg::doSend()
  	}
-
+ 
  	m_ = m;
 +	emit chatEdit()->appendMessageHistory(m.body());
-
+ 
  	// Request events
  	if (PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool()) {
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:02.456826062 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:02.456826062 +0400
-@@ -947,6 +947,7 @@
+--- git.temp.orig/src/groupchatdlg.cpp
++++ git.temp/src/groupchatdlg.cpp
+@@ -936,6 +936,7 @@ void GCMainDlg::mle_returnPressed()
  	m.setType("groupchat");
  	m.setBody(str);
  	m.setTimeStamp(QDateTime::currentDateTime());
 +	emit d->mle()->appendMessageHistory(m.body());
-
+ 
  	aSend(m);
-
-Index: psi/src/msgmle.cpp
-===================================================================
---- psi.orig/src/msgmle.cpp	2013-01-15 14:04:02.456826062 +0400
-+++ psi/src/msgmle.cpp	2013-01-15 14:04:02.456826062 +0400
-@@ -58,13 +58,45 @@
+ 
+--- git.temp.orig/src/msgmle.cpp
++++ git.temp/src/msgmle.cpp
+@@ -58,13 +58,45 @@ ChatEdit::ChatEdit(QWidget *parent)
  	previous_position_ = 0;
  	setCheckSpelling(checkSpellingGloballyEnabled());
  	connect(PsiOptions::instance(),SIGNAL(optionChanged(const QString&)),SLOT(optionsChanged()));
@@ -50,13 +42,13 @@ Index: psi/src/msgmle.cpp
 +	initActions();
 +	setShortcuts();
  }
-
+ 
  ChatEdit::~ChatEdit()
  {
 +	clearMessageHistory();
  	delete spellhighlighter_;
  }
-
+ 
 +void ChatEdit::initActions()
 +{
 +	act_showMessagePrev = new QAction(this);
@@ -87,10 +79,10 @@ Index: psi/src/msgmle.cpp
  void ChatEdit::setDialog(QWidget* dialog)
  {
  	dialog_ = dialog;
-@@ -239,6 +271,90 @@
+@@ -239,6 +271,90 @@ void ChatEdit::optionsChanged()
  	setCheckSpelling(checkSpellingGloballyEnabled());
  }
-
+ 
 +void ChatEdit::showHistoryMessageNext()
 +{
 +	if (!typedMsgsHistory.isEmpty()) {
@@ -178,23 +170,21 @@ Index: psi/src/msgmle.cpp
  //----------------------------------------------------------------------------
  // LineEdit
  //----------------------------------------------------------------------------
-Index: psi/src/msgmle.h
-===================================================================
---- psi.orig/src/msgmle.h	2013-01-15 14:04:02.456826062 +0400
-+++ psi/src/msgmle.h	2013-01-15 14:04:02.456826062 +0400
+--- git.temp.orig/src/msgmle.h
++++ git.temp/src/msgmle.h
 @@ -23,6 +23,8 @@
-
+ 
  #include <QTextEdit>
-
+ 
 +#define MAX_MESSAGE_HISTORY 50
 +
  class ChatEdit;
  class QEvent;
  class QKeyEvent;
-@@ -47,10 +49,18 @@
+@@ -47,10 +49,18 @@ public:
  	static bool checkSpellingGloballyEnabled();
  	void setCheckSpelling(bool);
-
+ 
 +public slots:
 +	void appendMessageHistory(const QString& text);
 +	void clearMessageHistory();
@@ -207,10 +197,10 @@ Index: psi/src/msgmle.h
 +	void showHistoryMessagePrev();
 +	void showHistoryMessageFirst();
 +	void showHistoryMessageLast();
-
+ 
  protected:
  	// override the tab/esc behavior
-@@ -58,6 +68,10 @@
+@@ -58,6 +68,10 @@ protected:
  	void keyPressEvent(QKeyEvent *);
  	bool event(QEvent * event);
  	void contextMenuEvent(QContextMenuEvent *e);
@@ -218,10 +208,10 @@ Index: psi/src/msgmle.h
 +	void initActions();
 +	void setShortcuts();
 +	void setEditText(const QString& text);
-
+ 
  private:
  	QWidget	*dialog_;
-@@ -65,6 +79,13 @@
+@@ -65,6 +79,13 @@ private:
  	SpellHighlighter* spellhighlighter_;
  	QPoint last_click_;
  	int previous_position_;
@@ -233,5 +223,5 @@ Index: psi/src/msgmle.h
 +	QAction* act_showMessageLast;
 +	QString currentText;
  };
-
-
+ 
+ 

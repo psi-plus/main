@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:09.848826363 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:09.844826363 +0400
-@@ -216,6 +216,9 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -215,6 +215,9 @@
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -12,12 +10,10 @@ Index: psi/options/default.xml
  				<theme comment="The theme used for groupchat messages rendering" type="QString">psi/classic</theme>
  				<highlight-words type="QStringList" />
  				<size comment="Remembered window size" type="QSize">
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:09.848826363 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:09.844826363 +0400
-@@ -233,6 +233,9 @@
-
+--- git.temp.orig/src/groupchatdlg.cpp
++++ git.temp/src/groupchatdlg.cpp
+@@ -232,6 +232,9 @@ public:
+ 
  	QPointer<MUCConfigDlg> configDlg;
  	QPointer<GroupchatTopicDlg> topicDlg;
 +
@@ -25,11 +21,11 @@ Index: psi/src/groupchatdlg.cpp
 +	int rosterSize;
  public:
  	bool trackBar;
-
-@@ -743,12 +746,24 @@
+ 
+@@ -740,12 +743,24 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
-
+ 
 +	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
 +
  	// resize the horizontal splitter
@@ -45,7 +41,7 @@ Index: psi/src/groupchatdlg.cpp
 +		list <<  d->logSize << d->rosterSize;
 +
  	ui_.hsplitter->setSizes(list);
-
+ 
 +	if (leftRoster)
 +		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
 +
@@ -53,8 +49,8 @@ Index: psi/src/groupchatdlg.cpp
  	list.clear();
  	list << 324;
  	list << 10;
-@@ -778,6 +793,10 @@
-
+@@ -766,6 +781,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+ 
  GCMainDlg::~GCMainDlg()
  {
 +	//  Save splitters size
@@ -64,10 +60,10 @@ Index: psi/src/groupchatdlg.cpp
  	if(d->state != Private::Idle && d->state != Private::ForcedLeave) {
  		account()->groupChatLeave(jid().domain(), jid().node());
  	}
-@@ -798,6 +817,17 @@
+@@ -786,6 +805,17 @@ GCMainDlg::~GCMainDlg()
  	}
  }
-
+ 
 +void GCMainDlg::horizSplitterMoved()
 +{
 +	QList<int> list = ui_.hsplitter->sizes();
@@ -82,7 +78,7 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::ensureTabbedCorrectly()
  {
  	TabbableWidget::ensureTabbedCorrectly();
-@@ -805,9 +835,15 @@
+@@ -793,9 +823,15 @@ void GCMainDlg::ensureTabbedCorrectly()
  	// QSplitter is broken again, force resize so that
  	// lv_users gets initizalised properly and context menu
  	// works in tabs too.
@@ -100,10 +96,10 @@ Index: psi/src/groupchatdlg.cpp
  	UserListItem* u = account()->find(jid().bare());
  	if(u) {
  		setTabIcon(PsiIconset::instance()->statusPtr(u)->icon());
-@@ -1971,6 +2007,33 @@
+@@ -1969,6 +2005,33 @@ void GCMainDlg::sendTemp(const QString &
  	}
  }
-
+ 
 +
 +
 +void GCMainDlg::resizeEvent(QResizeEvent *e)
@@ -134,23 +130,21 @@ Index: psi/src/groupchatdlg.cpp
  //----------------------------------------------------------------------------
  // GCFindDlg
  //----------------------------------------------------------------------------
-Index: psi/src/groupchatdlg.h
-===================================================================
---- psi.orig/src/groupchatdlg.h	2013-01-15 14:04:09.848826363 +0400
-+++ psi/src/groupchatdlg.h	2013-01-15 14:04:09.844826363 +0400
-@@ -88,6 +88,7 @@
+--- git.temp.orig/src/groupchatdlg.h
++++ git.temp/src/groupchatdlg.h
+@@ -90,6 +90,7 @@ protected:
  	void setShortcuts();
-
+ 
  	// reimplemented
 +	void resizeEvent(QResizeEvent *e);
  	void dragEnterEvent(QDragEnterEvent *);
  	void dropEvent(QDropEvent *);
  	void closeEvent(QCloseEvent *);
-@@ -142,6 +143,7 @@
+@@ -143,6 +144,7 @@ private slots:
  	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();
 +	void horizSplitterMoved();
-
+ 
  public:
  	class Private;

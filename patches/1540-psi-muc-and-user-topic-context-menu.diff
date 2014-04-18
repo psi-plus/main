@@ -1,16 +1,14 @@
-Index: psi/src/groupchatdlg.cpp
-===================================================================
---- psi.orig/src/groupchatdlg.cpp	2013-01-15 14:04:30.640827208 +0400
-+++ psi/src/groupchatdlg.cpp	2013-01-15 14:04:30.636827208 +0400
+--- git.temp.orig/src/groupchatdlg.cpp
++++ git.temp/src/groupchatdlg.cpp
 @@ -52,6 +52,7 @@
  #include <QCheckBox>
  #include <QDialogButtonBox>
  #include <QFormLayout>
 +#include <QClipboard>
-
+ 
  #include "psicon.h"
  #include "psiaccount.h"
-@@ -211,6 +212,7 @@
+@@ -210,6 +211,7 @@ public:
  	QString topic;
  	bool nonAnonymous;		 // got status code 100 ?
  	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark, *act_html_text;
@@ -18,7 +16,7 @@ Index: psi/src/groupchatdlg.cpp
  	TypeAheadFindBar *typeahead;
  //#ifdef WHITEBOARDING
  //	IconAction *act_whiteboard;
-@@ -730,6 +732,11 @@
+@@ -728,6 +730,11 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	d->act_bookmark = new IconAction(this);
  	connect(d->act_bookmark, SIGNAL(triggered()), SLOT(doBookmark()));
  	ui_.le_topic->addAction(d->act_bookmark);
@@ -30,10 +28,10 @@ Index: psi/src/groupchatdlg.cpp
  	BookmarkManager *bm = account()->bookmarkManager();
  	d->act_bookmark->setVisible(bm->isAvailable());
  	if (bm->isAvailable()) {
-@@ -2120,6 +2127,11 @@
+@@ -2117,6 +2124,11 @@ void GCMainDlg::doBookmark()
  	delete dlg;
  }
-
+ 
 +void GCMainDlg::copyMucJid()
 +{
 +	QApplication::clipboard()->setText(jid().bare());
@@ -42,11 +40,9 @@ Index: psi/src/groupchatdlg.cpp
  void GCMainDlg::doRemoveBookmark()
  {
  	BookmarkManager *bm = account()->bookmarkManager();
-Index: psi/src/groupchatdlg.h
-===================================================================
---- psi.orig/src/groupchatdlg.h	2013-01-15 14:04:30.640827208 +0400
-+++ psi/src/groupchatdlg.h	2013-01-15 14:04:30.636827208 +0400
-@@ -141,6 +141,7 @@
+--- git.temp.orig/src/groupchatdlg.h
++++ git.temp/src/groupchatdlg.h
+@@ -142,6 +142,7 @@ private slots:
  	void editTemplates();
  	void doPasteAndSend();
  	void doBookmark();
@@ -54,33 +50,29 @@ Index: psi/src/groupchatdlg.h
  	void doRemoveBookmark();
  	void sendTemp(const QString &);
  	void psButtonEnabled();
-Index: psi/src/infodlg.cpp
-===================================================================
---- psi.orig/src/infodlg.cpp	2013-01-15 14:04:30.640827208 +0400
-+++ psi/src/infodlg.cpp	2013-01-15 14:04:30.636827208 +0400
-@@ -161,7 +161,8 @@
+--- git.temp.orig/src/infodlg.cpp
++++ git.temp/src/infodlg.cpp
+@@ -161,7 +161,8 @@ InfoDlg::InfoDlg(int type, const Jid &j,
  	d->namesDlg->setLayout(fl);
  	// end names editing dialog
-
+ 
 -	QAction *editnames = new QAction(IconsetFactory::icon(d->type == Self?"psi/options":"psi/info").icon(), "", this);
 +	QAction *editnames = new QAction(IconsetFactory::icon(d->type == Self ? "psi/options" : "psi/info").icon(),
 +									 d->type == Self ? tr("Edit names") : tr("View names") , this);
  	ui_.le_fullname->addAction(editnames);
  	ui_.le_fullname->widgetForAction(editnames)->setPopup(d->namesDlg);
  	d->homepageAction = new QAction(IconsetFactory::icon("psi/arrowRight").icon(), tr("Open web browser"), this);
-diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index d3a9624..d8b1df0 100644
---- a/src/psichatdlg.cpp
-+++ b/src/psichatdlg.cpp
+--- git.temp.orig/src/psichatdlg.cpp
++++ git.temp/src/psichatdlg.cpp
 @@ -19,6 +19,7 @@
  #include <QMessageBox>
  #include <QDebug>
  #include <QTimer>
 +#include <QClipboard>
-
+ 
  #include "psicon.h"
  #include "psiaccount.h"
-@@ -222,6 +224,10 @@ void PsiChatDlg::initUi()
+@@ -220,6 +221,10 @@ void PsiChatDlg::initUi()
  		updateAutojidIcon();
  		connect(act_autojid, SIGNAL(triggered()), SLOT(doSwitchJidMode()));
  		le_autojid->addAction(act_autojid);
@@ -89,12 +81,12 @@ index d3a9624..d8b1df0 100644
 +		le_autojid->addAction(act_copy_user_jid);
 +		connect(act_copy_user_jid, SIGNAL(triggered()), SLOT(copyUserJid()));
  	}
-
+ 
  	ui_.lb_ident->setAccount(account());
-@@ -426,6 +433,11 @@ void PsiChatDlg::updateContactAdding(PsiContact* c)
+@@ -424,6 +429,11 @@ void PsiChatDlg::updateContactAdding(Psi
  	}
  }
-
+ 
 +void PsiChatDlg::copyUserJid()
 +{
 +	QApplication::clipboard()->setText(jid().bare());
@@ -103,15 +95,13 @@ index d3a9624..d8b1df0 100644
  void PsiChatDlg::updateContactAdding(const Jid &j)
  {
  	if (realJid().compare(j, false)) {
-diff --git a/src/psichatdlg.h b/src/psichatdlg.h
-index 0cc64bb..7732ff6 100644
---- a/src/psichatdlg.h
-+++ b/src/psichatdlg.h
+--- git.temp.orig/src/psichatdlg.h
++++ git.temp/src/psichatdlg.h
 @@ -47,6 +47,7 @@ private slots:
  	void updateCountVisibility();
  	void updateContactAdding(PsiContact* c = 0);
  	void updateContactAdding(const Jid &j);
 +	void copyUserJid();
-
+ 
  	// reimplemented
  	void chatEditCreated();

@@ -1,9 +1,7 @@
-Index: psi/src/tabs/tabbablewidget.cpp
-===================================================================
---- psi.orig/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:34.516827366 +0400
-+++ psi/src/tabs/tabbablewidget.cpp	2013-01-15 14:04:34.512827366 +0400
+--- git.temp.orig/src/tabs/tabbablewidget.cpp
++++ git.temp/src/tabs/tabbablewidget.cpp
 @@ -37,10 +37,15 @@
-
+ 
  TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabManager)
  	: AdvancedWidget<QWidget>(0)
 +	, state_(Deactivated)
@@ -18,7 +16,7 @@ Index: psi/src/tabs/tabbablewidget.cpp
  	if (TabbableWidget::chatsCount == 0) {
  		TabbableWidget::templateMenu = new SendButtonTemplatesMenu(NULL);
  		TabbableWidget::templateMenu->setParams(false);
-@@ -247,11 +252,22 @@
+@@ -247,11 +252,22 @@ void TabbableWidget::changeEvent(QEvent*
  	    event->type() == QEvent::WindowStateChange)
  	{
  		if (isActiveTab()) {
@@ -42,37 +40,35 @@ Index: psi/src/tabs/tabbablewidget.cpp
 +		deactivated();
  	}
  }
-
-Index: psi/src/tabs/tabbablewidget.h
-===================================================================
---- psi.orig/src/tabs/tabbablewidget.h	2013-01-15 14:04:34.516827366 +0400
-+++ psi/src/tabs/tabbablewidget.h	2013-01-15 14:04:34.512827366 +0400
+ 
+--- git.temp.orig/src/tabs/tabbablewidget.h
++++ git.temp/src/tabs/tabbablewidget.h
 @@ -22,6 +22,7 @@
  #define TABBABLE_H
-
+ 
  #include <QIcon>
 +#include <QTimer>
  #include "advwidget.h"
  #include "im.h" // ChatState
  #include "sendbuttonmenu.h"
-@@ -83,19 +84,26 @@
+@@ -83,19 +84,26 @@ signals:
  	void vSplitterMoved(int,int);
-
+ 
  public slots:
 -	virtual void deactivated();
 -	virtual void activated();
  	void bringToFront(bool raiseWindow = true);
  	virtual void ensureTabbedCorrectly();
  	void hideTab();
-
+ 
  protected:
  	virtual void setJid(const Jid&);
 +	virtual void deactivated();
 +	virtual void activated();
-
+ 
  	// reimplemented
  	void changeEvent(QEvent* e);
-
+ 
 +private slots:
 +	void commitState();
 +
@@ -84,26 +80,24 @@ Index: psi/src/tabs/tabbablewidget.h
  	Jid jid_;
  	PsiAccount *pa_;
  	TabManager *tabManager_;
-Index: psi/src/tabs/tabdlg.cpp
-===================================================================
---- psi.orig/src/tabs/tabdlg.cpp	2013-01-15 14:04:34.516827366 +0400
-+++ psi/src/tabs/tabdlg.cpp	2013-01-15 14:04:34.512827366 +0400
-@@ -397,12 +397,12 @@
+--- git.temp.orig/src/tabs/tabdlg.cpp
++++ git.temp/src/tabs/tabdlg.cpp
+@@ -397,12 +397,12 @@ void TabDlg::tabSelected(QWidget* _selec
  	// _selected could be null when TabDlg is closing and deleting all its tabs
  	TabbableWidget* selected = _selected ? qobject_cast<TabbableWidget*>(_selected) : 0;
  	if (!selectedTab_.isNull()) {
 -		selectedTab_->deactivated();
 +		QCoreApplication::postEvent(selectedTab_, new QEvent(QEvent::ActivationChange));
  	}
-
+ 
  	selectedTab_ = selected;
  	if (selected) {
 -		selected->activated();
 +		QCoreApplication::postEvent(selected, new QEvent(QEvent::ActivationChange));
  	}
-
+ 
  	updateCaption();
-@@ -517,7 +517,7 @@
+@@ -520,7 +520,7 @@ void TabDlg::closeTab(TabbableWidget* ch
  	chat->hide();
  	removeTabWithNoChecks(chat);
  	chat->setParent(0);

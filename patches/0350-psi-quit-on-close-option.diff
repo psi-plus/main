@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:06.304826219 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:06.296826219 +0400
-@@ -152,6 +152,7 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -151,6 +151,7 @@
  				<group-sort-style type="QString">alpha</group-sort-style>
  				<lockdown-roster type="bool">false</lockdown-roster>
  				<raise-on-new-event type="bool">false</raise-on-new-event>
@@ -10,11 +8,9 @@ Index: psi/options/default.xml
  				<show>
  					<agent-contacts type="bool">true</agent-contacts>
  					<away-contacts type="bool">true</away-contacts>
-Index: psi/src/mainwin.cpp
-===================================================================
---- psi.orig/src/mainwin.cpp	2013-01-15 14:04:06.304826219 +0400
-+++ psi/src/mainwin.cpp	2013-01-15 14:04:06.300826219 +0400
-@@ -1161,7 +1161,7 @@
+--- git.temp.orig/src/mainwin.cpp
++++ git.temp/src/mainwin.cpp
+@@ -1161,7 +1161,7 @@ void MainWin::closeEvent(QCloseEvent* e)
  	trayHide();
  	e->accept();
  #else
@@ -23,45 +19,43 @@ Index: psi/src/mainwin.cpp
  		trayHide();
  		e->accept();
  		return;
-Index: psi/src/options/opt_application.cpp
-===================================================================
---- psi.orig/src/options/opt_application.cpp	2013-01-15 14:04:06.304826219 +0400
-+++ psi/src/options/opt_application.cpp	2013-01-15 14:04:06.300826219 +0400
-@@ -67,6 +67,7 @@
-
-
+--- git.temp.orig/src/options/opt_application.cpp
++++ git.temp/src/options/opt_application.cpp
+@@ -67,6 +67,7 @@ QWidget *OptionsTabApplication::widget()
+ 
+ 
  	connect(d->le_dtPort, SIGNAL(textChanged(QString)), this, SLOT(updatePortLabel()));
 +	connect(d->ck_docklet, SIGNAL(stateChanged(int)), this, SLOT(doEnableQuitOnClose(int)));
-
+ 
  	return w;
  }
-@@ -83,6 +84,8 @@
-
+@@ -83,6 +84,8 @@ void OptionsTabApplication::applyOptions
+ 
  	OptApplicationUI *d = (OptApplicationUI *)w;
-
+ 
 +	PsiOptions::instance()->setOption("options.ui.contactlist.quit-on-close", d->ck_quitOnClose->isChecked());
 +
  	// Auto-update
  	PsiOptions::instance()->setOption("options.auto-update.check-on-startup", d->ck_autoUpdate->isChecked());
-
-@@ -108,18 +111,26 @@
+ 
+@@ -108,18 +111,26 @@ void OptionsTabApplication::restoreOptio
  	OptApplicationUI *d = (OptApplicationUI *)w;
-
+ 
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
 +	d->ck_quitOnClose->setChecked(PsiOptions::instance()->getOption("options.ui.contactlist.quit-on-close").toBool());
-
+ 
  	// docklet
  	d->ck_docklet->setChecked( PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool() );
  	d->ck_dockDCstyle->setChecked( PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool() );
  	d->ck_dockHideMW->setChecked( PsiOptions::instance()->getOption("options.contactlist.hide-on-start").toBool() );
  	d->ck_dockToolMW->setChecked( PsiOptions::instance()->getOption("options.contactlist.use-toolwindow").toBool() );
 +	doEnableQuitOnClose(d->ck_docklet->isChecked()?1:0);
-
+ 
  	// data transfer
  	d->le_dtPort->setText( QString::number(PsiOptions::instance()->getOption("options.p2p.bytestreams.listen-port").toInt()) );
  	d->le_dtExternal->setText( PsiOptions::instance()->getOption("options.p2p.bytestreams.external-address").toString() );
  }
-
+ 
 +void OptionsTabApplication::doEnableQuitOnClose(int state)
 +{
 +	OptApplicationUI *d = (OptApplicationUI *)w;
@@ -71,11 +65,9 @@ Index: psi/src/options/opt_application.cpp
  void OptionsTabApplication::updatePortLabel()
  {
  	if ( !w )
-Index: psi/src/options/opt_application.h
-===================================================================
---- psi.orig/src/options/opt_application.h	2013-01-15 14:04:06.304826219 +0400
-+++ psi/src/options/opt_application.h	2013-01-15 14:04:06.300826219 +0400
-@@ -25,6 +25,9 @@
+--- git.temp.orig/src/options/opt_application.h
++++ git.temp/src/options/opt_application.h
+@@ -25,6 +25,9 @@ private slots:
  private:
  	QWidget *w;
  	bool haveAutoUpdater_;
@@ -83,12 +75,10 @@ Index: psi/src/options/opt_application.h
 +private slots:
 +	void doEnableQuitOnClose(int);
  };
-
+ 
  #endif
-Index: psi/src/options/opt_application.ui
-===================================================================
---- psi.orig/src/options/opt_application.ui	2013-01-15 14:04:06.304826219 +0400
-+++ psi/src/options/opt_application.ui	2013-01-15 14:04:06.300826219 +0400
+--- git.temp.orig/src/options/opt_application.ui
++++ git.temp/src/options/opt_application.ui
 @@ -79,6 +79,13 @@
      </widget>
     </item>

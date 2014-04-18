@@ -1,10 +1,8 @@
 Entering 'iris'
 Entering 'src/libpsi'
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:11.776826441 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:11.768826441 +0400
-@@ -137,6 +137,7 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -136,6 +136,7 @@
  				<tooltip comment="Display options for the contact list tooltips">
  					<avatar comment="Display avatar" type="bool">true</avatar>
  					<client-version comment="Display client version information" type="bool">true</client-version>
@@ -12,7 +10,7 @@ Index: psi/options/default.xml
  					<last-status comment="Display the last status" type="bool">true</last-status>
  					<pgp comment="Display PGP information" type="bool">true</pgp>
  				</tooltip>
-@@ -170,6 +171,7 @@
+@@ -169,6 +170,7 @@
  				</avatars>
  				<show-mood-icons type="bool">true</show-mood-icons>
  				<show-activity-icons type="bool">true</show-activity-icons>
@@ -20,11 +18,9 @@ Index: psi/options/default.xml
  				<show-tune-icons type="bool">true</show-tune-icons>
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
-Index: psi/src/contactlistaccountmenu.cpp
-===================================================================
---- psi.orig/src/contactlistaccountmenu.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/contactlistaccountmenu.cpp	2013-01-15 14:04:11.772826441 +0400
-@@ -39,6 +39,7 @@
+--- git.temp.orig/src/contactlistaccountmenu.cpp
++++ git.temp/src/contactlistaccountmenu.cpp
+@@ -39,6 +39,7 @@ class ContactListAccountMenu::Private :
  	StatusMenu* statusMenu_;
  	QAction* moodAction_;
  	QAction* activityAction_;
@@ -32,17 +28,17 @@ Index: psi/src/contactlistaccountmenu.cpp
  	QAction* setAvatarAction_;
  	QMenu* avatarMenu_;
  	QAction* unsetAvatarAction_;
-@@ -78,6 +79,9 @@
+@@ -78,6 +79,9 @@ public:
  		activityAction_ = new QAction(tr("Activity"), this);
  		connect(activityAction_, SIGNAL(triggered()), SLOT(setActivity()));
-
+ 
 +		geolocationAction_ = new QAction(tr("GeoLocation"), this);
 +		connect(geolocationAction_, SIGNAL(triggered()), SLOT(setGeolocation()));
 +
  		setAvatarAction_ = new QAction(tr("Set Avatar"), this);
  		connect(setAvatarAction_, SIGNAL(triggered()), SLOT(setAvatar()));
-
-@@ -123,6 +127,7 @@
+ 
+@@ -123,6 +127,7 @@ public:
  		menu->addMenu(statusMenu_);
  		menu->addAction(moodAction_);
  		menu->addAction(activityAction_);
@@ -50,7 +46,7 @@ Index: psi/src/contactlistaccountmenu.cpp
  		avatarMenu_ = menu->addMenu(tr("Avatar"));
  		avatarMenu_->addAction(setAvatarAction_);
  		avatarMenu_->addAction(unsetAvatarAction_);
-@@ -162,10 +167,12 @@
+@@ -162,10 +167,12 @@ private slots:
  #ifndef USE_PEP
  		moodAction_->setVisible(false);
  		activityAction_->setVisible(false);
@@ -63,10 +59,10 @@ Index: psi/src/contactlistaccountmenu.cpp
  		avatarMenu_->setEnabled(account->account()->serverInfoManager()->hasPEP());
  #endif
  		bookmarksMenu_->clear();
-@@ -226,6 +233,14 @@
+@@ -226,6 +233,14 @@ private slots:
  		account->account()->actionSetActivity();
  	}
-
+ 
 +	void setGeolocation()
 +	{
 +		if (!account)
@@ -78,19 +74,17 @@ Index: psi/src/contactlistaccountmenu.cpp
  	void setAvatar()
  	{
  		if (!account)
-Index: psi/src/geolocation.cpp
-===================================================================
---- psi.orig/src/geolocation.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/geolocation.cpp	2013-01-15 14:04:11.772826441 +0400
+--- git.temp.orig/src/geolocation.cpp
++++ git.temp/src/geolocation.cpp
 @@ -20,6 +20,7 @@
-
+ 
  #include <QDomDocument>
  #include <QDomElement>
 +#include <QApplication>
-
+ 
  #include "geolocation.h"
-
-@@ -72,6 +73,56 @@
+ 
+@@ -72,6 +73,56 @@ QDomElement GeoLocation::toXml(QDomDocum
  		e.appendChild(doc.createTextNode(description_));
  		geoloc.appendChild(e);
  	}
@@ -144,10 +138,10 @@ Index: psi/src/geolocation.cpp
 +		e.appendChild(doc.createTextNode(text_));
 +		geoloc.appendChild(e);
 +	}
-
+ 
  	return geoloc;
  }
-@@ -85,18 +136,38 @@
+@@ -85,18 +136,38 @@ void GeoLocation::fromXml(const QDomElem
  		QDomElement m = n.toElement();
  		if (m.tagName() == "alt")
  			alt_ = Maybe<float>(m.text().toFloat());
@@ -191,11 +185,11 @@ Index: psi/src/geolocation.cpp
 +			text_ = m.text();
  	}
  }
-
-@@ -169,9 +240,60 @@
+ 
+@@ -169,9 +240,60 @@ const QString& GeoLocation::description(
  	return description_;
  }
-
+ 
 +const QString& GeoLocation::country() const
 +{
 +	return country_;
@@ -252,9 +246,9 @@ Index: psi/src/geolocation.cpp
 +	return !lat_.hasValue() && !lon_.hasValue() && !alt_.hasValue() && !bearing_.hasValue() && !error_.hasValue() && country_.isNull() && region_.isNull() && locality_.isNull()
 +		&& area_.isNull() && street_.isNull() && building_.isNull() && floor_.isNull() && room_.isNull() && postalcode_.isNull() && text_.isNull() && description_.isNull() && datum_.isNull();
  }
-
+ 
  bool GeoLocation::operator==(const GeoLocation& o) const
-@@ -180,6 +302,13 @@
+@@ -180,6 +302,13 @@ bool GeoLocation::operator==(const GeoLo
  	bool equal = true;
  	equal = equal && (lat_.hasValue() ? lat_.value() == o.lat().value() : !o.lat().hasValue());
  	equal = equal && (lon_.hasValue() ? lon_.value() == o.lon().value() : !o.lon().hasValue());
@@ -267,8 +261,8 @@ Index: psi/src/geolocation.cpp
 +			&& description() == o.description();
  	return equal;
  }
-
-@@ -187,3 +316,123 @@
+ 
+@@ -187,3 +316,123 @@ bool GeoLocation::operator!=(const GeoLo
  {
  	return !((*this) == o);
  }
@@ -392,14 +386,12 @@ Index: psi/src/geolocation.cpp
 +
 +	return loc;
 +}
-Index: psi/src/geolocation.h
-===================================================================
---- psi.orig/src/geolocation.h	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/geolocation.h	2013-01-15 14:04:11.772826441 +0400
-@@ -52,7 +52,30 @@
+--- git.temp.orig/src/geolocation.h
++++ git.temp/src/geolocation.h
+@@ -52,7 +52,30 @@ public:
  	void setDatum(const QString&);
  	void setDescription(const QString&);
-
+ 
 +	const QString& country() const;
 +	const QString& region() const;
 +	const QString& locality() const;
@@ -424,21 +416,19 @@ Index: psi/src/geolocation.h
 +
  	QDomElement toXml(QDomDocument&);
 +	QString toString() const;
-
+ 
  	bool operator==(const GeoLocation&) const;
  	bool operator!=(const GeoLocation&) const;
-@@ -63,6 +86,7 @@
+@@ -63,6 +86,7 @@ protected:
  private:
  	Maybe<float> alt_, bearing_, error_, lat_, lon_;
  	QString datum_, description_;
 +	QString country_, region_, locality_, area_, street_, building_, floor_, room_, postalcode_, text_;
  };
-
+ 
  #endif
-Index: psi/src/geolocation.ui
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/geolocation.ui	2013-01-15 14:04:11.772826441 +0400
+--- /dev/null
++++ git.temp/src/geolocation.ui
 @@ -0,0 +1,320 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -760,10 +750,8 @@ Index: psi/src/geolocation.ui
 + <resources/>
 + <connections/>
 +</ui>
-Index: psi/src/geolocationdlg.cpp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/geolocationdlg.cpp	2013-01-15 14:04:11.772826441 +0400
+--- /dev/null
++++ git.temp/src/geolocationdlg.cpp
 @@ -0,0 +1,166 @@
 +/*
 + * geolocationdlg.cpp
@@ -931,10 +919,8 @@ Index: psi/src/geolocationdlg.cpp
 +	close();
 +}
 +
-Index: psi/src/geolocationdlg.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ psi/src/geolocationdlg.h	2013-01-15 14:04:11.772826441 +0400
+--- /dev/null
++++ git.temp/src/geolocationdlg.h
 @@ -0,0 +1,45 @@
 +/*
 + * geolocationdlg.h
@@ -981,11 +967,9 @@ Index: psi/src/geolocationdlg.h
 +};
 +
 +#endif // GEOLOCATIONDLG_H
-Index: psi/src/options/opt_roster.cpp
-===================================================================
---- psi.orig/src/options/opt_roster.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/options/opt_roster.cpp	2013-01-15 14:04:11.772826441 +0400
-@@ -70,6 +70,7 @@
+--- git.temp.orig/src/options/opt_roster.cpp
++++ git.temp/src/options/opt_roster.cpp
+@@ -70,6 +70,7 @@ void OptionsTabRoster::applyOptions()
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-mood-icons", d->ck_showMoodIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-activity-icons", d->ck_showActivityIcons->isChecked());
@@ -993,7 +977,7 @@ Index: psi/src/options/opt_roster.cpp
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-tune-icons", d->ck_showTuneIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-client-icons", d->ck_showClientIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-all-client-icons", (d->cb_showAllClientIcons->currentIndex() == 0)?true:false);
-@@ -97,6 +98,7 @@
+@@ -97,6 +98,7 @@ void OptionsTabRoster::restoreOptions()
  	d->ck_showAvatarIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.show").toBool() );
  	d->ck_showMoodIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-mood-icons").toBool() );
  	d->ck_showActivityIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-activity-icons").toBool() );
@@ -1001,10 +985,8 @@ Index: psi/src/options/opt_roster.cpp
  	d->ck_showTuneIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-tune-icons").toBool() );
  	d->ck_showClientIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool() );
  	d->cb_showAllClientIcons->setEnabled(PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool());
-Index: psi/src/options/opt_roster.ui
-===================================================================
---- psi.orig/src/options/opt_roster.ui	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/options/opt_roster.ui	2013-01-15 14:04:11.772826441 +0400
+--- git.temp.orig/src/options/opt_roster.ui
++++ git.temp/src/options/opt_roster.ui
 @@ -7,7 +7,7 @@
      <x>0</x>
      <y>0</y>
@@ -1031,10 +1013,8 @@ Index: psi/src/options/opt_roster.ui
        <item>
         <widget class="QCheckBox" name="ck_showTuneIcons">
          <property name="whatsThis">
-Index: psi/src/physicallocation.cpp
-===================================================================
---- psi.orig/src/physicallocation.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/physicallocation.cpp	2013-01-15 14:04:11.772826441 +0400
+--- git.temp.orig/src/physicallocation.cpp
++++ git.temp/src/physicallocation.cpp
 @@ -17,7 +17,7 @@
   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
   *
@@ -1044,16 +1024,14 @@ Index: psi/src/physicallocation.cpp
  #include <QDomDocument>
  #include <QDomElement>
  #include <QStringList>
-@@ -268,3 +268,5 @@
-
+@@ -268,3 +268,5 @@ QString PhysicalLocation::toString() con
+ 
  	return str;
  }
 +
 +*/
-Index: psi/src/physicallocation.h
-===================================================================
---- psi.orig/src/physicallocation.h	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/physicallocation.h	2013-01-15 14:04:11.772826441 +0400
+--- git.temp.orig/src/physicallocation.h
++++ git.temp/src/physicallocation.h
 @@ -17,7 +17,7 @@
   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
   *
@@ -1062,17 +1040,15 @@ Index: psi/src/physicallocation.h
 +/*
  #ifndef PHYSICALOCATION_H
  #define PHYSICALOCATION_H
-
-@@ -69,3 +69,4 @@
+ 
+@@ -69,3 +69,4 @@ private:
  };
-
+ 
  #endif
 +*/
-Index: psi/src/psiaccount.cpp
-===================================================================
---- psi.orig/src/psiaccount.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/psiaccount.cpp	2013-01-15 14:04:11.772826441 +0400
-@@ -119,8 +119,8 @@
+--- git.temp.orig/src/psiaccount.cpp
++++ git.temp/src/psiaccount.cpp
+@@ -118,8 +118,8 @@
  #include "mooddlg.h"
  #include "activitydlg.h"
  #include "qwextend.h"
@@ -1083,7 +1059,7 @@ Index: psi/src/psiaccount.cpp
  #include "translationmanager.h"
  #include "irisprotocol/iris_discoinfoquerier.h"
  #include "iconwidget.h"
-@@ -1248,7 +1248,7 @@
+@@ -1240,7 +1240,7 @@ PsiAccount::PsiAccount(const UserAccount
  		pepNodes += "http://jabber.org/protocol/mood+notify";
  		pepNodes += "http://jabber.org/protocol/activity+notify";
  		pepNodes += "http://jabber.org/protocol/tune+notify";
@@ -1092,7 +1068,7 @@ Index: psi/src/psiaccount.cpp
  		pepNodes += "http://jabber.org/protocol/geoloc+notify";
  		pepNodes += "urn:xmpp:avatar:metadata+notify";
  		d->client->addExtension("ep-notify-2",Features(pepNodes));
-@@ -2234,7 +2234,7 @@
+@@ -2232,7 +2232,7 @@ void PsiAccount::setPEPAvailable(bool b)
  		pepNodes += "http://jabber.org/protocol/mood";
  		pepNodes += "http://jabber.org/protocol/activity";
  		pepNodes += "http://jabber.org/protocol/tune";
@@ -1101,7 +1077,7 @@ Index: psi/src/psiaccount.cpp
  		pepNodes += "http://jabber.org/protocol/geoloc";
  		pepNodes += "urn:xmpp:avatar:data";
  		pepNodes += "urn:xmpp:avatar:metadata";
-@@ -3424,14 +3424,14 @@
+@@ -3420,14 +3420,14 @@ void PsiAccount::itemRetracted(const Jid
  			cpUpdate(*u);
  		}
  	}
@@ -1116,9 +1092,9 @@ Index: psi/src/psiaccount.cpp
 -	}
 +	}*/
  }
-
+ 
  void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem& item)
-@@ -3485,7 +3485,7 @@
+@@ -3480,7 +3480,7 @@ void PsiAccount::itemPublished(const Jid
  			cpUpdate(*u);
  		}
  	}
@@ -1127,19 +1103,19 @@ Index: psi/src/psiaccount.cpp
  		// FIXME: try to find the right resource using JEP-33 'replyto'
  		// see tune case above
  		PhysicalLocation physloc(item.payload());
-@@ -3493,7 +3493,7 @@
+@@ -3488,7 +3488,7 @@ void PsiAccount::itemPublished(const Jid
  			u->setPhysicalLocation(physloc);
  			cpUpdate(*u);
  		}
 -	}
 +	}*/
  }
-
+ 
  QList<UserListItem*> PsiAccount::findRelevant(const Jid &j) const
-@@ -3817,6 +3817,12 @@
+@@ -3812,6 +3812,12 @@ void PsiAccount::actionSetActivity()
  	w->show();
  }
-
+ 
 +void PsiAccount::actionSetGeoLocation()
 +{
 +	GeoLocationDlg *w = new GeoLocationDlg(this);
@@ -1149,10 +1125,10 @@ Index: psi/src/psiaccount.cpp
  void PsiAccount::actionSetAvatar()
  {
  	QString str = FileUtil::getImageFileName(0);
-@@ -5550,6 +5556,11 @@
+@@ -5553,6 +5559,11 @@ const Activity &PsiAccount::activity() c
  	return d->self.activity();
  }
-
+ 
 +const GeoLocation &PsiAccount::geolocation() const
 +{
 +	return d->self.geoLocation();
@@ -1161,19 +1137,17 @@ Index: psi/src/psiaccount.cpp
  const Mood &PsiAccount::mood() const
  {
  	return d->self.mood();
-Index: psi/src/psiaccount.h
-===================================================================
---- psi.orig/src/psiaccount.h	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/psiaccount.h	2013-01-15 14:04:11.772826441 +0400
+--- git.temp.orig/src/psiaccount.h
++++ git.temp/src/psiaccount.h
 @@ -34,6 +34,7 @@
  #include "psiactions.h"
  #include "mood.h"
  #include "activity.h"
 +#include "geolocation.h"
-
+ 
  namespace XMPP
  {
-@@ -153,6 +154,7 @@
+@@ -153,6 +154,7 @@ public:
  	QString nick() const;
  	const Mood &mood() const;
  	const Activity &activity() const;
@@ -1181,7 +1155,7 @@ Index: psi/src/psiaccount.h
  	void forceDisconnect(bool fast, const XMPP::Status &s);
  	bool hasPGP() const;
  	QHostAddress *localAddress() const;
-@@ -364,6 +366,7 @@
+@@ -364,6 +366,7 @@ public slots:
  	void actionExecuteCommandSpecific(const Jid&, const QString& = QString());
  	void actionSetMood();
  	void actionSetActivity();
@@ -1189,11 +1163,9 @@ Index: psi/src/psiaccount.h
  	void actionSetAvatar();
  	void actionUnsetAvatar();
  	void actionQueryVersion(const Jid& j);
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:11.772826441 +0400
-@@ -616,7 +616,7 @@
+--- git.temp.orig/src/psicon.cpp
++++ git.temp/src/psicon.cpp
+@@ -612,7 +612,7 @@ bool PsiCon::init()
  				 << "http://jabber.org/protocol/mood"
  				 << "http://jabber.org/protocol/activity"
  				 << "http://jabber.org/protocol/tune"
@@ -1202,7 +1174,7 @@ Index: psi/src/psicon.cpp
  				 << "http://jabber.org/protocol/geoloc"
  				 << "urn:xmpp:avatar:data"
  				 << "urn:xmpp:avatar:metadata"
-@@ -626,7 +626,7 @@
+@@ -622,7 +622,7 @@ bool PsiCon::init()
  				 << "http://jabber.org/protocol/mood+notify"
  				 << "http://jabber.org/protocol/activity+notify"
  				 << "http://jabber.org/protocol/tune+notify"
@@ -1211,112 +1183,106 @@ Index: psi/src/psicon.cpp
  				 << "http://jabber.org/protocol/geoloc+notify"
  				 << "urn:xmpp:avatar:metadata+notify"
  				);
-Index: psi/src/src.pri
-===================================================================
---- psi.orig/src/src.pri	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/src.pri	2013-01-15 14:04:11.772826441 +0400
-@@ -207,6 +207,7 @@
+--- git.temp.orig/src/src.pri
++++ git.temp/src/src.pri
+@@ -208,6 +208,7 @@ HEADERS += \
  	$$PWD/vcardphotodlg.h \
  	$$PWD/psicli.h \
  	$$PWD/coloropt.h \
 +	$$PWD/geolocationdlg.h \
  	$$PWD/sendbuttonmenu.h
-
-
-@@ -346,6 +347,7 @@
+ 
+ 
+@@ -346,6 +347,7 @@ SOURCES += \
  	$$PWD/bookmarkmanagedlg.cpp \
  	$$PWD/vcardphotodlg.cpp \
  	$$PWD/coloropt.cpp \
 +	$$PWD/geolocationdlg.cpp \
  	$$PWD/sendbuttonmenu.cpp
-
-
-@@ -579,6 +581,7 @@
+ 
+ 
+@@ -579,6 +581,7 @@ FORMS += \
  	$$PWD/bookmarkmanage.ui \
  	$$PWD/ahcommanddlg.ui \
  	$$PWD/ahcformdlg.ui \
 +	$$PWD/geolocation.ui \
  	$$PWD/sendbuttontemplateseditor.ui
-
+ 
  # options dialog
-Index: psi/src/userlist.cpp
-===================================================================
---- psi.orig/src/userlist.cpp	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/userlist.cpp	2013-01-15 14:04:11.776826441 +0400
-@@ -189,7 +189,7 @@
+--- git.temp.orig/src/userlist.cpp
++++ git.temp/src/userlist.cpp
+@@ -189,7 +189,7 @@ const GeoLocation& UserResource::geoLoca
  	return v_geoLocation;
  }
-
+ 
 -void UserResource::setPhysicalLocation(const PhysicalLocation& physicalLocation)
 +/*void UserResource::setPhysicalLocation(const PhysicalLocation& physicalLocation)
  {
  	v_physicalLocation = physicalLocation;
  }
-@@ -197,7 +197,7 @@
+@@ -197,7 +197,7 @@ void UserResource::setPhysicalLocation(c
  const PhysicalLocation& UserResource::physicalLocation() const
  {
  	return v_physicalLocation;
 -}
 +}*/
-
-
+ 
+ 
  bool operator<(const UserResource &r1, const UserResource &r2)
-@@ -596,7 +596,7 @@
+@@ -706,7 +706,7 @@ const GeoLocation& UserListItem::geoLoca
  	return v_geoLocation;
  }
-
+ 
 -void UserListItem::setPhysicalLocation(const PhysicalLocation& physicalLocation)
 +/*void UserListItem::setPhysicalLocation(const PhysicalLocation& physicalLocation)
  {
  	v_physicalLocation = physicalLocation;
  }
-@@ -604,7 +604,7 @@
+@@ -714,7 +714,7 @@ void UserListItem::setPhysicalLocation(c
  const PhysicalLocation& UserListItem::physicalLocation() const
  {
  	return v_physicalLocation;
 -}
 +}*/
-
+ 
  void UserListItem::setAvatarFactory(AvatarFactory* av)
  {
-@@ -779,12 +779,12 @@
+@@ -889,12 +889,12 @@ QString UserListItem::makeBareTip(bool t
  		str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(tune()) + "</div>";
-
+ 
  	// User Physical Location
 -	if (!physicalLocation().isNull())
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(physicalLocation().toString()) + "</div>";
 +	//if (!physicalLocation().isNull())
 +	//	str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(physicalLocation().toString()) + "</div>";
-
+ 
  	// User Geolocation
 -	if (!geoLocation().isNull())
 -		str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(geoLocation().lat().value()) + "/" + QString::number(geoLocation().lon().value()) + "</div>";
 +	if (!geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
 +		str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
-
+ 
  	// resources
  	if(!userResourceList().isEmpty()) {
-@@ -869,12 +869,12 @@
+@@ -979,12 +979,12 @@ QString UserListItem::makeBareTip(bool t
  				str += QString("<div style='white-space:pre'>") + QObject::tr("Listening to") + ": " + TextUtil::escape(r.tune()) + "</div>";
-
+ 
  			// User Physical Location
 -			if (!r.physicalLocation().isNull())
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(r.physicalLocation().toString()) + "</div>";
 +		//	if (!r.physicalLocation().isNull())
 +		//		str += QString("<div style='white-space:pre'>") + QObject::tr("Location") + ": " + TextUtil::escape(r.physicalLocation().toString()) + "</div>";
-
+ 
  			// User Geolocation
 -			if (!r.geoLocation().isNull())
 -				str += QString("<div style='white-space:pre'>") + QObject::tr("Geolocation") + ": " + QString::number(r.geoLocation().lat().value()) + "/" + QString::number(r.geoLocation().lon().value()) + "</div>";
 +			if (!r.geoLocation().isNull() && PsiOptions::instance()->getOption("options.ui.contactlist.tooltip.geolocation").toBool())
 +				str += QString("<div style='white-space:pre'>") + TextUtil::escape(geoLocation().toString()) + "</div>";
-
+ 
  			// Entity Time
  			if (r.timezoneOffset().hasValue()) {
-Index: psi/src/userlist.h
-===================================================================
---- psi.orig/src/userlist.h	2013-01-15 14:04:11.776826441 +0400
-+++ psi/src/userlist.h	2013-01-15 14:04:11.776826441 +0400
+--- git.temp.orig/src/userlist.h
++++ git.temp/src/userlist.h
 @@ -30,7 +30,7 @@
  #include "mood.h"
  #include "activity.h"
@@ -1324,9 +1290,9 @@ Index: psi/src/userlist.h
 -#include "physicallocation.h"
 +//#include "physicallocation.h"
  #include "maybe.h"
-
+ 
  class AvatarFactory;
-@@ -68,8 +68,8 @@
+@@ -68,8 +68,8 @@ public:
  	const QString& tune() const;
  	void setGeoLocation(const GeoLocation&);
  	const GeoLocation& geoLocation() const;
@@ -1334,10 +1300,10 @@ Index: psi/src/userlist.h
 -	const PhysicalLocation& physicalLocation() const;
 +	//void setPhysicalLocation(const PhysicalLocation&);
 +	//const PhysicalLocation& physicalLocation() const;
-
+ 
  private:
  	QString v_ver, v_clientName, v_clientVersion, v_clientOS, v_keyID;
-@@ -77,7 +77,7 @@
+@@ -77,7 +77,7 @@ private:
  	QString v_tzoString;
  	QString v_tune;
  	GeoLocation v_geoLocation;
@@ -1346,7 +1312,7 @@ Index: psi/src/userlist.h
  	int v_pgpVerifyStatus;
  	QDateTime sigts;
  };
-@@ -139,8 +139,8 @@
+@@ -139,8 +139,8 @@ public:
  	const QString& tune() const;
  	void setGeoLocation(const GeoLocation&);
  	const GeoLocation& geoLocation() const;
@@ -1355,9 +1321,9 @@ Index: psi/src/userlist.h
 +	//void setPhysicalLocation(const PhysicalLocation&);
 +	//const PhysicalLocation& physicalLocation() const;
  	void setAvatarFactory(AvatarFactory*);
-
+ 
  	UserResourceList & userResourceList();
-@@ -169,7 +169,7 @@
+@@ -169,7 +169,7 @@ private:
  	Activity v_activity;
  	QString v_tune;
  	GeoLocation v_geoLocation;
@@ -1365,4 +1331,4 @@ Index: psi/src/userlist.h
 +	//PhysicalLocation v_physicalLocation;
  	AvatarFactory* v_avatarFactory;
  };
-
+ 

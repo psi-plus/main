@@ -1,47 +1,41 @@
-Index: psi/src/avcall/avcall.cpp
-===================================================================
---- psi.orig/src/avcall/avcall.cpp	2013-01-15 14:04:22.628826883 +0400
-+++ psi/src/avcall/avcall.cpp	2013-01-15 14:04:22.628826883 +0400
+--- git.temp.orig/src/avcall/avcall.cpp
++++ git.temp/src/avcall/avcall.cpp
 @@ -29,6 +29,7 @@
  #include "../psimedia/psimedia.h"
  #include "applicationinfo.h"
  #include "psiaccount.h"
 +#include "psioptions.h"
-
+ 
  #define USE_THREAD
-
-@@ -907,6 +908,9 @@
+ 
+@@ -907,6 +908,9 @@ bool AvCallManager::isVideoSupported()
  	if(!isSupported())
  		return false;
-
+ 
 +	if(PsiOptions::instance()->getOption("options.media.video-support").toBool())
 +		return true;
 +
  	if(!QString::fromLatin1(qgetenv("PSI_ENABLE_VIDEO")).isEmpty())
  		return true;
  	else
-Index: psi/src/options/opt_avcall.cpp
-===================================================================
---- psi.orig/src/options/opt_avcall.cpp	2013-01-15 14:04:22.628826883 +0400
-+++ psi/src/options/opt_avcall.cpp	2013-01-15 14:04:22.628826883 +0400
-@@ -201,6 +201,7 @@
+--- git.temp.orig/src/options/opt_avcall.cpp
++++ git.temp/src/options/opt_avcall.cpp
+@@ -201,6 +201,7 @@ void OptionsTabAvCall::applyOptions()
  	PsiOptions::instance()->setOption("options.media.devices.audio-output", d->cb_audioOutDevice->itemData(d->cb_audioOutDevice->currentIndex()).toString());
  	PsiOptions::instance()->setOption("options.media.devices.audio-input", d->cb_audioInDevice->itemData(d->cb_audioInDevice->currentIndex()).toString());
  	PsiOptions::instance()->setOption("options.media.devices.video-input", d->cb_videoInDevice->itemData(d->cb_videoInDevice->currentIndex()).toString());
 +	PsiOptions::instance()->setOption("options.media.video-support", d->cb_videoSupport->isChecked());
  }
-
+ 
  void OptionsTabAvCall::restoreOptions()
-@@ -246,4 +247,5 @@
+@@ -246,4 +247,5 @@ void OptionsTabAvCall::restoreOptions()
  	d->cb_audioOutDevice->setCurrentIndex(d->cb_audioOutDevice->findData(config.audioOutDeviceId));
  	d->cb_audioInDevice->setCurrentIndex(d->cb_audioInDevice->findData(config.audioInDeviceId));
  	d->cb_videoInDevice->setCurrentIndex(d->cb_videoInDevice->findData(config.videoInDeviceId));
 +	d->cb_videoSupport->setChecked(PsiOptions::instance()->getOption("options.media.video-support").toBool());
  }
-Index: psi/src/options/opt_avcall.ui
-===================================================================
---- psi.orig/src/options/opt_avcall.ui	2013-01-15 14:04:22.628826883 +0400
-+++ psi/src/options/opt_avcall.ui	2013-01-15 14:04:22.628826883 +0400
+--- git.temp.orig/src/options/opt_avcall.ui
++++ git.temp/src/options/opt_avcall.ui
 @@ -1,74 +1,90 @@
 -<ui version="4.0" >
 +<?xml version="1.0" encoding="UTF-8"?>

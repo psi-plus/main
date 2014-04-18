@@ -7,26 +7,23 @@ Subject: Allow multiple payload types
  src/avcall/avcall.cpp |   63 ++++++++++++++++++------------------------------
  1 files changed, 24 insertions(+), 39 deletions(-)
 
-Index: psi/src/avcall/avcall.cpp
-===================================================================
---- psi.orig/src/avcall/avcall.cpp	2013-01-15 14:04:13.136826497 +0400
-+++ psi/src/avcall/avcall.cpp	2013-01-15 14:04:13.132826497 +0400
-@@ -625,35 +625,38 @@
-
+--- git.temp.orig/src/avcall/avcall.cpp
++++ git.temp/src/avcall/avcall.cpp
+@@ -625,34 +625,37 @@ private slots:
+ 
  		printf("rtp_started\n");
-
+ 
 -		PsiMedia::PayloadInfo audio, *pAudio;
 -		PsiMedia::PayloadInfo video, *pVideo;
--
--		pAudio = 0;
--		pVideo = 0;
--		if(transmitAudio)
 +		if(!incoming)
 +		{
 +			sess = manager->rtpManager->createOutgoing();
 +			setup_sess();
 +		}
-+
+ 
+-		pAudio = 0;
+-		pVideo = 0;
+-		if(transmitAudio)
 +		if(transmitAudio && !rtp.localAudioPayloadInfo().isEmpty())
  		{
 -			// confirm transmitting of audio is actually possible,
@@ -64,16 +61,14 @@ Index: psi/src/avcall/avcall.cpp
 -				transmitVideo = false;
 +			sess->setLocalVideoPayloadTypes(pis);
  		}
--
 +		else
 +			transmitVideo = false;
-+
+ 
  		if(transmitAudio && transmitVideo)
  			mode = AvCall::Both;
- 		else if(transmitAudio && !transmitVideo)
-@@ -667,24 +670,6 @@
+@@ -667,24 +670,6 @@ private slots:
  		}
-
+ 
  		if(!incoming)
 -		{
 -			sess = manager->rtpManager->createOutgoing();

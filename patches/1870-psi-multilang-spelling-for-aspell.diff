@@ -1,8 +1,6 @@
-Index: psi/options/default.xml
-===================================================================
---- psi.orig/options/default.xml	2013-01-15 14:04:35.560827408 +0400
-+++ psi/options/default.xml	2013-01-15 14:04:35.556827408 +0400
-@@ -334,6 +334,7 @@
+--- git.temp.orig/options/default.xml
++++ git.temp/options/default.xml
+@@ -333,6 +333,7 @@ QLineEdit#le_status_text {
  			</show-deprecated>
  			<spell-check comment="Options related to the spell checker">
  				<enabled comment="Whether the spell checker is enabled" type="bool">true</enabled>
@@ -10,13 +8,11 @@ Index: psi/options/default.xml
  			</spell-check>
  			<disable-send-button type="bool">false</disable-send-button>
  			<systemtray comment="Options related to the system tray">
-Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
-===================================================================
---- psi.orig/src/libpsi/tools/spellchecker/aspellchecker.cpp	2013-01-15 14:04:35.560827408 +0400
-+++ psi/src/libpsi/tools/spellchecker/aspellchecker.cpp	2013-01-15 14:04:35.560827408 +0400
+--- git.temp.orig/src/libpsi/tools/spellchecker/aspellchecker.cpp
++++ git.temp/src/libpsi/tools/spellchecker/aspellchecker.cpp
 @@ -33,23 +33,15 @@
  #include "aspellchecker.h"
-
+ 
  ASpellChecker::ASpellChecker()
 +	: config_(new_aspell_config())
  {
@@ -38,19 +34,19 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 -	}
 +	setActiveLanguages(getAllLanguages());
  }
-
+ 
  ASpellChecker::~ASpellChecker()
-@@ -59,30 +51,33 @@
+@@ -59,30 +51,33 @@ ASpellChecker::~ASpellChecker()
  		config_ = NULL;
  	}
-
+ 
 -	if(speller_) {
 -		delete_aspell_speller(speller_);
 -		speller_ = NULL;
 -	}
 +	clearSpellers();
  }
-
+ 
  bool ASpellChecker::isCorrect(const QString& word)
  {
 -	if(speller_) {
@@ -66,7 +62,7 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 -	return true;
 +	return false;
  }
-
+ 
  QList<QString> ASpellChecker::suggestions(const QString& word)
  {
  	QList<QString> words;
@@ -85,7 +81,7 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
  		}
  		delete_aspell_string_enumeration(elements);
  	}
-@@ -92,11 +87,11 @@
+@@ -92,11 +87,11 @@ QList<QString> ASpellChecker::suggestion
  bool ASpellChecker::add(const QString& word)
  {
  	bool result = false;
@@ -100,14 +96,14 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
  			result = true;
  		}
  	}
-@@ -105,10 +100,63 @@
-
+@@ -105,10 +100,63 @@ bool ASpellChecker::add(const QString& w
+ 
  bool ASpellChecker::available() const
  {
 -	return (speller_ != NULL);
 +	return !spellers_.isEmpty();
  }
-
+ 
  bool ASpellChecker::writable() const
  {
  	return false;
@@ -165,14 +161,12 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.cpp
 +
 +	spellers_.clear();
 +}
-Index: psi/src/libpsi/tools/spellchecker/aspellchecker.h
-===================================================================
---- psi.orig/src/libpsi/tools/spellchecker/aspellchecker.h	2013-01-15 14:04:35.560827408 +0400
-+++ psi/src/libpsi/tools/spellchecker/aspellchecker.h	2013-01-15 14:04:35.560827408 +0400
-@@ -46,9 +46,17 @@
+--- git.temp.orig/src/libpsi/tools/spellchecker/aspellchecker.h
++++ git.temp/src/libpsi/tools/spellchecker/aspellchecker.h
+@@ -46,9 +46,17 @@ public:
  	virtual bool available() const;
  	virtual bool writable() const;
-
+ 
 +	virtual void setActiveLanguages(const QList<QString>& langs);
 +	virtual QList<QString> getAllLanguages() const;
 +
@@ -186,26 +180,22 @@ Index: psi/src/libpsi/tools/spellchecker/aspellchecker.h
 +	typedef QList<AspellSpeller*> ASpellers;
 +	ASpellers spellers_;
  };
-
+ 
  #endif
-Index: psi/src/libpsi/tools/spellchecker/spellchecker.h
-===================================================================
---- psi.orig/src/libpsi/tools/spellchecker/spellchecker.h	2013-01-15 14:04:35.560827408 +0400
-+++ psi/src/libpsi/tools/spellchecker/spellchecker.h	2013-01-15 14:04:35.560827408 +0400
-@@ -41,6 +41,9 @@
+--- git.temp.orig/src/libpsi/tools/spellchecker/spellchecker.h
++++ git.temp/src/libpsi/tools/spellchecker/spellchecker.h
+@@ -41,6 +41,9 @@ public:
  	virtual bool isCorrect(const QString&);
  	virtual bool add(const QString&);
-
+ 
 +	virtual void setActiveLanguages(const QList<QString>& ) {}
 +	virtual QList<QString> getAllLanguages() const { return QList<QString>(); }
 +
  protected:
  	SpellChecker();
  	virtual ~SpellChecker();
-Index: psi/src/psicon.cpp
-===================================================================
---- psi.orig/src/psicon.cpp	2013-01-15 14:04:35.560827408 +0400
-+++ psi/src/psicon.cpp	2013-01-15 14:04:35.560827408 +0400
+--- git.temp.orig/src/psicon.cpp
++++ git.temp/src/psicon.cpp
 @@ -81,6 +81,7 @@
  #include "accountscombobox.h"
  #include "tabdlg.h"
@@ -214,20 +204,20 @@ Index: psi/src/psicon.cpp
  #ifdef WEBKIT
  #include "avatars.h"
  #include "chatviewthemeprovider.h"
-@@ -737,6 +738,9 @@
+@@ -735,6 +736,9 @@ bool PsiCon::init()
  	optionChanged(tuneUrlFilterOptionPath);
  #endif
-
+ 
 +	//init spellchecker
 +	optionChanged("options.ui.spell-check.langs");
 +
  	return result;
  }
-
-@@ -1432,6 +1436,21 @@
+ 
+@@ -1438,6 +1442,21 @@ void PsiCon::optionChanged(const QString
  		return;
  	}
-
+ 
 +	if (option == "options.ui.spell-check.langs") {
 +		QStringList langs = PsiOptions::instance()->getOption(option).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
 +		if(langs.isEmpty()) {
