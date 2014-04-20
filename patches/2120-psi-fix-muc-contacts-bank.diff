@@ -316,7 +316,7 @@
 -		}
 -	} else {
 -		return j;
-+	if (d->gcbank->contains(j)) {
++	if (isGCContact(j)) {
 +		Status s = d->gcbank->status(j);
 +		if (s.hasMUCItem())
 +			return s.mucItem().jid();
@@ -331,7 +331,7 @@
  				// skip status changes from muc participants
  				// if the MUC somehow got into userList.
 -				if (!j.resource().isEmpty() && d->groupchats.contains(j.bare())) continue;
-+				if (!j.resource().isEmpty() && client()->groupchatExist(j.bare())) continue;
++				if (!j.resource().isEmpty() && isGCContact(j)) continue;
  			}
  			list.append(u);
  		}
@@ -349,7 +349,7 @@
  void PsiAccount::actionOpenChat(const Jid &j, const QString & body)
  {
 -	UserListItem *u = (findGCContact(j)) ? find(j) : find(j.bare());
-+	UserListItem *u = (d->gcbank->contains(j)) ? find(j) : find(j.bare());
++	UserListItem *u = (isGCContact(j)) ? find(j) : find(j.bare());
  	if(!u) {
  		qWarning("[%s] not in userlist\n", qPrintable(j.full()));
  		return;
@@ -359,7 +359,7 @@
  
 -		GCContact *c = findGCContact(j);
 -		if(c) {
-+		if (d->gcbank->contains(j)) {
++		if (isGCContact(j)) {
  			// if the contact is from a groupchat, use invokeGCChat
  			invokeGCChat(j);
  			return;
@@ -368,7 +368,7 @@
  	bool useCache = true;
  	Jid j;
 -	if(findGCContact(_j)) {
-+	if (d->gcbank->contains(_j)) {
++	if (isGCContact(_j)) {
  		useCache = false;
  		j = _j;
  	}
@@ -410,7 +410,7 @@
  	Jid j = u->jid();
 -	GCContact *c = findGCContact(j);
 -	if(c) {
-+	if (d->gcbank->contains(j)) {
++	if (isGCContact(j)) {
  		u->setName(j.resource());
  		u->setPrivate(true);
  
@@ -516,7 +516,7 @@
  }
  
  void PsiAccount::client_groupChatPresence(const Jid &j, const Status &s)
-@@ -5946,13 +5933,7 @@ void PsiAccount::client_groupChatPresenc
+@@ -5946,13 +5933,9 @@ void PsiAccount::client_groupChatPresenc
  	if(!w)
  		return;
  
@@ -527,21 +527,33 @@
 -		c->status = s;
 -		d->gcbank.append(c);
 -	}
++	if (!s.isAvailable())
++		d->gcbank->incRef(j);
 +	d->gcbank->setStatus(j, s);
  
  	w->presence(j.resource(), s);
  
-@@ -6449,8 +6430,7 @@ void PsiAccount::setReceipts(bool b)
+@@ -5965,6 +5948,9 @@ void PsiAccount::client_groupChatPresenc
+ 		client_resourceAvailable(j, r);
+ 	else
+ 		client_resourceUnavailable(j, j.resource());
++
++	if (!s.isAvailable())
++		d->gcbank->decRef(j);
+ #endif
+ }
+ 
+@@ -6449,8 +6435,7 @@ void PsiAccount::setReceipts(bool b)
  
  void PsiAccount::invokeGCMessage(const Jid &j)
  {
 -	GCContact *c = findGCContact(j);
 -	if(!c)
-+	if (!d->gcbank->contains(j))
++	if (!isGCContact(j))
  		return;
  
  	// create dummy item, open chat, then destroy item.  HORRIBLE HACK!
-@@ -6464,7 +6444,7 @@ void PsiAccount::invokeGCMessage(const J
+@@ -6464,7 +6449,7 @@ void PsiAccount::invokeGCMessage(const J
  	// make a resource so the contact appears online
  	UserResource ur;
  	ur.setName(j.resource());
@@ -550,17 +562,17 @@
  	u->userResourceList().append(ur);
  
  	d->userList.append(u);
-@@ -6475,8 +6455,7 @@ void PsiAccount::invokeGCMessage(const J
+@@ -6475,8 +6460,7 @@ void PsiAccount::invokeGCMessage(const J
  
  void PsiAccount::invokeGCChat(const Jid &j)
  {
 -	GCContact *c = findGCContact(j);
 -	if(!c)
-+	if (!d->gcbank->contains(j))
++	if (!isGCContact(j))
  		return;
  
  	// create dummy item, open chat, then destroy item.  HORRIBLE HACK!
-@@ -6491,7 +6470,7 @@ void PsiAccount::invokeGCChat(const Jid
+@@ -6491,7 +6475,7 @@ void PsiAccount::invokeGCChat(const Jid
  	// make a resource so the contact appears online
  	UserResource ur;
  	ur.setName(j.resource());
