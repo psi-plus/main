@@ -275,11 +275,12 @@
  	// Time server
  	new TimeServer(d->client->rootTask());
  	d->client->addExtension("e-time", QStringList("urn:xmpp:time"));
-@@ -1412,6 +1410,13 @@ PsiAccount::~PsiAccount()
+@@ -1412,6 +1410,14 @@ PsiAccount::~PsiAccount()
  
  	qDeleteAll(d->userList);
  	d->userList.clear();
 +
++	delete d->selfContact;
 +	foreach (PsiContact *pc, d->contacts) {
 +		pc->disconnect();
 +		delete pc;
@@ -289,7 +290,7 @@
  
  	d->contactList->unlink(this);
  	delete d;
-@@ -2897,7 +2902,7 @@ void PsiAccount::processIncomingMessage(
+@@ -2897,7 +2903,7 @@ void PsiAccount::processIncomingMessage(
  	if( m.messageReceipt() == ReceiptRequest && !m.id().isEmpty() &&
  		PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool()) {
  		UserListItem *u;
@@ -298,7 +299,7 @@
  			Message tm(m.from());
  			tm.setMessageReceiptId(m.id());
  			tm.setMessageReceipt(ReceiptReceived);
-@@ -3677,8 +3682,7 @@ void PsiAccount::simulateRosterOffline()
+@@ -3677,8 +3683,7 @@ void PsiAccount::simulateRosterOffline()
  		}
  	}
  
@@ -308,7 +309,7 @@
  
  	emit endBulkContactUpdate();
  }
-@@ -3807,16 +3811,13 @@ void PsiAccount::itemPublished(const Jid
+@@ -3807,16 +3812,13 @@ void PsiAccount::itemPublished(const Jid
  
  Jid PsiAccount::realJid(const Jid &j) const
  {
@@ -331,7 +332,7 @@
  }
  
  QList<UserListItem*> PsiAccount::findRelevant(const Jid &j) const
-@@ -3837,7 +3838,7 @@ QList<UserListItem*> PsiAccount::findRel
+@@ -3837,7 +3839,7 @@ QList<UserListItem*> PsiAccount::findRel
  			} else {
  				// skip status changes from muc participants
  				// if the MUC somehow got into userList.
@@ -340,7 +341,7 @@
  			}
  			list.append(u);
  		}
-@@ -4216,7 +4217,7 @@ void PsiAccount::actionDefault(const Jid
+@@ -4216,7 +4218,7 @@ void PsiAccount::actionDefault(const Jid
  
  	if(d->eventQueue->count(u->jid()) > 0)
  		openNextEvent(*u, UserAction);
@@ -349,7 +350,7 @@
  	{
  		TabbableWidget *tab = findDialog<TabbableWidget*>(Jid(j.full()));
  		if(tab) {
-@@ -4346,7 +4347,7 @@ void PsiAccount::actionHistoryBox(PsiEve
+@@ -4346,7 +4348,7 @@ void PsiAccount::actionHistoryBox(PsiEve
  
  void PsiAccount::actionOpenChat(const Jid &j, const QString & body)
  {
@@ -358,7 +359,7 @@
  	if(!u) {
  		qWarning("[%s] not in userlist\n", qPrintable(j.full()));
  		return;
-@@ -4395,8 +4396,7 @@ void PsiAccount::actionOpenChat2(const J
+@@ -4395,8 +4397,7 @@ void PsiAccount::actionOpenChat2(const J
  	else {
  		// this can happen if the contact is not in the roster at all
  
@@ -368,7 +369,7 @@
  			// if the contact is from a groupchat, use invokeGCChat
  			invokeGCChat(j);
  			return;
-@@ -4485,7 +4485,7 @@ void PsiAccount::actionInfo(const Jid &_
+@@ -4485,7 +4486,7 @@ void PsiAccount::actionInfo(const Jid &_
  {
  	bool useCache = true;
  	Jid j;
@@ -377,7 +378,7 @@
  		useCache = false;
  		j = _j;
  	}
-@@ -4760,7 +4760,7 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4760,7 +4761,7 @@ void PsiAccount::dj_sendMessage(const Me
  
  	// don't log groupchat, private messages, or encrypted messages
  	if(log) {
@@ -386,7 +387,7 @@
  			MessageEvent *me = new MessageEvent(m, this);
  			me->setOriginLocal(true);
  			me->setTimeStamp(QDateTime::currentDateTime());
-@@ -5052,7 +5052,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5052,7 +5053,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  	QList<UserListItem*> ul = findRelevant(e->from());
  	if(ul.isEmpty()) {
  		// if groupchat, then we want the full JID
@@ -395,7 +396,7 @@
  			j = e->from();
  		}
  		else {
-@@ -5101,7 +5101,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5101,7 +5102,7 @@ void PsiAccount::handleEvent(PsiEvent* e
  
  			// don't log private messages
  			if (!found &&
@@ -404,7 +405,7 @@
  				!(e->type() == PsiEvent::Message &&
  				  ((MessageEvent *)e)->message().body().isEmpty()))
  			{
-@@ -5412,19 +5412,18 @@ UserListItem* PsiAccount::addUserListIte
+@@ -5412,19 +5413,18 @@ UserListItem* PsiAccount::addUserListIte
  	u->setInList(false);
  	u->setAvatarFactory(avatarFactory());
  	u->setName(nick);
@@ -427,7 +428,7 @@
  		u->userResourceList().append(ur);
  	}
  
-@@ -5466,8 +5465,6 @@ void PsiAccount::addMucItem(const Jid& j
+@@ -5466,8 +5466,6 @@ void PsiAccount::addMucItem(const Jid& j
  		d->removeEntry(jid);
  		d->userList.removeAll(u);
  	}
@@ -436,7 +437,7 @@
  	addUserListItem(jid.bare(), "");
  }
  
-@@ -5855,7 +5852,6 @@ void PsiAccount::groupChatSetStatus(cons
+@@ -5855,7 +5853,6 @@ void PsiAccount::groupChatSetStatus(cons
  void PsiAccount::groupChatLeave(const QString &host, const QString &room)
  {
  	Jid j(room + '@' + host);
@@ -444,7 +445,7 @@
  	d->client->groupChatLeave(host, room, PsiOptions::instance()->getOption("options.muc.leave-status-message").toString());
  	UserListItem *u = find(j);
  	if (u) {
-@@ -5864,28 +5860,29 @@ void PsiAccount::groupChatLeave(const QS
+@@ -5864,28 +5861,29 @@ void PsiAccount::groupChatLeave(const QS
  	}
  }
  
@@ -487,7 +488,7 @@
  }
  
  void PsiAccount::client_groupChatJoined(const Jid &j)
-@@ -5919,24 +5916,17 @@ void PsiAccount::client_groupChatJoined(
+@@ -5919,24 +5917,17 @@ void PsiAccount::client_groupChatJoined(
  void PsiAccount::client_groupChatLeft(const Jid &j)
  {
  	// remove all associated groupchat contacts from the bank
@@ -519,7 +520,7 @@
  }
  
  void PsiAccount::client_groupChatPresence(const Jid &j, const Status &s)
-@@ -5946,13 +5936,9 @@ void PsiAccount::client_groupChatPresenc
+@@ -5946,13 +5937,9 @@ void PsiAccount::client_groupChatPresenc
  	if(!w)
  		return;
  
@@ -536,7 +537,7 @@
  
  	w->presence(j.resource(), s);
  
-@@ -5965,6 +5951,9 @@ void PsiAccount::client_groupChatPresenc
+@@ -5965,6 +5952,9 @@ void PsiAccount::client_groupChatPresenc
  		client_resourceAvailable(j, r);
  	else
  		client_resourceUnavailable(j, j.resource());
@@ -546,7 +547,7 @@
  #endif
  }
  
-@@ -6449,8 +6438,7 @@ void PsiAccount::setReceipts(bool b)
+@@ -6449,8 +6439,7 @@ void PsiAccount::setReceipts(bool b)
  
  void PsiAccount::invokeGCMessage(const Jid &j)
  {
@@ -556,7 +557,7 @@
  		return;
  
  	// create dummy item, open chat, then destroy item.  HORRIBLE HACK!
-@@ -6464,7 +6447,7 @@ void PsiAccount::invokeGCMessage(const J
+@@ -6464,7 +6448,7 @@ void PsiAccount::invokeGCMessage(const J
  	// make a resource so the contact appears online
  	UserResource ur;
  	ur.setName(j.resource());
@@ -565,7 +566,7 @@
  	u->userResourceList().append(ur);
  
  	d->userList.append(u);
-@@ -6475,8 +6463,7 @@ void PsiAccount::invokeGCMessage(const J
+@@ -6475,8 +6464,7 @@ void PsiAccount::invokeGCMessage(const J
  
  void PsiAccount::invokeGCChat(const Jid &j)
  {
@@ -575,7 +576,7 @@
  		return;
  
  	// create dummy item, open chat, then destroy item.  HORRIBLE HACK!
-@@ -6491,7 +6478,7 @@ void PsiAccount::invokeGCChat(const Jid
+@@ -6491,7 +6479,7 @@ void PsiAccount::invokeGCChat(const Jid
  	// make a resource so the contact appears online
  	UserResource ur;
  	ur.setName(j.resource());
