@@ -1,6 +1,8 @@
---- git.temp.orig/iris/src/xmpp/xmpp-im/client.cpp
-+++ git.temp/iris/src/xmpp/xmpp-im/client.cpp
-@@ -878,12 +878,33 @@ void Client::prRoster(const Roster &r)
+diff --git a/iris/src/xmpp/xmpp-im/client.cpp b/iris/src/xmpp/xmpp-im/client.cpp
+index bebcfa8..7c4c0a0 100644
+--- a/iris/src/xmpp/xmpp-im/client.cpp
++++ b/iris/src/xmpp/xmpp-im/client.cpp
+@@ -879,12 +879,38 @@ void Client::prRoster(const Roster &r)
  	importRoster(r);
  }
  
@@ -11,9 +13,13 @@
  		return;
  
  	JT_Roster *r = new JT_Roster(rootTask());
++	int timeout = 0;
 +	if (withGroupsDelimiter) {
 +		connect(r, SIGNAL(finished()), SLOT(slotRosterDelimiterRequestFinished()));
 +		r->getGroupsDelimiter();
++		// WORKAROUND: Some bad servers (Facebook for example) don't response
++		// on groups delimiter request. Wait timeout and go ahead.
++		timeout = 10;
 +	}
 +	else {
 +		connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
@@ -21,21 +27,22 @@
 +		d->roster.flagAllForDelete(); // mod_groups patch
 +	}
 +
-+	r->go(true);
++	r->go(true, timeout);
 +}
 +
 +void Client::slotRosterDelimiterRequestFinished()
 +{
 +	JT_Roster *r = qobject_cast<JT_Roster*>(sender());
-+	d->roster.setGroupsDelimiter(r->groupsDelimiter());
-+
-+	emit rosterGroupsDelimiterRequestFinished(r->groupsDelimiter());
++	if(r->success()) {
++		d->roster.setGroupsDelimiter(r->groupsDelimiter());
++		emit rosterGroupsDelimiterRequestFinished(r->groupsDelimiter());
++	}
 +
 +	r = new JT_Roster(rootTask());
  	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
  	r->get();
  	d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1243,13 +1264,35 @@ void LiveRosterItem::setFlagForDelete(bo
+@@ -1244,13 +1270,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -72,7 +79,7 @@
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1278,4 +1321,14 @@ LiveRoster::ConstIterator LiveRoster::fi
+@@ -1279,4 +1327,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
  	return it;
  }
  
@@ -87,9 +94,11 @@
 +}
 +
  }
---- git.temp.orig/iris/src/xmpp/xmpp-im/types.cpp
-+++ git.temp/iris/src/xmpp/xmpp-im/types.cpp
-@@ -2846,13 +2846,35 @@ bool RosterItem::fromXml(const QDomEleme
+diff --git a/iris/src/xmpp/xmpp-im/types.cpp b/iris/src/xmpp/xmpp-im/types.cpp
+index b0d5d05..e83b0c0 100644
+--- a/iris/src/xmpp/xmpp-im/types.cpp
++++ b/iris/src/xmpp/xmpp-im/types.cpp
+@@ -2846,13 +2846,35 @@ bool RosterItem::fromXml(const QDomElement &item)
  //---------------------------------------------------------------------------
  // Roster
  //---------------------------------------------------------------------------
@@ -126,7 +135,7 @@
  }
  
  Roster::Iterator Roster::find(const Jid &j)
-@@ -2875,6 +2897,16 @@ Roster::ConstIterator Roster::find(const
+@@ -2875,6 +2897,16 @@ Roster::ConstIterator Roster::find(const Jid &j) const
  	return end();
  }
  
@@ -143,8 +152,10 @@
  
  //---------------------------------------------------------------------------
  // FormField
---- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
-+++ git.temp/iris/src/xmpp/xmpp-im/xmpp_client.h
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_client.h b/iris/src/xmpp/xmpp-im/xmpp_client.h
+index cd57034..2bc38c8 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_client.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
 @@ -79,7 +79,7 @@ namespace XMPP
  		QString resource() const;
  		Jid jid() const;
@@ -162,7 +173,7 @@
  		void rosterRequestFinished(bool, int, const QString &);
  		void rosterItemAdded(const RosterItem &);
  		void rosterItemUpdated(const RosterItem &);
-@@ -170,6 +171,7 @@ namespace XMPP
+@@ -171,6 +172,7 @@ namespace XMPP
  		void streamIncomingXml(const QString &);
  		void streamOutgoingXml(const QString &);
  
@@ -170,8 +181,10 @@
  		void slotRosterRequestFinished();
  
  		// basic daemons
---- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
-+++ git.temp/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+index 94e9e4a..31077b1 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
 @@ -34,9 +34,19 @@ namespace XMPP
  		LiveRoster();
  		~LiveRoster();
@@ -192,8 +205,10 @@
  	};
  }
  
---- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_roster.h
-+++ git.temp/iris/src/xmpp/xmpp-im/xmpp_roster.h
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_roster.h b/iris/src/xmpp/xmpp-im/xmpp_roster.h
+index ff00e70..7b1f1dd 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_roster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_roster.h
 @@ -36,11 +36,18 @@ namespace XMPP
  		Roster();
  		~Roster();
@@ -214,8 +229,47 @@
  	};
  }
  
---- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-+++ git.temp/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_task.cpp b/iris/src/xmpp/xmpp-im/xmpp_task.cpp
+index 0917910..a1ea9da 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_task.cpp
++++ b/iris/src/xmpp/xmpp-im/xmpp_task.cpp
+@@ -109,7 +109,7 @@ const QString & Task::statusString() const
+ 	return d->statusString;
+ }
+ 
+-void Task::go(bool autoDelete)
++void Task::go(bool autoDelete, int timeout)
+ {
+ 	d->autoDelete = autoDelete;
+ 
+@@ -121,6 +121,9 @@ void Task::go(bool autoDelete)
+ 	}
+ 	else {
+ 		onGo();
++		if (timeout) {
++			QTimer::singleShot(timeout * 1000, this, SLOT(done()));
++		}
+ 	}
+ }
+ 
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_task.h b/iris/src/xmpp/xmpp-im/xmpp_task.h
+index 02477c1..6a4efb7 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_task.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_task.h
+@@ -49,7 +49,8 @@ namespace XMPP {
+ 		int statusCode() const;
+ 		const QString & statusString() const;
+ 
+-		void go(bool autoDelete=false);
++		// timeout in seconds
++		void go(bool autoDelete=false, int timeout = 0);
+ 		virtual bool take(const QDomElement &);
+ 		void safeDelete();
+ 
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+index fc5663f..4b7e0f0 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
 @@ -367,9 +367,11 @@ public:
  	Private() {}
  
@@ -228,7 +282,7 @@
  JT_Roster::JT_Roster(Task *parent)
  :Task(parent)
  {
-@@ -407,7 +409,7 @@ void JT_Roster::set(const Jid &jid, cons
+@@ -407,7 +409,7 @@ void JT_Roster::set(const Jid &jid, const QString &name, const QStringList &grou
  
  void JT_Roster::remove(const Jid &jid)
  {
@@ -312,7 +366,7 @@
  QString JT_Roster::toString() const
  {
  	if(type != 1)
-@@ -504,6 +553,24 @@ bool JT_Roster::take(const QDomElement &
+@@ -504,6 +553,24 @@ bool JT_Roster::take(const QDomElement &x)
  		setSuccess();
  		return true;
  	}
@@ -337,8 +391,10 @@
  
  	return false;
  }
---- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.h
-+++ git.temp/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.h b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+index e4afcd0..5b34656 100644
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
 @@ -98,7 +98,12 @@ namespace XMPP
  		void set(const Jid &, const QString &name, const QStringList &groups);
  		void remove(const Jid &);
