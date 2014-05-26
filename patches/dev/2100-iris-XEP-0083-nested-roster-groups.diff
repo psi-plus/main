@@ -1,8 +1,17 @@
 diff --git a/iris/src/xmpp/xmpp-im/client.cpp b/iris/src/xmpp/xmpp-im/client.cpp
-index bebcfa8..7c4c0a0 100644
+index bebcfa8..e4fc426 100644
 --- a/iris/src/xmpp/xmpp-im/client.cpp
 +++ b/iris/src/xmpp/xmpp-im/client.cpp
-@@ -879,12 +879,38 @@ void Client::prRoster(const Roster &r)
+@@ -102,6 +102,8 @@ using namespace Jabber;*/
+ #define vsnprintf _vsnprintf
+ #endif
+ 
++#define GROUPS_DELIMITER_TIMEOUT 10
++
+ namespace XMPP
+ {
+ 
+@@ -879,12 +881,38 @@ void Client::prRoster(const Roster &r)
  	importRoster(r);
  }
  
@@ -19,7 +28,7 @@ index bebcfa8..7c4c0a0 100644
 +		r->getGroupsDelimiter();
 +		// WORKAROUND: Some bad servers (Facebook for example) don't response
 +		// on groups delimiter request. Wait timeout and go ahead.
-+		timeout = 10;
++		r->setTimeout(GROUPS_DELIMITER_TIMEOUT);
 +	}
 +	else {
 +		connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
@@ -27,7 +36,7 @@ index bebcfa8..7c4c0a0 100644
 +		d->roster.flagAllForDelete(); // mod_groups patch
 +	}
 +
-+	r->go(true, timeout);
++	r->go(true);
 +}
 +
 +void Client::slotRosterDelimiterRequestFinished()
@@ -42,7 +51,7 @@ index bebcfa8..7c4c0a0 100644
  	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
  	r->get();
  	d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1244,13 +1270,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
+@@ -1244,13 +1272,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -79,7 +88,7 @@ index bebcfa8..7c4c0a0 100644
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1279,4 +1327,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
+@@ -1279,4 +1329,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
  	return it;
  }
  
@@ -230,42 +239,121 @@ index ff00e70..7b1f1dd 100644
  }
  
 diff --git a/iris/src/xmpp/xmpp-im/xmpp_task.cpp b/iris/src/xmpp/xmpp-im/xmpp_task.cpp
-index 0917910..a1ea9da 100644
+index 0917910..c624524 100644
 --- a/iris/src/xmpp/xmpp-im/xmpp_task.cpp
 +++ b/iris/src/xmpp/xmpp-im/xmpp_task.cpp
-@@ -109,7 +109,7 @@ const QString & Task::statusString() const
+@@ -24,6 +24,8 @@
+ #include "xmpp_client.h"
+ #include "xmpp_xmlcommon.h"
+ 
++#define DEFAULT_TIMEOUT 300
++
+ using namespace XMPP;
+ 
+ class Task::TaskPrivate
+@@ -38,6 +40,7 @@ public:
+ 	Client *client;
+ 	bool insig, deleteme, autoDelete;
+ 	bool done;
++	int timeout;
+ };
+ 
+ Task::Task(Task *parent)
+@@ -72,6 +75,7 @@ void Task::init()
+ 	d->deleteme = false;
+ 	d->autoDelete = false;
+ 	d->done = false;
++	d->timeout = DEFAULT_TIMEOUT;
+ }
+ 
+ Task *Task::parent() const
+@@ -109,6 +113,17 @@ const QString & Task::statusString() const
  	return d->statusString;
  }
  
--void Task::go(bool autoDelete)
-+void Task::go(bool autoDelete, int timeout)
++
++void Task::setTimeout(int seconds) const
++{
++	d->timeout = seconds;
++}
++
++int Task::timeout()
++{
++	return d->timeout;
++}
++
+ void Task::go(bool autoDelete)
  {
  	d->autoDelete = autoDelete;
- 
-@@ -121,6 +121,9 @@ void Task::go(bool autoDelete)
+@@ -121,6 +136,9 @@ void Task::go(bool autoDelete)
  	}
  	else {
  		onGo();
-+		if (timeout) {
-+			QTimer::singleShot(timeout * 1000, this, SLOT(done()));
++		if (d->timeout) {
++			QTimer::singleShot(d->timeout * 1000, this, SLOT(timeoutFinished()));
 +		}
  	}
  }
  
+@@ -169,6 +187,16 @@ void Task::onDisconnect()
+ 	}
+ }
+ 
++void Task::onTimeout()
++{
++	if(!d->done) {
++		d->success = false;
++		// d->statusCode = ErrTimeout;
++		d->statusString = tr("Request timed out");
++		done();
++	}
++}
++
+ void Task::send(const QDomElement &x)
+ {
+ 	client()->send(x);
+@@ -225,6 +253,11 @@ void Task::clientDisconnected()
+ 	onDisconnect();
+ }
+ 
++void Task::timeoutFinished()
++{
++	onTimeout();
++}
++
+ void Task::debug(const char *fmt, ...)
+ {
+ 	va_list ap;
 diff --git a/iris/src/xmpp/xmpp-im/xmpp_task.h b/iris/src/xmpp/xmpp-im/xmpp_task.h
-index 02477c1..6a4efb7 100644
+index 02477c1..9dd28c4 100644
 --- a/iris/src/xmpp/xmpp-im/xmpp_task.h
 +++ b/iris/src/xmpp/xmpp-im/xmpp_task.h
-@@ -49,7 +49,8 @@ namespace XMPP {
+@@ -49,6 +49,9 @@ namespace XMPP {
  		int statusCode() const;
  		const QString & statusString() const;
  
--		void go(bool autoDelete=false);
-+		// timeout in seconds
-+		void go(bool autoDelete=false, int timeout = 0);
++		void setTimeout(int seconds) const;
++		int timeout();
++
+ 		void go(bool autoDelete=false);
  		virtual bool take(const QDomElement &);
  		void safeDelete();
+@@ -59,6 +62,7 @@ namespace XMPP {
+ 	protected:
+ 		virtual void onGo();
+ 		virtual void onDisconnect();
++		virtual void onTimeout();
+ 		void send(const QDomElement &);
+ 		void setSuccess(int code=0, const QString &str="");
+ 		void setError(const QDomElement &);
+@@ -69,6 +73,7 @@ namespace XMPP {
  
+ 	private slots:
+ 		void clientDisconnected();
++		void timeoutFinished();
+ 		void done();
+ 
+ 	private:
 diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
 index fc5663f..4b7e0f0 100644
 --- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
