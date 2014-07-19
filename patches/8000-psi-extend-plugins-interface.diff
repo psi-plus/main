@@ -1,13 +1,13 @@
 --- git.temp.orig/iris/src/xmpp/xmpp-im/client.cpp
 +++ git.temp/iris/src/xmpp/xmpp-im/client.cpp
-@@ -638,6 +638,7 @@ void Client::send(const QDomElement &x)
+@@ -627,6 +627,7 @@ void Client::send(const QDomElement &x)
+ 		//printf("bad stanza??\n");
  		return;
  	}
- 
 +	emit stanzaElementOutgoing(e);
  	QString out = s.toString();
+ 	//qWarning() << "Out: " << out;
  	debug(QString("Client: outgoing: [\n%1]\n").arg(out));
- 	emit xmlOutgoing(out);
 --- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
 +++ git.temp/iris/src/xmpp/xmpp-im/xmpp_client.h
 @@ -152,6 +152,7 @@ namespace XMPP
@@ -3926,9 +3926,9 @@
  
  	d->stopReconnect();
 @@ -4746,6 +4758,22 @@ void PsiAccount::dj_sendMessage(const Me
- 		}
  	}
- 
+ 	else d->client->sendMessage(nm);
+
 +#ifdef PSI_PLUGINS
 +	if (!nm.body().isEmpty()) {
 +		QString body = nm.body();
@@ -3945,9 +3945,9 @@
 +	}
 +#endif
 +
- 	d->client->sendMessage(nm);
- 
  	// only toggle if not an invite or body is not empty
+ 	if(m.invite().isEmpty() && !m.body().isEmpty())
+ 		toggleSecurity(m.to(), m.wasEncrypted());
 @@ -5028,6 +5056,15 @@ static bool messageListContainsEvent(con
  	return false;
  }
@@ -4112,9 +4112,9 @@
 +#ifdef PSI_PLUGINS
 +	PluginManager::instance()->setupChatTab(this, account(), jid().full());
 +#endif
- }
  
- void PsiChatDlg::verticalSplitterMoved(int, int)
+ 	ui_.mini_prompt->hide();
+ 
 @@ -449,6 +456,14 @@ void PsiChatDlg::updateToolbuttons()
  			continue;
  		}
