@@ -171,10 +171,10 @@ index cd57034..2bc38c8 100644
  
 -		void rosterRequest();
 +		void rosterRequest(bool withGroupsDelimiter = true);
- 		void sendMessage(const Message &);
+ 		void sendMessage(const Message &, bool want_notify = false);
  		void sendSubscription(const Jid &, const QString &, const QString& nick = QString());
  		void setPresence(const Status &);
-@@ -137,6 +137,7 @@ namespace XMPP
+@@ -138,6 +138,7 @@ namespace XMPP
  		void activated();
  		void disconnected();
  		//void authFinished(bool, int, const QString &);
@@ -267,11 +267,10 @@ index 0917910..c624524 100644
  }
  
  Task *Task::parent() const
-@@ -109,6 +113,17 @@ const QString & Task::statusString() const
+@@ -109,6 +113,16 @@ const QString & Task::statusString() con
  	return d->statusString;
  }
  
-+
 +void Task::setTimeout(int seconds) const
 +{
 +	d->timeout = seconds;
@@ -285,7 +284,7 @@ index 0917910..c624524 100644
  void Task::go(bool autoDelete)
  {
  	d->autoDelete = autoDelete;
-@@ -121,6 +136,9 @@ void Task::go(bool autoDelete)
+@@ -121,6 +135,9 @@ void Task::go(bool autoDelete)
  	}
  	else {
  		onGo();
@@ -295,7 +294,7 @@ index 0917910..c624524 100644
  	}
  }
  
-@@ -169,6 +187,16 @@ void Task::onDisconnect()
+@@ -169,6 +186,16 @@ void Task::onDisconnect()
  	}
  }
  
@@ -309,10 +308,10 @@ index 0917910..c624524 100644
 +	}
 +}
 +
- void Task::send(const QDomElement &x)
+ void Task::send(const QDomElement &x, bool want_notify)
  {
- 	client()->send(x);
-@@ -225,6 +253,11 @@ void Task::clientDisconnected()
+ 	client()->send(x, want_notify);
+@@ -225,6 +252,11 @@ void Task::clientDisconnected()
  	onDisconnect();
  }
  
@@ -343,7 +342,7 @@ index 02477c1..9dd28c4 100644
  		virtual void onGo();
  		virtual void onDisconnect();
 +		virtual void onTimeout();
- 		void send(const QDomElement &);
+ 		void send(const QDomElement &, bool want_notify = false);
  		void setSuccess(int code=0, const QString &str="");
  		void setError(const QDomElement &);
 @@ -69,6 +73,7 @@ namespace XMPP {
@@ -354,6 +353,7 @@ index 02477c1..9dd28c4 100644
  		void done();
  
  	private:
+
 diff --git a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
 index fc5663f..4b7e0f0 100644
 --- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp

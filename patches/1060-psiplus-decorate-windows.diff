@@ -255,29 +255,28 @@
    <tabstop>ck_dockToolMW</tabstop>
 --- git.temp.orig/src/psichatdlg.cpp
 +++ git.temp/src/psichatdlg.cpp
-@@ -176,6 +176,8 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
+@@ -177,6 +177,8 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
  	connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
  	connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
  	mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
 +	tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
- 
  	SendButtonTemplatesMenu* menu = getTemplateMenu();
  	if (menu) {
-@@ -256,6 +258,12 @@ void PsiChatDlg::initUi()
- 
- 	connect(act_minimize_, SIGNAL(triggered()), SLOT(doMinimize()));
- 	addAction(act_minimize_);
-+
+ 		connect(menu, SIGNAL(doPasteAndSend()), this, SLOT(doPasteAndSend()));
+@@ -249,6 +251,11 @@ void PsiChatDlg::initUi()
+ 	act_mini_cmd_->setText(tr("Input command..."));
+ 	connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
+ 	addAction(act_mini_cmd_);
 +	if (!tabmode) {
 +		winHeader_ = new PsiWindowHeader(this);
 +		ui_.vboxLayout1->insertWidget(0, winHeader_);
 +	}
 +	setMargins();
- }
  
- void PsiChatDlg::updateCountVisibility()
-@@ -483,6 +491,22 @@ void PsiChatDlg::activated()
+ 	ui_.mini_prompt->hide();
+ 
+@@ -489,6 +496,22 @@ void PsiChatDlg::activated()
  	ChatDlg::activated();
  
  	updateCountVisibility();
@@ -300,7 +299,7 @@
  }
  
  void PsiChatDlg::setContactToolTip(QString text)
-@@ -787,4 +811,23 @@ void PsiChatDlg::sendTemp(const QString
+@@ -821,4 +844,23 @@ void PsiChatDlg::sendTemp(const QString
  	}
  }
  
@@ -326,7 +325,7 @@
  #include "psichatdlg.moc"
 --- git.temp.orig/src/psichatdlg.h
 +++ git.temp/src/psichatdlg.h
-@@ -9,6 +9,7 @@
+@@ -10,6 +10,7 @@
  
  #include "ui_chatdlg.h"
  #include "typeaheadfind.h"
@@ -334,7 +333,7 @@
  
  class IconAction;
  class PsiContact;
-@@ -70,6 +71,7 @@ private:
+@@ -71,6 +72,7 @@ private:
  	void appendSysMsg(const QString &);
  	ChatView* chatView() const;
  	ChatEdit* chatEdit() const;
@@ -342,15 +341,14 @@
  
  private:
  	Ui::ChatDlg ui_;
-@@ -99,6 +101,11 @@ private:
+@@ -106,6 +108,10 @@ private:
+ 	int unacked_messages;
  
- 	bool smallChat_;
- 	class ChatDlgMCmdProvider;
+ 	static QMovie *throbber_movie;
 +
 +private:
 +	bool tabmode;
 +	QPointer <PsiWindowHeader> winHeader_;
-+
  };
  
  #endif

@@ -1,13 +1,13 @@
 --- git.temp.orig/iris/src/xmpp/xmpp-im/client.cpp
 +++ git.temp/iris/src/xmpp/xmpp-im/client.cpp
-@@ -638,6 +638,7 @@ void Client::send(const QDomElement &x)
+@@ -626,6 +626,7 @@ void Client::send(const QDomElement &x,
+ 		//printf("bad stanza??\n");
  		return;
  	}
- 
 +	emit stanzaElementOutgoing(e);
  	QString out = s.toString();
+ 	//qWarning() << "Out: " << out;
  	debug(QString("Client: outgoing: [\n%1]\n").arg(out));
- 	emit xmlOutgoing(out);
 --- git.temp.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
 +++ git.temp/iris/src/xmpp/xmpp-im/xmpp_client.h
 @@ -152,6 +152,7 @@ namespace XMPP
@@ -3868,7 +3868,7 @@
  		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
 --- git.temp.orig/src/psiaccount.cpp
 +++ git.temp/src/psiaccount.cpp
-@@ -771,6 +771,13 @@ public slots:
+@@ -783,6 +783,13 @@ public slots:
  		xmlRingbufWrite = (xmlRingbufWrite + 1) % xmlRingbuf.count();
  	}
  
@@ -3882,7 +3882,7 @@
  	void pm_proxyRemoved(QString proxykey)
  	{
  		if (acc.proxyID == proxykey) acc.proxyID = "";
-@@ -1126,6 +1133,11 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1138,6 +1145,11 @@ PsiAccount::PsiAccount(const UserAccount
  
  	// create XMPP::Client
  	d->client = new Client;
@@ -3894,7 +3894,7 @@
  	d->client->setOSName(SystemInfo::instance()->os());
  	d->client->setClientName(ApplicationInfo::name());
  	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1184,6 +1196,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1195,6 +1207,7 @@ PsiAccount::PsiAccount(const UserAccount
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -3902,7 +3902,7 @@
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1249,11 +1262,6 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1257,11 +1270,6 @@ PsiAccount::PsiAccount(const UserAccount
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -3914,21 +3914,21 @@
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1814,6 +1822,10 @@ void PsiAccount::logout(bool fast, const
+@@ -1830,6 +1838,9 @@ void PsiAccount::logout(bool fast, const
  	if(!isActive())
  		return;
  
 +#ifdef PSI_PLUGINS
 +	PluginManager::instance()->logout(this);
 +#endif
-+
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4746,6 +4758,22 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4714,6 +4725,22 @@ void PsiAccount::dj_sendMessage(const Me
+ 			nm.setNick(nick());
  		}
  	}
- 
++	
 +#ifdef PSI_PLUGINS
 +	if (!nm.body().isEmpty()) {
 +		QString body = nm.body();
@@ -3944,11 +3944,10 @@
 +		}
 +	}
 +#endif
-+
- 	d->client->sendMessage(nm);
  
- 	// only toggle if not an invite or body is not empty
-@@ -5028,6 +5056,15 @@ static bool messageListContainsEvent(con
+ 	// GSOC: stream management
+ 	// check whether message came from a ChatDlg
+@@ -5007,6 +5034,15 @@ static bool messageListContainsEvent(con
  	return false;
  }
  
@@ -3964,7 +3963,7 @@
  // handle an incoming event
  void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
  {
-@@ -5073,12 +5110,14 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5052,12 +5088,14 @@ void PsiAccount::handleEvent(PsiEvent* e
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -3981,7 +3980,7 @@
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5328,6 +5367,13 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5306,6 +5344,13 @@ void PsiAccount::handleEvent(PsiEvent* e
  		}
  #endif
  	}
@@ -3995,7 +3994,7 @@
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5347,7 +5393,16 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -5325,7 +5370,16 @@ void PsiAccount::handleEvent(PsiEvent* e
  		    (popupType == PopupManager::AlertAvCall    && o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PopupManager::AlertComposing && o->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
@@ -4013,7 +4012,7 @@
  		}
  		emit startBounce();
  	}
-@@ -5516,6 +5571,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
+@@ -5497,6 +5551,10 @@ void PsiAccount::queueEvent(PsiEvent* e,
  		else if (e->type() == PsiEvent::File) {
  			doPopup = PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool();
  		}
@@ -4024,7 +4023,7 @@
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5538,6 +5597,18 @@ void PsiAccount::openNextEvent(const Use
+@@ -5519,6 +5577,18 @@ void PsiAccount::openNextEvent(const Use
  	PsiEvent *e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;
@@ -4045,7 +4044,7 @@
  }
 --- git.temp.orig/src/psiaccount.h
 +++ git.temp/src/psiaccount.h
-@@ -251,6 +251,10 @@ public:
+@@ -252,6 +252,10 @@ public:
  	};
  	void playSound(SoundType onevent);
  
@@ -4094,7 +4093,7 @@
  void PsiActionList::Private::optionsChanged()
 --- git.temp.orig/src/psichatdlg.cpp
 +++ git.temp/src/psichatdlg.cpp
-@@ -50,6 +50,9 @@
+@@ -51,6 +51,9 @@
  #include "avcall/avcall.h"
  #include "actionlist.h"
  #include "psiactionlist.h"
@@ -4104,18 +4103,18 @@
  
  #define MCMDCHAT		"http://psi-im.org/ids/mcmd#chatmain"
  
-@@ -300,6 +303,10 @@ void PsiChatDlg::initUi()
+@@ -292,6 +295,10 @@ void PsiChatDlg::initUi()
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
-  
+ 	
  	ui_.log->realTextWidget()->installEventFilter(this);
 +
 +#ifdef PSI_PLUGINS
 +	PluginManager::instance()->setupChatTab(this, account(), jid().full());
 +#endif
- }
+ 	
+ 	ui_.mini_prompt->hide();
  
- void PsiChatDlg::verticalSplitterMoved(int, int)
-@@ -449,6 +456,14 @@ void PsiChatDlg::updateToolbuttons()
+@@ -454,6 +461,14 @@ void PsiChatDlg::updateToolbuttons()
  			continue;
  		}
  
@@ -4130,7 +4129,7 @@
  		// Hack. separator action can be added only once.
  		if (actionName == "separator") {
  			ui_.toolbar->addSeparator();
-@@ -909,6 +924,12 @@ void PsiChatDlg::buildMenu()
+@@ -928,6 +943,12 @@ void PsiChatDlg::buildMenu()
  
  	pm_settings_->addAction(actions_->action("chat_info"));
  	pm_settings_->addAction(actions_->action("chat_history"));
