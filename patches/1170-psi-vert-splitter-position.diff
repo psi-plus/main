@@ -1,5 +1,5 @@
---- a/options/default.xml
-+++ b/options/default.xml
+--- git.orig/options/default.xml
++++ git/options/default.xml
 @@ -119,6 +119,8 @@
  				<only-paste-template type="bool">false</only-paste-template>
  				<hide-when-closing type="bool">false</hide-when-closing>
@@ -9,9 +9,9 @@
  			</chat>
  			<save>
  				<toolbars-state type="QByteArray"/>
---- a/src/chatsplitter.cpp
-+++ b/src/chatsplitter.cpp
-@@ -75,6 +75,15 @@ void ChatSplitter::setSizes(const QList<int>& list)
+--- git.orig/src/chatsplitter.cpp
++++ git/src/chatsplitter.cpp
+@@ -75,6 +75,15 @@ void ChatSplitter::setSizes(const QList<
  		splitter_->setSizes(list);
  }
  
@@ -36,8 +36,8 @@
  }
  
  /**
---- a/src/chatsplitter.h
-+++ b/src/chatsplitter.h
+--- git.orig/src/chatsplitter.h
++++ git/src/chatsplitter.h
 @@ -35,6 +35,7 @@ public:
  	void setOrientation(Qt::Orientation orientation);
  	void addWidget(QWidget* widget);
@@ -56,8 +56,8 @@
  private:
  	void updateChildLayout(QWidget* child);
  	void updateLayout();
---- a/src/groupchatdlg.cpp
-+++ b/src/groupchatdlg.cpp
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
 @@ -239,6 +239,9 @@ public:
  	int logSize;
  	int rosterSize;
@@ -68,7 +68,7 @@
  public:
  	bool trackBar;
  
-@@ -782,6 +785,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -782,6 +785,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
  	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
@@ -76,7 +76,7 @@
  
  	// resize the horizontal splitter
  	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
-@@ -799,10 +803,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -799,10 +803,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
  	// resize the vertical splitter
@@ -117,8 +117,8 @@
  void GCMainDlg::doMinimize()
  {
  	window()->showMinimized();
---- a/src/groupchatdlg.h
-+++ b/src/groupchatdlg.h
+--- git.orig/src/groupchatdlg.h
++++ git/src/groupchatdlg.h
 @@ -85,6 +85,7 @@ public:
  	virtual TabbableWidget::State state() const;
  	virtual int unreadMessageCount() const;
@@ -135,8 +135,8 @@
  	void doMinimize();
  
  
---- a/src/psichatdlg.cpp
-+++ b/src/psichatdlg.cpp
+--- git.orig/src/psichatdlg.cpp
++++ git/src/psichatdlg.cpp
 @@ -236,10 +236,11 @@ void PsiChatDlg::initUi()
  
  	connect(account()->capsManager(), SIGNAL(capsChanged(const Jid&)), SLOT(capsChanged(const Jid&)));
@@ -180,8 +180,8 @@
  void PsiChatDlg::updateCountVisibility()
  {
  	if (PsiOptions::instance()->getOption("options.ui.message.show-character-count").toBool() && !smallChat_) {
---- a/src/psichatdlg.h
-+++ b/src/psichatdlg.h
+--- git.orig/src/psichatdlg.h
++++ git/src/psichatdlg.h
 @@ -22,6 +22,8 @@ public:
  	PsiChatDlg(const Jid& jid, PsiAccount* account, TabManager* tabManager);
  	~PsiChatDlg();
@@ -199,18 +199,18 @@
  
  private:
  	void initToolBar();
-@@ -74,6 +77,9 @@ private:
- 	ChatEdit* chatEdit() const;
- 	void setMargins();
- 
+@@ -110,6 +113,9 @@ private:
+ 	static PsiIcon *throbber_icon;
+ 	bool tabmode;
+ 	QPointer <PsiWindowHeader> winHeader_;
++
 +	int logHeight;
 +	int chateditHeight;
-+
- private:
- 	Ui::ChatDlg ui_;
+ };
  
---- a/src/tabs/tabbablewidget.h
-+++ b/src/tabs/tabbablewidget.h
+ #endif
+--- git.orig/src/tabs/tabbablewidget.h
++++ git/src/tabs/tabbablewidget.h
 @@ -68,6 +68,7 @@ public:
  	virtual State state() const = 0;
  	virtual int unreadMessageCount() const = 0;
@@ -227,8 +227,8 @@
  
  public slots:
  	virtual void deactivated();
---- a/src/tabs/tabdlg.cpp
-+++ b/src/tabs/tabdlg.cpp
+--- git.orig/src/tabs/tabdlg.cpp
++++ git/src/tabs/tabdlg.cpp
 @@ -426,6 +426,7 @@ void TabDlg::addTab(TabbableWidget* tab)
  
  	connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
@@ -237,7 +237,7 @@
  
  	updateTab(tab);
  	setUpdatesEnabled(true);
-@@ -496,6 +497,7 @@ void TabDlg::removeTabWithNoChecks(TabbableWidget *tab)
+@@ -496,6 +497,7 @@ void TabDlg::removeTabWithNoChecks(Tabba
  {
  	disconnect(tab, SIGNAL(invalidateTabInfo()), this, SLOT(updateTab()));
  	disconnect(tab, SIGNAL(updateFlashState()), this, SLOT(updateFlashState()));
@@ -245,7 +245,7 @@
  
  	tabs_.removeAll(tab);
  	tabWidget_->removePage(tab);
-@@ -906,3 +908,10 @@ void TabDlg::setTabIcon(QWidget *widget,const QIcon &icon)
+@@ -906,3 +908,10 @@ void TabDlg::setTabIcon(QWidget *widget,
  {
  	tabWidget_->setTabIcon(widget, icon);
  }
@@ -256,8 +256,8 @@
 +		w->setVSplitterPosition(log, chat);
 +	}
 +}
---- a/src/tabs/tabdlg.h
-+++ b/src/tabs/tabdlg.h
+--- git.orig/src/tabs/tabdlg.h
++++ git/src/tabs/tabdlg.h
 @@ -146,6 +146,7 @@ private slots:
  	void menu_sendTabTo(QAction *act);
  	void queuedSendTabTo(TabbableWidget* chat, TabDlg *dest);
