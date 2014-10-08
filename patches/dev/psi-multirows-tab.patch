@@ -143,10 +143,10 @@ index 4d4b49e..e1a00f3 100644
  	QStackedLayout *stacked_;
 diff --git a/src/widgets/tabbar.cpp b/src/widgets/tabbar.cpp
 new file mode 100644
-index 0000000..45bff5b
+index 0000000..4c016ac
 --- /dev/null
 +++ b/src/widgets/tabbar.cpp
-@@ -0,0 +1,532 @@
+@@ -0,0 +1,549 @@
 +/*
 + * tabbar.cpp
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -214,7 +214,6 @@ index 0000000..45bff5b
 +	QSize tabSizeHint(QStyleOptionTabV3 tab) const;
 +	void balanseCloseButtons();
 +
-+	QList<QList <QStyleOptionTabV3> > hackedRows;
 +	QList<QStyleOptionTabV3> hackedTabs;
 +	QList<CloseButton*> closeButtons;
 +	bool tabsClosable;
@@ -288,7 +287,6 @@ index 0000000..45bff5b
 +	int rowStart = 0;
 +
 +	// stretch filled or last row
-+	hackedRows.clear();
 +	for (int i = 0; i < hackedTabs.size(); i++) {
 +		QStyleOptionTab::TabPosition position = hackedTabs.at(i).position;
 +		if (position != QStyleOptionTab::End && position != QStyleOptionTab::OnlyOneTab) {
@@ -296,22 +294,33 @@ index 0000000..45bff5b
 +		}
 +
 +		// stretch factor
-+		float sf = static_cast<float>(barWidth) / hackedTabs.at(i).rect.right();
++		double sf = static_cast<float>(barWidth) / hackedTabs.at(i).rect.right();
++
++		// don't strech the last row
++		bool lastRow = i == hackedTabs.size() - 1;
++		if (lastRow)
++			sf = qMin(1.5, sf);
++
 +		for (int j = rowStart; j <= i; j++) {
 +			QStyleOptionTabV3 tab = hackedTabs.at(j);
 +			if (j > rowStart) {
 +				tab.rect.moveLeft(hackedTabs.at(j - 1).rect.right() + 1);
 +			}
-+			if (j < i && i != j) {
++			if (j < i) {
 +				tab.rect.setWidth(tab.rect.width() * sf);
 +			}
 +			else {
-+				tab.rect.setRight(barWidth - 1);
++				if (!lastRow) {
++					tab.rect.setRight(barWidth - 1);
++				}
++				else {
++					int width = qMin(static_cast<int>(tab.rect.width() * sf), barWidth - 1);
++					tab.rect.setWidth(width);
++				}
 +			}
 +			hackedTabs[j] = tab;
 +		}
 +
-+		hackedRows << hackedTabs.mid(rowStart, i - rowStart + 1);
 +		rowStart = i + 1;
 +	}
 +
@@ -456,6 +465,14 @@ index 0000000..45bff5b
 +{
 +	QTabBar::setTabTextColor(index, color);
 +	layoutTabs();
++}
++
++QRect TabBar::tabRect(int index) const
++{
++	if (index < d->hackedTabs.size() && index >= 0)
++		return d->hackedTabs[index].rect;
++	else
++		return QRect();
 +}
 +
 +bool TabBar::multiRow() const
@@ -681,10 +698,10 @@ index 0000000..45bff5b
 +#include "tabbar.moc"
 diff --git a/src/widgets/tabbar.h b/src/widgets/tabbar.h
 new file mode 100644
-index 0000000..c8c48e0
+index 0000000..ec190fb
 --- /dev/null
 +++ b/src/widgets/tabbar.h
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,66 @@
 +/*
 + * tabbar.h - 
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -730,6 +747,7 @@ index 0000000..c8c48e0
 +	void setCurrentIndex(int index);
 +	void setTabText(int index, const QString & text);
 +	void setTabTextColor(int index, const QColor & color);
++	QRect tabRect(int index) const;
 +
 +protected:
 +	// reimplemented
