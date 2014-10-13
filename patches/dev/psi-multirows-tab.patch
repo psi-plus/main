@@ -156,10 +156,10 @@ index 4d4b49e..e1a00f3 100644
  	QStackedLayout *stacked_;
 diff --git a/src/widgets/tabbar.cpp b/src/widgets/tabbar.cpp
 new file mode 100644
-index 0000000..41c9203
+index 0000000..3b4df91
 --- /dev/null
 +++ b/src/widgets/tabbar.cpp
-@@ -0,0 +1,558 @@
+@@ -0,0 +1,601 @@
 +/*
 + * tabbar.cpp
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -568,7 +568,8 @@ index 0000000..41c9203
 +
 +	QStylePainter p(this);
 +	QList<QStyleOptionTabV3> tabs = d->hackedTabs;
-+	int rowHeight = tabs[currentIndex()].rect.height();
++	int selected = currentIndex();
++	int rowHeight = tabs[selected].rect.height();
 +
 +	// There is some problems when tabs are painted not in first row.
 +	// Draw on a pixmap like a painting in the first row. Then move image
@@ -576,16 +577,58 @@ index 0000000..41c9203
 +	QPixmap pixmap(width(), rowHeight);
 +	pixmap.fill(Qt::transparent);
 +	QStylePainter pp(&pixmap, this);
++	bool drawSelected = false;
 +
-+	for (int i = 0; i < tabs.size(); ++i) {
-+		QStyleOptionTabV3 tab = tabs[i];
-+		tab.rect.moveTop(0);
-+		pp.drawControl(QStyle::CE_TabBarTab, tab);
++	if (shape() == QTabBar::RoundedNorth) {
++		for (int i = 0; i < tabs.size(); ++i) {
++			QStyleOptionTabV3 tab = tabs[i];
++			if (i != selected) {
++				tab.rect.moveBottom(rowHeight - 1);
++				pp.drawControl(QStyle::CE_TabBarTab, tab);
++			}
++			else {
++				drawSelected = true;
++			}
 +
-+		if (tab.position == QStyleOptionTab::End || tab.position == QStyleOptionTab::OnlyOneTab) {
-+			QRect rect(0, tabs[i].rect.top(), width(), rowHeight);
-+			p.drawItemPixmap(rect, Qt::AlignCenter, pixmap);
-+			pixmap.fill(Qt::transparent);
++			if (tab.position == QStyleOptionTab::End || tab.position == QStyleOptionTab::OnlyOneTab) {
++				if (drawSelected) {
++					// Draw current tab in the last order
++					tab = tabs[selected];
++					tab.rect.moveBottom(rowHeight - 1);
++					pp.drawControl(QStyle::CE_TabBarTab, tab);
++					drawSelected = false;
++				}
++
++				QRect rect(0, tabs[i].rect.top(), width(), rowHeight);
++				p.drawItemPixmap(rect, Qt::AlignCenter, pixmap);
++				pixmap.fill(Qt::transparent);
++			}
++		}
++	}
++	else {
++		for (int i = tabs.size() - 1; i >= 0; --i) {
++			QStyleOptionTabV3 tab = tabs[i];
++			if (i != selected) {
++				tab.rect.moveTop(0);
++				pp.drawControl(QStyle::CE_TabBarTab, tab);
++			}
++			else {
++				drawSelected = true;
++			}
++
++			if (tab.position == QStyleOptionTab::Beginning || tab.position == QStyleOptionTab::OnlyOneTab) {
++				if (drawSelected) {
++					// Draw current tab in the last order
++					tab = tabs[selected];
++					tab.rect.moveTop(0);
++					pp.drawControl(QStyle::CE_TabBarTab, tab);
++					drawSelected = false;
++				}
++
++				QRect rect(0, tabs[i].rect.top(), width(), rowHeight);
++				p.drawItemPixmap(rect, Qt::AlignCenter, pixmap);
++				pixmap.fill(Qt::transparent);
++			}
 +		}
 +	}
 +
