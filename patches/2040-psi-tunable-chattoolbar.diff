@@ -1,6 +1,6 @@
---- git.temp.orig/options/default.xml
-+++ git.temp/options/default.xml
-@@ -564,6 +564,27 @@ QLineEdit#le_status_text {
+--- git.orig/options/default.xml
++++ git/options/default.xml
+@@ -565,6 +565,27 @@ QLineEdit#le_status_text {
  				<help_about_qt type="QKeySequence" comment="About Qt"></help_about_qt>
  				<help_diag_qcaplugin type="QKeySequence" comment="QCA plugin diag"></help_diag_qcaplugin>
  				<help_diag_qcakeystore type="QKeySequence" comment="QCA key store diag"></help_diag_qcakeystore>
@@ -28,8 +28,8 @@
  			</alist>
  			<chat comment="Shortcuts in the chat dialog">
  				<next-tab type="QVariantList" comment="Switch to the next tab">
---- git.temp.orig/src/groupchatdlg.cpp
-+++ git.temp/src/groupchatdlg.cpp
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
 @@ -54,6 +54,7 @@
  #include <QFormLayout>
  #include <QClipboard>
@@ -241,7 +241,7 @@
  	}
  
  	PsiOptions *options_ = PsiOptions::instance();
-@@ -1891,7 +1913,7 @@ void GCMainDlg::setLooks()
+@@ -1890,7 +1912,7 @@ void GCMainDlg::setLooks()
  	f.fromString(PsiOptions::instance()->getOption("options.ui.look.font.contactlist").toString());
  	ui_.lv_users->setFont(f);
  
@@ -250,7 +250,7 @@
  		ui_.toolbar->show();
  		ui_.tb_actions->hide();
  		ui_.tb_emoticons->hide();
-@@ -1919,6 +1941,28 @@ void GCMainDlg::setLooks()
+@@ -1918,6 +1940,28 @@ void GCMainDlg::setLooks()
  	ui_.lv_users->setLooks();
  }
  
@@ -279,7 +279,7 @@
  void GCMainDlg::optionsUpdate()
  {
  	/*QMimeSourceFactory *m = ui_.log->mimeSourceFactory();
-@@ -1926,6 +1970,7 @@ void GCMainDlg::optionsUpdate()
+@@ -1925,6 +1969,7 @@ void GCMainDlg::optionsUpdate()
  	delete m;*/
  
  	setLooks();
@@ -287,7 +287,7 @@
  	setShortcuts();
  	d->typeahead->optionsUpdate();
  	// update status icons
-@@ -2051,16 +2096,16 @@ void GCMainDlg::buildMenu()
+@@ -2050,16 +2095,16 @@ void GCMainDlg::buildMenu()
  	// Dialog menu
  	d->pm_settings->clear();
  
@@ -309,7 +309,7 @@
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
  }
-@@ -2116,7 +2161,7 @@ void GCMainDlg::doPasteAndSend()
+@@ -2115,7 +2160,7 @@ void GCMainDlg::doPasteAndSend()
  	if(TabbableWidget::isActiveTab()) {
  		d->mle()->paste();
  		mle_returnPressed();
@@ -318,7 +318,7 @@
  		QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
  	}
  }
-@@ -2194,7 +2239,7 @@ void GCMainDlg::doRemoveBookmark()
+@@ -2193,7 +2238,7 @@ void GCMainDlg::doRemoveBookmark()
  
  void GCMainDlg::psButtonEnabled()
  {
@@ -327,8 +327,8 @@
  }
  
  void GCMainDlg::sendTemp(const QString &templText)
---- git.temp.orig/src/groupchatdlg.h
-+++ git.temp/src/groupchatdlg.h
+--- git.orig/src/groupchatdlg.h
++++ git/src/groupchatdlg.h
 @@ -165,6 +165,7 @@ private:
  	void appendSysMsg(const MessageView &);
  	void appendMessage(const Message &, bool);
@@ -337,8 +337,8 @@
  
  	void mucKickMsgHelper(const QString &nick, const Status &s, const QString &nickJid, const QString &title,
  			const QString &youSimple, const QString &youBy, const QString &someoneSimple,
---- git.temp.orig/src/mainwin.cpp
-+++ git.temp/src/mainwin.cpp
+--- git.orig/src/mainwin.cpp
++++ git/src/mainwin.cpp
 @@ -397,8 +397,8 @@ MainWin::MainWin(bool _onTop, bool _asTo
  	if (allInOne) {
  		QString toolOpt = "options.ui.contactlist.toolbars";
@@ -367,8 +367,8 @@
  		PsiToolBar* tb;
  		if (allInOne) {
  			if (d && d->viewToolBar && (d->viewToolBar->base() == base))
---- git.temp.orig/src/options/opt_lookfeel_toolbars.ui
-+++ git.temp/src/options/opt_lookfeel_toolbars.ui
+--- git.orig/src/options/opt_lookfeel_toolbars.ui
++++ git/src/options/opt_lookfeel_toolbars.ui
 @@ -1,45 +1,44 @@
 -<ui version="4.0" >
 +<?xml version="1.0" encoding="UTF-8"?>
@@ -840,8 +840,8 @@
   <customwidgets>
    <customwidget>
     <class>IconToolButton</class>
---- git.temp.orig/src/options/opt_toolbars.cpp
-+++ git.temp/src/options/opt_toolbars.cpp
+--- git.orig/src/options/opt_toolbars.cpp
++++ git/src/options/opt_toolbars.cpp
 @@ -23,6 +23,10 @@
  #include <QList>
  #include <QVBoxLayout>
@@ -1021,73 +1021,8 @@
  	// tb.stretchable = d->ck_toolbarStretch->isChecked();
  
  	p->toolbars[n] = tb;
---- git.temp.orig/src/psi_profiles.cpp
-+++ git.temp/src/psi_profiles.cpp
-@@ -1358,6 +1358,62 @@ bool OptionsMigration::fromFile(const QS
- 
- void OptionsMigration::lateMigration()
- {
-+	// Add default chat and groupchat toolbars
-+	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat") {
-+		QStringList pluginsKeys;
-+		ToolbarPrefs chatToolbar;
-+		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
-+		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
-+		chatToolbar.name = "Chat";
-+		chatToolbar.keys << "chat_clear"  << "chat_find" << "chat_html_text" << "chat_add_contact";
-+		chatToolbar.keys += pluginsKeys;
-+		chatToolbar.keys << "spacer" << "chat_icon" << "chat_templates" << "chat_ps" << "chat_file"
-+						 << "chat_pgp" << "chat_info" << "chat_history" << "chat_voice"
-+						 << "chat_active_contacts";
-+
-+		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
-+			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("chat_ps"));
-+		}
-+
-+		ToolbarPrefs groupchatToolbar;
-+		groupchatToolbar.on = chatToolbar.on;
-+
-+		groupchatToolbar.name = "Groupchat";
-+		groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" << "gchat_configure";
-+		groupchatToolbar.keys += pluginsKeys;
-+		groupchatToolbar.keys << "spacer" << "gchat_icon" << "gchat_templates" << "gchat_ps" ;
-+
-+		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
-+			groupchatToolbar.keys.removeAt(groupchatToolbar.keys.indexOf("gchat_ps"));
-+		}
-+		PsiOptions::instance()->removeOption("options.ui.chat.disable-paste-send");
-+
-+		QList<ToolbarPrefs> toolbars;
-+		toolbars << chatToolbar
-+		         << groupchatToolbar;
-+
-+		QStringList toolbarBases = PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true);
-+		foreach(QString base, toolbarBases) {
-+			ToolbarPrefs tb;
-+			tb.id = PsiOptions::instance()->getOption(base + ".key").toString();
-+			tb.name = PsiOptions::instance()->getOption(base + ".name").toString();
-+			tb.on = PsiOptions::instance()->getOption(base + ".visible").toBool();
-+			tb.locked = PsiOptions::instance()->getOption(base + ".locked").toBool();
-+			tb.dock = (Qt3Dock)PsiOptions::instance()->getOption(base + ".dock.position").toInt(); //FIXME
-+			tb.nl = PsiOptions::instance()->getOption(base + ".dock.nl").toBool();
-+			tb.keys = PsiOptions::instance()->getOption(base + ".actions").toStringList();
-+
-+			toolbars << tb;
-+		}
-+
-+		PsiOptions::instance()->removeOption("options.ui.contactlist.toolbars", true);
-+
-+		foreach(ToolbarPrefs tb, toolbars) {
-+			tb.locked = true;
-+			PsiToolBar::structToOptions(PsiOptions::instance(), tb);
-+		}
-+	}
-+
- 	foreach(QString opt, PsiOptions::instance()->allOptionNames()) {
- 		if (opt.startsWith("options.status.presets.") ||
- 			opt.startsWith("options.iconsets.service-status.") ||
---- git.temp.orig/src/psiactionlist.cpp
-+++ git.temp/src/psiactionlist.cpp
+--- git.orig/src/psiactionlist.cpp
++++ git/src/psiactionlist.cpp
 @@ -59,6 +59,8 @@ private:
  	void createChat();
  	void createGroupchat();
@@ -1174,8 +1109,8 @@
  }
  
  void PsiActionList::Private::optionsChanged()
---- git.temp.orig/src/psiactionlist.h
-+++ git.temp/src/psiactionlist.h
+--- git.orig/src/psiactionlist.h
++++ git/src/psiactionlist.h
 @@ -35,8 +35,8 @@ public:
  		Actions_Common    = (1 << 0),
  		Actions_MainWin   = (1 << 1),
@@ -1187,8 +1122,8 @@
  	};
  
  public:
---- git.temp.orig/src/psichatdlg.cpp
-+++ git.temp/src/psichatdlg.cpp
+--- git.orig/src/psichatdlg.cpp
++++ git/src/psichatdlg.cpp
 @@ -48,7 +48,8 @@
  #include "xmpp_tasks.h"
  #include "lastactivitytask.h"
@@ -1209,7 +1144,7 @@
  {
  	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
  	connect(account(), SIGNAL(addedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
-@@ -197,6 +199,7 @@ PsiChatDlg::~PsiChatDlg()
+@@ -196,6 +198,7 @@ PsiChatDlg::~PsiChatDlg()
  		disconnect(menu, SIGNAL(doEditTemplates()), this, SLOT(editTemplates()));
  		disconnect(menu, SIGNAL(doTemplateText(const QString &)), this, SLOT(sendTemp(const QString &)));
  	}
@@ -1217,7 +1152,7 @@
  }
  
  void PsiChatDlg::initUi()
-@@ -357,7 +360,7 @@ void PsiChatDlg::setLooks()
+@@ -355,7 +358,7 @@ void PsiChatDlg::setLooks()
  		ui_.lb_client->show();
  		ui_.lb_status->show();
  		ui_.le_jid->show();
@@ -1226,7 +1161,7 @@
  			ui_.toolbar->show();
  			ui_.tb_actions->hide();
  			ui_.tb_emoticons->hide();
-@@ -374,25 +377,26 @@ void PsiChatDlg::setLooks()
+@@ -372,25 +375,26 @@ void PsiChatDlg::setLooks()
  	updateIdentityVisibility();
  	updateCountVisibility();
  	updateContactAdding();
@@ -1259,7 +1194,7 @@
  
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
-@@ -423,11 +427,41 @@ void PsiChatDlg::updateContactAdding(Psi
+@@ -425,11 +429,41 @@ void PsiChatDlg::updateContactAdding(Psi
  		Jid rj = realJid();
  		UserListItem *uli;
  		if (rj.isNull() || ((uli = account()->findFirstRelevant(rj)) && (uli->inList() || uli->isSelf()))) {
@@ -1303,7 +1238,7 @@
  }
  
  void PsiChatDlg::copyUserJid()
-@@ -451,54 +485,69 @@ void PsiChatDlg::initToolButtons()
+@@ -453,54 +487,69 @@ void PsiChatDlg::initToolButtons()
  	ui_.vboxLayout1->addLayout(hb3a);
  // -- typeahead
  
@@ -1419,7 +1354,7 @@
  }
  
  void PsiChatDlg::initToolBar()
-@@ -506,28 +555,7 @@ void PsiChatDlg::initToolBar()
+@@ -508,28 +557,7 @@ void PsiChatDlg::initToolBar()
  	ui_.toolbar->setWindowTitle(tr("Chat Toolbar"));
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s, s));
@@ -1449,7 +1384,7 @@
  }
  
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -782,18 +810,18 @@ void PsiChatDlg::optionsUpdate()
+@@ -798,18 +826,18 @@ void PsiChatDlg::optionsUpdate()
  void PsiChatDlg::updatePGP()
  {
  	if (account()->hasPGP()) {
@@ -1471,7 +1406,7 @@
  	ui_.log->setEncryptionEnabled(isEncryptionEnabled());
  }
  
-@@ -849,7 +877,7 @@ void PsiChatDlg::doClearButton()
+@@ -865,7 +893,7 @@ void PsiChatDlg::doClearButton()
  
  void PsiChatDlg::setPGPEnabled(bool enabled)
  {
@@ -1480,7 +1415,7 @@
  	ui_.log->setEncryptionEnabled(enabled);
  }
  
-@@ -863,22 +891,22 @@ void PsiChatDlg::buildMenu()
+@@ -879,22 +907,22 @@ void PsiChatDlg::buildMenu()
  {
  	// Dialog menu
  	pm_settings_->clear();
@@ -1513,7 +1448,7 @@
  }
  
  void PsiChatDlg::updateCounter()
-@@ -888,7 +916,7 @@ void PsiChatDlg::updateCounter()
+@@ -904,7 +932,7 @@ void PsiChatDlg::updateCounter()
  
  bool PsiChatDlg::isEncryptionEnabled() const
  {
@@ -1522,7 +1457,7 @@
  }
  
  void PsiChatDlg::appendSysMsg(const QString &str)
-@@ -987,14 +1015,14 @@ void PsiChatDlg::doPasteAndSend()
+@@ -1019,14 +1047,14 @@ void PsiChatDlg::doPasteAndSend()
  	if(ChatDlg::isActiveTab()) {
  		chatEdit()->paste();
  		doSend();
@@ -1539,9 +1474,9 @@
  }
  
  void PsiChatDlg::sendTemp(const QString &templText)
---- git.temp.orig/src/psichatdlg.h
-+++ git.temp/src/psichatdlg.h
-@@ -11,7 +11,7 @@
+--- git.orig/src/psichatdlg.h
++++ git/src/psichatdlg.h
+@@ -12,7 +12,7 @@
  #include "typeaheadfind.h"
  #include "psiwindowheader.h"
  #include "widgets/actionlineedit.h"
@@ -1550,7 +1485,7 @@
  
  class IconAction;
  class PsiContact;
-@@ -47,6 +47,7 @@ private slots:
+@@ -48,6 +48,7 @@ private slots:
  	void updateCountVisibility();
  	void updateContactAdding(PsiContact* c = 0);
  	void updateContactAdding(const Jid &j);
@@ -1558,7 +1493,7 @@
  	void copyUserJid();
  
  	// reimplemented
-@@ -93,20 +94,8 @@ private:
+@@ -94,20 +95,8 @@ private:
  
  	QMenu* pm_settings_;
  
@@ -1580,8 +1515,8 @@
  	QAction *act_mini_cmd_, *act_minimize_;
  
  	ActionLineEdit *le_autojid;
---- git.temp.orig/src/psioptions.cpp
-+++ git.temp/src/psioptions.cpp
+--- git.orig/src/psioptions.cpp
++++ git/src/psioptions.cpp
 @@ -31,10 +31,8 @@
  #include "statuspreset.h"
  #include "psitoolbar.h"
@@ -1633,8 +1568,73 @@
  PsiOptions* PsiOptions::instance_ = NULL;
  PsiOptions* PsiOptions::defaults_ = NULL;
 -
---- git.temp.orig/src/widgets/iconaction.cpp
-+++ git.temp/src/widgets/iconaction.cpp
+--- git.orig/src/psi_profiles.cpp
++++ git/src/psi_profiles.cpp
+@@ -1358,6 +1358,62 @@ bool OptionsMigration::fromFile(const QS
+ 
+ void OptionsMigration::lateMigration()
+ {
++	// Add default chat and groupchat toolbars
++	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat") {
++		QStringList pluginsKeys;
++		ToolbarPrefs chatToolbar;
++		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
++		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
++		chatToolbar.name = "Chat";
++		chatToolbar.keys << "chat_clear"  << "chat_find" << "chat_html_text" << "chat_add_contact";
++		chatToolbar.keys += pluginsKeys;
++		chatToolbar.keys << "spacer" << "chat_icon" << "chat_templates" << "chat_ps" << "chat_file"
++						 << "chat_pgp" << "chat_info" << "chat_history" << "chat_voice"
++						 << "chat_active_contacts";
++
++		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
++			chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("chat_ps"));
++		}
++
++		ToolbarPrefs groupchatToolbar;
++		groupchatToolbar.on = chatToolbar.on;
++
++		groupchatToolbar.name = "Groupchat";
++		groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" << "gchat_configure";
++		groupchatToolbar.keys += pluginsKeys;
++		groupchatToolbar.keys << "spacer" << "gchat_icon" << "gchat_templates" << "gchat_ps" ;
++
++		if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
++			groupchatToolbar.keys.removeAt(groupchatToolbar.keys.indexOf("gchat_ps"));
++		}
++		PsiOptions::instance()->removeOption("options.ui.chat.disable-paste-send");
++
++		QList<ToolbarPrefs> toolbars;
++		toolbars << chatToolbar
++		         << groupchatToolbar;
++
++		QStringList toolbarBases = PsiOptions::instance()->getChildOptionNames("options.ui.contactlist.toolbars", true, true);
++		foreach(QString base, toolbarBases) {
++			ToolbarPrefs tb;
++			tb.id = PsiOptions::instance()->getOption(base + ".key").toString();
++			tb.name = PsiOptions::instance()->getOption(base + ".name").toString();
++			tb.on = PsiOptions::instance()->getOption(base + ".visible").toBool();
++			tb.locked = PsiOptions::instance()->getOption(base + ".locked").toBool();
++			tb.dock = (Qt3Dock)PsiOptions::instance()->getOption(base + ".dock.position").toInt(); //FIXME
++			tb.nl = PsiOptions::instance()->getOption(base + ".dock.nl").toBool();
++			tb.keys = PsiOptions::instance()->getOption(base + ".actions").toStringList();
++
++			toolbars << tb;
++		}
++
++		PsiOptions::instance()->removeOption("options.ui.contactlist.toolbars", true);
++
++		foreach(ToolbarPrefs tb, toolbars) {
++			tb.locked = true;
++			PsiToolBar::structToOptions(PsiOptions::instance(), tb);
++		}
++	}
++
+ 	foreach(QString opt, PsiOptions::instance()->allOptionNames()) {
+ 		if (opt.startsWith("options.status.presets.") ||
+ 			opt.startsWith("options.iconsets.service-status.") ||
+--- git.orig/src/widgets/iconaction.cpp
++++ git/src/widgets/iconaction.cpp
 @@ -57,7 +57,7 @@ public:
  		action = act;
  		Q_ASSERT(action);

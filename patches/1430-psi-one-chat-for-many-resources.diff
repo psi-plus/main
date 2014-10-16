@@ -26,7 +26,7 @@
  	// Message events
  	contactChatState_ = XMPP::StateNone;
  	lastChatState_ = XMPP::StateNone;
-@@ -388,18 +396,7 @@ const QString& ChatDlg::getDisplayName()
+@@ -398,18 +406,7 @@ const QString& ChatDlg::getDisplayName()
  	return dispNick_;
  }
  
@@ -46,7 +46,7 @@
  {
  	if (ul.isEmpty())
  		return UserStatus();
-@@ -458,12 +455,20 @@ void ChatDlg::updateContact(const Jid &j
+@@ -468,12 +465,20 @@ void ChatDlg::updateContact(const Jid &j
  	if (jid().compare(j, false)) {
  		QList<UserListItem*> ul = account()->findRelevant(j);
  		UserStatus userStatus = userStatusFor(jid(), ul, false);
@@ -68,7 +68,7 @@
  			statusChanged = true;
  			status_ = userStatus.statusType;
  			statusString_ = userStatus.status;
-@@ -501,6 +506,13 @@ void ChatDlg::updateContact(const Jid &j
+@@ -511,6 +516,13 @@ void ChatDlg::updateContact(const Jid &j
  	}
  }
  
@@ -252,7 +252,7 @@
  		// on X11, do a special reparent to open on the right desktop
  #ifdef HAVE_X11
  		/* KIS added an exception for tabs here. We do *not* want chats flying
-@@ -4924,12 +4957,12 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4921,12 +4954,12 @@ void PsiAccount::handleEvent(const PsiEv
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (o->getOption("options.ui.notifications.request-receipts").toBool()) {
@@ -270,8 +270,8 @@
 +					}
  				}
  			}
- 			delete e;
-@@ -4939,11 +4972,9 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			return;
+@@ -4935,11 +4968,9 @@ void PsiAccount::handleEvent(const PsiEv
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
  			if (o->getOption("options.messages.send-composing-events").toBool()) {
@@ -285,7 +285,7 @@
  					c->incomingMessage(m);
  				}
  			}
-@@ -4960,11 +4991,8 @@ void PsiAccount::handleEvent(PsiEvent* e
+@@ -4955,11 +4986,8 @@ void PsiAccount::handleEvent(const PsiEv
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		else if(m.type() == "chat") {
@@ -299,7 +299,7 @@
  				c->setJid(e->from());
  
  			//if the chat exists, and is either open in a tab,
-@@ -5444,12 +5472,12 @@ void PsiAccount::messageStanzasAcked(int
+@@ -5430,12 +5458,12 @@ void PsiAccount::messageStanzasAcked(int
  void PsiAccount::processChatsHelper(const Jid& j, bool removeEvents)
  {
  	//printf("processing chats for [%s]\n", j.full().latin1());
@@ -308,7 +308,7 @@
  	if(!c)
  		return;
  	// extract the chats
- 	QList<PsiEvent*> chatList;
+ 	QList<PsiEvent::Ptr> chatList;
 -	bool compareResources = true;
 +	bool compareResources = !c->autoSelectContact();
  #ifdef YAPSI
@@ -619,7 +619,7 @@
  
 --- git.orig/src/psicon.cpp
 +++ git/src/psicon.cpp
-@@ -1736,9 +1736,9 @@ void PsiCon::processEvent(PsiEvent *e, A
+@@ -1731,9 +1731,9 @@ void PsiCon::processEvent(const PsiEvent
  		if ( PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && sentToChatWindow ) {
  			// Message already displayed, need only to pop up chat dialog, so that
  			// it will be read (or marked as read)

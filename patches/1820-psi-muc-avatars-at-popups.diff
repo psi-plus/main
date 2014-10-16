@@ -1,19 +1,20 @@
---- git.temp.orig/src/groupchatdlg.cpp
-+++ git.temp/src/groupchatdlg.cpp
-@@ -1728,7 +1728,9 @@ void GCMainDlg::message(const Message &_
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
+@@ -1728,8 +1728,9 @@ void GCMainDlg::message(const Message &_
  			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
  				XMPP::Jid jid = m.from()/*.withDomain("")*/;
- 				MessageEvent *e = new MessageEvent(m, account());
--				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), 0, (PsiEvent *)e);
+ 				MessageEvent::Ptr e(new MessageEvent(m, account()));
+-				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), 0, e);
+-				e->deleteLater();
 +				UserListItem i;
 +				i.setPrivate(true);
-+				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), &i, (PsiEvent *)e);
- 				e->deleteLater();
++				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), &i, e.staticCast<PsiEvent>());
  			}
  		}
---- git.temp.orig/src/psidbusnotifier.cpp
-+++ git.temp/src/psidbusnotifier.cpp
-@@ -208,7 +208,11 @@ void PsiDBusNotifier::popup(PsiAccount*
+ 	}
+--- git.orig/src/psidbusnotifier.cpp
++++ git/src/psidbusnotifier.cpp
+@@ -206,7 +206,11 @@ void PsiDBusNotifier::popup(PsiAccount*
  //	}
  	QImage im;
  	if(account) {
@@ -26,8 +27,8 @@
  		if(!im.isNull()) {
  			int size = PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.avatar-size").toInt();
  			im = im.scaledToWidth(size, Qt::SmoothTransformation);
---- git.temp.orig/src/psigrowlnotifier.cpp
-+++ git.temp/src/psigrowlnotifier.cpp
+--- git.orig/src/psigrowlnotifier.cpp
++++ git/src/psigrowlnotifier.cpp
 @@ -126,8 +126,12 @@ void PsiGrowlNotifier::popup(PsiAccount*
  		if (((int)statusMsg.length()) > len)
  			statusMsg = statusMsg.left(len) + "...";
@@ -43,9 +44,9 @@
  
  	if (uli) {
  		contact = uli->name();
---- git.temp.orig/src/psipopup.cpp
-+++ git.temp/src/psipopup.cpp
-@@ -340,7 +340,13 @@ void PsiPopup::setData(const Jid &j, con
+--- git.orig/src/psipopup.cpp
++++ git/src/psipopup.cpp
+@@ -330,7 +330,13 @@ void PsiPopup::setData(const Jid &j, con
  			}
  		}
  	}

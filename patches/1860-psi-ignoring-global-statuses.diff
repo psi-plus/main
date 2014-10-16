@@ -1,7 +1,5 @@
-Entering 'iris'
-Entering 'src/libpsi'
---- git.temp.orig/src/accountstatusmenu.cpp
-+++ git.temp/src/accountstatusmenu.cpp
+--- git.orig/src/accountstatusmenu.cpp
++++ git/src/accountstatusmenu.cpp
 @@ -30,4 +30,18 @@ void AccountStatusMenu::fill()
  {
  	StatusMenu::fill();
@@ -21,8 +19,8 @@ Entering 'src/libpsi'
 +
 +}
 +
---- git.temp.orig/src/accountstatusmenu.h
-+++ git.temp/src/accountstatusmenu.h
+--- git.orig/src/accountstatusmenu.h
++++ git/src/accountstatusmenu.h
 @@ -20,6 +20,9 @@ protected:
  	void addChoose();
  	void addReconnect();
@@ -33,8 +31,8 @@ Entering 'src/libpsi'
  private slots:
  	void chooseStatusActivated();
  
---- git.temp.orig/src/mainwin.cpp
-+++ git.temp/src/mainwin.cpp
+--- git.orig/src/mainwin.cpp
++++ git/src/mainwin.cpp
 @@ -1200,7 +1200,7 @@ void MainWin::actSetMoodActivated()
  {
  	QList<PsiAccount*> l;
@@ -62,8 +60,8 @@ Entering 'src/libpsi'
  			l.append(pa);
  	}
  	if(l.isEmpty())
---- git.temp.orig/src/profiles.h
-+++ git.temp/src/profiles.h
+--- git.orig/src/profiles.h
++++ git/src/profiles.h
 @@ -63,7 +63,7 @@ public:
  	XMPP::ClientStream::AllowPlainType allow_plain;
  	bool req_mutual_auth;
@@ -73,8 +71,53 @@ Entering 'src/libpsi'
  	int security_level;
  	enum SSLFlag { SSL_No = 0, SSL_Yes = 1, SSL_Auto = 2, SSL_Legacy = 3 } ssl;
  
---- git.temp.orig/src/psi_profiles.cpp
-+++ git.temp/src/psi_profiles.cpp
+--- git.orig/src/psiaccount.cpp
++++ git/src/psiaccount.cpp
+@@ -4090,6 +4090,11 @@ void PsiAccount::actionExecuteCommandSpe
+ 	}
+ }
+ 
++void PsiAccount::actionSetBlock(bool blocked)
++{
++	d->acc.ignore_global_actions = blocked;
++}
++
+ void PsiAccount::actionSetMood()
+ {
+ 	QList<PsiAccount*> list;
+--- git.orig/src/psiaccount.h
++++ git/src/psiaccount.h
+@@ -377,6 +377,7 @@ public slots:
+ 	void actionSendFiles(const Jid &, const QStringList&);
+ 	void actionExecuteCommand(const Jid& j, const QString& = QString());
+ 	void actionExecuteCommandSpecific(const Jid&, const QString& = QString());
++	void actionSetBlock(bool);
+ 	void actionSetMood();
+ 	void actionSetActivity();
+ 	void actionSetGeoLocation();
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
+@@ -1179,7 +1179,7 @@ void PsiCon::setGlobalStatus(const Statu
+ 
+ 	// globally set each account which is logged in
+ 	foreach(PsiAccount* account, d->contactList->enabledAccounts())
+-		if (allOffline || account->isActive())
++		if ((allOffline || account->isActive()) && (!account->accountOptions().ignore_global_actions || s.type() == Status::Offline))
+ 			account->setStatus(s, withPriority, isManualStatus);
+ 
+ 	emit statusMessageChanged(s.status());
+@@ -1930,6 +1930,9 @@ void PsiCon::secondsIdle(int sec)
+ 		aa = PsiAccount::AutoAway_None;
+ 
+ 	foreach(PsiAccount* pa, d->contactList->enabledAccounts()) {
++		if(pa->accountOptions().ignore_global_actions)
++			continue;
++
+ 		pa->setAutoAwayStatus(aa);
+ 	}
+ }
+--- git.orig/src/psi_profiles.cpp
++++ git/src/psi_profiles.cpp
 @@ -133,6 +133,7 @@ void UserAccount::reset()
  	host = "";
  	opt_automatic_resource = false;
@@ -107,48 +150,3 @@ Entering 'src/libpsi'
  
  	// Will be overwritten if there is a new option
  	bool opt_plain = false;
---- git.temp.orig/src/psiaccount.cpp
-+++ git.temp/src/psiaccount.cpp
-@@ -4062,6 +4062,11 @@ void PsiAccount::actionExecuteCommandSpe
- 	}
- }
- 
-+void PsiAccount::actionSetBlock(bool blocked)
-+{
-+	d->acc.ignore_global_actions = blocked;
-+}
-+
- void PsiAccount::actionSetMood()
- {
- 	QList<PsiAccount*> list;
---- git.temp.orig/src/psiaccount.h
-+++ git.temp/src/psiaccount.h
-@@ -377,6 +377,7 @@ public slots:
- 	void actionSendFiles(const Jid &, const QStringList&);
- 	void actionExecuteCommand(const Jid& j, const QString& = QString());
- 	void actionExecuteCommandSpecific(const Jid&, const QString& = QString());
-+	void actionSetBlock(bool);
- 	void actionSetMood();
- 	void actionSetActivity();
- 	void actionSetGeoLocation();
---- git.temp.orig/src/psicon.cpp
-+++ git.temp/src/psicon.cpp
-@@ -1179,7 +1179,7 @@ void PsiCon::setGlobalStatus(const Statu
- 
- 	// globally set each account which is logged in
- 	foreach(PsiAccount* account, d->contactList->enabledAccounts())
--		if (allOffline || account->isActive())
-+		if ((allOffline || account->isActive()) && (!account->accountOptions().ignore_global_actions || s.type() == Status::Offline))
- 			account->setStatus(s, withPriority, isManualStatus);
- 
- 	emit statusMessageChanged(s.status());
-@@ -1935,6 +1935,9 @@ void PsiCon::secondsIdle(int sec)
- 		aa = PsiAccount::AutoAway_None;
- 
- 	foreach(PsiAccount* pa, d->contactList->enabledAccounts()) {
-+		if(pa->accountOptions().ignore_global_actions)
-+			continue;
-+
- 		pa->setAutoAwayStatus(aa);
- 	}
- }

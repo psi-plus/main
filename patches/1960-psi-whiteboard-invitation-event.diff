@@ -1,7 +1,6 @@
-diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
---- a/src/psiaccount.cpp
-+++ b/src/psiaccount.cpp
-@@ -1217,6 +1217,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+--- git.orig/src/psiaccount.cpp
++++ git/src/psiaccount.cpp
+@@ -1217,6 +1217,7 @@ PsiAccount::PsiAccount(const UserAccount
  	d->sxeManager = new SxeManager(d->client, this);
  	 // Initialize Whiteboard manager
  	d->wbManager = new WbManager(d->client, this, d->sxeManager);
@@ -9,7 +8,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  #endif
  
  	// Avatars
-@@ -1557,7 +1558,12 @@ VoiceCaller* PsiAccount::voiceCaller() const
+@@ -1557,7 +1558,12 @@ VoiceCaller* PsiAccount::voiceCaller() c
  {
  	return d->voiceCaller;
  }
@@ -23,14 +22,14 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  PrivacyManager* PsiAccount::privacyManager() const
  {
  	return d->privacyManager;
-@@ -2751,6 +2757,19 @@ void PsiAccount::client_messageReceived(const Message &m)
+@@ -2754,6 +2760,19 @@ void PsiAccount::client_messageReceived(
  	}
  }
  
 +#ifdef WHITEBOARDING
 +void PsiAccount::wbRequest(const Jid &j, int id)
 +{
-+	SxeEvent *se = new SxeEvent(id, this);
++	SxeEvent::Ptr se(new SxeEvent(id, this));
 +	XMPP::Message m;
 +	m.setSubject(tr("Whiteboard invitation"));
 +	m.setFrom(j);
@@ -43,7 +42,7 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  /**
   * Handles the passed Message \param m. Also message's type could be modified
   * here, if certain options are set.
-@@ -5173,6 +5192,13 @@ void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
+@@ -5171,6 +5190,13 @@ void PsiAccount::handleEvent(const PsiEv
  	else if(e->type() == PsiEvent::HttpAuth) {
  		soundType = eSystem;
  	}
@@ -57,9 +56,8 @@ diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
  	else if(e->type() == PsiEvent::File) {
  		soundType = eIncomingFT;
  		doPopup = true;
-diff --git a/src/psiaccount.h b/src/psiaccount.h
---- a/src/psiaccount.h
-+++ b/src/psiaccount.h
+--- git.orig/src/psiaccount.h
++++ git/src/psiaccount.h
 @@ -91,6 +91,9 @@ class GoogleFileTransfer;
  #endif
  class PsiIcon;
@@ -91,9 +89,8 @@ diff --git a/src/psiaccount.h b/src/psiaccount.h
  	void itemPublished(const Jid&, const QString&, const PubSubItem&);
  	void itemRetracted(const Jid&, const QString&, const PubSubRetraction&);
  
-diff --git a/src/psicon.cpp b/src/psicon.cpp
---- a/src/psicon.cpp
-+++ b/src/psicon.cpp
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
 @@ -112,6 +112,9 @@
  #include "alertmanager.h"
  #include "bosskey.h"
@@ -104,7 +101,7 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
  
  #include "AutoUpdater/AutoUpdater.h"
  #ifdef HAVE_SPARKLE
-@@ -1772,6 +1775,16 @@ void PsiCon::processEvent(PsiEvent *e, ActivationType activationType)
+@@ -1767,6 +1770,15 @@ void PsiCon::processEvent(const PsiEvent
  		// as the event could be deleted just above, we're using cached account and from values
  		account->openChat(from, activationType);
  	}
@@ -113,19 +110,17 @@ diff --git a/src/psicon.cpp b/src/psicon.cpp
 +		e->account()->eventQueue()->dequeue(e);
 +		e->account()->queueChanged();
 +		e->account()->cpUpdate(*u);
-+		e->account()->wbManager()->requestActivated(((SxeEvent*)e)->id());
-+		delete e;
++		e->account()->wbManager()->requestActivated((e.staticCast<SxeEvent>())->id());
 +		return;
 +	}
 +#endif
  	else {
  		// search for an already opened eventdlg
  		EventDlg *w = e->account()->findDialog<EventDlg*>(u->jid());
-diff --git a/src/psievent.h b/src/psievent.h
---- a/src/psievent.h
-+++ b/src/psievent.h
-@@ -53,6 +53,9 @@ public:
- 
+--- git.orig/src/psievent.h
++++ git/src/psievent.h
+@@ -54,6 +54,9 @@ public:
+ 	typedef QSharedPointer<PsiEvent> Ptr;
  	enum {
  		Message,
 +#ifdef WHITEBOARDING
@@ -134,7 +129,7 @@ diff --git a/src/psievent.h b/src/psievent.h
  		Auth,
  		PGP,
  		File,
-@@ -174,6 +177,26 @@ private:
+@@ -177,6 +180,27 @@ private:
  	QString v_at;
  };
  
@@ -148,6 +143,7 @@ diff --git a/src/psievent.h b/src/psievent.h
 +	SxeEvent(const SxeEvent &from)
 +		: MessageEvent(from), id_(from.id()) {}
 +	~SxeEvent() {}
++	typedef QSharedPointer<SxeEvent> Ptr;
 +	int type() const { return Sxe; }
 +//	XMPP::Jid from() const { return jid(); }
 +//	void setFrom(const XMPP::Jid &) {  }
@@ -161,10 +157,9 @@ diff --git a/src/psievent.h b/src/psievent.h
  // request pgp passphrase
  class PGPEvent : public PsiEvent
  {
-diff --git a/src/sxe/sxemanager.cpp b/src/sxe/sxemanager.cpp
---- a/src/sxe/sxemanager.cpp
-+++ b/src/sxe/sxemanager.cpp
-@@ -50,9 +50,9 @@ SxeManager::SxeManager(Client* client, PsiAccount* pa) : client_(client) {
+--- git.orig/src/sxe/sxemanager.cpp
++++ git/src/sxe/sxemanager.cpp
+@@ -50,9 +50,9 @@ SxeManager::SxeManager(Client* client, P
  	connect(&negotiationTimer_, SIGNAL(timeout()), SLOT(negotiationTimeout()));
  }
  
@@ -177,7 +172,7 @@ diff --git a/src/sxe/sxemanager.cpp b/src/sxe/sxemanager.cpp
  
  void SxeManager::messageReceived(const Message &message) {
  	// only process messages that contain a <sxe/> with a nonempty
-@@ -269,8 +269,9 @@ bool SxeManager::processNegotiationAsJoiner(const QDomNode &negotiationElement,
+@@ -269,8 +269,9 @@ bool SxeManager::processNegotiationAsJoi
  
  		// check if one of the invitation callbacks accepts the invitation.
  		const QString sessionId = negotiation->sessionId;
@@ -189,7 +184,7 @@ diff --git a/src/sxe/sxemanager.cpp b/src/sxe/sxemanager.cpp
  			if (!negotiations_.contains(sessionId, negotiation)) { //FIXME that's wrong. negotiation can be replaced with new one with the same address
  				return false;
  			}
-@@ -279,7 +280,8 @@ bool SxeManager::processNegotiationAsJoiner(const QDomNode &negotiationElement,
+@@ -279,7 +280,8 @@ bool SxeManager::processNegotiationAsJoi
  				negotiation->state = SxeNegotiation::InvitationAccepted;
  				return true;
  			}
@@ -199,9 +194,8 @@ diff --git a/src/sxe/sxemanager.cpp b/src/sxe/sxemanager.cpp
  		// othewise abort negotiation
  		abortNegotiation(negotiation);
  		return false;
-diff --git a/src/sxe/sxemanager.h b/src/sxe/sxemanager.h
---- a/src/sxe/sxemanager.h
-+++ b/src/sxe/sxemanager.h
+--- git.orig/src/sxe/sxemanager.h
++++ git/src/sxe/sxemanager.h
 @@ -101,8 +101,8 @@ public:
  	 *  If such session doesn't exits, returns 0.
  	 */
@@ -233,9 +227,8 @@ diff --git a/src/sxe/sxemanager.h b/src/sxe/sxemanager.h
  	/*! \brief A counter used for including a unique id in each sent sxe element.*/
  	int sxeId_;
  	/*! \brief A list of messages waiting to be sent out.*/
-diff --git a/src/whiteboarding/wbmanager.cpp b/src/whiteboarding/wbmanager.cpp
---- a/src/whiteboarding/wbmanager.cpp
-+++ b/src/whiteboarding/wbmanager.cpp
+--- git.orig/src/whiteboarding/wbmanager.cpp
++++ git/src/whiteboarding/wbmanager.cpp
 @@ -32,8 +32,45 @@
  
  using namespace XMPP;
@@ -283,7 +276,7 @@ diff --git a/src/whiteboarding/wbmanager.cpp b/src/whiteboarding/wbmanager.cpp
  WbManager::WbManager(XMPP::Client* client, PsiAccount* pa, SxeManager* sxemanager) {
  	pa_ = pa;
  	sxemanager_ = sxemanager;
-@@ -41,12 +78,14 @@ WbManager::WbManager(XMPP::Client* client, PsiAccount* pa, SxeManager* sxemanage
+@@ -41,12 +78,14 @@ WbManager::WbManager(XMPP::Client* clien
  	client->addExtension("whiteboard", Features(WBNS));
  
  	connect(sxemanager_, SIGNAL(sessionNegotiated(SxeSession*)), SLOT(createWbDlg(SxeSession*)));
@@ -299,7 +292,7 @@ diff --git a/src/whiteboarding/wbmanager.cpp b/src/whiteboarding/wbmanager.cpp
  }
  
  void WbManager::openWhiteboard(const Jid &target, const Jid &ownJid, bool groupChat, bool promptInitialDoc) {
-@@ -143,13 +182,33 @@ void WbManager::createWbDlg(SxeSession* session) {
+@@ -143,13 +182,33 @@ void WbManager::createWbDlg(SxeSession*
  	}
  }
  
@@ -337,9 +330,8 @@ diff --git a/src/whiteboarding/wbmanager.cpp b/src/whiteboarding/wbmanager.cpp
 +		}
 +	}
 +}
-diff --git a/src/whiteboarding/wbmanager.h b/src/whiteboarding/wbmanager.h
---- a/src/whiteboarding/wbmanager.h
-+++ b/src/whiteboarding/wbmanager.h
+--- git.orig/src/whiteboarding/wbmanager.h
++++ git/src/whiteboarding/wbmanager.h
 @@ -37,6 +37,7 @@ namespace XMPP {
  }
  

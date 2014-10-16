@@ -1,0 +1,1913 @@
+--- git.orig/src/chatdlg.cpp
++++ git/src/chatdlg.cpp
+@@ -191,8 +191,9 @@ void ChatDlg::ensureTabbedCorrectly()
+ 	}
+ }
+ 
+-void ChatDlg::ackLastMessages(int a) {
+-
++void ChatDlg::ackLastMessages(int a)
++{
++	Q_UNUSED(a);
+ }
+ 
+ 
+--- git.orig/src/contactupdatesmanager.cpp
++++ git/src/contactupdatesmanager.cpp
+@@ -84,18 +84,17 @@ void ContactUpdatesManager::removeAuthRe
+ 		return;
+ 
+ 	foreach(EventQueue::PsiEventId p, account->eventQueue()->eventsFor(jid, false)) {
+-		PsiEvent* e = p.second;
++		PsiEvent::Ptr e = p.second;
+ 		if (e->type() == PsiEvent::Auth) {
+-			AuthEvent* authEvent = static_cast<AuthEvent*>(e);
++			AuthEvent::Ptr authEvent = e.staticCast<AuthEvent>();
+ 			if (authEvent->authType() == "subscribe") {
+ 				if (denyAuthRequests) {
+ 					account->dj_deny(jid);
+ 				}
+ #ifdef YAPSI_ACTIVEX_SERVER
+-				controller_->yaOnline()->closeNotify(p.first, e);
++				controller_->yaOnline()->closeNotify(p.first, e.data());
+ #endif
+ 				account->eventQueue()->dequeue(e);
+-				e->deleteLater();
+ 			}
+ 		}
+ 	}
+@@ -108,7 +107,7 @@ void ContactUpdatesManager::removeToaste
+ 		return;
+ 
+ 	foreach(EventQueue::PsiEventId p, account->eventQueue()->eventsFor(jid, false)) {
+-		PsiEvent* e = p.second;
++		PsiEvent::Ptr e = p.second;
+ 		if (e->type() == PsiEvent::Message
+ #ifdef YAPSI
+ 		    || e->type() == PsiEvent::Mood
+@@ -116,10 +115,9 @@ void ContactUpdatesManager::removeToaste
+ 		    )
+ 		{
+ #ifdef YAPSI_ACTIVEX_SERVER
+-			controller_->yaOnline()->closeNotify(p.first, e);
++			controller_->yaOnline()->closeNotify(p.first, e.data());
+ #endif
+ 			account->eventQueue()->dequeue(e);
+-			e->deleteLater();
+ 		}
+ 	}
+ }
+--- git.orig/src/eventdb.cpp
++++ git/src/eventdb.cpp
+@@ -39,7 +39,7 @@ using namespace XMPP;
+ //----------------------------------------------------------------------------
+ // EDBItem
+ //----------------------------------------------------------------------------
+-EDBItem::EDBItem(PsiEvent *event, const QString &id, const QString &prevId, const QString &nextId)
++EDBItem::EDBItem(const PsiEvent::Ptr &event, const QString &id, const QString &prevId, const QString &nextId)
+ {
+ 	e = event;
+ 	v_id = id;
+@@ -49,10 +49,9 @@ EDBItem::EDBItem(PsiEvent *event, const
+ 
+ EDBItem::~EDBItem()
+ {
+-	delete e;
+ }
+ 
+-PsiEvent *EDBItem::event() const
++PsiEvent::Ptr EDBItem::event() const
+ {
+ 	return e;
+ }
+@@ -144,7 +143,7 @@ void EDBHandle::find(const QString &str,
+ 	d->listeningFor = d->edb->op_find(str, j, id, direction);
+ }
+ 
+-void EDBHandle::append(const Jid &j, PsiEvent *e)
++void EDBHandle::append(const Jid &j, const PsiEvent::Ptr &e)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Write;
+@@ -265,7 +264,7 @@ int EDB::op_find(const QString &str, con
+ 	return find(str, j, id, direction);
+ }
+ 
+-int EDB::op_append(const Jid &j, PsiEvent *e)
++int EDB::op_append(const Jid &j, const PsiEvent::Ptr &e)
+ {
+ 	return append(j, e);
+ }
+@@ -310,7 +309,7 @@ struct item_file_req
+ 	int id;
+ 	int eventId;
+ 	QString findStr;
+-	PsiEvent *event;
++	PsiEvent::Ptr event;
+ 
+ 	QDateTime first, last;
+ 	enum Type {
+@@ -421,12 +420,12 @@ int EDBFlatFile::find(const QString &str
+ 	return r->id;
+ }
+ 
+-int EDBFlatFile::append(const Jid &j, PsiEvent *e)
++int EDBFlatFile::append(const Jid &j, const PsiEvent::Ptr &e)
+ {
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+ 	r->type = item_file_req::Type_append;
+-	r->event = e->copy();
++	r->event = e;
+ 	if ( !r->event ) {
+ 		qWarning("EDBFlatFile::append(): Attempted to append incompatible type.");
+ 		delete r;
+@@ -444,7 +443,6 @@ int EDBFlatFile::erase(const Jid &j)
+ 	item_file_req *r = new item_file_req;
+ 	r->j = j;
+ 	r->type = item_file_req::Type_erase;
+-	r->event = 0;
+ 	r->id = genUniqueId();
+ 	d->rlist.append(r);
+ 
+@@ -541,7 +539,7 @@ void EDBFlatFile::performRequests()
+ 
+ 		EDBResult result;
+ 		for(int n = 0; n < len; ++n) {
+-			PsiEvent *e = f->get(id);
++			PsiEvent::Ptr e(f->get(id));
+ 			if(e) {
+ 				QString prevId, nextId;
+ 				if(id > 0)
+@@ -561,13 +559,12 @@ void EDBFlatFile::performRequests()
+ 	}
+ 	else if(type == item_file_req::Type_append) {
+ 		writeFinished(r->id, f->append(r->event));
+-		delete r->event;
+ 	}
+ 	else if(type == item_file_req::Type_find) {
+ 		int id = r->eventId;
+ 		EDBResult result;
+ 		while(1) {
+-			PsiEvent *e = f->get(id);
++			PsiEvent::Ptr e(f->get(id));
+ 			if(!e)
+ 				break;
+ 
+@@ -577,20 +574,16 @@ void EDBFlatFile::performRequests()
+ 			if(id < f->total()-1)
+ 				nextId = QString::number(id+1);
+ 
+-			bool matched = false;
+ 			if(e->type() == PsiEvent::Message) {
+-				MessageEvent *me = (MessageEvent *)e;
++				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 				const Message &m = me->message();
+ 				if(m.body().indexOf(r->findStr, 0, Qt::CaseInsensitive) != -1) {
+ 					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
+ 					result.append(ei);
+-					matched = true;
+ 					//commented line below to return ALL(instead of just first) messages that contain findStr
+ 					//break;
+ 				}
+ 			}
+-			if (!matched)
+-				delete e;
+ 
+ 			if(r->dir == Forward)
+ 				++id;
+@@ -603,7 +596,7 @@ void EDBFlatFile::performRequests()
+ 		int id = 0;
+ 		EDBResult result;
+ 		for (int i=0; i < f->total(); ++i) {
+-			PsiEvent *e = f->get(id);
++			PsiEvent::Ptr e(f->get(id));
+ 			if(!e)
+ 				continue;
+ 
+@@ -613,18 +606,14 @@ void EDBFlatFile::performRequests()
+ 			if(id < f->total()-1)
+ 				nextId = QString::number(id+1);
+ 
+-			bool matched = false;
+ 			if(e->type() == PsiEvent::Message) {
+-				MessageEvent *me = (MessageEvent *)e;
++				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 				const Message &m = me->message();
+ 				if(m.timeStamp() > r->first && m.timeStamp() < r->last ) {
+ 					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
+ 					result.append(ei);
+-					matched = true;
+ 				}
+ 			}
+-			if (!matched)
+-				delete e;
+ 
+ 			++id;
+ 		}
+@@ -749,16 +738,16 @@ void EDBFlatFile::File::timer_timeout()
+ 	timeout();
+ }
+ 
+-PsiEvent *EDBFlatFile::File::get(int id)
++PsiEvent::Ptr EDBFlatFile::File::get(int id)
+ {
+ 	touch();
+ 
+ 	if(!valid)
+-		return 0;
++		return PsiEvent::Ptr();
+ 
+ 	ensureIndex();
+ 	if(id < 0 || id >= (int)d->index.size())
+-		return 0;
++		return PsiEvent::Ptr();
+ 
+ 	f.seek(d->index[id]);
+ 
+@@ -770,7 +759,7 @@ PsiEvent *EDBFlatFile::File::get(int id)
+ 	return lineToEvent(line);
+ }
+ 
+-bool EDBFlatFile::File::append(PsiEvent *e)
++bool EDBFlatFile::File::append(const PsiEvent::Ptr &e)
+ {
+ 	touch();
+ 
+@@ -799,7 +788,7 @@ bool EDBFlatFile::File::append(PsiEvent
+ 	return true;
+ }
+ 
+-PsiEvent *EDBFlatFile::File::lineToEvent(const QString &line)
++PsiEvent::Ptr EDBFlatFile::File::lineToEvent(const QString &line)
+ {
+ 	// -- read the line --
+ 	QString sTime, sType, sOrigin, sFlags, sText, sSubj, sUrl, sUrlDesc;
+@@ -874,10 +863,10 @@ PsiEvent *EDBFlatFile::File::lineToEvent
+ 			m.urlAdd(Url(url, logdecode(sUrlDesc)));
+ 		m.setSpooled(true);
+ 
+-		MessageEvent *me = new MessageEvent(m, 0);
++		MessageEvent::Ptr me(new MessageEvent(m, 0));
+ 		me->setOriginLocal(originLocal);
+ 
+-		return me;
++		return me.staticCast<PsiEvent>();
+ 	}
+ 	else if(type == 2 || type == 3 || type == 6 || type == 7 || type == 8) {
+ 		QString subType = "subscribe";
+@@ -898,21 +887,21 @@ PsiEvent *EDBFlatFile::File::lineToEvent
+ 		else if(type == 8)
+ 			subType = "unsubscribed";
+ 
+-		AuthEvent *ae = new AuthEvent(j, subType, 0);
++		AuthEvent::Ptr ae(new AuthEvent(j, subType, 0));
+ 		ae->setTimeStamp(QDateTime::fromString(sTime, Qt::ISODate));
+-		return ae;
++		return ae.staticCast<PsiEvent>();
+ 	}
+ 
+-	return NULL;
++	return PsiEvent::Ptr();
+ }
+ 
+-QString EDBFlatFile::File::eventToLine(PsiEvent *e)
++QString EDBFlatFile::File::eventToLine(const PsiEvent::Ptr &e)
+ {
+ 	int subflags = 0;
+ 	QString sTime, sType, sOrigin, sFlags;
+ 
+ 	if(e->type() == PsiEvent::Message) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 		const UrlList urls = m.urlList();
+ 
+@@ -952,7 +941,7 @@ QString EDBFlatFile::File::eventToLine(P
+ 		return line;
+ 	}
+ 	else if(e->type() == PsiEvent::Auth) {
+-		AuthEvent *ae = (AuthEvent *)e;
++		AuthEvent::Ptr ae = e.staticCast<AuthEvent>();
+ 		sTime = ae->timeStamp().toString(Qt::ISODate);
+ 		QString subType = ae->authType();
+ 		int n = 0;
+--- git.orig/src/eventdb.h
++++ git/src/eventdb.h
+@@ -28,23 +28,22 @@
+ #include <QDateTime>
+ 
+ #include "xmpp_jid.h"
+-
+-class PsiEvent;
++#include "psievent.h"
+ 
+ class EDBItem
+ {
+ public:
+-	EDBItem(PsiEvent *, const QString &id, const QString &nextId, const QString &prevId);
++	EDBItem(const PsiEvent::Ptr &, const QString &id, const QString &nextId, const QString &prevId);
+ 	~EDBItem();
+ 
+-	PsiEvent *event() const;
++	PsiEvent::Ptr event() const;
+ 	const QString & id() const;
+ 	const QString & nextId() const;
+ 	const QString & prevId() const;
+ 
+ private:
+ 	QString v_id, v_prevId, v_nextId;
+-	PsiEvent *e;
++	PsiEvent::Ptr e;
+ };
+ 
+ typedef QSharedPointer<EDBItem> EDBItemPtr;
+@@ -65,7 +64,7 @@ public:
+ 	void get(const XMPP::Jid &jid, const QString &id, int direction, int len);
+ 	void getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+ 	void find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	void append(const XMPP::Jid &, PsiEvent *);
++	void append(const XMPP::Jid &, const PsiEvent::Ptr &);
+ 	void erase(const XMPP::Jid &);
+ 
+ 	bool busy() const;
+@@ -100,7 +99,7 @@ protected:
+ 	virtual int getOldest(const XMPP::Jid &, int len)=0;
+ 	virtual int get(const XMPP::Jid &jid, const QString &id, int direction, int len)=0;
+ 	virtual int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last) = 0;
+-	virtual int append(const XMPP::Jid &, PsiEvent *)=0;
++	virtual int append(const XMPP::Jid &, const PsiEvent::Ptr &)=0;
+ 	virtual int find(const QString &, const XMPP::Jid &, const QString &id, int direction)=0;
+ 	virtual int erase(const XMPP::Jid &)=0;
+ 	void resultReady(int, EDBResult);
+@@ -119,7 +118,7 @@ private:
+ 	int op_get(const XMPP::Jid &, const QString &id, int direction, int len);
+ 	int op_getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+ 	int op_find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	int op_append(const XMPP::Jid &, PsiEvent *);
++	int op_append(const XMPP::Jid &, const PsiEvent::Ptr&);
+ 	int op_erase(const XMPP::Jid &);
+ };
+ 
+@@ -135,7 +134,7 @@ public:
+ 	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
+ 	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+ 	int find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	int append(const XMPP::Jid &, PsiEvent *);
++	int append(const XMPP::Jid &, const PsiEvent::Ptr&);
+ 	int erase(const XMPP::Jid &);
+ 
+ 	class File;
+@@ -162,8 +161,8 @@ public:
+ 
+ 	int total() const;
+ 	void touch();
+-	PsiEvent *get(int);
+-	bool append(PsiEvent *);
++	PsiEvent::Ptr get(int);
++	bool append(const PsiEvent::Ptr &);
+ 
+ 	static QString jidToFileName(const XMPP::Jid &);
+ 
+@@ -184,8 +183,8 @@ public:
+ 	Private *d;
+ 
+ private:
+-	PsiEvent *lineToEvent(const QString &);
+-	QString eventToLine(PsiEvent *);
++	PsiEvent::Ptr lineToEvent(const QString &);
++	QString eventToLine(const PsiEvent::Ptr&);
+ 	void ensureIndex();
+ };
+ 
+--- git.orig/src/eventdlg.cpp
++++ git/src/eventdlg.cpp
+@@ -1732,7 +1732,7 @@ void EventDlg::setTime(const QDateTime &
+ 	d->lb_time->setText(str);
+ }
+ 
+-void EventDlg::updateEvent(PsiEvent *e)
++void EventDlg::updateEvent(const PsiEvent::Ptr &e)
+ {
+ 	// Default buttons setup
+ 	d->pb_next->show();
+@@ -1766,7 +1766,7 @@ void EventDlg::updateEvent(PsiEvent *e)
+ 
+ 	if (e->type() == PsiEvent::HttpAuth) {
+ 
+-		HttpAuthEvent *hae = (HttpAuthEvent *)e;
++		HttpAuthEvent::Ptr hae = e.staticCast<HttpAuthEvent>();
+ 		const HttpAuthRequest &confirm = hae->request();
+ 
+ 		QString body(tr(
+@@ -1804,7 +1804,7 @@ void EventDlg::updateEvent(PsiEvent *e)
+ 	}
+ 
+ 	if(e->type() == PsiEvent::Message || e->type() == PsiEvent::HttpAuth) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 
+ 		d->enc = m.wasEncrypted();
+@@ -1883,7 +1883,7 @@ void EventDlg::updateEvent(PsiEvent *e)
+ 		showHideAttachView();
+ 	}
+ 	else if(e->type() == PsiEvent::Auth) {
+-		AuthEvent *ae = (AuthEvent *)e;
++		AuthEvent::Ptr ae = e.staticCast<AuthEvent>();
+ 		QString type = ae->authType();
+ 
+ 		d->le_subj->setText("");
+@@ -1929,7 +1929,7 @@ void EventDlg::updateEvent(PsiEvent *e)
+ 		}
+ 	}
+ 	else if (e->type() == PsiEvent::RosterExchange) {
+-		RosterExchangeEvent *re = (RosterExchangeEvent *)e;
++		RosterExchangeEvent::Ptr re = e.staticCast<RosterExchangeEvent>();
+ 		int additions = 0, deletions = 0, modifications = 0;
+ 		foreach(RosterExchangeItem item, re->rosterExchangeItems()) {
+ 			switch(item.action()) {
+--- git.orig/src/eventdlg.h
++++ git/src/eventdlg.h
+@@ -29,10 +29,10 @@
+ #include "ui_addurl.h"
+ #include "advwidget.h"
+ #include "userlist.h"
++#include "psievent.h"
+ 
+ class QDateTime;
+ class QStringList;
+-class PsiEvent;
+ class PsiCon;
+ class PsiAccount;
+ class PsiIcon;
+@@ -150,7 +150,7 @@ public slots:
+ 	void optionsUpdate();
+ 	void closeAfterReply();
+ 	void updateContact(const Jid &);
+-	void updateEvent(PsiEvent *);
++	void updateEvent(const PsiEvent::Ptr &);
+ 	void updateReadNext(PsiIcon *, int);
+ 	void actionGCJoin(const QString &, const QString&);
+ 
+--- git.orig/src/globaleventqueue.cpp
++++ git/src/globaleventqueue.cpp
+@@ -39,13 +39,13 @@ const QList<int>& GlobalEventQueue::ids(
+ 	return ids_;
+ }
+ 
+-PsiEvent *GlobalEventQueue::peek(int id) const
++PsiEvent::Ptr GlobalEventQueue::peek(int id) const
+ {
+ 	Q_ASSERT(ids_.contains(id));
+ 	foreach(EventItem* item, items_)
+ 		if (item->id() == id)
+ 			return item->event();
+-	return 0;
++	return PsiEvent::Ptr();
+ }
+ 
+ void GlobalEventQueue::enqueue(EventItem* item)
+--- git.orig/src/globaleventqueue.h
++++ git/src/globaleventqueue.h
+@@ -35,7 +35,7 @@ public:
+ 	int count() const;
+ 
+ 	const QList<int>& ids() const;
+-	PsiEvent *peek(int id) const;
++	PsiEvent::Ptr peek(int id) const;
+ 
+ protected:
+ 	void enqueue(EventItem* item);
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
+@@ -1418,8 +1418,8 @@ void GCMainDlg::message(const Message &_
+ 		if(alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
+ 			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
+ 				XMPP::Jid jid = m.from()/*.withDomain("")*/;
+-				MessageEvent *e = new MessageEvent(m, account());
+-				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), 0, (PsiEvent *)e);
++				MessageEvent::Ptr e(new MessageEvent(m, account()));
++				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), 0, e);
+ 				e->deleteLater();
+ 			}
+ 		}
+--- git.orig/src/historydlg.cpp
++++ git/src/historydlg.cpp
+@@ -367,7 +367,7 @@ void HistoryDlg::exportHistory()
+ 		for(int i = 0; i < cnt; ++i) {
+ 			EDBItemPtr item = r.value(i);
+ 			id = item->nextId();
+-			PsiEvent *e = item->event();
++			PsiEvent::Ptr e(item->event());
+ 			QString txt;
+ 
+ 			QString ts = e->timeStamp().toString(Qt::LocalDate);
+@@ -381,7 +381,7 @@ void HistoryDlg::exportHistory()
+ 			}
+ 
+ 			if(e->type() == PsiEvent::Message) {
+-				MessageEvent *me = (MessageEvent *)e;
++				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 				stream << QString("[%1] <%2>: ").arg(ts, nick)/* << endl*/;
+ 
+ 				QStringList lines = me->message().body().split('\n', QString::KeepEmptyParts);
+@@ -605,13 +605,13 @@ void HistoryDlg::displayResult(const EDB
+ 	while (i >= 0 && i <= r.count() - 1 && (max == -1 ? true : at < max))
+ 	{
+ 		EDBItemPtr item = r.value(i);
+-		PsiEvent* e = item->event();
++		PsiEvent::Ptr e(item->event());
+ 		UserListItem *u = d->pa->findFirstRelevant(e->from().full());
+ 		if(u) {
+ 			QString from = JIDUtil::nickOrJid(u->name(), u->jid().full());
+ 			if (e->type() == PsiEvent::Message)
+ 			{
+-				MessageEvent *me = (MessageEvent *) e;
++				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 				QString msg = me->message().body();
+ 				msg = TextUtil::linkify(TextUtil::plain2rich(msg));
+ 
+--- git.orig/src/popupmanager.cpp
++++ git/src/popupmanager.cpp
+@@ -206,7 +206,7 @@ const QStringList PopupManager::optionsN
+ }
+ 
+ void PopupManager::doPopup(PsiAccount *account, PopupType pType, const Jid &j, const Resource &r,
+-			   UserListItem *u, PsiEvent *e, bool checkNoPopup)
++			   UserListItem *u, const PsiEvent::Ptr &e, bool checkNoPopup)
+ {
+ 	if (!PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.enabled").toBool())
+ 		return;
+--- git.orig/src/popupmanager.h
++++ git/src/popupmanager.h
+@@ -22,11 +22,11 @@
+ #define POPUPMANAGER_H
+ 
+ #include <QStringList>
++#include "psievent.h"
+ 
+ class PsiAccount;
+ class PsiCon;
+ class UserListItem;
+-class PsiEvent;
+ class PsiIcon;
+ class QPixmap;
+ 
+@@ -71,7 +71,7 @@ public:
+ 	QString currentType() const;
+ 
+ 	void doPopup(PsiAccount* account, PopupType type, const Jid& j, const Resource& r,
+-			    UserListItem* u = 0, PsiEvent* e = 0, bool checkNoPopup = true);
++			    UserListItem* u = 0, const PsiEvent::Ptr &e = PsiEvent::Ptr(), bool checkNoPopup = true);
+ 	void doPopup(PsiAccount *account, const Jid &j, const PsiIcon *titleIcon, const QString& titleText,
+ 			    const QPixmap *avatar, const PsiIcon *icon, const QString& text, bool checkNoPopup = true, PopupType type = AlertNone);
+ 
+--- git.orig/src/psiaccount.cpp
++++ git/src/psiaccount.cpp
+@@ -855,7 +855,7 @@ public slots:
+ 	void incoming_call()
+ 	{
+ 		AvCall *sess = avCallManager->takeIncoming();
+-		AvCallEvent *ae = new AvCallEvent(sess->jid().full(), sess, account);
++		AvCallEvent::Ptr ae(new AvCallEvent(sess->jid().full(), sess, account));
+ 		ae->setTimeStamp(QDateTime::currentDateTime());
+ 		account->handleEvent(ae, IncomingStanza);
+ 	}
+@@ -1009,7 +1009,7 @@ PsiAccount::PsiAccount(const UserAccount
+ 	d->eventQueue = new EventQueue(this);
+ 	connect(d->eventQueue, SIGNAL(queueChanged()), SIGNAL(queueChanged()));
+ 	connect(d->eventQueue, SIGNAL(queueChanged()), d, SLOT(queueChanged()));
+-	connect(d->eventQueue, SIGNAL(eventFromXml(PsiEvent *)), SLOT(eventFromXml(PsiEvent *)));
++	connect(d->eventQueue, SIGNAL(eventFromXml(PsiEvent::Ptr)), SLOT(eventFromXml(PsiEvent::Ptr)));
+ 	d->self = UserListItem(true);
+ 	d->self.setSubscription(Subscription::Both);
+ 	d->nickFromVCard = false;
+@@ -2279,7 +2279,7 @@ void PsiAccount::bookmarksAvailabilityCh
+ 
+ void PsiAccount::incomingHttpAuthRequest(const PsiHttpAuthRequest &req)
+ {
+-	HttpAuthEvent *e = new HttpAuthEvent(req, this);
++	HttpAuthEvent::Ptr e(new HttpAuthEvent(req, this));
+ 	handleEvent(e, IncomingStanza);
+ }
+ 
+@@ -2432,7 +2432,7 @@ void PsiAccount::client_resourceAvailabl
+ 				pt = PopupManager::AlertStatusChange;
+ 
+ 			if ((popupType == PopupOnline && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.online").toBool()) || (popupType == PopupStatusChange && PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.other-changes").toBool())) {
+-				psi()->popupManager()->doPopup(this, pt, j, r, u, 0, false);
++				psi()->popupManager()->doPopup(this, pt, j, r, u, PsiEvent::Ptr(), false);
+ 			}
+ 		}
+ 		else if ( !notifyOnlineOk ) {
+@@ -2521,7 +2521,7 @@ void PsiAccount::client_resourceUnavaila
+ 		UserListItem *u = findFirstRelevant(j);
+ 
+ 		if (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.status.offline").toBool()) {
+-			psi()->popupManager()->doPopup(this, PopupManager::AlertOffline, j, r, u, 0, false);
++			psi()->popupManager()->doPopup(this, PopupManager::AlertOffline, j, r, u, PsiEvent::Ptr(), false);
+ 		}
+ 	}
+ }
+@@ -2669,7 +2669,7 @@ void PsiAccount::processIncomingMessage(
+ 
+ 		// Roster item exchange
+ 		if (!_m.rosterExchangeItems().isEmpty()) {
+-			RosterExchangeEvent* ree = new RosterExchangeEvent(j,_m.rosterExchangeItems(), _m.body(), this);
++			RosterExchangeEvent::Ptr ree(new RosterExchangeEvent(j,_m.rosterExchangeItems(), _m.body(), this));
+ 			handleEvent(ree, IncomingStanza);
+ 			return;
+ 		}
+@@ -2708,7 +2708,7 @@ void PsiAccount::processIncomingMessage(
+ 		}
+ 	}
+ 
+-	MessageEvent *me = new MessageEvent(m, this);
++	MessageEvent::Ptr me(new MessageEvent(m, this));
+ 	me->setOriginLocal(false);
+ 	handleEvent(me, IncomingStanza);
+ }
+@@ -2722,7 +2722,7 @@ void PsiAccount::client_subscription(con
+ 			simulateContactOffline(u);
+ 	}
+ 
+-	AuthEvent *ae = new AuthEvent(j, str, this);
++	AuthEvent::Ptr ae(new AuthEvent(j, str, this));
+ 	ae->setTimeStamp(QDateTime::currentDateTime());
+ 	ae->setNick(nick);
+ 	handleEvent(ae, IncomingStanza);
+@@ -2759,7 +2759,7 @@ void PsiAccount::client_incomingFileTran
+ 	printf("  Name: [%s]\n", ft->fileName().latin1());
+ 	printf("  Size: %d bytes\n", ft->fileSize());*/
+ 
+-	FileEvent *fe = new FileEvent(ft->peer().full(), ft, this);
++	FileEvent::Ptr fe(new FileEvent(ft->peer().full(), ft, this));
+ 	fe->setTimeStamp(QDateTime::currentDateTime());
+ 	handleEvent(fe, IncomingStanza);
+ #endif
+@@ -3549,7 +3549,7 @@ UserListItem *PsiAccount::find(const Jid
+ 
+ void PsiAccount::cpUpdate(const UserListItem &u, const QString &rname, bool fromPresence)
+ {
+-	PsiEvent *e = d->eventQueue->peek(u.jid());
++	PsiEvent::Ptr e = d->eventQueue->peek(u.jid());
+ 
+ 	if(e) {
+ 		profileSetAlert(u.jid(), PsiIconset::instance()->event2icon(e));
+@@ -3816,7 +3816,7 @@ void PsiAccount::actionRecvEvent(const J
+ 
+ void PsiAccount::actionRecvRosterExchange(const Jid& j, const RosterExchangeItems& items)
+ {
+-	handleEvent(new RosterExchangeEvent(j,items,"", this), IncomingStanza);
++	handleEvent(RosterExchangeEvent::Ptr(new RosterExchangeEvent(j,items,"", this)), IncomingStanza);
+ }
+ 
+ void PsiAccount::actionSendMessage(const Jid &j)
+@@ -3900,7 +3900,7 @@ void PsiAccount::actionHistory(const Jid
+ 	}
+ }
+ 
+-void PsiAccount::actionHistoryBox(PsiEvent *e)
++void PsiAccount::actionHistoryBox(const PsiEvent::Ptr &e)
+ {
+ 	if (!EventDlg::messagingEnabled())
+ 		return;
+@@ -4334,11 +4334,10 @@ void PsiAccount::dj_sendMessage(const Me
+ 	// don't log groupchat, private messages, or encrypted messages
+ 	if(log) {
+ 		if(m.type() != "groupchat" && m.xencrypted().isEmpty() && !findGCContact(m.to())) {
+-			MessageEvent *me = new MessageEvent(m, this);
++			MessageEvent::Ptr me(new MessageEvent(m, this));
+ 			me->setOriginLocal(true);
+ 			me->setTimeStamp(QDateTime::currentDateTime());
+ 			logEvent(m.to(), me);
+-			delete me;
+ 		}
+ 	}
+ 
+@@ -4577,18 +4576,18 @@ void PsiAccount::dj_rosterExchange(const
+ 	}
+ }
+ 
+-void PsiAccount::eventFromXml(PsiEvent* e)
++void PsiAccount::eventFromXml(const PsiEvent::Ptr &e)
+ {
+ 	handleEvent(e, FromXml);
+ }
+ 
+-static bool messageListContainsEvent(const QList<PsiEvent*>& messageList, const MessageEvent* me)
++static bool messageListContainsEvent(const QList<PsiEvent::Ptr>& messageList, const MessageEvent::Ptr me)
+ {
+ 	Q_ASSERT(me);
+ #ifdef YAPSI
+ 	YaDateTime timeStamp = getYaDateTime(me);
+-	foreach(const PsiEvent* event, messageList) {
+-		const MessageEvent* me2 = dynamic_cast<const MessageEvent*>(event);
++	foreach(const PsiEvent::Ptr &event, messageList) {
++		const MessageEvent::Ptr me2 = event.dynamicCast<MessageEvent>();
+ 		if (!me2)
+ 			continue;
+ 
+@@ -4610,7 +4609,7 @@ static bool messageListContainsEvent(con
+ }
+ 
+ // handle an incoming event
+-void PsiAccount::handleEvent(PsiEvent* e, ActivationType activationType)
++void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationType)
+ {
+ 	PsiOptions *o = PsiOptions::instance();
+ 	if (e && activationType != FromXml) {
+@@ -4663,7 +4662,6 @@ void PsiAccount::handleEvent(PsiEvent* e
+ #endif
+ 
+ 	if (d->psi->filterEvent(this, e)) {
+-		delete e;
+ 		return;
+ 	}
+ 
+@@ -4678,7 +4676,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			if (!found &&
+ 				!findGCContact(e->from()) &&
+ 				!(e->type() == PsiEvent::Message &&
+-				  ((MessageEvent *)e)->message().body().isEmpty()))
++				 e.staticCast<MessageEvent>()->message().body().isEmpty()))
+ 			{
+ 				logEvent(e->from(), e);
+ 			}
+@@ -4686,7 +4684,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 	}
+ 
+ 	if(e->type() == PsiEvent::Message) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 
+ #ifdef PSI_PLUGINS
+@@ -4701,10 +4699,9 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		//PluginManager::instance()->message(this,e->from(),ulItem,((MessageEvent*)e)->message().body());
+ #endif
+ 
+-		QList<PsiEvent*> chatList;
++		QList<PsiEvent::Ptr> chatList;
+ 		d->eventQueue->extractChats(&chatList, me->from(), false, false);
+ 		if (messageListContainsEvent(chatList, me)) {
+-			delete e;
+ 			return;
+ 		}
+ 		else if (m.messageReceipt() == ReceiptReceived) {
+@@ -4717,7 +4714,6 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 					c->incomingMessage(m);
+ 				}
+ 			}
+-			delete e;
+ 			return;
+ 		}
+ 
+@@ -4738,7 +4734,6 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 				popupType = PopupManager::AlertComposing;
+ 			}
+ 			else {
+-				delete e;
+ 				return;
+ 			}
+ 		}
+@@ -4819,14 +4814,13 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 		popupType = PopupManager::AlertAvCall;
+ 	}
+ 	else if(e->type() == PsiEvent::RosterExchange) {
+-		RosterExchangeEvent* re = (RosterExchangeEvent*) e;
++		RosterExchangeEvent::Ptr re = e.staticCast<RosterExchangeEvent>();
+ 		RosterExchangeItems items;
+ 		foreach(RosterExchangeItem item, re->rosterExchangeItems()) {
+ 			if (validRosterExchangeItem(item))
+ 				items += item;
+ 		}
+ 		if (items.isEmpty()) {
+-			delete e;
+ 			return;
+ 		}
+ 		re->setRosterExchangeItems(items);
+@@ -4835,7 +4829,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 	else if (e->type() == PsiEvent::Auth) {
+ 		soundType = eSystem;
+ 
+-		AuthEvent *ae = (AuthEvent *)e;
++		AuthEvent::Ptr ae = e.staticCast<AuthEvent>();
+ 		if(ae->authType() == "subscribe") {
+ #ifdef YAPSI
+ 			UserListItem *userListItem = d->userList.find(ae->from());
+@@ -4874,7 +4868,6 @@ void PsiAccount::handleEvent(PsiEvent* e
+ #ifdef YAPSI
+ 		if (!putToQueue) {
+ 			playSound(soundType);
+-			delete e;
+ 			return;
+ 		}
+ #endif
+@@ -4905,7 +4898,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 
+ #ifdef YAPSI
+ 	int id = -1;
+-	PsiEvent* backupEvent = e->copy(); // FIXME: temporary workaround for braindead queueEvent
++	PsiEvent::Ptr backupEvent = e; // FIXME: temporary workaround for braindead queueEvent
+ 	if (putToQueue) {
+ 		QList<int> ids = GlobalEventQueue::instance()->ids();
+ 		int lastId = ids.isEmpty() ? -1 : ids.last();
+@@ -4919,11 +4912,11 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 			id = lastId2;
+ 	}
+ 	else {
+-		psi()->yaUnreadMessagesManager()->eventRead(e);
++		psi()->yaUnreadMessagesManager()->eventRead(e.data());
+ 	}
+ 
+ 	if (activationType != FromXml) {
+-		PsiEvent* notificationEvent = id == -1 ? backupEvent : e;
++		PsiEvent::Ptr notificationEvent = id == -1 ? backupEvent : e;
+ 		bool shouldPlaySound = true;
+ 		if (notificationEvent) {
+ 			shouldPlaySound = !YaPopupNotification::notify(id, notificationEvent, soundType);
+@@ -4933,10 +4926,7 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 				playSound(soundType);
+ 		}
+ 	}
+-	delete backupEvent;
+ 
+-	if (!putToQueue)
+-		delete e;
+ #else
+ 	if (soundType >= 0 && activationType != FromXml) {
+ 		playSound(soundType);
+@@ -4944,8 +4934,6 @@ void PsiAccount::handleEvent(PsiEvent* e
+ 
+ 	if ( putToQueue )
+ 		queueEvent(e, activationType);
+-	else
+-		delete e;
+ #endif
+ }
+ 
+@@ -4987,18 +4975,18 @@ UserListItem* PsiAccount::addUserListIte
+ }
+ 
+ // put an event into the event queue, and update the related alerts
+-void PsiAccount::queueEvent(PsiEvent* e, ActivationType activationType)
++void PsiAccount::queueEvent(const PsiEvent::Ptr &e, ActivationType activationType)
+ {
+ 	// do we have roster item for this?
+ 	UserListItem *u = find(e->jid());
+ 	if(!u) {
+ 		QString nick;
+ 		if (e->type() == PsiEvent::Auth) {
+-			AuthEvent* ae = (AuthEvent*) e;
++			AuthEvent::Ptr ae = e.staticCast<AuthEvent>();
+ 			nick = ae->nick();
+ 		}
+ 		else if (e->type() == PsiEvent::Message) {
+-			MessageEvent* me = (MessageEvent*) e;
++			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 			if (me->message().type()  != "error")
+ 				nick = me->nick();
+ 		}
+@@ -5028,7 +5016,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
+ 
+ 		// Check to see if we need to popup
+ 		if (e->type() == PsiEvent::Message) {
+-			MessageEvent *me = (MessageEvent *)e;
++			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 			const Message &m = me->message();
+ 			if (m.type() == "chat")
+ 				doPopup = PsiOptions::instance()->getOption("options.ui.chat.auto-popup").toBool();
+@@ -5061,7 +5049,7 @@ void PsiAccount::queueEvent(PsiEvent* e,
+ // take the next event from the queue and display it
+ void PsiAccount::openNextEvent(const UserListItem& u, ActivationType activationType)
+ {
+-	PsiEvent *e = d->eventQueue->peek(u.jid());
++	PsiEvent::Ptr e = d->eventQueue->peek(u.jid());
+ 	if(!e)
+ 		return;
+ 
+@@ -5070,7 +5058,7 @@ void PsiAccount::openNextEvent(const Use
+ 
+ void PsiAccount::openNextEvent(ActivationType activationType)
+ {
+-	PsiEvent *e = d->eventQueue->peekNext();
++	PsiEvent::Ptr e = d->eventQueue->peekNext();
+ 	if(!e)
+ 		return;
+ 
+@@ -5087,10 +5075,10 @@ void PsiAccount::openNextEvent(Activatio
+ 
+ int PsiAccount::forwardPendingEvents(const Jid &jid)
+ {
+-	QList<PsiEvent*> chatList;
++	QList<PsiEvent::Ptr> chatList;
+ 	d->eventQueue->extractMessages(&chatList);
+-	foreach(PsiEvent* e, chatList) {
+-		MessageEvent *me = (MessageEvent *) e;
++	foreach(const PsiEvent::Ptr &e, chatList) {
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		Message m = me->message();
+ 
+ 		AddressList oFrom = m.findAddresses(Address::OriginalFrom);
+@@ -5109,7 +5097,6 @@ int PsiAccount::forwardPendingEvents(con
+ 
+ 		// update the eventdlg
+ 		UserListItem *u = find(e->jid());
+-		delete e;
+ 
+ 		// update the contact
+ 		if(u) {
+@@ -5152,13 +5139,13 @@ void PsiAccount::processReadNext(const U
+ 	}
+ 
+ 	// peek the event
+-	PsiEvent *e = d->eventQueue->peek(u.jid());
++	PsiEvent::Ptr e = d->eventQueue->peek(u.jid());
+ 	if(!e)
+ 		return;
+ 
+ 	bool isChat = false;
+ 	if(e->type() == PsiEvent::Message) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 		if(m.type() == "chat" && m.getForm().fields().empty())
+ 			isChat = true;
+@@ -5177,7 +5164,6 @@ void PsiAccount::processReadNext(const U
+ 
+ 	// update the eventdlg
+ 	w->updateEvent(e);
+-	delete e;
+ 
+ 	// update the contact
+ 	cpUpdate(u);
+@@ -5200,7 +5186,7 @@ void PsiAccount::processChatsHelper(cons
+ 	if(!c)
+ 		return;
+ 	// extract the chats
+-	QList<PsiEvent*> chatList;
++	QList<PsiEvent::Ptr> chatList;
+ 	bool compareResources = true;
+ #ifdef YAPSI
+ 	compareResources = false;
+@@ -5217,9 +5203,9 @@ void PsiAccount::processChatsHelper(cons
+ 		// 15:15 *mblsha is Offline
+ 		// 15:10 <mblsha> hello!
+ 
+-		foreach(PsiEvent *e, chatList) {
++		foreach(const PsiEvent::Ptr &e, chatList) {
+ 			if (e->type() == PsiEvent::Message) {
+-				MessageEvent* me = static_cast<MessageEvent*>(e);
++				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 				const Message &m = me->message();
+ 
+ 				// process the message
+@@ -5231,14 +5217,11 @@ void PsiAccount::processChatsHelper(cons
+ 		}
+ 
+ 		if (removeEvents) {
+-			while (!chatList.isEmpty()) {
+-				PsiEvent* e = chatList.takeFirst();
+ #ifdef YAPSI
+-				psi()->yaUnreadMessagesManager()->eventRead(e);
+-#endif
+-				delete e;
++			while (!chatList.isEmpty()) {
++				psi()->yaUnreadMessagesManager()->eventRead(chatList.takeFirst().data());
+ 			}
+-
++#endif
+ 			QList<UserListItem*> ul = findRelevant(j);
+ 			if(!ul.isEmpty()) {
+ 				UserListItem *u = ul.first();
+@@ -5279,7 +5262,7 @@ void PsiAccount::chatMessagesRead(const
+ 	}
+ }
+ 
+-void PsiAccount::logEvent(const Jid &j, PsiEvent *e)
++void PsiAccount::logEvent(const Jid &j, const PsiEvent::Ptr &e)
+ {
+ 	if (!d->acc.opt_log)
+ 		return;
+@@ -5704,11 +5687,10 @@ void PsiAccount::pgp_encryptFinished()
+ 		Message m = pt->message();
+ 		// log the message here, before we encrypt it
+ 		{
+-			MessageEvent *me = new MessageEvent(m, this);
++			MessageEvent::Ptr me(new MessageEvent(m, this));
+ 			me->setOriginLocal(true);
+ 			me->setTimeStamp(QDateTime::currentDateTime());
+ 			logEvent(m.to(), me);
+-			delete me;
+ 		}
+ 
+ 		Message mwrap;
+--- git.orig/src/psiaccount.h
++++ git/src/psiaccount.h
+@@ -32,6 +32,7 @@
+ #include "xmpp_rosterx.h"
+ #include "xmpp_status.h"
+ #include "psiactions.h"
++#include "psievent.h"
+ 
+ namespace XMPP
+ {
+@@ -55,7 +56,6 @@ class PsiCon;
+ class PsiContact;
+ class PsiContactList;
+ class PsiAccount;
+-class PsiEvent;
+ class PsiHttpAuthRequest;
+ class Tune;
+ class BookmarkManager;
+@@ -345,7 +345,7 @@ public slots:
+ 	void actionGroupAdd(const Jid &, const QString &);
+ 	void actionGroupRemove(const Jid &, const QString &);
+ 	void actionGroupsSet(const Jid &, const QStringList &);
+-	void actionHistoryBox(PsiEvent *);
++	void actionHistoryBox(const PsiEvent::Ptr &e);
+ 	void actionRegister(const Jid &);
+ 	void actionSearch(const Jid &);
+ 	void actionManageBookmarks();
+@@ -453,11 +453,11 @@ protected:
+ 	virtual void profileClearAlert(const Jid& jid);
+ 
+ private slots:
+-	void eventFromXml(PsiEvent* e);
++	void eventFromXml(const PsiEvent::Ptr &e);
+ 	void simulateContactOffline(const XMPP::Jid& contact);
+ 
+ private:
+-	void handleEvent(PsiEvent* e, ActivationType activationType);
++	void handleEvent(const PsiEvent::Ptr &e, ActivationType activationType);
+ 
+ public:
+ 	QStringList groupList() const;
+@@ -486,8 +486,8 @@ private:
+ 	void simulateRosterOffline();
+ 	void cpUpdate(const UserListItem &, const QString &rname="", bool fromPresence=false);
+ 	UserListItem* addUserListItem(const Jid& jid, const QString& nick="");
+-	void logEvent(const Jid &, PsiEvent *);
+-	void queueEvent(PsiEvent* e, ActivationType activationType);
++	void logEvent(const Jid &, const PsiEvent::Ptr &);
++	void queueEvent(const PsiEvent::Ptr &e, ActivationType activationType);
+ 	void openNextEvent(const UserListItem &, ActivationType activationType);
+ 	void updateReadNext(const Jid &);
+ 	ChatDlg *ensureChatDlg(const Jid &);
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
+@@ -1534,24 +1534,22 @@ IconSelectPopup *PsiCon::iconSelectPopup
+ 	return d->iconSelect;
+ }
+ 
+-bool PsiCon::filterEvent(const PsiAccount* acc, const PsiEvent* e) const
++bool PsiCon::filterEvent(const PsiAccount* acc, const PsiEvent::Ptr &e) const
+ {
+ 	Q_UNUSED(acc);
+ 	Q_UNUSED(e);
+ 	return false;
+ }
+ 
+-void PsiCon::processEvent(PsiEvent *e, ActivationType activationType)
++void PsiCon::processEvent(const PsiEvent::Ptr &e, ActivationType activationType)
+ {
+ 	if ( !e->account() ) {
+-		delete e;
+ 		return;
+ 	}
+ 
+ 	if ( e->type() == PsiEvent::PGP ) {
+ 		e->account()->eventQueue()->dequeue(e);
+ 		e->account()->queueChanged();
+-		delete e;
+ 		return;
+ 	}
+ 
+@@ -1560,13 +1558,12 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 		qWarning("SYSTEM MESSAGE: Bug #1. Contact the developers and tell them what you did to make this message appear. Thank you.");
+ 		e->account()->eventQueue()->dequeue(e);
+ 		e->account()->queueChanged();
+-		delete e;
+ 		return;
+ 	}
+ 
+ #ifdef FILETRANSFER
+ 	if( e->type() == PsiEvent::File ) {
+-		FileEvent *fe = (FileEvent *)e;
++		FileEvent::Ptr fe = e.staticCast<FileEvent>();
+ 		FileTransfer *ft = fe->takeFileTransfer();
+ 		e->account()->eventQueue()->dequeue(e);
+ 		e->account()->queueChanged();
+@@ -1575,13 +1572,12 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 			FileRequestDlg *w = new FileRequestDlg(fe->timeStamp(), ft, e->account());
+ 			bringToFront(w);
+ 		}
+-		delete e;
+ 		return;
+ 	}
+ #endif
+ 
+ 	if(e->type() == PsiEvent::AvCallType) {
+-		AvCallEvent *ae = (AvCallEvent *)e;
++		AvCallEvent::Ptr ae = e.staticCast<AvCallEvent>();
+ 		AvCall *sess = ae->takeAvCall();
+ 		e->account()->eventQueue()->dequeue(e);
+ 		e->account()->queueChanged();
+@@ -1598,14 +1594,13 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 				delete sess;
+ 			}
+ 		}
+-		delete e;
+ 		return;
+ 	}
+ 
+ 	bool isChat = false;
+ 	bool sentToChatWindow = false;
+ 	if ( e->type() == PsiEvent::Message ) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 		bool emptyForm = m.getForm().fields().empty();
+ 		// FIXME: Refactor this, PsiAccount and PsiEvent out
+@@ -1617,7 +1612,7 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 	}
+ 
+ 	if (e->type() == PsiEvent::Auth && !EventDlg::messagingEnabled()) {
+-		if (static_cast<AuthEvent*>(e)->authType() == "subscribe") {
++		if (e.staticCast<AuthEvent>()->authType() == "subscribe") {
+ #ifdef YAPSI
+ 			bringToFront(d->mainwin);
+ 			return;
+@@ -1626,7 +1621,6 @@ void PsiCon::processEvent(PsiEvent *e, A
+ #endif
+ 		}
+ 		e->account()->eventQueue()->dequeue(e);
+-		delete e;
+ 		return;
+ 	}
+ 
+@@ -1666,7 +1660,7 @@ void PsiCon::processEvent(PsiEvent *e, A
+ 	}
+ }
+ 
+-void PsiCon::removeEvent(PsiEvent *e)
++void PsiCon::removeEvent(const PsiEvent::Ptr &e)
+ {
+ 	PsiAccount* account = e->account();
+ 	if (!account)
+--- git.orig/src/psicon.h
++++ git/src/psicon.h
+@@ -33,7 +33,6 @@ using namespace XMPP;
+ 
+ class PsiCon;
+ class PsiAccount;
+-class PsiEvent;
+ class ContactView;
+ class AutoUpdater;
+ class EventDlg;
+@@ -117,9 +116,9 @@ public:
+ 	PsiActionList *actionList() const;
+ 
+ 	IconSelectPopup *iconSelectPopup() const;
+-	bool filterEvent(const PsiAccount*, const PsiEvent*) const;
+-	void processEvent(PsiEvent*, ActivationType activationType);
+-	void removeEvent(PsiEvent* e);
++	bool filterEvent(const PsiAccount*, const PsiEvent::Ptr &) const;
++	void processEvent(const PsiEvent::Ptr &, ActivationType activationType);
++	void removeEvent(const PsiEvent::Ptr &e);
+ 
+ 	Status::Type currentStatusType() const;
+ 	Status::Type lastLoggedInStatusType() const;
+--- git.orig/src/psidbusnotifier.cpp
++++ git/src/psidbusnotifier.cpp
+@@ -105,7 +105,6 @@ PsiDBusNotifier::PsiDBusNotifier(QObject
+ 	: QObject(parent)
+ 	, id_(0)
+ 	, account_(0)
+-	, event_(0)
+ 	, lifeTimer_(new QTimer(this))
+ {
+ 	QDBusConnection::sessionBus().connect("org.freedesktop.Notifications",
+@@ -152,13 +151,12 @@ QStringList PsiDBusNotifier::capabilitie
+ 	return caps_;
+ }
+ 
+-void PsiDBusNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
++void PsiDBusNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, const PsiEvent::Ptr &event)
+ {
+ 	account_ = account;
+ 	jid_ = jid;
+ 	if(event) {
+ 		event_ = event;
+-		connect(event_, SIGNAL(destroyed()), SLOT(eventDestroyed()));
+ 	}
+ 
+ 	QString title, desc, contact, text, statusMsg;
+@@ -176,10 +174,10 @@ void PsiDBusNotifier::popup(PsiAccount*
+ 		contact = uli->name();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Auth) {
+-		contact = ((AuthEvent*) event)->nick();
++		contact = event.staticCast<AuthEvent>()->nick();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Message) {
+-		contact = ((MessageEvent*) event)->nick();
++		contact = event.staticCast<MessageEvent>()->nick();
+ 	}
+ 
+ 	QString j = jid.full();
+@@ -249,7 +247,7 @@ void PsiDBusNotifier::popup(PsiAccount*
+ 		{
+ 			text = QObject::tr("%1 says:").arg(contact);
+ 			if(showMessage) {
+-				const Message* jmessage = &((MessageEvent *)event)->message();
++				const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 				desc = jmessage->body();
+ 			}
+ 			break;
+@@ -257,7 +255,7 @@ void PsiDBusNotifier::popup(PsiAccount*
+ 	case PopupManager::AlertHeadline: {
+ 			text = QObject::tr("Headline from %1").arg(contact);
+ 			if(showMessage) {
+-				const Message* jmessage = &((MessageEvent *)event)->message();
++				const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 				if ( !jmessage->subject().isEmpty())
+ 					title = jmessage->subject();
+ 				desc = jmessage->body();
+@@ -382,11 +380,6 @@ void PsiDBusNotifier::popupClosed(uint i
+ 	}
+ }
+ 
+-void PsiDBusNotifier::eventDestroyed()
+-{
+-	event_ = 0;
+-}
+-
+ void PsiDBusNotifier::readyToDie()
+ {
+ 	if(lifeTimer_->isActive()) {
+@@ -397,11 +390,6 @@ void PsiDBusNotifier::readyToDie()
+ 						 "/org/freedesktop/Notifications",
+ 						 "org.freedesktop.Notifications",
+ 						 "NotificationClosed", this, SLOT(popupClosed(uint,uint)));
+-
+-	if(event_) {
+-		disconnect(event_, SIGNAL(destroyed()), this, SLOT(eventDestroyed()));
+-	}
+-
+ 	deleteLater();
+ }
+ 
+--- git.orig/src/psidbusnotifier.h
++++ git/src/psidbusnotifier.h
+@@ -45,13 +45,12 @@ public:
+ 	~PsiDBusNotifier();
+ 	static bool isAvailable();
+ 
+-	virtual void popup(PsiAccount *account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0);
++	virtual void popup(PsiAccount *account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, const PsiEvent::Ptr& = PsiEvent::Ptr());
+ 	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const PsiIcon* titleIcon, const QString& titleText,
+ 			   const QPixmap* avatar, const PsiIcon* icon, const QString& text);
+ 
+ private slots:
+ 	void popupClosed(uint id, uint reason);
+-	void eventDestroyed();
+ 	void asyncCallFinished(QDBusPendingCallWatcher*);
+ 	void readyToDie();
+ 
+@@ -63,7 +62,7 @@ private:
+ 	Jid jid_;
+ 	uint id_;
+ 	PsiAccount *account_;
+-	PsiEvent *event_;
++	PsiEvent::Ptr event_;
+ 	QTimer *lifeTimer_;
+ 	static QStringList caps_;
+ };
+--- git.orig/src/psievent.cpp
++++ git/src/psievent.cpp
+@@ -734,7 +734,7 @@ PsiEvent *AvCallEvent::copy() const
+ // EventItem
+ //----------------------------------------------------------------------------
+ 
+-EventItem::EventItem(PsiEvent *_e)
++EventItem::EventItem(const PsiEvent::Ptr &_e)
+ {
+ 	e = _e;
+ #ifdef YAPSI
+@@ -754,7 +754,7 @@ EventItem::EventItem(PsiEvent *_e)
+ 
+ EventItem::EventItem(const EventItem &from)
+ {
+-	e = from.e->copy();
++	e = from.e;
+ 	v_id = from.v_id;
+ }
+ 
+@@ -767,7 +767,7 @@ int EventItem::id() const
+ 	return v_id;
+ }
+ 
+-PsiEvent* EventItem::event() const
++PsiEvent::Ptr EventItem::event() const
+ {
+ 	return e;
+ }
+@@ -827,8 +827,8 @@ EventQueue &EventQueue::operator= (const
+ 	account_ = from.account_;
+ 
+ 	foreach(EventItem *i, from.list_) {
+-		PsiEvent *e = i->event();
+-		enqueue( e->copy() );
++		PsiEvent::Ptr e = i->event();
++		enqueue( e );
+ 	}
+ 
+ 	return *this;
+@@ -861,7 +861,7 @@ int EventQueue::count(const Jid &j, bool
+ 	return total;
+ }
+ 
+-void EventQueue::enqueue(PsiEvent *e)
++void EventQueue::enqueue(const PsiEvent::Ptr &e)
+ {
+ 	EventItem *i = new EventItem(e);
+ 
+@@ -888,7 +888,7 @@ void EventQueue::enqueue(PsiEvent *e)
+ 	emit queueChanged();
+ }
+ 
+-void EventQueue::dequeue(PsiEvent *e)
++void EventQueue::dequeue(const PsiEvent::Ptr &e)
+ {
+ 	if ( !e )
+ 		return;
+@@ -906,10 +906,10 @@ void EventQueue::dequeue(PsiEvent *e)
+ 	}
+ }
+ 
+-PsiEvent *EventQueue::dequeue(const Jid &j, bool compareRes)
++PsiEvent::Ptr EventQueue::dequeue(const Jid &j, bool compareRes)
+ {
+ 	foreach(EventItem *i, list_) {
+-		PsiEvent *e = i->event();
++		PsiEvent::Ptr e = i->event();
+ 		Jid j2(e->jid());
+ 		if(j.compare(j2, compareRes)) {
+ 			if (enabled_) {
+@@ -922,31 +922,31 @@ PsiEvent *EventQueue::dequeue(const Jid
+ 		}
+ 	}
+ 
+-	return 0;
++	return PsiEvent::Ptr();
+ }
+ 
+-PsiEvent *EventQueue::peek(const Jid &j, bool compareRes) const
++PsiEvent::Ptr EventQueue::peek(const Jid &j, bool compareRes) const
+ {
+ 	foreach(EventItem *i, list_) {
+-		PsiEvent *e = i->event();
++		PsiEvent::Ptr e = i->event();
+ 		Jid j2(e->jid());
+ 		if(j.compare(j2, compareRes)) {
+ 			return e;
+ 		}
+ 	}
+ 
+-	return 0;
++	return PsiEvent::Ptr();
+ }
+ 
+-PsiEvent *EventQueue::dequeueNext()
++PsiEvent::Ptr EventQueue::dequeueNext()
+ {
+ 	if (list_.isEmpty())
+-		return 0;
++		return PsiEvent::Ptr();
+ 
+ 	EventItem *i = list_.first();
+ 	if(!i)
+-		return 0;
+-	PsiEvent *e = i->event();
++		return PsiEvent::Ptr();
++	PsiEvent::Ptr e = i->event();
+ 	if (enabled_) {
+ 		GlobalEventQueue::instance()->dequeue(i);
+ 	}
+@@ -956,29 +956,29 @@ PsiEvent *EventQueue::dequeueNext()
+ 	return e;
+ }
+ 
+-PsiEvent *EventQueue::peekNext() const
++PsiEvent::Ptr EventQueue::peekNext() const
+ {
+ 	if (list_.isEmpty())
+-		return 0;
++		return PsiEvent::Ptr();
+ 
+ 	EventItem *i = list_.first();
+ 	if(!i)
+-		return 0;
++		return PsiEvent::Ptr();
+ 	return i->event();
+ }
+ 
+-PsiEvent *EventQueue::peekFirstChat(const Jid &j, bool compareRes) const
++PsiEvent::Ptr EventQueue::peekFirstChat(const Jid &j, bool compareRes) const
+ {
+ 	foreach(EventItem *i, list_) {
+-		PsiEvent *e = i->event();
++		PsiEvent::Ptr e = i->event();
+ 		if(e->type() == PsiEvent::Message) {
+-			MessageEvent *me = (MessageEvent *)e;
++			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 			if(j.compare(me->from(), compareRes) && me->message().type() == "chat")
+ 				return e;
+ 		}
+ 	}
+ 
+-	return 0;
++	return PsiEvent::Ptr();
+ }
+ 
+ bool EventQueue::hasChats(const Jid &j, bool compareRes) const
+@@ -987,15 +987,15 @@ bool EventQueue::hasChats(const Jid &j,
+ }
+ 
+ // this function extracts all chats from the queue, and returns a list of queue positions
+-void EventQueue::extractChats(QList<PsiEvent*> *el, const Jid &j, bool compareRes, bool removeEvents)
++void EventQueue::extractChats(QList<PsiEvent::Ptr> *el, const Jid &j, bool compareRes, bool removeEvents)
+ {
+ 	bool changed = false;
+ 
+ 	for(QList<EventItem*>::Iterator it = list_.begin(); it != list_.end();) {
+-		PsiEvent *e = (*it)->event();
++		PsiEvent::Ptr e = (*it)->event();
+ 		bool extract = false;
+ 		if(e->type() == PsiEvent::Message) {
+-			MessageEvent *me = (MessageEvent *)e;
++			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 			if(j.compare(me->from(), compareRes) && me->message().type() == "chat") { // FIXME: refactor-refactor-refactor
+ 				extract = true;
+ 			}
+@@ -1024,12 +1024,12 @@ void EventQueue::extractChats(QList<PsiE
+ }
+ 
+ // this function extracts all messages from the queue, and returns a list of them
+-void EventQueue::extractMessages(QList<PsiEvent*> *el)
++void EventQueue::extractMessages(QList<PsiEvent::Ptr> *el)
+ {
+ 	bool changed = false;
+ 
+ 	for(QList<EventItem*>::Iterator it = list_.begin(); it != list_.end();) {
+-		PsiEvent *e = (*it)->event();
++		PsiEvent::Ptr e = (*it)->event();
+ 		if(e->type() == PsiEvent::Message) {
+ 			el->append(e);
+ 			EventItem* ei = *it;
+@@ -1051,7 +1051,7 @@ void EventQueue::extractMessages(QList<P
+ void EventQueue::printContent() const
+ {
+ 	foreach(EventItem *i, list_) {
+-		PsiEvent *e = i->event();
++		PsiEvent::Ptr e = i->event();
+ 		printf("  %d: (%d) from=[%s] jid=[%s]\n", i->id(), e->type(), qPrintable(e->from().full()), qPrintable(e->jid().full()));
+ 	}
+ }
+@@ -1070,7 +1070,7 @@ void EventQueue::clear(const Jid &j, boo
+ 	bool changed = false;
+ 
+ 	for(QList<EventItem*>::Iterator it = list_.begin(); it != list_.end();) {
+-		PsiEvent *e = (*it)->event();
++		PsiEvent::Ptr e = (*it)->event();
+ 		Jid j2(e->jid());
+ 		if(j.compare(j2, compareRes)) {
+ 			EventItem* ei = *it;
+@@ -1124,20 +1124,20 @@ bool EventQueue::fromXml(const QDomEleme
+ 		if ( e.tagName() != "event" )
+ 			continue;
+ 
+-		PsiEvent *event = 0;
++		PsiEvent::Ptr event;
+ 		QString eventType = e.attribute("type");
+ 		if ( eventType == "MessageEvent" ) {
+-			event = new MessageEvent(0);
++			event = MessageEvent::Ptr(new MessageEvent(0));
+ 			if ( !event->fromXml(psi_, account_, &e) ) {
+-				delete event;
+-				event = 0;
++				//delete event;
++				event.clear();
+ 			}
+ 		}
+ 		else if ( eventType == "AuthEvent" ) {
+-			event = new AuthEvent("", "", 0);
++			event = AuthEvent::Ptr(new AuthEvent("", "", 0));
+ 			if ( !event->fromXml(psi_, account_, &e) ) {
+-				delete event;
+-				event = 0;
++				//delete event;
++				event.clear();
+ 			}
+ 		}
+ 
+@@ -1154,7 +1154,7 @@ QList<EventQueue::PsiEventId> EventQueue
+ 
+ 	foreach(EventItem* i, list_) {
+ 		if (i->event()->from().compare(jid, compareRes))
+-			result << QPair<int, PsiEvent*>(i->id(), i->event());
++			result << QPair<int, PsiEvent::Ptr>(i->id(), i->event());
+ 	}
+ 
+ 	return result;
+--- git.orig/src/psievent.h
++++ git/src/psievent.h
+@@ -51,6 +51,7 @@ public:
+ 	PsiEvent(const PsiEvent &);
+ 	virtual ~PsiEvent() = 0;
+ 
++	typedef QSharedPointer<PsiEvent> Ptr;
+ 	enum {
+ 		Message,
+ 		Auth,
+@@ -114,6 +115,7 @@ public:
+ 	MessageEvent(const XMPP::Message &, PsiAccount *acc);
+ 	~MessageEvent();
+ 
++	typedef QSharedPointer<MessageEvent> Ptr;
+ 	int type() const;
+ 	XMPP::Jid from() const;
+ 	void setFrom(const XMPP::Jid &j);
+@@ -150,6 +152,7 @@ public:
+ 	AuthEvent(const AuthEvent &from);
+ 	~AuthEvent();
+ 
++	typedef QSharedPointer<AuthEvent> Ptr;
+ 	int type() const;
+ 	XMPP::Jid from() const;
+ 	void setFrom(const XMPP::Jid &j);
+@@ -183,6 +186,7 @@ public:
+ 	PGPEvent(const PGPEvent &from)
+ 	: PsiEvent(from) {}
+ 	~PGPEvent() {}
++	typedef QSharedPointer<PGPEvent> Ptr;
+ 	int type() const { return PGP; }
+ 	XMPP::Jid from() const { return QString(); }
+ 	void setFrom(const XMPP::Jid &) {}
+@@ -197,6 +201,7 @@ public:
+ 	FileEvent(const FileEvent &from);
+ 	~FileEvent();
+ 
++	typedef QSharedPointer<FileEvent> Ptr;
+ 	int type() const { return File; }
+ 	XMPP::Jid from() const;
+ 	void setFrom(const XMPP::Jid &);
+@@ -220,6 +225,7 @@ class RosterExchangeEvent : public PsiEv
+ public:
+ 	RosterExchangeEvent(const XMPP::Jid &j, const XMPP::RosterExchangeItems& i, const QString& body, PsiAccount *acc);
+ 
++	typedef QSharedPointer<RosterExchangeEvent> Ptr;
+ 	int type() const { return RosterExchange; }
+ 	XMPP::Jid from() const;
+ 	void setFrom(const XMPP::Jid &);
+@@ -265,6 +271,7 @@ public:
+ 	HttpAuthEvent(const PsiHttpAuthRequest &req, PsiAccount *acc);
+ 	~HttpAuthEvent();
+ 
++	typedef QSharedPointer<HttpAuthEvent> Ptr;
+ 	int type() const { return HttpAuth; }
+ 
+ 	const PsiHttpAuthRequest & request() { return v_req; }
+@@ -285,6 +292,7 @@ public:
+ 	AvCallEvent(const AvCallEvent &from);
+ 	~AvCallEvent();
+ 
++	typedef QSharedPointer<AvCallEvent> Ptr;
+ 	int type() const { return AvCallType; }
+ 	XMPP::Jid from() const;
+ 	void setFrom(const XMPP::Jid &);
+@@ -304,14 +312,14 @@ private:
+ class EventItem
+ {
+ public:
+-	EventItem(PsiEvent *_e);
++	EventItem(const PsiEvent::Ptr &_e);
+ 	EventItem(const EventItem &from);
+ 	~EventItem();
+ 	int id() const;
+-	PsiEvent *event() const;
++	PsiEvent::Ptr event() const;
+ 
+ private:
+-	PsiEvent *e;
++	PsiEvent::Ptr e;
+ 	int v_id;
+ };
+ 
+@@ -332,20 +340,20 @@ public:
+ 	int nextId() const;
+ 	int count() const;
+ 	int count(const XMPP::Jid &, bool compareRes=true) const;
+-	void enqueue(PsiEvent *);
+-	void dequeue(PsiEvent *);
+-	PsiEvent *dequeue(const XMPP::Jid &, bool compareRes=true);
+-	PsiEvent *peek(const XMPP::Jid &, bool compareRes=true) const;
+-	PsiEvent *dequeueNext();
+-	PsiEvent *peekNext() const;
++	void enqueue(const PsiEvent::Ptr &);
++	void dequeue(const PsiEvent::Ptr &);
++	PsiEvent::Ptr dequeue(const XMPP::Jid &, bool compareRes=true);
++	PsiEvent::Ptr peek(const XMPP::Jid &, bool compareRes=true) const;
++	PsiEvent::Ptr dequeueNext();
++	PsiEvent::Ptr peekNext() const;
+ 	bool hasChats(const XMPP::Jid &, bool compareRes=true) const;
+-	PsiEvent *peekFirstChat(const XMPP::Jid &, bool compareRes=true) const;
+-	void extractMessages(QList<PsiEvent*> *list);
+-	void extractChats(QList<PsiEvent*> *list, const XMPP::Jid &, bool compareRes, bool removeEvents);
++	PsiEvent::Ptr peekFirstChat(const XMPP::Jid &, bool compareRes=true) const;
++	void extractMessages(QList<PsiEvent::Ptr> *list);
++	void extractChats(QList<PsiEvent::Ptr> *list, const XMPP::Jid &, bool compareRes, bool removeEvents);
+ 	void printContent() const;
+ 	void clear();
+ 	void clear(const XMPP::Jid &, bool compareRes=true);
+-	typedef QPair<int, PsiEvent*> PsiEventId;
++	typedef QPair<int, PsiEvent::Ptr> PsiEventId;
+ 	QList<PsiEventId> eventsFor(const XMPP::Jid& jid, bool compareRes=true);
+ 
+ 	QDomElement toXml(QDomDocument *) const; // these work with pointers, to save inclusion of qdom.h, which is pretty large
+@@ -355,7 +363,7 @@ public:
+ 	bool fromFile(const QString &fname);
+ 
+ signals:
+-	void eventFromXml(PsiEvent *);
++	void eventFromXml(const PsiEvent::Ptr &);
+ 	void queueChanged();
+ 
+ private:
+--- git.orig/src/psigrowlnotifier.cpp
++++ git/src/psigrowlnotifier.cpp
+@@ -113,7 +113,7 @@ PsiGrowlNotifier* PsiGrowlNotifier::inst
+  * \param uli The originating userlist item. Can be NULL.
+  * \param event The originating event. Can be NULL.
+  */
+-void PsiGrowlNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, PsiEvent* event)
++void PsiGrowlNotifier::popup(PsiAccount* account, PopupManager::PopupType type, const Jid& jid, const Resource& r, const UserListItem* uli, const PsiEvent::Ptr &event)
+ {
+ 	QString name;
+ 	QString title, desc, contact;
+@@ -133,10 +133,10 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 		contact = uli->name();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Auth) {
+-		contact = ((AuthEvent*) event)->nick();
++		contact = event.staticCast<AuthEvent>()->nick();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Message) {
+-		contact = ((MessageEvent*) event)->nick();
++		contact = event.staticCast<MessageEvent>()->nick();
+ 	}
+ 
+ 	if (contact.isEmpty())
+@@ -180,7 +180,7 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 			name = QObject::tr("Incoming Message");
+ 			title = QObject::tr("%1 says:").arg(contact);
+ 			if(showMessage) {
+-				const Message* jmessage = &((MessageEvent *)event)->message();
++				const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 				desc = jmessage->body();
+ 			} else
+ 				desc = QObject::tr("[Incoming Message]");
+@@ -190,7 +190,7 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 		case PopupManager::AlertChat: {
+ 			name = QObject::tr("Incoming Message");
+ 			if(showMessage) {
+-				const Message* jmessage = &((MessageEvent *)event)->message();
++				const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 				desc = jmessage->body();
+ 			} else
+ 				desc = QObject::tr("[Incoming Message]");
+@@ -199,7 +199,7 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 		}
+ 		case PopupManager::AlertHeadline: {
+ 			name = QObject::tr("Incoming Headline");
+-			const Message* jmessage = &((MessageEvent *)event)->message();
++			const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 			if ( !jmessage->subject().isEmpty())
+ 				title = jmessage->subject();
+ 			if(showMessage) {
+@@ -217,7 +217,7 @@ void PsiGrowlNotifier::popup(PsiAccount*
+ 		case PopupManager::AlertGcHighlight: {
+ 			name = QObject::tr("Groupchat highlight");
+ 			if(showMessage) {
+-				const Message* jmessage = &((MessageEvent *)event)->message();
++				const Message* jmessage = &event.staticCast<MessageEvent>()->message();
+ 				desc = jmessage->body();
+ 			} else
+ 				desc = QObject::tr("[Groupchat highlight]");
+--- git.orig/src/psigrowlnotifier.h
++++ git/src/psigrowlnotifier.h
+@@ -53,7 +53,7 @@ public:
+ 	static PsiGrowlNotifier* instance();
+ 	static bool isAvailable();
+ 
+-	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0);
++	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, const PsiEvent::Ptr& = PsiEvent::Ptr());
+ 	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const PsiIcon* titleIcon, const QString& titleText,
+ 		   const QPixmap* avatar, const PsiIcon* icon, const QString& text);
+ 
+--- git.orig/src/psiiconset.cpp
++++ git/src/psiiconset.cpp
+@@ -480,11 +480,11 @@ void PsiIconset::reloadRoster()
+ 	}
+ }
+ 
+-PsiIcon *PsiIconset::event2icon(PsiEvent *e)
++PsiIcon *PsiIconset::event2icon(const PsiEvent::Ptr &e)
+ {
+ 	QString icon;
+ 	if(e->type() == PsiEvent::Message) {
+-		MessageEvent *me = (MessageEvent *)e;
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+ 		const Message &m = me->message();
+ 		if(m.type() == "headline")
+ 			icon = "psi/headline";
+--- git.orig/src/psiiconset.h
++++ git/src/psiiconset.h
+@@ -24,8 +24,8 @@
+ #include <QMap>
+ 
+ #include "iconset.h"
++#include "psievent.h"
+ 
+-class PsiEvent;
+ class UserListItem;
+ namespace XMPP {
+ 	class Status;
+@@ -48,7 +48,7 @@ public:
+ 	void stripFirstAnimFrame(Iconset *);
+ 	static void removeAnimation(Iconset *);
+ 
+-	PsiIcon *event2icon(PsiEvent *);
++	PsiIcon *event2icon(const PsiEvent::Ptr &e);
+ 
+ 	// these two can possibly fail (and return 0)
+ 	PsiIcon *statusPtr(int);
+--- git.orig/src/psipopup.cpp
++++ git/src/psipopup.cpp
+@@ -72,7 +72,6 @@ public:
+ private slots:
+ 	void popupDestroyed();
+ 	void popupClicked(int);
+-	void eventDestroyed();
+ 
+ public:
+ 	PsiCon *psi;
+@@ -83,7 +82,7 @@ public:
+ 	PopupManager::PopupType popupType;
+ 	Jid jid;
+ 	Status status;
+-	PsiEvent *event;
++	PsiEvent::Ptr event;
+ 	PsiIcon *titleIcon;
+ 	bool display;
+ 	bool doAlertIcon;
+@@ -95,7 +94,6 @@ PsiPopup::Private::Private(PsiPopup *p)
+ 	, popup(0)
+ 	, psiPopup(p)
+ 	, popupType(PopupManager::AlertNone)
+-	, event(0)
+ 	, titleIcon(0)
+ 	, doAlertIcon(false)
+ {
+@@ -173,11 +171,6 @@ void PsiPopup::Private::popupClicked(int
+ 	popup->deleteLater();
+ }
+ 
+-void PsiPopup::Private::eventDestroyed()
+-{
+-	event = 0;
+-}
+-
+ QBoxLayout *PsiPopup::Private::createContactInfo(const QPixmap *avatar, const PsiIcon *icon, const QString& text)
+ {
+ 	QHBoxLayout *dataBox = new QHBoxLayout();
+@@ -229,7 +222,7 @@ PsiPopup::~PsiPopup()
+ 	delete d;
+ }
+ 
+-void PsiPopup::popup(PsiAccount *acc, PopupManager::PopupType type, const Jid &j, const Resource &r, const UserListItem *item, PsiEvent *event)
++void PsiPopup::popup(PsiAccount *acc, PopupManager::PopupType type, const Jid &j, const Resource &r, const UserListItem *item, const PsiEvent::Ptr &event)
+ {
+ 	d->popupType = type;
+ 	PsiIcon *icon = 0;
+@@ -269,7 +262,7 @@ void PsiPopup::setData(const QPixmap *av
+ 	show();
+ }
+ 
+-void PsiPopup::setData(const Jid &j, const Resource &r, const UserListItem *u, const PsiEvent *event)
++void PsiPopup::setData(const Jid &j, const Resource &r, const UserListItem *u, const PsiEvent::Ptr &event)
+ {
+ 	if ( !d->popup ) {
+ 		deleteLater();
+@@ -279,10 +272,7 @@ void PsiPopup::setData(const Jid &j, con
+ 	d->jid    = j;
+ 	d->status = r.status();
+ 	if(d->popupType != PopupManager::AlertComposing)
+-		d->event  = (PsiEvent *)event;
+-
+-	if ( d->event )
+-		connect(event, SIGNAL(destroyed()), d, SLOT(eventDestroyed()));
++		d->event  = event;
+ 
+ 	PsiIcon *icon = PsiIconset::instance()->statusPtr(j, r.status());
+ 
+@@ -304,10 +294,10 @@ void PsiPopup::setData(const Jid &j, con
+ 		name = u->name();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Auth) {
+-		name = ((AuthEvent*) event)->nick();
++		name = event.staticCast<AuthEvent>()->nick();
+ 	}
+ 	else if (event && event->type() == PsiEvent::Message) {
+-		name = ((MessageEvent*) event)->nick();
++		name = event.staticCast<MessageEvent>()->nick();
+ 	}
+ 
+ 	if (!name.isEmpty()) {
+@@ -346,7 +336,7 @@ void PsiPopup::setData(const Jid &j, con
+ 	     (d->popupType != PopupManager::AlertFile || !PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool()) )
+ 	{
+ 		if ((event && event->type() == PsiEvent::Message) && (PsiOptions::instance()->getOption("options.ui.notifications.passive-popups.showMessage").toBool())) {
+-			const Message *jmessage = &((MessageEvent *)event)->message();
++			const Message *jmessage = &event.staticCast<MessageEvent>()->message();
+ 			QString message;
+ 
+ 			if ( !jmessage->subject().isEmpty() )
+@@ -357,7 +347,7 @@ void PsiPopup::setData(const Jid &j, con
+ 				contactText += "<br/><font size=\"+1\">" + message + "</font>";
+ 			}
+ 		}
+-                setData(&avatar, icon, contactText);
++		setData(&avatar, icon, contactText);
+ 	}
+ 	else if ( d->popupType == PopupManager::AlertComposing ) {
+ 		QString txt = "<font size=\"+1\">" + name + tr(" is typing...") + "</font>" ;
+@@ -369,7 +359,7 @@ void PsiPopup::setData(const Jid &j, con
+ 
+ 		vbox->addSpacing(5);
+ 
+-		const Message *jmessage = &((MessageEvent *)event)->message();
++		const Message *jmessage = &event.staticCast<MessageEvent>()->message();
+ 		QString message;
+ 		if ( !jmessage->subject().isEmpty() )
+ 			message += "<font color=\"red\"><b>" + tr("Subject:") + ' ' + jmessage->subject() + "</b></font><br>";
+--- git.orig/src/psipopup.h
++++ git/src/psipopup.h
+@@ -26,6 +26,7 @@
+ #endif
+ 
+ #include "psipopupinterface.h"
++#include "psievent.h"
+ 
+ class FancyPopup;
+ 
+@@ -37,14 +38,14 @@ public:
+ 	PsiPopup(QObject* parent = 0);
+ 	~PsiPopup();
+ 
+-	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0);
++	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, const PsiEvent::Ptr& = PsiEvent::Ptr());
+ 	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const PsiIcon* titleIcon, const QString& titleText,
+ 		   const QPixmap* avatar, const PsiIcon* icon, const QString& text);
+ 
+ 	static void deleteAll();
+ 
+ private:
+-	void setData(const Jid &, const Resource &, const UserListItem * = 0, const PsiEvent * = 0);
++	void setData(const Jid &, const Resource &, const UserListItem * = 0, const PsiEvent::Ptr &event = PsiEvent::Ptr());
+ 	void setData(const QPixmap *avatar, const PsiIcon *icon, const QString& text);
+ 	void setJid(const Jid &j);
+ 	QString id() const;
+--- git.orig/src/psipopupinterface.h
++++ git/src/psipopupinterface.h
+@@ -22,6 +22,7 @@
+ #define PSIPOPUPINTERFACE_H
+ 
+ #include "popupmanager.h"
++#include "psievent.h"
+ 
+ class PsiPopupInterface;
+ 
+@@ -39,7 +40,7 @@ Q_DECLARE_INTERFACE(PsiPopupPluginInterf
+ class PsiPopupInterface
+ {
+ public:
+-	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, PsiEvent* = 0) = 0;
++	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const Resource& r, const UserListItem* = 0, const PsiEvent::Ptr& = PsiEvent::Ptr()) = 0;
+ 	virtual void popup(PsiAccount* account, PopupManager::PopupType type, const Jid& j, const PsiIcon* titleIcon, const QString& titleText,
+ 				    const QPixmap* avatar, const PsiIcon* icon, const QString& text) = 0;
+ 
+

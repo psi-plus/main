@@ -1,6 +1,6 @@
---- git.temp.orig/options/default.xml
-+++ git.temp/options/default.xml
-@@ -153,7 +153,16 @@
+--- git.orig/options/default.xml
++++ git/options/default.xml
+@@ -154,7 +154,16 @@
  					<self-contact type="bool">true</self-contact>
  				</show>
  				<show-group-counts type="bool">true</show-group-counts>
@@ -18,8 +18,8 @@
  				<toolbars/>
  				<toolbars-state type="QByteArray"/>
  				<use-left-click type="bool">false</use-left-click>
---- git.temp.orig/src/options/opt_application.cpp
-+++ git.temp/src/options/opt_application.cpp
+--- git.orig/src/options/opt_application.cpp
++++ git/src/options/opt_application.cpp
 @@ -39,16 +39,6 @@ QWidget *OptionsTabApplication::widget()
  	w = new OptApplicationUI();
  	OptApplicationUI *d = (OptApplicationUI *)w;
@@ -70,8 +70,8 @@
  	d->ck_autoUpdate->setChecked(PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool());
  
  	// docklet
---- git.temp.orig/src/options/opt_application.ui
-+++ git.temp/src/options/opt_application.ui
+--- git.orig/src/options/opt_application.ui
++++ git/src/options/opt_application.ui
 @@ -14,37 +14,6 @@
    </property>
    <layout class="QVBoxLayout" >
@@ -121,8 +121,52 @@
    <tabstop>ck_docklet</tabstop>
    <tabstop>ck_dockDCstyle</tabstop>
    <tabstop>ck_dockHideMW</tabstop>
---- /dev/null
-+++ git.temp/src/options/opt_roster.cpp
+--- git.orig/src/options/optionsdlg.cpp
++++ git/src/options/optionsdlg.cpp
+@@ -39,6 +39,7 @@
+ // tabs
+ #include "opt_toolbars.h"
+ #include "opt_application.h"
++#include "opt_roster.h"
+ #include "opt_appearance.h"
+ #include "opt_chat.h"
+ #include "opt_events.h"
+@@ -270,6 +271,7 @@ void OptionsDlg::Private::createTabs()
+ 	OptionsTabApplication* applicationTab = new OptionsTabApplication(this);
+ 	applicationTab->setHaveAutoUpdater(psi->haveAutoUpdater());
+ 	tabs.append( applicationTab );
++	tabs.append( new OptionsTabRoster(this) );
+ 	tabs.append( new OptionsTabChat(this) );
+ 	tabs.append( new OptionsTabEvents(this) );
+ 	tabs.append( new OptionsTabPopups(this) );
+--- git.orig/src/options/options.pri
++++ git/src/options/options.pri
+@@ -12,6 +12,7 @@ FORMS += \
+ # additional tabs
+ HEADERS += \
+ 	$$PWD/opt_application.h \
++	$$PWD/opt_roster.h \
+ 	$$PWD/opt_chat.h \
+ 	$$PWD/opt_events.h \
+ 	$$PWD/opt_popups.h \
+@@ -30,6 +31,7 @@ HEADERS += $$PWD/opt_tree.h
+ 
+ SOURCES += \
+ 	$$PWD/opt_application.cpp \
++	$$PWD/opt_roster.cpp \
+ 	$$PWD/opt_chat.cpp \
+ 	$$PWD/opt_events.cpp \
+ 	$$PWD/opt_popups.cpp \
+@@ -48,6 +50,7 @@ SOURCES += $$PWD/opt_tree.cpp
+ 
+ FORMS += \
+ 	$$PWD/opt_application.ui \
++	$$PWD/opt_roster.ui \
+ 	$$PWD/opt_chat.ui \
+ 	$$PWD/opt_events.ui \
+ 	$$PWD/opt_popups.ui \
+--- git.orig/src/options/opt_roster.cpp
++++ git/src/options/opt_roster.cpp
 @@ -0,0 +1,103 @@
 +#include "opt_roster.h"
 +#include "common.h"
@@ -227,8 +271,8 @@
 +	d->sb_avatarsSize->setValue( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.size").toInt() );
 +	d->sb_avatarsRadius->setValue( PsiOptions::instance()->getOption("options.ui.contactlist.avatars.radius").toInt() );
 +}
---- /dev/null
-+++ git.temp/src/options/opt_roster.h
+--- git.orig/src/options/opt_roster.h
++++ git/src/options/opt_roster.h
 @@ -0,0 +1,24 @@
 +#ifndef OPT_ROSTER_H
 +#define OPT_ROSTER_H
@@ -254,8 +298,8 @@
 +};
 +
 +#endif
---- /dev/null
-+++ git.temp/src/options/opt_roster.ui
+--- git.orig/src/options/opt_roster.ui
++++ git/src/options/opt_roster.ui
 @@ -0,0 +1,208 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -465,47 +509,3 @@
 + <resources/>
 + <connections/>
 +</ui>
---- git.temp.orig/src/options/options.pri
-+++ git.temp/src/options/options.pri
-@@ -12,6 +12,7 @@ FORMS += \
- # additional tabs
- HEADERS += \
- 	$$PWD/opt_application.h \
-+	$$PWD/opt_roster.h \
- 	$$PWD/opt_chat.h \
- 	$$PWD/opt_events.h \
- 	$$PWD/opt_popups.h \
-@@ -30,6 +31,7 @@ HEADERS += $$PWD/opt_tree.h
- 
- SOURCES += \
- 	$$PWD/opt_application.cpp \
-+	$$PWD/opt_roster.cpp \
- 	$$PWD/opt_chat.cpp \
- 	$$PWD/opt_events.cpp \
- 	$$PWD/opt_popups.cpp \
-@@ -48,6 +50,7 @@ SOURCES += $$PWD/opt_tree.cpp
- 
- FORMS += \
- 	$$PWD/opt_application.ui \
-+	$$PWD/opt_roster.ui \
- 	$$PWD/opt_chat.ui \
- 	$$PWD/opt_events.ui \
- 	$$PWD/opt_popups.ui \
---- git.temp.orig/src/options/optionsdlg.cpp
-+++ git.temp/src/options/optionsdlg.cpp
-@@ -39,6 +39,7 @@
- // tabs
- #include "opt_toolbars.h"
- #include "opt_application.h"
-+#include "opt_roster.h"
- #include "opt_appearance.h"
- #include "opt_chat.h"
- #include "opt_events.h"
-@@ -270,6 +271,7 @@ void OptionsDlg::Private::createTabs()
- 	OptionsTabApplication* applicationTab = new OptionsTabApplication(this);
- 	applicationTab->setHaveAutoUpdater(psi->haveAutoUpdater());
- 	tabs.append( applicationTab );
-+	tabs.append( new OptionsTabRoster(this) );
- 	tabs.append( new OptionsTabChat(this) );
- 	tabs.append( new OptionsTabEvents(this) );
- 	tabs.append( new OptionsTabPopups(this) );

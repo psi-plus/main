@@ -1,8 +1,6 @@
-Entering 'iris'
-Entering 'src/libpsi'
---- git.temp.orig/options/default.xml
-+++ git.temp/options/default.xml
-@@ -136,6 +136,7 @@
+--- git.orig/options/default.xml
++++ git/options/default.xml
+@@ -137,6 +137,7 @@
  				<tooltip comment="Display options for the contact list tooltips">
  					<avatar comment="Display avatar" type="bool">true</avatar>
  					<client-version comment="Display client version information" type="bool">true</client-version>
@@ -10,7 +8,7 @@ Entering 'src/libpsi'
  					<last-status comment="Display the last status" type="bool">true</last-status>
  					<pgp comment="Display PGP information" type="bool">true</pgp>
  				</tooltip>
-@@ -169,6 +170,7 @@
+@@ -170,6 +171,7 @@
  				</avatars>
  				<show-mood-icons type="bool">true</show-mood-icons>
  				<show-activity-icons type="bool">true</show-activity-icons>
@@ -18,8 +16,8 @@ Entering 'src/libpsi'
  				<show-tune-icons type="bool">true</show-tune-icons>
  				<show-client-icons type="bool">true</show-client-icons>
  				<show-all-client-icons type="bool">false</show-all-client-icons>
---- git.temp.orig/src/contactlistaccountmenu.cpp
-+++ git.temp/src/contactlistaccountmenu.cpp
+--- git.orig/src/contactlistaccountmenu.cpp
++++ git/src/contactlistaccountmenu.cpp
 @@ -39,6 +39,7 @@ class ContactListAccountMenu::Private :
  	StatusMenu* statusMenu_;
  	QAction* moodAction_;
@@ -74,8 +72,8 @@ Entering 'src/libpsi'
  	void setAvatar()
  	{
  		if (!account)
---- git.temp.orig/src/geolocation.cpp
-+++ git.temp/src/geolocation.cpp
+--- git.orig/src/geolocation.cpp
++++ git/src/geolocation.cpp
 @@ -20,6 +20,7 @@
  
  #include <QDomDocument>
@@ -386,8 +384,225 @@ Entering 'src/libpsi'
 +
 +	return loc;
 +}
---- git.temp.orig/src/geolocation.h
-+++ git.temp/src/geolocation.h
+--- git.orig/src/geolocationdlg.cpp
++++ git/src/geolocationdlg.cpp
+@@ -0,0 +1,166 @@
++/*
++ * geolocationdlg.cpp
++ * Copyright (C) 2009  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include "geolocationdlg.h"
++
++#include "xmpp_pubsubitem.h"
++#include "xmpp_client.h"
++#include "xmpp_task.h"
++#include "psiaccount.h"
++#include "pepmanager.h"
++#include "geolocation.h"
++#include <QLineEdit>
++
++GeoLocationDlg::GeoLocationDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
++{
++	setAttribute(Qt::WA_DeleteOnClose);
++	ui_.setupUi(this);
++	setModal(false);
++	connect(ui_.pb_cancel, SIGNAL(clicked()), SLOT(close()));
++ 	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setGeoLocation()));
++	connect(ui_.pb_reset, SIGNAL(clicked()), SLOT(reset()));
++
++	GeoLocation geoloc = pa_->geolocation();
++	if(geoloc.isNull())
++		return;
++
++	if (geoloc.alt().hasValue())
++		ui_.le_altitude->setText(QString::number(geoloc.alt().value()));
++
++	if (!geoloc.area().isEmpty())
++		ui_.le_area->setText(geoloc.area());
++
++	if (geoloc.bearing().hasValue())
++		ui_.le_bearing->setText(QString::number(geoloc.bearing().value()));
++
++	if (!geoloc.building().isEmpty())
++		ui_.le_building->setText(geoloc.building());
++
++	if (!geoloc.country().isEmpty())
++		ui_.le_country->setText(geoloc.country());
++
++	if (!geoloc.datum().isEmpty())
++		ui_.le_datum->setText(geoloc.datum());
++
++	if (!geoloc.description().isEmpty())
++		ui_.le_description->setText(geoloc.description());
++
++	if (geoloc.error().hasValue())
++		ui_.le_error->setText(QString::number(geoloc.error().value()));
++
++	if (!geoloc.floor().isEmpty())
++		ui_.le_floor->setText(geoloc.floor());
++
++	if (geoloc.lat().hasValue())
++		ui_.le_latitude->setText(QString::number(geoloc.lat().value()));
++
++	if (!geoloc.locality().isEmpty())
++		ui_.le_locality->setText(geoloc.locality());
++
++	if (geoloc.lon().hasValue())
++		ui_.le_longitude->setText(QString::number(geoloc.lon().value()));
++
++	if (!geoloc.postalcode().isEmpty())
++		ui_.le_postalcode->setText(geoloc.postalcode());
++
++	if (!geoloc.region().isEmpty())
++		ui_.le_region->setText(geoloc.region());
++
++	if (!geoloc.room().isEmpty())
++		ui_.le_room->setText(geoloc.room());
++
++	if (!geoloc.street().isEmpty())
++		ui_.le_street->setText(geoloc.street());
++
++	if (!geoloc.text().isEmpty())
++		ui_.le_text->setText(geoloc.text());
++}
++
++void GeoLocationDlg::reset()
++{
++	foreach(QLineEdit *le, this->findChildren<QLineEdit*>()) {
++		le->setText("");
++	}
++}
++
++void GeoLocationDlg::setGeoLocation()
++{
++	GeoLocation geoloc;
++
++	if(!ui_.le_altitude->text().isEmpty())
++		geoloc.setAlt(ui_.le_altitude->text().toFloat());
++
++	if(!ui_.le_bearing->text().isEmpty())
++		geoloc.setBearing(ui_.le_bearing->text().toFloat());
++
++	if(!ui_.le_error->text().isEmpty())
++		geoloc.setError(ui_.le_error->text().toFloat());
++
++	if(!ui_.le_latitude->text().isEmpty())
++		geoloc.setLat(ui_.le_latitude->text().toFloat());
++
++	if(!ui_.le_longitude->text().isEmpty())
++		geoloc.setLon(ui_.le_longitude->text().toFloat());
++
++	if(!ui_.le_datum->text().isEmpty())
++		geoloc.setDatum(ui_.le_datum->text());
++
++	if(!ui_.le_description->text().isEmpty())
++		geoloc.setDescription(ui_.le_description->text());
++
++	if(!ui_.le_country->text().isEmpty())
++		geoloc.setCountry(ui_.le_country->text());
++
++	if(!ui_.le_region->text().isEmpty())
++		geoloc.setRegion(ui_.le_region->text());
++
++	if(!ui_.le_locality->text().isEmpty())
++		geoloc.setLocality(ui_.le_locality->text());
++
++	if(!ui_.le_area->text().isEmpty())
++		geoloc.setArea(ui_.le_area->text());
++
++	if(!ui_.le_street->text().isEmpty())
++		geoloc.setStreet(ui_.le_street->text());
++
++	if(!ui_.le_building->text().isEmpty())
++		geoloc.setBuilding(ui_.le_building->text());
++
++	if(!ui_.le_floor->text().isEmpty())
++		geoloc.setFloor(ui_.le_floor->text());
++
++	if(!ui_.le_room->text().isEmpty())
++		geoloc.setRoom(ui_.le_room->text());
++
++	if(!ui_.le_postalcode->text().isEmpty())
++		geoloc.setPostalcode(ui_.le_postalcode->text());
++
++	if(!ui_.le_text->text().isEmpty())
++		geoloc.setText(ui_.le_text->text());
++
++	if (geoloc.isNull()) {
++ 		pa_->pepManager()->retract("http://jabber.org/protocol/geoloc", "current");
++	}
++	else {
++		pa_->pepManager()->publish("http://jabber.org/protocol/geoloc", PubSubItem("current",geoloc.toXml(*pa_->client()->rootTask()->doc())), PEPManager::PresenceAccess);
++	}
++	close();
++}
++
+--- git.orig/src/geolocationdlg.h
++++ git/src/geolocationdlg.h
+@@ -0,0 +1,45 @@
++/*
++ * geolocationdlg.h
++ * Copyright (C) 2009  Khryukin Evgeny
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef GEOLOCATIONDLG_H
++#define GEOLOCATIONDLG_H
++
++#include <QDialog>
++
++#include "ui_geolocation.h"
++
++class PsiAccount;
++
++class GeoLocationDlg : public QDialog
++{
++	Q_OBJECT
++
++public:
++	GeoLocationDlg(PsiAccount*);
++
++protected slots:
++	void setGeoLocation();
++	void reset();
++
++private:
++	Ui::GeoLocation ui_;
++ 	PsiAccount* pa_;
++};
++
++#endif // GEOLOCATIONDLG_H
+--- git.orig/src/geolocation.h
++++ git/src/geolocation.h
 @@ -52,7 +52,30 @@ public:
  	void setDatum(const QString&);
  	void setDescription(const QString&);
@@ -427,8 +642,8 @@ Entering 'src/libpsi'
  };
  
  #endif
---- /dev/null
-+++ git.temp/src/geolocation.ui
+--- git.orig/src/geolocation.ui
++++ git/src/geolocation.ui
 @@ -0,0 +1,320 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -750,225 +965,8 @@ Entering 'src/libpsi'
 + <resources/>
 + <connections/>
 +</ui>
---- /dev/null
-+++ git.temp/src/geolocationdlg.cpp
-@@ -0,0 +1,166 @@
-+/*
-+ * geolocationdlg.cpp
-+ * Copyright (C) 2009  Khryukin Evgeny
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+
-+#include "geolocationdlg.h"
-+
-+#include "xmpp_pubsubitem.h"
-+#include "xmpp_client.h"
-+#include "xmpp_task.h"
-+#include "psiaccount.h"
-+#include "pepmanager.h"
-+#include "geolocation.h"
-+#include <QLineEdit>
-+
-+GeoLocationDlg::GeoLocationDlg(PsiAccount* pa) : QDialog(0), pa_(pa)
-+{
-+	setAttribute(Qt::WA_DeleteOnClose);
-+	ui_.setupUi(this);
-+	setModal(false);
-+	connect(ui_.pb_cancel, SIGNAL(clicked()), SLOT(close()));
-+ 	connect(ui_.pb_ok, SIGNAL(clicked()), SLOT(setGeoLocation()));
-+	connect(ui_.pb_reset, SIGNAL(clicked()), SLOT(reset()));
-+
-+	GeoLocation geoloc = pa_->geolocation();
-+	if(geoloc.isNull())
-+		return;
-+
-+	if (geoloc.alt().hasValue())
-+		ui_.le_altitude->setText(QString::number(geoloc.alt().value()));
-+
-+	if (!geoloc.area().isEmpty())
-+		ui_.le_area->setText(geoloc.area());
-+
-+	if (geoloc.bearing().hasValue())
-+		ui_.le_bearing->setText(QString::number(geoloc.bearing().value()));
-+
-+	if (!geoloc.building().isEmpty())
-+		ui_.le_building->setText(geoloc.building());
-+
-+	if (!geoloc.country().isEmpty())
-+		ui_.le_country->setText(geoloc.country());
-+
-+	if (!geoloc.datum().isEmpty())
-+		ui_.le_datum->setText(geoloc.datum());
-+
-+	if (!geoloc.description().isEmpty())
-+		ui_.le_description->setText(geoloc.description());
-+
-+	if (geoloc.error().hasValue())
-+		ui_.le_error->setText(QString::number(geoloc.error().value()));
-+
-+	if (!geoloc.floor().isEmpty())
-+		ui_.le_floor->setText(geoloc.floor());
-+
-+	if (geoloc.lat().hasValue())
-+		ui_.le_latitude->setText(QString::number(geoloc.lat().value()));
-+
-+	if (!geoloc.locality().isEmpty())
-+		ui_.le_locality->setText(geoloc.locality());
-+
-+	if (geoloc.lon().hasValue())
-+		ui_.le_longitude->setText(QString::number(geoloc.lon().value()));
-+
-+	if (!geoloc.postalcode().isEmpty())
-+		ui_.le_postalcode->setText(geoloc.postalcode());
-+
-+	if (!geoloc.region().isEmpty())
-+		ui_.le_region->setText(geoloc.region());
-+
-+	if (!geoloc.room().isEmpty())
-+		ui_.le_room->setText(geoloc.room());
-+
-+	if (!geoloc.street().isEmpty())
-+		ui_.le_street->setText(geoloc.street());
-+
-+	if (!geoloc.text().isEmpty())
-+		ui_.le_text->setText(geoloc.text());
-+}
-+
-+void GeoLocationDlg::reset()
-+{
-+	foreach(QLineEdit *le, this->findChildren<QLineEdit*>()) {
-+		le->setText("");
-+	}
-+}
-+
-+void GeoLocationDlg::setGeoLocation()
-+{
-+	GeoLocation geoloc;
-+
-+	if(!ui_.le_altitude->text().isEmpty())
-+		geoloc.setAlt(ui_.le_altitude->text().toFloat());
-+
-+	if(!ui_.le_bearing->text().isEmpty())
-+		geoloc.setBearing(ui_.le_bearing->text().toFloat());
-+
-+	if(!ui_.le_error->text().isEmpty())
-+		geoloc.setError(ui_.le_error->text().toFloat());
-+
-+	if(!ui_.le_latitude->text().isEmpty())
-+		geoloc.setLat(ui_.le_latitude->text().toFloat());
-+
-+	if(!ui_.le_longitude->text().isEmpty())
-+		geoloc.setLon(ui_.le_longitude->text().toFloat());
-+
-+	if(!ui_.le_datum->text().isEmpty())
-+		geoloc.setDatum(ui_.le_datum->text());
-+
-+	if(!ui_.le_description->text().isEmpty())
-+		geoloc.setDescription(ui_.le_description->text());
-+
-+	if(!ui_.le_country->text().isEmpty())
-+		geoloc.setCountry(ui_.le_country->text());
-+
-+	if(!ui_.le_region->text().isEmpty())
-+		geoloc.setRegion(ui_.le_region->text());
-+
-+	if(!ui_.le_locality->text().isEmpty())
-+		geoloc.setLocality(ui_.le_locality->text());
-+
-+	if(!ui_.le_area->text().isEmpty())
-+		geoloc.setArea(ui_.le_area->text());
-+
-+	if(!ui_.le_street->text().isEmpty())
-+		geoloc.setStreet(ui_.le_street->text());
-+
-+	if(!ui_.le_building->text().isEmpty())
-+		geoloc.setBuilding(ui_.le_building->text());
-+
-+	if(!ui_.le_floor->text().isEmpty())
-+		geoloc.setFloor(ui_.le_floor->text());
-+
-+	if(!ui_.le_room->text().isEmpty())
-+		geoloc.setRoom(ui_.le_room->text());
-+
-+	if(!ui_.le_postalcode->text().isEmpty())
-+		geoloc.setPostalcode(ui_.le_postalcode->text());
-+
-+	if(!ui_.le_text->text().isEmpty())
-+		geoloc.setText(ui_.le_text->text());
-+
-+	if (geoloc.isNull()) {
-+ 		pa_->pepManager()->retract("http://jabber.org/protocol/geoloc", "current");
-+	}
-+	else {
-+		pa_->pepManager()->publish("http://jabber.org/protocol/geoloc", PubSubItem("current",geoloc.toXml(*pa_->client()->rootTask()->doc())), PEPManager::PresenceAccess);
-+	}
-+	close();
-+}
-+
---- /dev/null
-+++ git.temp/src/geolocationdlg.h
-@@ -0,0 +1,45 @@
-+/*
-+ * geolocationdlg.h
-+ * Copyright (C) 2009  Khryukin Evgeny
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this library; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#ifndef GEOLOCATIONDLG_H
-+#define GEOLOCATIONDLG_H
-+
-+#include <QDialog>
-+
-+#include "ui_geolocation.h"
-+
-+class PsiAccount;
-+
-+class GeoLocationDlg : public QDialog
-+{
-+	Q_OBJECT
-+
-+public:
-+	GeoLocationDlg(PsiAccount*);
-+
-+protected slots:
-+	void setGeoLocation();
-+	void reset();
-+
-+private:
-+	Ui::GeoLocation ui_;
-+ 	PsiAccount* pa_;
-+};
-+
-+#endif // GEOLOCATIONDLG_H
---- git.temp.orig/src/options/opt_roster.cpp
-+++ git.temp/src/options/opt_roster.cpp
+--- git.orig/src/options/opt_roster.cpp
++++ git/src/options/opt_roster.cpp
 @@ -70,6 +70,7 @@ void OptionsTabRoster::applyOptions()
  	PsiOptions::instance()->setOption("options.ui.contactlist.avatars.show", d->ck_showAvatarIcons->isChecked());
  	PsiOptions::instance()->setOption("options.ui.contactlist.show-mood-icons", d->ck_showMoodIcons->isChecked());
@@ -985,8 +983,8 @@ Entering 'src/libpsi'
  	d->ck_showTuneIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-tune-icons").toBool() );
  	d->ck_showClientIcons->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool() );
  	d->cb_showAllClientIcons->setEnabled(PsiOptions::instance()->getOption("options.ui.contactlist.show-client-icons").toBool());
---- git.temp.orig/src/options/opt_roster.ui
-+++ git.temp/src/options/opt_roster.ui
+--- git.orig/src/options/opt_roster.ui
++++ git/src/options/opt_roster.ui
 @@ -7,7 +7,7 @@
      <x>0</x>
      <y>0</y>
@@ -1013,8 +1011,8 @@ Entering 'src/libpsi'
        <item>
         <widget class="QCheckBox" name="ck_showTuneIcons">
          <property name="whatsThis">
---- git.temp.orig/src/physicallocation.cpp
-+++ git.temp/src/physicallocation.cpp
+--- git.orig/src/physicallocation.cpp
++++ git/src/physicallocation.cpp
 @@ -17,7 +17,7 @@
   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
   *
@@ -1030,8 +1028,8 @@ Entering 'src/libpsi'
  }
 +
 +*/
---- git.temp.orig/src/physicallocation.h
-+++ git.temp/src/physicallocation.h
+--- git.orig/src/physicallocation.h
++++ git/src/physicallocation.h
 @@ -17,7 +17,7 @@
   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
   *
@@ -1046,9 +1044,9 @@ Entering 'src/libpsi'
  
  #endif
 +*/
---- git.temp.orig/src/psiaccount.cpp
-+++ git.temp/src/psiaccount.cpp
-@@ -118,8 +118,8 @@
+--- git.orig/src/psiaccount.cpp
++++ git/src/psiaccount.cpp
+@@ -119,8 +119,8 @@
  #include "mooddlg.h"
  #include "activitydlg.h"
  #include "qwextend.h"
@@ -1059,7 +1057,7 @@ Entering 'src/libpsi'
  #include "translationmanager.h"
  #include "irisprotocol/iris_discoinfoquerier.h"
  #include "iconwidget.h"
-@@ -1240,7 +1240,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1248,7 +1248,7 @@ PsiAccount::PsiAccount(const UserAccount
  		pepNodes += "http://jabber.org/protocol/mood+notify";
  		pepNodes += "http://jabber.org/protocol/activity+notify";
  		pepNodes += "http://jabber.org/protocol/tune+notify";
@@ -1068,7 +1066,7 @@ Entering 'src/libpsi'
  		pepNodes += "http://jabber.org/protocol/geoloc+notify";
  		pepNodes += "urn:xmpp:avatar:metadata+notify";
  		d->client->addExtension("ep-notify-2",Features(pepNodes));
-@@ -2232,7 +2232,7 @@ void PsiAccount::setPEPAvailable(bool b)
+@@ -2253,7 +2253,7 @@ void PsiAccount::setPEPAvailable(bool b)
  		pepNodes += "http://jabber.org/protocol/mood";
  		pepNodes += "http://jabber.org/protocol/activity";
  		pepNodes += "http://jabber.org/protocol/tune";
@@ -1077,7 +1075,7 @@ Entering 'src/libpsi'
  		pepNodes += "http://jabber.org/protocol/geoloc";
  		pepNodes += "urn:xmpp:avatar:data";
  		pepNodes += "urn:xmpp:avatar:metadata";
-@@ -3420,14 +3420,14 @@ void PsiAccount::itemRetracted(const Jid
+@@ -3448,14 +3448,14 @@ void PsiAccount::itemRetracted(const Jid
  			cpUpdate(*u);
  		}
  	}
@@ -1094,7 +1092,7 @@ Entering 'src/libpsi'
  }
  
  void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem& item)
-@@ -3480,7 +3480,7 @@ void PsiAccount::itemPublished(const Jid
+@@ -3508,7 +3508,7 @@ void PsiAccount::itemPublished(const Jid
  			cpUpdate(*u);
  		}
  	}
@@ -1103,7 +1101,7 @@ Entering 'src/libpsi'
  		// FIXME: try to find the right resource using JEP-33 'replyto'
  		// see tune case above
  		PhysicalLocation physloc(item.payload());
-@@ -3488,7 +3488,7 @@ void PsiAccount::itemPublished(const Jid
+@@ -3516,7 +3516,7 @@ void PsiAccount::itemPublished(const Jid
  			u->setPhysicalLocation(physloc);
  			cpUpdate(*u);
  		}
@@ -1112,7 +1110,7 @@ Entering 'src/libpsi'
  }
  
  QList<UserListItem*> PsiAccount::findRelevant(const Jid &j) const
-@@ -3812,6 +3812,12 @@ void PsiAccount::actionSetActivity()
+@@ -3840,6 +3840,12 @@ void PsiAccount::actionSetActivity()
  	w->show();
  }
  
@@ -1125,7 +1123,7 @@ Entering 'src/libpsi'
  void PsiAccount::actionSetAvatar()
  {
  	QString str = FileUtil::getImageFileName(0);
-@@ -5553,6 +5559,11 @@ const Activity &PsiAccount::activity() c
+@@ -5581,6 +5587,11 @@ const Activity &PsiAccount::activity() c
  	return d->self.activity();
  }
  
@@ -1137,10 +1135,10 @@ Entering 'src/libpsi'
  const Mood &PsiAccount::mood() const
  {
  	return d->self.mood();
---- git.temp.orig/src/psiaccount.h
-+++ git.temp/src/psiaccount.h
-@@ -34,6 +34,7 @@
- #include "psiactions.h"
+--- git.orig/src/psiaccount.h
++++ git/src/psiaccount.h
+@@ -35,6 +35,7 @@
+ #include "psievent.h"
  #include "mood.h"
  #include "activity.h"
 +#include "geolocation.h"
@@ -1163,8 +1161,8 @@ Entering 'src/libpsi'
  	void actionSetAvatar();
  	void actionUnsetAvatar();
  	void actionQueryVersion(const Jid& j);
---- git.temp.orig/src/psicon.cpp
-+++ git.temp/src/psicon.cpp
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
 @@ -612,7 +612,7 @@ bool PsiCon::init()
  				 << "http://jabber.org/protocol/mood"
  				 << "http://jabber.org/protocol/activity"
@@ -1183,8 +1181,8 @@ Entering 'src/libpsi'
  				 << "http://jabber.org/protocol/geoloc+notify"
  				 << "urn:xmpp:avatar:metadata+notify"
  				);
---- git.temp.orig/src/src.pri
-+++ git.temp/src/src.pri
+--- git.orig/src/src.pri
++++ git/src/src.pri
 @@ -208,6 +208,7 @@ HEADERS += \
  	$$PWD/vcardphotodlg.h \
  	$$PWD/psicli.h \
@@ -1209,8 +1207,8 @@ Entering 'src/libpsi'
  	$$PWD/sendbuttontemplateseditor.ui
  
  # options dialog
---- git.temp.orig/src/userlist.cpp
-+++ git.temp/src/userlist.cpp
+--- git.orig/src/userlist.cpp
++++ git/src/userlist.cpp
 @@ -189,7 +189,7 @@ const GeoLocation& UserResource::geoLoca
  	return v_geoLocation;
  }
@@ -1281,8 +1279,8 @@ Entering 'src/libpsi'
  
  			// Entity Time
  			if (r.timezoneOffset().hasValue()) {
---- git.temp.orig/src/userlist.h
-+++ git.temp/src/userlist.h
+--- git.orig/src/userlist.h
++++ git/src/userlist.h
 @@ -30,7 +30,7 @@
  #include "mood.h"
  #include "activity.h"
