@@ -156,10 +156,10 @@ index 4d4b49e..e1a00f3 100644
  	QStackedLayout *stacked_;
 diff --git a/src/widgets/tabbar.cpp b/src/widgets/tabbar.cpp
 new file mode 100644
-index 0000000..fe06474
+index 0000000..5eb0ff8
 --- /dev/null
 +++ b/src/widgets/tabbar.cpp
-@@ -0,0 +1,607 @@
+@@ -0,0 +1,617 @@
 +/*
 + * tabbar.cpp
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -499,6 +499,16 @@ index 0000000..fe06474
 +	}
 +}
 +
++QWidget *TabBar::tabButton(int index, ButtonPosition position) const
++{
++	ButtonPosition closeButtonPos = static_cast<ButtonPosition>(style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, 0, this));
++	if (!d->multiRow || position != closeButtonPos)
++		return QTabBar::tabButton(index, position);
++
++	Q_ASSERT(index < d->closeButtons.size());
++	return index < d->closeButtons.size() ? d->closeButtons[index] : 0;
++}
++
 +bool TabBar::multiRow() const
 +{
 +	return d->multiRow;
@@ -756,9 +766,9 @@ index 0000000..fe06474
 +	if (isDown())
 +		opt.state |= QStyle::State_Sunken;
 +
-+	if (const QTabBar *tb = qobject_cast<const QTabBar *>(parent())) {
++	if (const TabBar *tb = qobject_cast<const TabBar*>(parent())) {
 +		int index = tb->currentIndex();
-+		QTabBar::ButtonPosition position = (QTabBar::ButtonPosition)style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, 0, tb);
++		QTabBar::ButtonPosition position = static_cast<QTabBar::ButtonPosition>(style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, 0, tb));
 +		if (tb->tabButton(index, position) == this)
 +			opt.state |= QStyle::State_Selected;
 +	}
@@ -769,10 +779,10 @@ index 0000000..fe06474
 +#include "tabbar.moc"
 diff --git a/src/widgets/tabbar.h b/src/widgets/tabbar.h
 new file mode 100644
-index 0000000..0e02fec
+index 0000000..84f4188
 --- /dev/null
 +++ b/src/widgets/tabbar.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,62 @@
 +/*
 + * tabbar.h
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -819,6 +829,7 @@ index 0000000..0e02fec
 +	void setTabTextColor(int index, const QColor &color);
 +	void setTabIcon(int index, const QIcon &icon);
 +	QRect tabRect(int index) const;
++	QWidget *tabButton(int index, ButtonPosition position) const;
 +
 +protected:
 +	// reimplemented
