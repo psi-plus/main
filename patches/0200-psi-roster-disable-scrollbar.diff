@@ -1,5 +1,7 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+diff --git a/options/default.xml b/options/default.xml
+index 291a2fa..e3ba86b 100644
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -139,6 +139,7 @@
  				<always-on-top type="bool">false</always-on-top>
  				<automatically-resize-roster type="bool">false</automatically-resize-roster>
@@ -8,21 +10,25 @@
  				<contact-sort-style type="QString">status</contact-sort-style>
  				<disable-service-discovery type="bool">false</disable-service-discovery>
  				<ensure-contact-visible-on-event type="bool">true</ensure-contact-visible-on-event>
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
-@@ -638,6 +638,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
- 
- 	ui_.lv_users->setMainDlg(this);
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+index cbd0a0e..cd1dd97 100644
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -642,6 +642,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+ #ifndef HAVE_QT5
  	ui_.lv_users->model()->setSupportedDragActions(Qt::CopyAction);
-+	if ( PsiOptions::instance()->getOption("options.ui.contactlist.disable-scrollbar").toBool() ) {
+ #endif
++	if (options->getOption("options.ui.contactlist.disable-scrollbar").toBool() ) {
 +		ui_.lv_users->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 +	}
  	connect(ui_.lv_users, SIGNAL(action(const QString &, const Status &, int)), SLOT(lv_action(const QString &, const Status &, int)));
  	connect(ui_.lv_users, SIGNAL(insertNick(const QString&)), d, SLOT(insertNick(const QString&)));
  
---- git.orig/src/psirosterwidget.cpp
-+++ git/src/psirosterwidget.cpp
-@@ -48,6 +48,7 @@ static const QString showAgentsOptionPat
+diff --git a/src/psirosterwidget.cpp b/src/psirosterwidget.cpp
+index ee6a55b..caff897 100644
+--- a/src/psirosterwidget.cpp
++++ b/src/psirosterwidget.cpp
+@@ -48,6 +48,7 @@ static const QString showAgentsOptionPath = "options.ui.contactlist.show.agent-c
  static const QString showSelfOptionPath = "options.ui.contactlist.show.self-contact";
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
  static const QString allowAutoResizeOptionPath = "options.ui.contactlist.automatically-resize-roster";
@@ -30,7 +36,7 @@
  
  //----------------------------------------------------------------------------
  // PsiRosterFilterProxyModel
-@@ -131,6 +132,9 @@ PsiRosterWidget::PsiRosterWidget(QWidget
+@@ -131,6 +132,9 @@ PsiRosterWidget::PsiRosterWidget(QWidget* parent)
  	contactListPageView_ = new PsiContactListView(contactListPage_);
  	contactListPageView_->installEventFilter(this);
  	contactListPageView_->setObjectName("contactListView");
@@ -40,7 +46,7 @@
  	contactListPageLayout->addWidget(contactListPageView_);
  
  	// filterPage_
-@@ -235,6 +239,11 @@ void PsiRosterWidget::optionChanged(cons
+@@ -235,6 +239,11 @@ void PsiRosterWidget::optionChanged(const QString& option)
  	else if (option == allowAutoResizeOptionPath) {
  		contactListPageView_->setAutoResizeEnabled(PsiOptions::instance()->getOption(allowAutoResizeOptionPath).toBool());
  	}
