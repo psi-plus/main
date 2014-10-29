@@ -10,7 +10,7 @@
  				<service-discovery comment="Service discovery dialog">
 --- git.orig/src/chatdlg.cpp
 +++ git/src/chatdlg.cpp
-@@ -457,6 +457,8 @@ void ChatDlg::ensureTabbedCorrectly()
+@@ -448,6 +448,8 @@ void ChatDlg::ensureTabbedCorrectly()
  
  void ChatDlg::updateContact(const Jid &j, bool fromPresence)
  {
@@ -37,7 +37,7 @@
  
  	QStringList hist;
  	int histAt;
-@@ -1043,6 +1045,7 @@ void GCMainDlg::activated()
+@@ -1047,6 +1049,7 @@ void GCMainDlg::activated()
  			u->setPending(d->pending, d->hPending);
  			account()->updateEntry(*u);
  		}
@@ -45,7 +45,12 @@
  		invalidateTab();
  	}
  	doFlash(false);
-@@ -1681,7 +1684,7 @@ void GCMainDlg::message(const Message &_
+@@ -1681,11 +1684,11 @@ void GCMainDlg::avatarUpdated(const Jid
+ 	}
+ }
+ 
+-void GCMainDlg::message(const Message &_m)
++void GCMainDlg::message(const Message &_m, const PsiEvent::Ptr &e)
  {
  	Message m = _m;
  	QString from = m.from().resource();
@@ -54,7 +59,7 @@
  
  	if (m.getMUCStatuses().contains(100)) {
  		d->nonAnonymous = true;
-@@ -1731,7 +1734,7 @@ void GCMainDlg::message(const Message &_
+@@ -1735,7 +1738,7 @@ void GCMainDlg::message(const Message &_
  
  	// code to determine if the speaker was addressing this client in chat
  	if(m.body().contains(d->self))
@@ -63,7 +68,7 @@
  
  	if (m.body().left(d->self.length()) == d->self)
  		d->lastReferrer = m.from().resource();
-@@ -1740,7 +1743,7 @@ void GCMainDlg::message(const Message &_
+@@ -1744,7 +1747,7 @@ void GCMainDlg::message(const Message &_
  		QStringList highlightWords = options->getOption("options.ui.muc.highlight-words").toStringList();
  		foreach (QString word, highlightWords) {
  			if(m.body().contains((word), Qt::CaseInsensitive)) {
@@ -72,7 +77,7 @@
  			}
  		}
  	}
-@@ -1751,10 +1754,10 @@ void GCMainDlg::message(const Message &_
+@@ -1755,13 +1758,12 @@ void GCMainDlg::message(const Message &_
  			account()->playSound(PsiAccount::eSend);
  	}
  	else {
@@ -84,8 +89,11 @@
 +		if(d->alert || (options->getOption("options.ui.notifications.passive-popups.notify-every-muc-message").toBool() && !m.spooled() && !from.isEmpty()) ) {
  			if (!m.spooled() && !isActiveTab() && !m.from().resource().isEmpty()) {
  				XMPP::Jid jid = m.from()/*.withDomain("")*/;
- 				MessageEvent::Ptr e(new MessageEvent(m, account()));
-@@ -1766,9 +1769,9 @@ void GCMainDlg::message(const Message &_
+-				MessageEvent::Ptr e(new MessageEvent(m, account()));
+ 				UserListItem i;
+ 				i.setPrivate(true);
+ 				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), &i, e);
+@@ -1770,9 +1772,9 @@ void GCMainDlg::message(const Message &_
  	}
  
  	if(from.isEmpty())
@@ -97,7 +105,7 @@
  }
  
  void GCMainDlg::joined()
-@@ -1805,6 +1808,11 @@ const QDateTime & GCMainDlg::lastMsgTime
+@@ -1809,6 +1811,11 @@ const QDateTime & GCMainDlg::lastMsgTime
  	return d->te_log()->lastMsgTime();
  }
  
@@ -111,7 +119,22 @@
  	MessageView mv = MessageView::fromPlainText(str, MessageView::System);
 --- git.orig/src/groupchatdlg.h
 +++ git/src/groupchatdlg.h
-@@ -76,6 +76,7 @@ public:
+@@ -31,6 +31,7 @@
+ #include "ui_groupchatdlg.h"
+ #include "mucmanager.h"
+ #include "advwidget.h"
++#include "psievent.h"
+ 
+ using namespace XMPP;
+ 
+@@ -70,12 +71,13 @@ public:
+ 
+ 	void error(int, const QString &);
+ 	void presence(const QString &, const Status &);
+-	void message(const Message &);
++	void message(const Message &, const PsiEvent::Ptr &e = PsiEvent::Ptr());
+ 	void joined();
+ 	void setPassword(const QString&);
  	const QString& nick() const;
  	const QString& topic() const;
  	const QDateTime& lastMsgTime() const;
@@ -119,7 +142,7 @@
  
  	bool isInactive() const;
  	void reactivate();
-@@ -100,6 +101,7 @@ protected:
+@@ -100,6 +102,7 @@ protected:
  
  signals:
  	void aSend(const Message &);
@@ -181,7 +204,7 @@
 +			if (activationType != FromXml) {
 +				GCMainDlg *c = findDialog<GCMainDlg*>(e->from());
 +				if (c) {
-+					c->message(m);
++					c->message(m, e);
 +					if (!c->isActiveTab() && c->isLastMessageAlert() && !m.spooled() && allowMucEvents)
 +						putToQueue = true;
 +				}
@@ -316,7 +339,7 @@
  	}
  
  	if ( isChat ) {
-@@ -1781,6 +1796,17 @@ void PsiCon::processEvent(const PsiEvent
+@@ -1780,6 +1795,17 @@ void PsiCon::processEvent(const PsiEvent
  	}
  #endif
  	else {
