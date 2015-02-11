@@ -32,7 +32,7 @@
  }
  
  QWidget *OptionsTabPlugins::widget()
-@@ -43,15 +41,17 @@ QWidget *OptionsTabPlugins::widget()
+@@ -43,41 +41,27 @@ QWidget *OptionsTabPlugins::widget()
  	w = new OptPluginsUI();
  	OptPluginsUI *d = (OptPluginsUI *)w;
  
@@ -58,10 +58,11 @@
  
  	return w;
  }
-@@ -60,24 +60,12 @@ void OptionsTabPlugins::applyOptions()
+ 
+ void OptionsTabPlugins::applyOptions()
  {
- 	if ( !w )
- 		return;
+-	if ( !w )
+-		return;
 -
 -	OptPluginsUI *d = (OptPluginsUI *)w;
 -	QString pluginName=d->cb_plugins->currentText();
@@ -71,8 +72,8 @@
  
  void OptionsTabPlugins::restoreOptions()
  {
- 	if ( !w )
- 		return;
+-	if ( !w )
+-		return;
 -
 -	OptPluginsUI *d = (OptPluginsUI *)w;
 -
@@ -83,7 +84,13 @@
  }
  
  bool OptionsTabPlugins::stretchable() const
-@@ -93,96 +81,119 @@ void OptionsTabPlugins::listPlugins()
+@@ -88,101 +72,146 @@ bool OptionsTabPlugins::stretchable() co
+ 
+ void OptionsTabPlugins::listPlugins()
+ {
+-  	if ( !w )
++	if ( !w )
+ 		return;
  
  	OptPluginsUI *d = (OptPluginsUI *)w;
  
@@ -99,14 +106,16 @@
  		QIcon icon = pm->icon(plugin);
 -
 -		if (!pm->isEnabled(plugin)) {
++		bool enabled = pm->isEnabled(plugin);
++		QString path = pm->pathToPlugin(plugin);
++		Qt::CheckState state = enabled ? Qt::Checked : Qt::Unchecked;
 +		QTreeWidgetItem *item = new QTreeWidgetItem(QTreeWidgetItem::Type);
 +		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-+		bool enabled = pm->isEnabled(plugin);
 +		item->setText(C_NAME, plugin);
 +		item->setText(C_VERSION, pm->version(plugin));
 +		item->setTextAlignment(C_VERSION, Qt::AlignHCenter);
-+		item->setText(C_PATH, pm->pathToPlugin(plugin));
-+		Qt::CheckState state = enabled ? Qt::Checked : Qt::Unchecked;
++		item->setText(C_PATH, path);
++		item->setToolTip(C_PATH, path);
 +		item->setCheckState(C_NAME, state);
 +		if (!enabled) {
  			icon = QIcon(icon.pixmap(icon.availableSizes().at(0), QIcon::Disabled));
@@ -117,7 +126,9 @@
 +	}
 +	if (!plugList.isEmpty()) {
 +		d->tw_Plugins->addTopLevelItems(plugList);
-+		d->tw_Plugins->header()->resizeSection(C_NAME, 260);
++		d->tw_Plugins->resizeColumnToContents(C_NAME);
++		d->tw_Plugins->resizeColumnToContents(C_VERSION);
++		d->tw_Plugins->resizeColumnToContents(C_PATH);
  	}
 -	pluginSelected(0);
  }
@@ -125,10 +136,9 @@
 -void OptionsTabPlugins::loadToggled(bool state)
 +void OptionsTabPlugins::pluginSelected()
  {
--	if ( !w )
--		return;
--
- 	OptPluginsUI *d = (OptPluginsUI *)w;
+ 	if ( !w )
+ 		return;
++	OptPluginsUI *d = (OptPluginsUI *)w;
 +	bool enabled = d->tw_Plugins->currentItem()->checkState(C_NAME) == Qt::Checked;
 +	d->tb_aboutPlugin->setEnabled(true);
 +	d->tb_pluginSettings->setEnabled(enabled);
@@ -137,51 +147,45 @@
 +void OptionsTabPlugins::itemChanged(QTreeWidgetItem *item, int column)
 +{
 +	Q_UNUSED(column);
-+	OptPluginsUI *d = (OptPluginsUI *)w;
++	if ( !w )
++		return;
+ 	OptPluginsUI *d = (OptPluginsUI *)w;
 +	bool enabled = item->checkState(C_NAME) == Qt::Checked;
+ 
  	PluginManager *pm = PluginManager::instance();
 -	QString name = d->cb_plugins->currentText();
 -
 +	QString name = item->text(C_NAME);
-+	d->tb_pluginSettings->setEnabled(enabled);
-+	d->tw_Plugins->setCurrentItem(item);
  	QString option=QString("%1.%2")
  		.arg(PluginManager::loadOptionPrefix)
  		.arg(pm->shortName(name));
 -	PsiOptions::instance()->setOption(option, state);
--
+ 
 -	pluginSelected(0);
--
++	d->tb_pluginSettings->setEnabled(enabled);
++	d->tw_Plugins->setCurrentItem(item);
 +	PsiOptions::instance()->setOption(option, enabled);
+ 
 +	d->tw_Plugins->blockSignals(true); //Block signalls to set icon
  	QIcon icon = pm->icon(name);
 -	if (!pm->isEnabled(name)) {
 +	if (!enabled) {
  		icon = QIcon(icon.pixmap(icon.availableSizes().at(0), QIcon::Disabled));
  	}
--
--	d->cb_plugins->setItemIcon(d->cb_plugins->currentIndex(), icon);
--
 +	item->setIcon(C_NAME, icon);
 +	d->tw_Plugins->blockSignals(false); //Release signals blocking
- }
++}
  
--void OptionsTabPlugins::pluginSelected(int index)
+-	d->cb_plugins->setItemIcon(d->cb_plugins->currentIndex(), icon);
 +void OptionsTabPlugins::showPluginInfo()
- {
--	Q_UNUSED(index);
--  	if ( !w )
--		return;
--
- 	OptPluginsUI *d = (OptPluginsUI *)w;
--	d->le_location->setText(tr("No plugin selected."));
--	d->cb_loadPlugin->setEnabled(false);
--	d->pb_info->setEnabled(false);
--	if(infoDialog)
--		delete(infoDialog);
++{
++	if ( !w )
++		return;
++	OptPluginsUI *d = (OptPluginsUI *)w;
 +	if ( d->tw_Plugins->topLevelItemCount() > 0 ) {
 +		if(infoDialog)
-+			delete infoDialog;
++			delete(infoDialog);
+ 
 +		infoDialog = new QDialog();
 +		ui_.setupUi(infoDialog);
 +		QString name = d->tw_Plugins->currentItem()->text(C_NAME);
@@ -191,18 +195,29 @@
 +		infoDialog->setAttribute(Qt::WA_DeleteOnClose);
 +		infoDialog->show();
 +	}
-+}
+ }
  
+-void OptionsTabPlugins::pluginSelected(int index)
++void OptionsTabPlugins::settingsClicked()
+ {
+-	Q_UNUSED(index);
+-  	if ( !w )
++	if ( !w )
+ 		return;
+-
+ 	OptPluginsUI *d = (OptPluginsUI *)w;
+-	d->le_location->setText(tr("No plugin selected."));
+-	d->cb_loadPlugin->setEnabled(false);
+-	d->pb_info->setEnabled(false);
+-	if(infoDialog)
+-		delete(infoDialog);
+-
 -	if ( d->cb_plugins->count() > 0 ) {
 -		QString pluginName = d->cb_plugins->currentText();
 -		d->le_location->setText(PluginManager::instance()->pathToPlugin( pluginName ));
 -		d->cb_loadPlugin->setEnabled(true);
-+void OptionsTabPlugins::settingsClicked()
-+{
-+	OptPluginsUI *d = (OptPluginsUI *)w;
 +	if ( d->tw_Plugins->topLevelItemCount() > 0 ) {
-+		QTreeWidgetItem *item = d->tw_Plugins->currentItem();
-+		QString pluginName = item->text(C_NAME);
++		QString pluginName = d->tw_Plugins->currentItem()->text(C_NAME);
  		QWidget* pluginOptions = PluginManager::instance()->optionsWidget( pluginName );
 -		d->cb_plugins->setEnabled(true);
 -		d->version->setText(tr("Version: ")+PluginManager::instance()->version( pluginName ));
@@ -221,11 +236,16 @@
 -		//d->updateGeometry();
 -		d->pb_info->setEnabled(PluginManager::instance()->hasInfoProvider(d->cb_plugins->currentText()));
 +		if(settingsDialog)
-+			delete settingsDialog;
++			delete(settingsDialog);
++
 +		settingsDialog = new QDialog();
-+		settingsDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
 +		settsUi_.setupUi(settingsDialog);
++		settingsDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
++		settingsDialog->setWindowTitle(tr("%1 Settings").arg(pluginName));
 +		settsUi_.verticalLayout->insertWidget(0, pluginOptions);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Ok);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Apply);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Cancel);
 +		connect(settsUi_.buttonBox, SIGNAL(accepted()), this, SLOT(onSettingsOk()));
 +		connect(settsUi_.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(onSettingsClicked(QAbstractButton*)));
 +		if (pluginOptions->size().isValid()) {
@@ -249,6 +269,8 @@
 -		ui_.te_info->setText(PluginManager::instance()->pluginInfo(d->cb_plugins->currentText()));
 -		infoDialog->setAttribute(Qt::WA_DeleteOnClose);
 -		infoDialog->show();
++	if ( !w )
++		return;
 +	OptPluginsUI *d = (OptPluginsUI *)w;
 +	if (d->tw_Plugins->currentItem()->isSelected()) {
 +		PluginManager::instance()->applyOptions( d->tw_Plugins->currentItem()->text(C_NAME) );
@@ -285,9 +307,11 @@
  public:
  	OptionsTabPlugins(QObject *parent);
  	~OptionsTabPlugins();
-@@ -24,13 +31,19 @@ private:
+@@ -22,15 +29,20 @@ public:
+ 
+ private:
  	QWidget *w;
- 	QWidget *pluginWidget;
+-	QWidget *pluginWidget;
  	QPointer<QDialog> infoDialog;
 +	QPointer<QDialog> settingsDialog;
  	Ui::PluginInfoDialog ui_;
@@ -318,7 +342,7 @@
    <property name="geometry">
     <rect>
      <x>0</x>
-@@ -10,154 +10,126 @@
+@@ -10,154 +10,135 @@
      <height>400</height>
     </rect>
    </property>
@@ -460,6 +484,9 @@
 +        <property name="text">
 +         <string>Plugin Name</string>
 +        </property>
++        <property name="whatsThis">
++         <string>Available plugins</string>
++        </property>
 +        <property name="textAlignment">
 +         <set>AlignHCenter|AlignVCenter|AlignCenter</set>
 +        </property>
@@ -496,6 +523,9 @@
 +       </item>
 +       <item>
 +        <widget class="QToolButton" name="tb_aboutPlugin">
++         <property name="toolTip">
++          <string>Show about plugin dialog</string>
++         </property>
 +         <property name="text">
 +          <string>About....</string>
 +         </property>
@@ -519,6 +549,9 @@
 +       </item>
 +       <item>
 +        <widget class="QToolButton" name="tb_pluginSettings">
++         <property name="toolTip">
++          <string>Show plugin settings</string>
++         </property>
 +         <property name="text">
 +          <string>Settings</string>
 +         </property>
@@ -592,6 +625,9 @@
 +<ui version="4.0">
 + <class>PluginSettingsDialog</class>
 + <widget class="QDialog" name="PluginSettingsDialog">
++  <property name="windowModality">
++   <enum>Qt::NonModal</enum>
++  </property>
 +  <property name="geometry">
 +   <rect>
 +    <x>0</x>
@@ -600,14 +636,11 @@
 +    <height>37</height>
 +   </rect>
 +  </property>
-+  <property name="sizePolicy">
-+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-+    <horstretch>0</horstretch>
-+    <verstretch>0</verstretch>
-+   </sizepolicy>
-+  </property>
 +  <property name="windowTitle">
-+   <string>Dialog</string>
++   <string>SettingsDialog</string>
++  </property>
++  <property name="modal">
++   <bool>true</bool>
 +  </property>
 +  <layout class="QVBoxLayout" name="verticalLayout">
 +   <item>
@@ -616,7 +649,7 @@
 +      <enum>Qt::Horizontal</enum>
 +     </property>
 +     <property name="standardButtons">
-+      <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
++      <set>QDialogButtonBox::NoButton</set>
 +     </property>
 +     <property name="centerButtons">
 +      <bool>true</bool>
