@@ -1,6 +1,6 @@
 --- git.orig/iris/src/xmpp/xmpp-im/client.cpp
 +++ git/iris/src/xmpp/xmpp-im/client.cpp
-@@ -626,6 +626,7 @@ void Client::send(const QDomElement &x,
+@@ -628,6 +628,7 @@ void Client::send(const QDomElement &x,
  		//printf("bad stanza??\n");
  		return;
  	}
@@ -121,7 +121,7 @@
  #include "psirichtext.h"
  #include "psiwindowheader.h"
  #include "avatars.h"
-@@ -899,6 +902,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -904,6 +907,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  
  	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
@@ -132,7 +132,7 @@
  }
  
  GCMainDlg::~GCMainDlg()
-@@ -1962,6 +1969,14 @@ void GCMainDlg::setToolbuttons()
+@@ -1966,6 +1973,14 @@ void GCMainDlg::setToolbuttons()
  	PsiOptions *options = PsiOptions::instance();
  	QStringList actionsNames = options->getOption("options.ui.contactlist.toolbars.m1.actions").toStringList();
  	foreach (const QString &actionName, actionsNames) {
@@ -147,7 +147,7 @@
  		// Hack. separator action can be added only once.
  		if (actionName == "separator") {
  			ui_.toolbar->addSeparator();
-@@ -2123,6 +2138,12 @@ void GCMainDlg::buildMenu()
+@@ -2127,6 +2142,12 @@ void GCMainDlg::buildMenu()
  	d->pm_settings->addAction(d->actions->action("gchat_ps"));
  	d->pm_settings->addAction(d->act_nick);
  	d->pm_settings->addAction(d->act_bookmark);
@@ -162,27 +162,35 @@
  void GCMainDlg::chatEditCreated()
 --- git.orig/src/options/options.pri
 +++ git/src/options/options.pri
-@@ -79,7 +79,8 @@ FORMS += \
+@@ -79,7 +79,9 @@ FORMS += \
  	$$PWD/opt_iconset_roster.ui \
  	$$PWD/opt_general_groupchat.ui \
  	$$PWD/opt_shortcuts.ui \
 -	$$PWD/opt_statuspep.ui
 +	$$PWD/opt_statuspep.ui \
-+	$$PWD/plugininfodialog.ui
++	$$PWD/plugininfodialog.ui \
++	$$PWD/pluginsettsdialog.ui
  
  psi_plugins {
  	FORMS += $$PWD/opt_plugins.ui
 --- git.orig/src/options/opt_plugins.cpp
 +++ git/src/options/opt_plugins.cpp
-@@ -3,6 +3,7 @@
+@@ -3,12 +3,10 @@
  #include "iconwidget.h"
  #include "pluginmanager.h"
  #include "psioptions.h"
 +#include "psiiconset.h"
  
  #include <QWhatsThis>
- #include <QCheckBox>
-@@ -23,13 +24,15 @@ public:
+-#include <QCheckBox>
+-#include <QComboBox>
+-#include <QButtonGroup>
+-#include <QRadioButton>
++#include <QToolButton>
+ 
+ #include "ui_opt_plugins.h"
+ 
+@@ -23,13 +21,17 @@ public:
  //----------------------------------------------------------------------------
  
  OptionsTabPlugins::OptionsTabPlugins(QObject *parent)
@@ -197,28 +205,24 @@
  {
 +	if(infoDialog)
 +		delete(infoDialog);
++	if(settingsDialog)
++		delete(settingsDialog);
  }
  
  QWidget *OptionsTabPlugins::widget()
-@@ -40,39 +43,49 @@ QWidget *OptionsTabPlugins::widget()
- 	w = new OptPluginsUI();
+@@ -41,117 +43,179 @@ QWidget *OptionsTabPlugins::widget()
  	OptPluginsUI *d = (OptPluginsUI *)w;
  
--	listPlugins();
+ 	listPlugins();
 -
-+	d->pb_info->setIcon(QIcon(IconsetFactory::iconPixmap("psi/info")));
-+	d->cb_plugins->setMaxVisibleItems(50);
-+	d->cb_loadPlugin->setProperty("isOption", false);
- 
+-
 -	/*d->ck_messageevents->setWhatsThis(
 -		tr("Enables the sending and requesting of message events such as "
 -		"'Contact is Typing', ..."));*/
-+	listPlugins();
- 
- 	connect(d->cb_plugins,SIGNAL(currentIndexChanged(int)),SLOT(pluginSelected(int)));
+-
+-	connect(d->cb_plugins,SIGNAL(currentIndexChanged(int)),SLOT(pluginSelected(int)));
 -	connect(d->cb_loadPlugin,SIGNAL(stateChanged(int)),SLOT(loadToggled(int)));
-+	connect(d->cb_loadPlugin,SIGNAL(clicked(bool)),SLOT(loadToggled(bool)));
-+	connect(d->pb_info, SIGNAL(clicked()), SLOT(showPluginInfo()));
++	connect(d->tw_Plugins, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(itemChanged(QTreeWidgetItem*,int)));
  
  	return w;
  }
@@ -226,33 +230,24 @@
 -void OptionsTabPlugins::applyOptions(Options *opt)
 +void OptionsTabPlugins::applyOptions()
  {
- 	if ( !w )
- 		return;
- 
- 	OptPluginsUI *d = (OptPluginsUI *)w;
+-	if ( !w )
+-		return;
+-
+-	OptPluginsUI *d = (OptPluginsUI *)w;
 -	Q_UNUSED(d);
 -	Q_UNUSED(opt);
-+	QString pluginName=d->cb_plugins->currentText();
-+	if(d->cb_loadPlugin->isChecked())
-+		PluginManager::instance()->applyOptions( pluginName );
  }
  
 -void OptionsTabPlugins::restoreOptions(const Options *opt)
 +void OptionsTabPlugins::restoreOptions()
  {
- 	if ( !w )
- 		return;
+-	if ( !w )
+-		return;
++}
  
- 	OptPluginsUI *d = (OptPluginsUI *)w;
+-	OptPluginsUI *d = (OptPluginsUI *)w;
 -	Q_UNUSED(opt);
 -	Q_UNUSED(d);
-+
-+	if(d->cb_loadPlugin->isChecked()) {
-+		QString pluginName=d->cb_plugins->currentText();
-+		PluginManager::instance()->restoreOptions( pluginName );
-+	}
-+}
-+
 +bool OptionsTabPlugins::stretchable() const
 +{
 +	return true;
@@ -261,8 +256,14 @@
 +
  void OptionsTabPlugins::listPlugins()
  {
-   	if ( !w )
-@@ -84,26 +97,43 @@ void OptionsTabPlugins::listPlugins()
+-  	if ( !w )
++	if ( !w )
+ 		return;
+ 
+ 	OptPluginsUI *d = (OptPluginsUI *)w;
+ 
+-	d->cb_plugins->clear();
++	d->tw_Plugins->clear();
  
  	PluginManager *pm=PluginManager::instance();
  
@@ -271,71 +272,138 @@
 -		d->cb_plugins->addItem(plugin);
 +	QStringList plugins = pm->availablePlugins();
 +	plugins.sort();
++	const QSize buttonSize = QSize(21,21);
 +	foreach (const QString& plugin, plugins){
 +		QIcon icon = pm->icon(plugin);
-+
-+		if (!pm->isEnabled(plugin)) {
++		bool enabled = pm->isEnabled(plugin);
++		const QString path = pm->pathToPlugin(plugin);
++		QString toolTip = tr("Plugin Path:\n%1").arg(path);
++		Qt::CheckState state = enabled ? Qt::Checked : Qt::Unchecked;
++		QTreeWidgetItem *item = new QTreeWidgetItem(d->tw_Plugins, QTreeWidgetItem::Type);
++		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
++		item->setText(C_NAME, plugin);
++		item->setText(C_VERSION, pm->version(plugin));
++		item->setTextAlignment(C_VERSION, Qt::AlignHCenter);
++		item->setToolTip(C_NAME, toolTip);
++		item->setCheckState(C_NAME, state);
++		if (!enabled) {
 +			icon = QIcon(icon.pixmap(icon.availableSizes().at(0), QIcon::Disabled));
 +		}
-+		d->cb_plugins->addItem(icon, plugin);
++		item->setIcon(C_NAME,icon);
++		QString shortName = PluginManager::instance()->shortName(plugin);
++
++		QToolButton *aboutbutton = new QToolButton(d->tw_Plugins);
++		aboutbutton->setIcon(QIcon(IconsetFactory::iconPixmap("psi/info")));
++		aboutbutton->resize(buttonSize);
++		aboutbutton->setObjectName("ab_" + shortName);
++		aboutbutton->setToolTip(tr("Show information about plugin"));
++		connect(aboutbutton, SIGNAL(clicked()), this, SLOT(showPluginInfo()));
++		d->tw_Plugins->setItemWidget(item, C_ABOUT, aboutbutton);
++
++		QToolButton *settsbutton = new QToolButton(d->tw_Plugins);
++		settsbutton->setIcon(QIcon(IconsetFactory::iconPixmap("psi/options")));
++		settsbutton->resize(buttonSize);
++		settsbutton->setObjectName("sb_" + shortName);
++		settsbutton->setToolTip(tr("Open plugin settings dialog"));
++		connect(settsbutton, SIGNAL(clicked()), this, SLOT(settingsClicked()));
++		settsbutton->setEnabled(enabled);
++		d->tw_Plugins->setItemWidget(item, C_SETTS, settsbutton);
++	}
++	if (d->tw_Plugins->topLevelItemCount() > 0) {
++		d->tw_Plugins->header()->setResizeMode(C_NAME, QHeaderView::Stretch);
++		d->tw_Plugins->resizeColumnToContents(C_VERSION);
++		d->tw_Plugins->resizeColumnToContents(C_ABOUT);
++		d->tw_Plugins->resizeColumnToContents(C_SETTS);
  	}
- 	pluginSelected(0);
+-	pluginSelected(0);
  }
  
 -void OptionsTabPlugins::loadToggled(int state)
-+void OptionsTabPlugins::loadToggled(bool state)
++void OptionsTabPlugins::itemChanged(QTreeWidgetItem *item, int column)
  {
 -	Q_UNUSED(state);
++	Q_UNUSED(column);
  	if ( !w )
  		return;
- 
+-
  	OptPluginsUI *d = (OptPluginsUI *)w;
++	bool enabled = item->checkState(C_NAME) == Qt::Checked;
++	d->tw_Plugins->setCurrentItem(item);
  
 +	PluginManager *pm = PluginManager::instance();
-+	QString name = d->cb_plugins->currentText();
-+
++	QString name = item->text(C_NAME);
  	QString option=QString("%1.%2")
  		.arg(PluginManager::loadOptionPrefix)
 -		.arg(PluginManager::instance()->shortName(d->cb_plugins->currentText()));
 -	bool value=d->cb_loadPlugin->isChecked();
 -	PsiOptions::instance()->setOption(option, value);
 +		.arg(pm->shortName(name));
-+	PsiOptions::instance()->setOption(option, state);
++	PsiOptions::instance()->setOption(option, enabled);
 +
-+	pluginSelected(0);
-+
++	d->tw_Plugins->blockSignals(true); //Block signalls to change item elements
++	d->tw_Plugins->itemWidget(item, C_SETTS)->setEnabled(enabled);
 +	QIcon icon = pm->icon(name);
-+	if (!pm->isEnabled(name)) {
++	if (!enabled) {
 +		icon = QIcon(icon.pixmap(icon.availableSizes().at(0), QIcon::Disabled));
 +	}
-+
-+	d->cb_plugins->setItemIcon(d->cb_plugins->currentIndex(), icon);
-+
++	item->setIcon(C_NAME, icon);
++	d->tw_Plugins->blockSignals(false); //Release signals blocking
  }
  
- void OptionsTabPlugins::pluginSelected(int index)
-@@ -115,43 +145,44 @@ void OptionsTabPlugins::pluginSelected(i
+-void OptionsTabPlugins::pluginSelected(int index)
++void OptionsTabPlugins::showPluginInfo()
+ {
+-	Q_UNUSED(index);
+-  	if ( !w )
++	if ( !w )
++		return;
++	OptPluginsUI *d = (OptPluginsUI *)w;
++	QToolButton *btn = qobject_cast<QToolButton*>(sender());
++	const QPoint coords = QPoint(btn->x(),btn->y());
++	d->tw_Plugins->setCurrentItem(d->tw_Plugins->itemAt(coords));
++	if ( d->tw_Plugins->selectedItems().size() > 0 ) {
++		if(infoDialog)
++			delete(infoDialog);
++
++		infoDialog = new QDialog();
++		ui_.setupUi(infoDialog);
++		QString name = d->tw_Plugins->currentItem()->text(C_NAME);
++		infoDialog->setWindowTitle(infoDialog->windowTitle() + " " + name);
++		infoDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
++		ui_.te_info->setText(PluginManager::instance()->pluginInfo(name));
++		infoDialog->setAttribute(Qt::WA_DeleteOnClose);
++		infoDialog->show();
++	}
++}
++
++void OptionsTabPlugins::settingsClicked()
++{
++	if ( !w )
+ 		return;
+ 
  	OptPluginsUI *d = (OptPluginsUI *)w;
- 	d->le_location->setText(tr("No plugin selected."));
- 	d->cb_loadPlugin->setEnabled(false);
+-	d->le_location->setText(tr("No plugin selected."));
+-	d->cb_loadPlugin->setEnabled(false);
 -	delete d->pluginOptions;
 -	d->pluginOptions = new QLabel(tr("This plugin has no user configurable options"));
-+	d->pb_info->setEnabled(false);
-+	if(infoDialog)
-+		delete(infoDialog);
- 
- 	if ( d->cb_plugins->count() > 0 ) {
--		QString pluginName=d->cb_plugins->currentText();
-+		QString pluginName = d->cb_plugins->currentText();
- 		d->le_location->setText(PluginManager::instance()->pathToPlugin( pluginName ));
- 		d->cb_loadPlugin->setEnabled(true);
- 		QWidget* pluginOptions = PluginManager::instance()->optionsWidget( pluginName );
- 		d->cb_plugins->setEnabled(true);
 -
-+		d->version->setText(tr("Version: ")+PluginManager::instance()->version( pluginName ));
- 		QString option=QString("%1.%2")
- 			.arg(PluginManager::loadOptionPrefix)
- 			.arg(PluginManager::instance()->shortName(pluginName));
+-	if ( d->cb_plugins->count() > 0 ) {
+-		QString pluginName=d->cb_plugins->currentText();
+-		d->le_location->setText(PluginManager::instance()->pathToPlugin( pluginName ));
+-		d->cb_loadPlugin->setEnabled(true);
++	QToolButton *btn = qobject_cast<QToolButton*>(sender());
++	const QPoint coords = QPoint(btn->x(),btn->y());
++	d->tw_Plugins->setCurrentItem(d->tw_Plugins->itemAt(coords));
++	if ( d->tw_Plugins->selectedItems().size() > 0 ) {
++		QString pluginName = d->tw_Plugins->currentItem()->text(C_NAME);
+ 		QWidget* pluginOptions = PluginManager::instance()->optionsWidget( pluginName );
+-		d->cb_plugins->setEnabled(true);
++		PluginManager::instance()->restoreOptions( pluginName );
++		pluginOptions->setParent(d);
+ 
+-		QString option=QString("%1.%2")
+-			.arg(PluginManager::loadOptionPrefix)
+-			.arg(PluginManager::instance()->shortName(pluginName));
 -		int value=PsiOptions::instance()->getOption(option, false).toBool();
 -		if (value)
 -			value=Qt::Checked;
@@ -357,47 +425,69 @@
 -			d->pluginOptions = new QLabel(tr("This plugin has no user configurable options"),d);
 -			qWarning("Plugin has no options");
 -		}
--
--		d->vboxLayout1->addWidget(d->pluginOptions);
-+		d->cb_loadPlugin->setChecked(PsiOptions::instance()->getOption(option, false).toBool());
-+		pluginOptions->setParent(d);
-+#ifndef PLUGINS_NO_DEBUG
-+		qDebug("Showing Plugin options");
-+#endif
-+		d->vboxLayout1->addWidget(pluginOptions);
-+		emit connectDataChanged(w);
- 		//d->pluginOptions->show();
- 		//d->updateGeometry();
-+		d->pb_info->setEnabled(PluginManager::instance()->hasInfoProvider(d->cb_plugins->currentText()));
++		if(settingsDialog)
++			delete(settingsDialog);
++
++		settingsDialog = new QDialog();
++		settsUi_.setupUi(settingsDialog);
++		settingsDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
++		settingsDialog->setWindowTitle(tr("Settings of %1").arg(pluginName));
++		settsUi_.verticalLayout->insertWidget(0, pluginOptions);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Ok);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Apply);
++		settsUi_.buttonBox->addButton(QDialogButtonBox::Cancel);
++		connect(settsUi_.buttonBox, SIGNAL(accepted()), this, SLOT(onSettingsOk()));
++		connect(settsUi_.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(onSettingsClicked(QAbstractButton*)));
++		settingsDialog->adjustSize();
++		settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
++		settingsDialog->show();
 +	}
 +}
 +
-+void OptionsTabPlugins::showPluginInfo()
++void OptionsTabPlugins::onSettingsOk()
 +{
-+	if(infoDialog)
-+		infoDialog->raise();
-+	else {
-+		OptPluginsUI *d = (OptPluginsUI *)w;
-+		infoDialog = new QDialog();
-+		infoDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
-+		ui_.setupUi(infoDialog);
-+		ui_.te_info->setText(PluginManager::instance()->pluginInfo(d->cb_plugins->currentText()));
-+		infoDialog->setAttribute(Qt::WA_DeleteOnClose);
-+		infoDialog->show();
++	if ( !w )
++		return;
++	OptPluginsUI *d = (OptPluginsUI *)w;
++	if (d->tw_Plugins->currentItem()->isSelected()) {
++		PluginManager::instance()->applyOptions( d->tw_Plugins->currentItem()->text(C_NAME) );
++	}
++}
+ 
+-		d->vboxLayout1->addWidget(d->pluginOptions);
+-		//d->pluginOptions->show();
+-		//d->updateGeometry();
++void OptionsTabPlugins::onSettingsClicked(QAbstractButton *button)
++{
++	if (settsUi_.buttonBox->buttonRole(button) == QDialogButtonBox::ApplyRole) {
++		onSettingsOk();
  	}
  }
 --- git.orig/src/options/opt_plugins.h
 +++ git/src/options/opt_plugins.h
-@@ -2,6 +2,8 @@
+@@ -2,6 +2,10 @@
  #define OPT_PLUGINS_H
  
  #include "optionstab.h"
 +#include "ui_plugininfodialog.h"
++#include "ui_pluginsettsdialog.h"
 +#include <QPointer>
++#include <QTreeWidgetItem>
  
  class QWidget;
  class Options;
-@@ -14,17 +16,21 @@ public:
+@@ -9,22 +13,35 @@ class Options;
+ class OptionsTabPlugins : public OptionsTab
+ {
+ 	Q_OBJECT
++	enum ColumnName {
++		C_NAME = 0,
++		C_VERSION = 1,
++		C_ABOUT = 2,
++		C_SETTS = 3
++	};
+ public:
+ 	OptionsTabPlugins(QObject *parent);
  	~OptionsTabPlugins();
  
  	QWidget *widget();
@@ -409,22 +499,27 @@
  
  private:
  	QWidget *w;
- 	QWidget *pluginWidget;
+-	QWidget *pluginWidget;
 +	QPointer<QDialog> infoDialog;
++	QPointer<QDialog> settingsDialog;
 +	Ui::PluginInfoDialog ui_;
++	Ui::PluginSettingsDialog settsUi_;
  
  private slots:
  	void listPlugins();
- 	void pluginSelected(int index);
+-	void pluginSelected(int index);
 -	void loadToggled(int state);
 +	void showPluginInfo();
-+	void loadToggled(bool state);
++	void itemChanged(QTreeWidgetItem *item, int column);
++	void settingsClicked();
++	void onSettingsOk();
++	void onSettingsClicked(QAbstractButton* button);
  };
  
  #endif
 --- git.orig/src/options/opt_plugins.ui
 +++ git/src/options/opt_plugins.ui
-@@ -1,72 +1,91 @@
+@@ -1,133 +1,98 @@
 -<ui version="4.0" >
 - <author></author>
 - <comment></comment>
@@ -432,8 +527,9 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
   <class>OptPlugins</class>
-  <widget class="QWidget" name="OptPlugins" >
+- <widget class="QWidget" name="OptPlugins" >
 -  <property name="geometry" >
++ <widget class="QWidget" name="OptPlugins">
 +  <property name="geometry">
     <rect>
      <x>0</x>
@@ -443,13 +539,14 @@
      <height>400</height>
     </rect>
    </property>
-   <property name="windowTitle" >
+-  <property name="windowTitle" >
++  <property name="windowTitle">
     <string>OptPluginsUI</string>
    </property>
 -  <layout class="QVBoxLayout" >
 -   <property name="margin" >
 -    <number>9</number>
-+  <layout class="QVBoxLayout" stretch="0,0,1,0">
++  <layout class="QVBoxLayout" stretch="0">
 +   <property name="bottomMargin">
 +    <number>3</number>
     </property>
@@ -477,108 +574,66 @@
 -     </property>
 -    </widget>
 -   </item>
-    <item>
+-   <item>
 -    <widget class="QLineEdit" name="le_location" >
 -     <property name="enabled" >
 -      <bool>false</bool>
 -     </property>
 -     <property name="text" >
 -      <string>No plugin selected</string>
-+    <layout class="QHBoxLayout">
-+     <property name="spacing">
-+      <number>6</number>
-      </property>
+-     </property>
 -    </widget>
 -   </item>
--   <item>
+    <item>
 -    <layout class="QHBoxLayout" >
 -     <property name="margin" >
-+     <property name="margin">
-       <number>0</number>
-      </property>
+-      <number>0</number>
+-     </property>
 -     <property name="spacing" >
 -      <number>6</number>
 -     </property>
++    <layout class="QVBoxLayout" name="mainLayout">
       <item>
 -      <widget class="QCheckBox" name="cb_loadPlugin" >
 -       <property name="enabled" >
-+      <widget class="QLabel" name="TextLabel2">
-+       <property name="maximumSize">
-+        <size>
-+         <width>16777215</width>
-+         <height>16777215</height>
-+        </size>
++      <widget class="QTreeWidget" name="tw_Plugins">
++       <property name="layoutDirection">
++        <enum>Qt::LeftToRight</enum>
 +       </property>
-+       <property name="text">
-+        <string>Plugin Name:</string>
++       <property name="horizontalScrollBarPolicy">
++        <enum>Qt::ScrollBarAlwaysOff</enum>
 +       </property>
-+      </widget>
-+     </item>
-+     <item>
-+      <widget class="QComboBox" name="cb_plugins">
-+       <property name="enabled">
++       <property name="editTriggers">
++        <set>QAbstractItemView::NoEditTriggers</set>
++       </property>
++       <property name="showDropIndicator" stdset="0">
          <bool>false</bool>
         </property>
 -       <property name="text" >
-+       <property name="isOption" stdset="0">
-+        <bool>false</bool>
-+       </property>
-+      </widget>
-+     </item>
-+     <item>
-+      <widget class="QPushButton" name="pb_info">
-+       <property name="sizePolicy">
-+        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-+         <horstretch>27</horstretch>
-+         <verstretch>27</verstretch>
-+        </sizepolicy>
-+       </property>
-+       <property name="maximumSize">
-+        <size>
-+         <width>27</width>
-+         <height>27</height>
-+        </size>
-+       </property>
-+       <property name="text">
-+        <string></string>
-+       </property>
-+      </widget>
-+     </item>
-+     <item>
-+      <widget class="QLabel" name="version">
-+       <property name="sizePolicy">
-+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-+         <horstretch>0</horstretch>
-+         <verstretch>0</verstretch>
-+        </sizepolicy>
-+       </property>
-+       <property name="text">
-+        <string>Version: 0</string>
-+       </property>
-+      </widget>
-+     </item>
-+     <item>
-+      <widget class="QCheckBox" name="cb_loadPlugin">
-+       <property name="enabled">
-+        <bool>false</bool>
-+       </property>
-+       <property name="text">
-         <string>Load this plugin</string>
+-        <string>Load this plugin</string>
++       <property name="alternatingRowColors">
++        <bool>true</bool>
         </property>
-       </widget>
-@@ -76,7 +95,7 @@
-        <property name="orientation" >
-         <enum>Qt::Horizontal</enum>
-        </property>
+-      </widget>
+-     </item>
+-     <item>
+-      <spacer>
+-       <property name="orientation" >
+-        <enum>Qt::Horizontal</enum>
+-       </property>
 -       <property name="sizeHint" >
-+       <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-@@ -87,29 +106,40 @@
-     </layout>
-    </item>
-    <item>
+-        <size>
+-         <width>40</width>
+-         <height>20</height>
+-        </size>
++       <property name="rootIsDecorated">
++        <bool>false</bool>
+        </property>
+-      </spacer>
+-     </item>
+-    </layout>
+-   </item>
+-   <item>
 -    <spacer>
 -     <property name="orientation" >
 -      <enum>Qt::Vertical</enum>
@@ -590,64 +645,88 @@
 -      </size>
 -     </property>
 -    </spacer>
-+    <layout class="QHBoxLayout">
-+     <item>
-+      <widget class="QLabel" name="label">
-+       <property name="text">
-+        <string>Plugin Location:</string>
-+       </property>
-+      </widget>
-+     </item>
-+     <item>
-+      <widget class="QLineEdit" name="le_location">
-+       <property name="enabled">
-+        <bool>true</bool>
-+       </property>
-+       <property name="text">
-+        <string>No plugin selected</string>
-+       </property>
-+       <property name="readOnly">
-+        <bool>true</bool>
-+       </property>
-+       <property name="isOption" stdset="0">
-+        <bool>false</bool>
-+       </property>
-+      </widget>
-+     </item>
-+    </layout>
-    </item>
-    <item>
+-   </item>
+-   <item>
 -    <layout class="QVBoxLayout" >
 -     <property name="margin" >
 -      <number>0</number>
 -     </property>
 -     <property name="spacing" >
-+    <layout class="QVBoxLayout" name="vboxLayout1">
-+     <property name="spacing">
-       <number>6</number>
-      </property>
+-      <number>6</number>
+-     </property>
 -     <item>
 -      <widget class="QWidget" name="pluginOptions" />
--     </item>
-+     <property name="margin">
-+      <number>0</number>
-+     </property>
++       <property name="itemsExpandable">
++        <bool>false</bool>
++       </property>
++       <property name="expandsOnDoubleClick">
++        <bool>false</bool>
++       </property>
++       <attribute name="headerVisible">
++        <bool>false</bool>
++       </attribute>
++       <attribute name="headerDefaultSectionSize">
++        <number>100</number>
++       </attribute>
++       <attribute name="headerMinimumSectionSize">
++        <number>21</number>
++       </attribute>
++       <attribute name="headerStretchLastSection">
++        <bool>false</bool>
++       </attribute>
++       <column>
++        <property name="text">
++         <string>Plugin Name</string>
++        </property>
++        <property name="whatsThis">
++         <string>Available plugins</string>
++        </property>
++        <property name="textAlignment">
++         <set>AlignHCenter|AlignVCenter|AlignCenter</set>
++        </property>
++       </column>
++       <column>
++        <property name="text">
++         <string>Version</string>
++        </property>
++        <property name="textAlignment">
++         <set>AlignHCenter|AlignVCenter|AlignCenter</set>
++        </property>
++       </column>
++       <column>
++        <property name="text">
++         <string>A</string>
++        </property>
++       </column>
++       <column>
++        <property name="text">
++         <string>S</string>
++        </property>
++       </column>
++      </widget>
+      </item>
      </layout>
     </item>
-    <item>
-@@ -117,10 +147,10 @@
-      <property name="orientation" >
-       <enum>Qt::Vertical</enum>
-      </property>
+-   <item>
+-    <spacer>
+-     <property name="orientation" >
+-      <enum>Qt::Vertical</enum>
+-     </property>
 -     <property name="sizeHint" >
-+     <property name="sizeHint" stdset="0">
-       <size>
-        <width>20</width>
+-      <size>
+-       <width>20</width>
 -       <height>40</height>
-+       <height>0</height>
-       </size>
-      </property>
-     </spacer>
+-      </size>
+-     </property>
+-    </spacer>
+-   </item>
+   </layout>
+  </widget>
+- <layoutdefault spacing="6" margin="11" />
++ <layoutdefault spacing="6" margin="11"/>
+  <resources/>
+  <connections/>
+ </ui>
 --- git.orig/src/options/plugininfodialog.ui
 +++ git/src/options/plugininfodialog.ui
 @@ -0,0 +1,96 @@
@@ -682,7 +761,7 @@
 +   </size>
 +  </property>
 +  <property name="windowTitle">
-+   <string>Information</string>
++   <string>About</string>
 +  </property>
 +  <layout class="QVBoxLayout" name="verticalLayout">
 +   <item>
@@ -742,6 +821,82 @@
 +    <hint type="destinationlabel">
 +     <x>199</x>
 +     <y>149</y>
++    </hint>
++   </hints>
++  </connection>
++ </connections>
++</ui>
+--- git.orig/src/options/pluginsettsdialog.ui
++++ git/src/options/pluginsettsdialog.ui
+@@ -0,0 +1,73 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>PluginSettingsDialog</class>
++ <widget class="QDialog" name="PluginSettingsDialog">
++  <property name="windowModality">
++   <enum>Qt::NonModal</enum>
++  </property>
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>266</width>
++    <height>37</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>SettingsDialog</string>
++  </property>
++  <property name="modal">
++   <bool>true</bool>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <widget class="QDialogButtonBox" name="buttonBox">
++     <property name="orientation">
++      <enum>Qt::Horizontal</enum>
++     </property>
++     <property name="standardButtons">
++      <set>QDialogButtonBox::NoButton</set>
++     </property>
++     <property name="centerButtons">
++      <bool>true</bool>
++     </property>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections>
++  <connection>
++   <sender>buttonBox</sender>
++   <signal>accepted()</signal>
++   <receiver>PluginSettingsDialog</receiver>
++   <slot>accept()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>248</x>
++     <y>254</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>157</x>
++     <y>274</y>
++    </hint>
++   </hints>
++  </connection>
++  <connection>
++   <sender>buttonBox</sender>
++   <signal>rejected()</signal>
++   <receiver>PluginSettingsDialog</receiver>
++   <slot>reject()</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>316</x>
++     <y>260</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>286</x>
++     <y>274</y>
 +    </hint>
 +   </hints>
 +  </connection>
