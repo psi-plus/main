@@ -285,7 +285,7 @@
  }
  
  QWidget *OptionsTabPlugins::widget()
-@@ -41,117 +43,177 @@ QWidget *OptionsTabPlugins::widget()
+@@ -41,117 +43,179 @@ QWidget *OptionsTabPlugins::widget()
  	OptPluginsUI *d = (OptPluginsUI *)w;
  
  	listPlugins();
@@ -470,7 +470,9 @@
 +	const QPoint coords(btn->x(),btn->y());
 +	d->tw_Plugins->setCurrentItem(d->tw_Plugins->itemAt(coords));
 +	if ( d->tw_Plugins->selectedItems().size() > 0 ) {
-+		QString pluginName = d->tw_Plugins->currentItem()->text(C_NAME);
++		const QString pluginName = d->tw_Plugins->currentItem()->text(C_NAME);
++		const QString shortName = PluginManager::instance()->shortName(pluginName);
++		const QString geometryOption = QString("plugins.options.%1.dialog-size").arg(shortName);
  		QWidget* pluginOptions = PluginManager::instance()->optionsWidget( pluginName );
 -		d->cb_plugins->setEnabled(true);
 +		PluginManager::instance()->restoreOptions( pluginName );
@@ -506,7 +508,7 @@
 -		d->vboxLayout1->addWidget(d->pluginOptions);
 -		//d->pluginOptions->show();
 -		//d->updateGeometry();
-+		settingsDialog = new QDialog(d);
++		settingsDialog = new AdvancedWidget<QDialog>(d);
 +		settsUi_.setupUi(settingsDialog);
 +		settingsDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
 +		settingsDialog->setWindowTitle(tr("Settings of %1").arg(pluginName));
@@ -515,7 +517,7 @@
 +		connect(settsUi_.buttonBox->button(QDialogButtonBox::Ok), SIGNAL(clicked()), this, SLOT(onSettingsOk()));
 +		connect(settsUi_.buttonBox->button(QDialogButtonBox::Apply), SIGNAL(clicked()), this, SLOT(onSettingsOk()));
 +		settsUi_.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
-+		settingsDialog->adjustSize();
++		settingsDialog->setGeometryOptionPath(geometryOption);
 +		settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 +		settingsDialog->show();
  	}
@@ -538,10 +540,11 @@
 +}
 --- git.orig/src/options/opt_plugins.h
 +++ git/src/options/opt_plugins.h
-@@ -2,6 +2,10 @@
+@@ -2,6 +2,11 @@
  #define OPT_PLUGINS_H
  
  #include "optionstab.h"
++#include "advwidget.h"
 +#include "ui_plugininfodialog.h"
 +#include "ui_pluginsettsdialog.h"
 +#include <QPointer>
@@ -549,7 +552,7 @@
  
  class QWidget;
  class Options;
-@@ -9,22 +13,35 @@ class Options;
+@@ -9,22 +14,35 @@ class Options;
  class OptionsTabPlugins : public OptionsTab
  {
  	Q_OBJECT
@@ -574,7 +577,7 @@
  	QWidget *w;
 -	QWidget *pluginWidget;
 +	QPointer<QDialog> infoDialog;
-+	QPointer<QDialog> settingsDialog;
++	QPointer<AdvancedWidget<QDialog> > settingsDialog;
 +	Ui::PluginInfoDialog ui_;
 +	Ui::PluginSettingsDialog settsUi_;
  
