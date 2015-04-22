@@ -1,15 +1,15 @@
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -4270,7 +4270,7 @@ void PsiAccount::actionHistoryBox(const
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -4276,7 +4276,7 @@ void PsiAccount::actionHistoryBox(const PsiEvent::Ptr &e)
  
- void PsiAccount::actionOpenChat(const Jid &j, const QString & body)
+ ChatDlg* PsiAccount::actionOpenChat(const Jid &j)
  {
 -	UserListItem *u = find(j);
 +	UserListItem *u = (findGCContact(j)) ? find(j) : find(j.bare());
  	if(!u) {
  		qWarning("[%s] not in userlist\n", qPrintable(j.full()));
- 		return;
-@@ -4278,7 +4278,7 @@ void PsiAccount::actionOpenChat(const Ji
+ 		return 0;
+@@ -4284,7 +4284,7 @@ ChatDlg* PsiAccount::actionOpenChat(const Jid &j)
  
  	// if 'j' is bare, we might want to switch to a specific resource
  	QString res;
@@ -18,7 +18,7 @@
  		// first, are there any queued chats?
  		/*PsiEvent *e = d->eventQueue->peekFirstChat(j, false);
  		if(e) {
-@@ -4616,7 +4616,7 @@ void PsiAccount::openUri(const QUrl &uri
+@@ -4624,7 +4624,7 @@ void PsiAccount::openUri(const QUrl &uriToOpen)
  		QString body = uri.queryItemValue("body");
  		QString type = uri.queryItemValue("type");
  		if (type == "chat" && subject.isEmpty()) {
@@ -26,4 +26,4 @@
 +			if (!find(entity.bare())) {
  				addUserListItem(entity);
  			}
- 			actionOpenChat(entity, body);
+ 			ChatDlg *dlg = actionOpenChat(entity);

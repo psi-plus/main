@@ -1,6 +1,6 @@
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
-@@ -112,6 +112,7 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
+--- a/src/chatdlg.cpp
++++ b/src/chatdlg.cpp
+@@ -112,6 +112,7 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
  	sendComposingEvents_ = false;
  	isComposing_ = false;
  	composingTimer_ = 0;
@@ -8,7 +8,7 @@
  }
  
  void ChatDlg::init()
-@@ -375,6 +376,7 @@ void ChatDlg::setJid(const Jid &j)
+@@ -366,6 +367,7 @@ void ChatDlg::setJid(const Jid &j)
  	if (!j.compare(jid())) {
  		account()->dialogUnregister(this);
  		TabbableWidget::setJid(j);
@@ -16,7 +16,7 @@
  		account()->dialogRegister(this, jid());
  		updateContact(jid(), false);
  	}
-@@ -643,6 +645,16 @@ void ChatDlg::invalidateTab()
+@@ -634,6 +636,16 @@ void ChatDlg::invalidateTab()
  	TabbableWidget::invalidateTab();
  }
  
@@ -33,12 +33,12 @@
  bool ChatDlg::isEncryptionEnabled() const
  {
  	return false;
---- git.orig/src/chatdlg.h
-+++ git/src/chatdlg.h
+--- a/src/chatdlg.h
++++ b/src/chatdlg.h
 @@ -75,6 +75,7 @@ public:
  public:
  	PsiAccount* account() const;
- 	void setText(const QString& );
+ 	void setInputText(const QString &text);
 +	Jid realJid() const;
  
  signals:
@@ -59,9 +59,9 @@
  
  	// Message Events & Chat States
  	QTimer* composingTimer_;
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -3595,6 +3595,20 @@ void PsiAccount::itemPublished(const Jid
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -3601,6 +3601,20 @@ void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem&
  	}*/
  }
  
@@ -82,8 +82,8 @@
  QList<UserListItem*> PsiAccount::findRelevant(const Jid &j) const
  {
  	QList<UserListItem*> list;
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
 @@ -204,6 +204,7 @@ public:
  	void groupChatChangeNick(const QString &host, const QString &room, const QString& nick, const Status &);
  	void groupChatLeave(const QString &host, const QString &room);
@@ -92,8 +92,8 @@
  	PsiContact* selfContact() const;
  	const QList<PsiContact*>& contactList() const;
  	int onlineContactsCount() const;
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -41,6 +41,7 @@
  #include "capsmanager.h"
  #include "psicontactlist.h"
@@ -102,7 +102,7 @@
  #include "jidutil.h"
  #include "xmpp_tasks.h"
  #include "lastactivitytask.h"
-@@ -171,6 +172,9 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
+@@ -171,6 +172,9 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
  		: ChatDlg(jid, pa, tabManager), mCmdManager_(&mCmdSite_), tabCompletion(&mCmdManager_)
  {
  	connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
@@ -120,7 +120,7 @@
  
  	// toolbuttons
  	QIcon i;
-@@ -356,6 +361,26 @@ void PsiChatDlg::updateIdentityVisibilit
+@@ -356,6 +361,26 @@ void PsiChatDlg::updateIdentityVisibility()
  	}
  }
  
@@ -180,8 +180,8 @@
  void PsiChatDlg::doMinimize()
  {
  	window()->showMinimized();
---- git.orig/src/psichatdlg.h
-+++ git/src/psichatdlg.h
+--- a/src/psichatdlg.h
++++ b/src/psichatdlg.h
 @@ -12,6 +12,7 @@
  #include "typeaheadfind.h"
  

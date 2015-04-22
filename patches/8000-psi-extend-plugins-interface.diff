@@ -1,6 +1,6 @@
---- git.orig/iris/src/xmpp/xmpp-im/client.cpp
-+++ git/iris/src/xmpp/xmpp-im/client.cpp
-@@ -628,6 +628,7 @@ void Client::send(const QDomElement &x,
+--- a/iris/src/xmpp/xmpp-im/client.cpp
++++ b/iris/src/xmpp/xmpp-im/client.cpp
+@@ -628,6 +628,7 @@ void Client::send(const QDomElement &x, bool want_notify)
  		//printf("bad stanza??\n");
  		return;
  	}
@@ -8,8 +8,8 @@
  	QString out = s.toString();
  	//qWarning() << "Out: " << out;
  	debug(QString("Client: outgoing: [\n%1]\n").arg(out));
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
-+++ git/iris/src/xmpp/xmpp-im/xmpp_client.h
+--- a/iris/src/xmpp/xmpp-im/xmpp_client.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
 @@ -151,6 +151,7 @@ namespace XMPP
  		void debugText(const QString &);
  		void xmlIncoming(const QString &);
@@ -18,8 +18,8 @@
  		void groupChatJoined(const Jid &);
  		void groupChatLeft(const Jid &);
  		void groupChatPresence(const Jid &, const Status &);
---- git.orig/src/applicationinfo.cpp
-+++ git/src/applicationinfo.cpp
+--- a/src/applicationinfo.cpp
++++ b/src/applicationinfo.cpp
 @@ -27,6 +27,7 @@
  
  #include "psiapplication.h"
@@ -40,8 +40,8 @@
  QString ApplicationInfo::IPCName()
  {
  	return PROG_IPC_NAME;
---- git.orig/src/applicationinfo.h
-+++ git/src/applicationinfo.h
+--- a/src/applicationinfo.h
++++ b/src/applicationinfo.h
 @@ -20,6 +20,7 @@ public:
  	static QString version();
  	static QString capsNode();
@@ -50,8 +50,8 @@
  	static QString IPCName();
  
  	// URLs
---- git.orig/src/chatdlg.h
-+++ git/src/chatdlg.h
+--- a/src/chatdlg.h
++++ b/src/chatdlg.h
 @@ -170,7 +170,11 @@ protected:
  
  	void appendMessage(const Message &, bool local = false);
@@ -64,8 +64,69 @@
  	virtual void nicksChanged();
  
  	QString whoNick(bool local) const;
---- git.orig/src/contactlistaccountmenu.cpp
-+++ git/src/contactlistaccountmenu.cpp
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -25,6 +25,7 @@
+ #include "psiiconset.h"
+ #include "applicationinfo.h"
+ #include "psioptions.h"
++#include "tabdlg.h"
+ 
+ #include <QUrl>
+ #include <QProcess>
+@@ -427,6 +428,32 @@ void reorderGridLayout(QGridLayout* layout, int maxCols)
+ 	}
+ }
+ 
++TabbableWidget* findActiveTab()
++{
++	QWidget* chat = QApplication::activeWindow();
++	TabbableWidget* tw = 0;
++	if(chat) {
++		TabDlg* td = qobject_cast<TabDlg*>(chat);
++		if(td) {
++			tw = td->getCurrentTab();
++		}
++		else {
++			tw = qobject_cast<TabbableWidget*>(chat);
++			if (!tw) {
++				QList<TabDlg*> tmp = chat->findChildren<TabDlg*>(); // all-in-one
++				while(!tmp.isEmpty()) {
++					TabDlg* td = tmp.takeFirst();
++					tw = td->getCurrentTab();
++					if(tw) {
++						break;
++					}
++				}
++			}
++		}
++	}
++	return tw;
++}
++
+ #ifdef HAVE_X11
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h> // needed for WM_CLASS hinting
+--- a/src/common.h
++++ b/src/common.h
+@@ -30,6 +30,7 @@
+ #include <QGridLayout>
+ 
+ class QMenu;
++class TabbableWidget;
+ 
+ #include "statuspreset.h"
+ 
+@@ -150,6 +151,7 @@ void clearMenu(QMenu *m); // deletes all items, including submenus, from given Q
+ void bringToFront(QWidget *w, bool grabFocus = true);
+ void replaceWidget(QWidget *, QWidget *);
+ void closeDialogs(QWidget *);
++TabbableWidget* findActiveTab();
+ #ifdef HAVE_X11
+ #include <QWidget>
+ #include "x11info.h"
+--- a/src/contactlistaccountmenu.cpp
++++ b/src/contactlistaccountmenu.cpp
 @@ -22,6 +22,8 @@
  
  #include <QPointer>
@@ -75,7 +136,7 @@
  #include "psiaccount.h"
  #include "contactlistaccountgroup.h"
  #include "accountstatusmenu.h"
-@@ -64,6 +66,7 @@ class ContactListAccountMenu::Private :
+@@ -64,6 +66,7 @@ class ContactListAccountMenu::Private : public QObject
  	QAction* adminUpdateMotdAction_;
  	QAction* adminDeleteMotdAction_;
  	QAction *doGroupChatAction_;
@@ -109,8 +170,8 @@
  	}
  
  	void statusChanged(XMPP::Status::Type statusType, bool forceDialog)
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
 @@ -85,6 +85,9 @@
  #include "mucreasonseditor.h"
  #include "mcmdmanager.h"
@@ -121,7 +182,7 @@
  #include "psirichtext.h"
  #include "psiwindowheader.h"
  #include "avatars.h"
-@@ -904,6 +907,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -904,6 +907,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  
  	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
@@ -160,96 +221,8 @@
  }
  
  void GCMainDlg::chatEditCreated()
---- git.orig/src/options/optionsdlg.cpp
-+++ git/src/options/optionsdlg.cpp
-@@ -196,6 +196,7 @@ private slots:
- 
- 	//void addWidgetChangedSignal(QString widgetName, QCString signal);
- 	void connectDataChanged(QWidget *);
-+	void connectSignalsToWidget(QWidget *, QObject *, const char *);
- 
- public:
- 	OptionsDlg *dlg;
-@@ -236,6 +237,9 @@ OptionsDlg::Private::Private(OptionsDlg
- 		//connect(opttab, SIGNAL(addWidgetChangedSignal(QString, QCString)), SLOT(addWidgetChangedSignal(QString, QCString)));
- 		connect(opttab, SIGNAL(noDirty(bool)), SLOT(noDirtySlot(bool)));
- 		connect(opttab, SIGNAL(connectDataChanged(QWidget *)), SLOT(connectDataChanged(QWidget *)));
-+		connect(opttab,
-+			SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
-+			SLOT(connectSignalsToWidget(QWidget*,QObject*,const char*)));
- 
- 		if ( opttab->id().isEmpty() )
- 			continue;
-@@ -444,6 +448,11 @@ void OptionsDlg::Private::enableCommonWi
- 
- void OptionsDlg::Private::connectDataChanged(QWidget *widget)
- {
-+	connectSignalsToWidget(widget, this, SLOT(dataChanged()));
-+}
-+
-+void OptionsDlg::Private::connectSignalsToWidget(QWidget *widget, QObject *object, const char *slot)
-+{
- 	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
- 		QVariant isOption = w->property("isOption");
- 		if (isOption.isValid() && !isOption.toBool()) {
-@@ -451,8 +460,8 @@ void OptionsDlg::Private::connectDataCha
- 		}
- 		QMap<QString, QByteArray>::Iterator it2 = changedMap.find( w->metaObject()->className() );
- 		if ( it2 != changedMap.end() ) {
--			disconnect(w, changedMap[w->metaObject()->className()], this, SLOT(dataChanged()));
--			connect(w, changedMap[w->metaObject()->className()], SLOT(dataChanged()));
-+			disconnect(w, changedMap[w->metaObject()->className()], object, slot);
-+			connect(w, changedMap[w->metaObject()->className()], object, slot);
- 		}
- 	}
- }
---- git.orig/src/options/options.pri
-+++ git/src/options/options.pri
-@@ -79,7 +79,9 @@ FORMS += \
- 	$$PWD/opt_iconset_roster.ui \
- 	$$PWD/opt_general_groupchat.ui \
- 	$$PWD/opt_shortcuts.ui \
--	$$PWD/opt_statuspep.ui
-+	$$PWD/opt_statuspep.ui \
-+	$$PWD/plugininfodialog.ui \
-+	$$PWD/pluginsettsdialog.ui
- 
- psi_plugins {
- 	FORMS += $$PWD/opt_plugins.ui
---- git.orig/src/options/optionstab.cpp
-+++ git/src/options/optionstab.cpp
-@@ -241,6 +241,9 @@ void MetaOptionsTab::addTab(OptionsTab *
- 	//connect(tab, SIGNAL(addWidgetChangedSignal(QString, QCString)), SIGNAL(addWidgetChangedSignal(QString, QCString)));
- 	connect(tab, SIGNAL(noDirty(bool)), SIGNAL(noDirty(bool)));
- 	connect(tab, SIGNAL(connectDataChanged(QWidget *)), SIGNAL(connectDataChanged(QWidget *)));
-+	connect(tab,
-+		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
-+		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)));
- 
- 	tabs.append(tab);
- }
-@@ -262,6 +265,9 @@ QWidget *MetaOptionsTab::widget()
- 
- 	connect(w, SIGNAL(connectDataChanged(QWidget *)), SIGNAL(connectDataChanged(QWidget *)));
- 	connect(w, SIGNAL(noDirty(bool)), SIGNAL(noDirty(bool)));
-+	connect(w,
-+		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
-+		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)));
- 
- 	foreach(OptionsTab* tab, tabs) {
- 		t->addTab(tab);
---- git.orig/src/options/optionstab.h
-+++ git/src/options/optionstab.h
-@@ -36,6 +36,7 @@ signals:
- 	//void addWidgetChangedSignal(QString widgetName, QCString signal);
- 	void noDirty(bool);
- 	void connectDataChanged(QWidget *);
-+	void connectSignalsToWidget(QWidget *, QObject *, const char *);
- 
- public slots:
- 	virtual void setData(PsiCon *, QWidget *parentDialog);
---- git.orig/src/options/opt_plugins.cpp
-+++ git/src/options/opt_plugins.cpp
+--- a/src/options/opt_plugins.cpp
++++ b/src/options/opt_plugins.cpp
 @@ -3,12 +3,11 @@
  #include "iconwidget.h"
  #include "pluginmanager.h"
@@ -428,10 +401,13 @@
 +	}
 +	item->setIcon(C_NAME, icon);
 +	d->tw_Plugins->blockSignals(false); //Release signals blocking
-+}
-+
+ }
+ 
+-void OptionsTabPlugins::pluginSelected(int index)
 +void OptionsTabPlugins::showPluginInfo()
-+{
+ {
+-	Q_UNUSED(index);
+-  	if ( !w )
 +	if ( !w || !sender()->inherits("QToolButton") )
 +		return;
 +	OptPluginsUI *d = (OptPluginsUI *)w;
@@ -451,13 +427,10 @@
 +		infoDialog->setAttribute(Qt::WA_DeleteOnClose);
 +		infoDialog->show();
 +	}
- }
- 
--void OptionsTabPlugins::pluginSelected(int index)
++}
++
 +void OptionsTabPlugins::settingsClicked()
- {
--	Q_UNUSED(index);
--  	if ( !w )
++{
 +	if ( !w || !sender()->inherits("QToolButton") )
  		return;
  
@@ -480,9 +453,7 @@
 +		const QString geometryOption = QString("plugins.options.%1.dialog-size").arg(shortName);
  		QWidget* pluginOptions = PluginManager::instance()->optionsWidget( pluginName );
 -		d->cb_plugins->setEnabled(true);
-+		PluginManager::instance()->restoreOptions( pluginName );
-+		pluginOptions->setParent(d);
- 
+-
 -		QString option=QString("%1.%2")
 -			.arg(PluginManager::loadOptionPrefix)
 -			.arg(PluginManager::instance()->shortName(pluginName));
@@ -507,12 +478,12 @@
 -			d->pluginOptions = new QLabel(tr("This plugin has no user configurable options"),d);
 -			qWarning("Plugin has no options");
 -		}
++		PluginManager::instance()->restoreOptions( pluginName );
++		pluginOptions->setParent(d);
++
 +		if( settingsDialog )
 +			delete(settingsDialog);
- 
--		d->vboxLayout1->addWidget(d->pluginOptions);
--		//d->pluginOptions->show();
--		//d->updateGeometry();
++
 +		settingsDialog = new AdvancedWidget<QDialog>(d);
 +		settsUi_.setupUi(settingsDialog);
 +		settingsDialog->setWindowIcon(QIcon(IconsetFactory::iconPixmap("psi/logo_128")));
@@ -525,9 +496,12 @@
 +		settingsDialog->setGeometryOptionPath(geometryOption);
 +		settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 +		settingsDialog->show();
- 	}
- }
-+
++	}
++}
+ 
+-		d->vboxLayout1->addWidget(d->pluginOptions);
+-		//d->pluginOptions->show();
+-		//d->updateGeometry();
 +void OptionsTabPlugins::onSettingsOk()
 +{
 +	if ( !w )
@@ -535,16 +509,16 @@
 +	OptPluginsUI *d = (OptPluginsUI *)w;
 +	if ( d->tw_Plugins->currentItem()->isSelected() ) {
 +		PluginManager::instance()->applyOptions( d->tw_Plugins->currentItem()->text(C_NAME) );
-+	}
+ 	}
 +	settsUi_.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 +}
 +
 +void OptionsTabPlugins::onDataChanged()
 +{
 +	settsUi_.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(true);
-+}
---- git.orig/src/options/opt_plugins.h
-+++ git/src/options/opt_plugins.h
+ }
+--- a/src/options/opt_plugins.h
++++ b/src/options/opt_plugins.h
 @@ -2,6 +2,11 @@
  #define OPT_PLUGINS_H
  
@@ -598,8 +572,8 @@
  };
  
  #endif
---- git.orig/src/options/opt_plugins.ui
-+++ git/src/options/opt_plugins.ui
+--- a/src/options/opt_plugins.ui
++++ b/src/options/opt_plugins.ui
 @@ -1,133 +1,98 @@
 -<ui version="4.0" >
 - <author></author>
@@ -701,13 +675,15 @@
 -      <spacer>
 -       <property name="orientation" >
 -        <enum>Qt::Horizontal</enum>
--       </property>
++       <property name="rootIsDecorated">
++        <bool>false</bool>
+        </property>
 -       <property name="sizeHint" >
 -        <size>
 -         <width>40</width>
 -         <height>20</height>
 -        </size>
-+       <property name="rootIsDecorated">
++       <property name="itemsExpandable">
 +        <bool>false</bool>
         </property>
 -      </spacer>
@@ -737,9 +713,6 @@
 -     </property>
 -     <item>
 -      <widget class="QWidget" name="pluginOptions" />
-+       <property name="itemsExpandable">
-+        <bool>false</bool>
-+       </property>
 +       <property name="expandsOnDoubleClick">
 +        <bool>false</bool>
 +       </property>
@@ -808,8 +781,98 @@
   <resources/>
   <connections/>
  </ui>
---- git.orig/src/options/plugininfodialog.ui
-+++ git/src/options/plugininfodialog.ui
+--- a/src/options/options.pri
++++ b/src/options/options.pri
+@@ -79,7 +79,9 @@ FORMS += \
+ 	$$PWD/opt_iconset_roster.ui \
+ 	$$PWD/opt_general_groupchat.ui \
+ 	$$PWD/opt_shortcuts.ui \
+-	$$PWD/opt_statuspep.ui
++	$$PWD/opt_statuspep.ui \
++	$$PWD/plugininfodialog.ui \
++	$$PWD/pluginsettsdialog.ui
+ 
+ psi_plugins {
+ 	FORMS += $$PWD/opt_plugins.ui
+--- a/src/options/optionsdlg.cpp
++++ b/src/options/optionsdlg.cpp
+@@ -196,6 +196,7 @@ private slots:
+ 
+ 	//void addWidgetChangedSignal(QString widgetName, QCString signal);
+ 	void connectDataChanged(QWidget *);
++	void connectSignalsToWidget(QWidget *, QObject *, const char *);
+ 
+ public:
+ 	OptionsDlg *dlg;
+@@ -236,6 +237,9 @@ OptionsDlg::Private::Private(OptionsDlg *d, PsiCon *_psi)
+ 		//connect(opttab, SIGNAL(addWidgetChangedSignal(QString, QCString)), SLOT(addWidgetChangedSignal(QString, QCString)));
+ 		connect(opttab, SIGNAL(noDirty(bool)), SLOT(noDirtySlot(bool)));
+ 		connect(opttab, SIGNAL(connectDataChanged(QWidget *)), SLOT(connectDataChanged(QWidget *)));
++		connect(opttab,
++			SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
++			SLOT(connectSignalsToWidget(QWidget*,QObject*,const char*)));
+ 
+ 		if ( opttab->id().isEmpty() )
+ 			continue;
+@@ -444,6 +448,11 @@ void OptionsDlg::Private::enableCommonWidgets(bool enable)
+ 
+ void OptionsDlg::Private::connectDataChanged(QWidget *widget)
+ {
++	connectSignalsToWidget(widget, this, SLOT(dataChanged()));
++}
++
++void OptionsDlg::Private::connectSignalsToWidget(QWidget *widget, QObject *object, const char *slot)
++{
+ 	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
+ 		QVariant isOption = w->property("isOption");
+ 		if (isOption.isValid() && !isOption.toBool()) {
+@@ -451,8 +460,8 @@ void OptionsDlg::Private::connectDataChanged(QWidget *widget)
+ 		}
+ 		QMap<QString, QByteArray>::Iterator it2 = changedMap.find( w->metaObject()->className() );
+ 		if ( it2 != changedMap.end() ) {
+-			disconnect(w, changedMap[w->metaObject()->className()], this, SLOT(dataChanged()));
+-			connect(w, changedMap[w->metaObject()->className()], SLOT(dataChanged()));
++			disconnect(w, changedMap[w->metaObject()->className()], object, slot);
++			connect(w, changedMap[w->metaObject()->className()], object, slot);
+ 		}
+ 	}
+ }
+--- a/src/options/optionstab.cpp
++++ b/src/options/optionstab.cpp
+@@ -241,6 +241,9 @@ void MetaOptionsTab::addTab(OptionsTab *tab)
+ 	//connect(tab, SIGNAL(addWidgetChangedSignal(QString, QCString)), SIGNAL(addWidgetChangedSignal(QString, QCString)));
+ 	connect(tab, SIGNAL(noDirty(bool)), SIGNAL(noDirty(bool)));
+ 	connect(tab, SIGNAL(connectDataChanged(QWidget *)), SIGNAL(connectDataChanged(QWidget *)));
++	connect(tab,
++		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
++		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)));
+ 
+ 	tabs.append(tab);
+ }
+@@ -262,6 +265,9 @@ QWidget *MetaOptionsTab::widget()
+ 
+ 	connect(w, SIGNAL(connectDataChanged(QWidget *)), SIGNAL(connectDataChanged(QWidget *)));
+ 	connect(w, SIGNAL(noDirty(bool)), SIGNAL(noDirty(bool)));
++	connect(w,
++		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)),
++		SIGNAL(connectSignalsToWidget(QWidget*,QObject*,const char*)));
+ 
+ 	foreach(OptionsTab* tab, tabs) {
+ 		t->addTab(tab);
+--- a/src/options/optionstab.h
++++ b/src/options/optionstab.h
+@@ -36,6 +36,7 @@ signals:
+ 	//void addWidgetChangedSignal(QString widgetName, QCString signal);
+ 	void noDirty(bool);
+ 	void connectDataChanged(QWidget *);
++	void connectSignalsToWidget(QWidget *, QObject *, const char *);
+ 
+ public slots:
+ 	virtual void setData(PsiCon *, QWidget *parentDialog);
+new file mode 100644
+index 0000000..1523c3e
+--- /dev/null
++++ b/src/options/plugininfodialog.ui
 @@ -0,0 +1,96 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -907,8 +970,9 @@
 +  </connection>
 + </connections>
 +</ui>
---- git.orig/src/options/pluginsettsdialog.ui
-+++ git/src/options/pluginsettsdialog.ui
+new file mode 100644
+--- /dev/null
++++ b/src/options/pluginsettsdialog.ui
 @@ -0,0 +1,64 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -974,8 +1038,8 @@
 +  </connection>
 + </connections>
 +</ui>
---- git.orig/src/pluginhost.cpp
-+++ git/src/pluginhost.cpp
+--- a/src/pluginhost.cpp
++++ b/src/pluginhost.cpp
 @@ -6,17 +6,52 @@
  #include "pluginhost.h"
  
@@ -1049,7 +1113,7 @@
  {
  	load();	// reads plugin name, etc
  	unload();
-@@ -107,6 +146,26 @@ const QString& PluginHost::version() con
+@@ -107,6 +146,26 @@ const QString& PluginHost::version() const
  }
  
  /**
@@ -1076,7 +1140,7 @@
   * \brief Returns plugin options widget.
   *
   * Always returns null if plugin is not currently loaded.
-@@ -136,21 +195,29 @@ QWidget* PluginHost::optionsWidget() con
+@@ -136,21 +195,29 @@ QWidget* PluginHost::optionsWidget() const
   */
  bool PluginHost::load()
  {
@@ -1308,7 +1372,7 @@
  	}
  	return !enabled_;
  }
-@@ -356,6 +547,16 @@ bool PluginHost::incomingXml(int account
+@@ -356,6 +547,16 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
  }
  
  
@@ -1325,7 +1389,7 @@
  //-- for EventFilter ------------------------------------------------
  
  /**
-@@ -365,13 +566,12 @@ bool PluginHost::incomingXml(int account
+@@ -365,13 +566,12 @@ bool PluginHost::incomingXml(int account, const QDomElement &e)
   * this will call its processEvent() handler.
   * Handler may then modify the event and may cause the event to be
   * silently discarded.
@@ -1340,7 +1404,7 @@
  {
  	bool handled = false;
  	EventFilter *ef = qobject_cast<EventFilter*>(plugin_);
-@@ -406,6 +606,23 @@ bool PluginHost::processMessage(int acco
+@@ -406,6 +606,23 @@ bool PluginHost::processMessage(int account, const QString& jidFrom, const QStri
  	return handled;
  }
  
@@ -1364,7 +1428,7 @@
  
  //-- StanzaSender ---------------------------------------------------
  
-@@ -456,7 +673,8 @@ void PluginHost::sendMessage(int account
+@@ -456,7 +673,8 @@ void PluginHost::sendMessage(int account, const QString& to, const QString& body
  	//manager_->sendXml(account, m.toStanza(...).toString());
  
  	//TODO(mck): yeah, that's sick..
@@ -1374,7 +1438,7 @@
  
  }
  
-@@ -471,6 +689,10 @@ QString PluginHost::uniqueId(int account
+@@ -471,6 +689,10 @@ QString PluginHost::uniqueId(int account)
  	return manager_->uniqueId(account);
  }
  
@@ -1385,7 +1449,7 @@
  
  //-- IqFilter -------------------------------------------------------
  
-@@ -494,7 +716,9 @@ QString PluginHost::uniqueId(int account
+@@ -494,7 +716,9 @@ QString PluginHost::uniqueId(int account)
  void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filter)
  {
  	if (iqNsFilters_.values(ns).contains(filter)) {
@@ -1396,7 +1460,7 @@
  	} else {
  		iqNsFilters_.insert(ns, filter);
  	}
-@@ -519,9 +743,13 @@ void PluginHost::addIqNamespaceFilter(co
+@@ -519,9 +743,13 @@ void PluginHost::addIqNamespaceFilter(const QString &ns, IqNamespaceFilter *filt
   */
  void PluginHost::addIqNamespaceFilter(const QRegExp &ns, IqNamespaceFilter *filter)
  {
@@ -1411,7 +1475,7 @@
  	} else {
  		iqNsxFilters_.insert(ns, filter);
  	}
-@@ -570,9 +798,8 @@ void PluginHost::setPluginOption( const
+@@ -570,9 +798,8 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
  	//
  	//if (!plugin)
  	//	return;
@@ -1423,7 +1487,7 @@
  }
  
  /**
-@@ -585,9 +812,11 @@ void PluginHost::setPluginOption( const
+@@ -585,9 +812,11 @@ void PluginHost::setPluginOption( const QString& option, const QVariant& value)
   * \param  option Option to set
   * \param value Return value
   */
@@ -1437,7 +1501,7 @@
  }
  
  /**
-@@ -616,6 +845,468 @@ QVariant PluginHost::getGlobalOption(con
+@@ -616,6 +845,468 @@ QVariant PluginHost::getGlobalOption(const QString& option)
  	return PsiOptions::instance()->getOption(option);
  }
  
@@ -1906,8 +1970,8 @@
  
  //-- helpers --------------------------------------------------------
  
---- git.orig/src/pluginhost.h
-+++ git/src/pluginhost.h
+--- a/src/pluginhost.h
++++ b/src/pluginhost.h
 @@ -10,10 +10,28 @@
  #include <QVariant>
  #include <QRegExp>
@@ -2122,8 +2186,8 @@
  
  	bool loadPlugin(QObject* pluginObject);
  
---- git.orig/src/pluginmanager.cpp
-+++ git/src/pluginmanager.cpp
+--- a/src/pluginmanager.cpp
++++ b/src/pluginmanager.cpp
 @@ -8,7 +8,7 @@
  #include <QtCore>
  #include <QtCrypto>
@@ -2170,7 +2234,7 @@
  	foreach (QString path, pluginDirs()) {
  		QCA::DirWatch *dw = new QCA::DirWatch(path, this);
  		connect(dw, SIGNAL(changed()), SLOT(dirsChanged()));
-@@ -92,38 +97,77 @@ PluginManager::PluginManager() : QObject
+@@ -92,38 +97,77 @@ PluginManager::PluginManager() : QObject(NULL)
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), this, SLOT(optionChanged(const QString&)));
  }
  
@@ -2322,7 +2386,7 @@
  }
  
  /**
-@@ -160,7 +229,9 @@ void PluginManager::optionChanged(const
+@@ -160,7 +229,9 @@ void PluginManager::optionChanged(const QString& option)
   */
  void PluginManager::loadAllPlugins()
  {
@@ -2371,7 +2435,7 @@
  {
  	QString path;
  	if (hosts_.contains(plugin)) {
-@@ -213,7 +293,7 @@ QString PluginManager::pathToPlugin(cons
+@@ -213,7 +293,7 @@ QString PluginManager::pathToPlugin(const QString& plugin)
   * \param plugin Name of the plugin.
   * \return Path to the plugin file.
   */
@@ -2380,7 +2444,7 @@
  {
  	QString name;
  	if (hosts_.contains(plugin)) {
-@@ -222,10 +302,31 @@ QString PluginManager::shortName(const Q
+@@ -222,10 +302,31 @@ QString PluginManager::shortName(const QString& plugin)
  	return name;
  }
  
@@ -2413,7 +2477,7 @@
  {
  	return hosts_.keys();
  }
-@@ -238,13 +339,33 @@ QStringList PluginManager::availablePlug
+@@ -238,13 +339,33 @@ QStringList PluginManager::availablePlugins()
   */
  QWidget* PluginManager::optionsWidget(const QString& plugin)
  {
@@ -2451,7 +2515,7 @@
  }
  
  /**
-@@ -257,10 +378,10 @@ QWidget* PluginManager::optionsWidget(co
+@@ -257,10 +378,10 @@ QWidget* PluginManager::optionsWidget(const QString& plugin)
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -2464,7 +2528,7 @@
  		if (host->processMessage(accountIds_[account], jidFrom, body, subject)) {
  			handled = true;
  			break;
-@@ -279,10 +400,10 @@ bool PluginManager::processMessage(const
+@@ -279,10 +400,10 @@ bool PluginManager::processMessage(const PsiAccount* account, const QString& jid
   * \param event Incoming event
   * \return Continue processing the event; true if the event should be silently discarded.
   */
@@ -2477,7 +2541,7 @@
  		if (host->processEvent(accountIds_[account], event)) {
  			handled = true;
  			break;
-@@ -292,6 +413,40 @@ bool PluginManager::processEvent(const P
+@@ -292,6 +413,40 @@ bool PluginManager::processEvent(const PsiAccount* account, QDomElement& event)
  }
  
  /**
@@ -2518,7 +2582,7 @@
   * \brief Give each plugin the opportunity to process the incoming xml
   *
   * Each plugin is passed the xml in turn using various filter interfaces
-@@ -306,7 +461,7 @@ bool PluginManager::processEvent(const P
+@@ -306,7 +461,7 @@ bool PluginManager::processEvent(const PsiAccount* account, QDomElement& event)
  bool PluginManager::incomingXml(int account, const QDomElement &xml)
  {
  	bool handled = false;
@@ -2527,7 +2591,7 @@
  		if (host->incomingXml(account, xml)) {
  			handled = true;
  			break;
-@@ -342,7 +497,7 @@ void PluginManager::sendXml(int account,
+@@ -342,7 +497,7 @@ void PluginManager::sendXml(int account, const QString& xml)
   * \param account Identifier of the PsiAccount responsible
   * \return Unique ID to be used for when sending a stanza
   */
@@ -2536,7 +2600,7 @@
  {
  	QString id;
  	if (account < clients_.size()) {
-@@ -351,15 +506,322 @@ QString PluginManager::uniqueId(int acco
+@@ -351,15 +506,322 @@ QString PluginManager::uniqueId(int account)
  	return id;
  }
  
@@ -2860,7 +2924,7 @@
  }
  
  /**
-@@ -372,6 +834,212 @@ bool PluginManager::verifyStanza(const Q
+@@ -372,6 +834,212 @@ bool PluginManager::verifyStanza(const QString& stanza)
  	return true;
  }
  
@@ -3073,8 +3137,8 @@
  PluginManager* PluginManager::instance_ = NULL;
  const QString PluginManager::loadOptionPrefix = "plugins.auto-load";
  const QString PluginManager::pluginOptionPrefix = "plugins.options";
---- git.orig/src/pluginmanager.h
-+++ git/src/pluginmanager.h
+--- a/src/pluginmanager.h
++++ b/src/pluginmanager.h
 @@ -11,12 +11,16 @@
  #include <QMap>
  #include <QHash>
@@ -3232,8 +3296,9 @@
  };
  
  #endif
---- git.orig/src/plugins/include/accountinfoaccessinghost.h
-+++ git/src/plugins/include/accountinfoaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/accountinfoaccessinghost.h
 @@ -0,0 +1,27 @@
 +#ifndef ACCOUNTINFOACCESSINGHOST_H
 +#define ACCOUNTINFOACCESSINGHOST_H
@@ -3262,8 +3327,9 @@
 +Q_DECLARE_INTERFACE(AccountInfoAccessingHost, "org.psi-im.AccountInfoAccessingHost/0.1");
 +
 +#endif // ACCOUNTINFOACCESSINGHOST_H
---- git.orig/src/plugins/include/accountinfoaccessor.h
-+++ git/src/plugins/include/accountinfoaccessor.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/accountinfoaccessor.h
 @@ -0,0 +1,18 @@
 +#ifndef ACCOUNTINFOACCESSOR_H
 +#define ACCOUNTINFOACCESSOR_H
@@ -3283,8 +3349,9 @@
 +
 +
 +#endif // ACCOUNTINFOACCESSOR_H
---- git.orig/src/plugins/include/activetabaccessinghost.h
-+++ git/src/plugins/include/activetabaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/activetabaccessinghost.h
 @@ -0,0 +1,18 @@
 +#ifndef ACTIVETABACCESSINGHOST_H
 +#define ACTIVETABACCESSINGHOST_H
@@ -3304,8 +3371,10 @@
 +
 +Q_DECLARE_INTERFACE(ActiveTabAccessingHost, "org.psi-im.ActiveTabAccessingHost/0.1");
 +#endif // ACTIVETABACCESSINGHOST_H
---- git.orig/src/plugins/include/activetabaccessor.h
-+++ git/src/plugins/include/activetabaccessor.h
+new file mode 100644
+index 0000000..278fbdc
+--- /dev/null
++++ b/src/plugins/include/activetabaccessor.h
 @@ -0,0 +1,17 @@
 +#ifndef ACTIVETABACCESSOR_H
 +#define ACTIVETABACCESSOR_H
@@ -3324,8 +3393,10 @@
 +Q_DECLARE_INTERFACE(ActiveTabAccessor, "org.psi-im.ActiveTabAccessor/0.1");
 +
 +#endif // ACTIVETABACCESSOR_H
---- git.orig/src/plugins/include/applicationinfoaccessinghost.h
-+++ git/src/plugins/include/applicationinfoaccessinghost.h
+new file mode 100644
+index 0000000..61b8fbd
+--- /dev/null
++++ b/src/plugins/include/applicationinfoaccessinghost.h
 @@ -0,0 +1,45 @@
 +#ifndef APPLICATIONINFOACCESSINGHOST_H
 +#define APPLICATIONINFOACCESSINGHOST_H
@@ -3372,8 +3443,10 @@
 +Q_DECLARE_INTERFACE(ApplicationInfoAccessingHost, "org.psi-im.ApplicationInfoAccessingHost/0.1");
 +
 +#endif // APPLICATIONINFOACCESSINGHOST_H
---- git.orig/src/plugins/include/applicationinfoaccessor.h
-+++ git/src/plugins/include/applicationinfoaccessor.h
+new file mode 100644
+index 0000000..0ddde3b
+--- /dev/null
++++ b/src/plugins/include/applicationinfoaccessor.h
 @@ -0,0 +1,17 @@
 +#ifndef APPLICATIONINFOACCESSOR_H
 +#define APPLICATIONINFOACCESSOR_H
@@ -3392,8 +3465,10 @@
 +Q_DECLARE_INTERFACE(ApplicationInfoAccessor, "org.psi-im.ApplicationInfoAccessor/0.1");
 +
 +#endif // APPLICATIONINFOACCESSOR_H
---- git.orig/src/plugins/include/chattabaccessor.h
-+++ git/src/plugins/include/chattabaccessor.h
+new file mode 100644
+index 0000000..bb3279a
+--- /dev/null
++++ b/src/plugins/include/chattabaccessor.h
 @@ -0,0 +1,18 @@
 +#ifndef CHATTABACCESSOR_H
 +#define CHATTABACCESSOR_H
@@ -3413,8 +3488,10 @@
 +Q_DECLARE_INTERFACE(ChatTabAccessor, "org.psi-im.ChatTabAccessor/0.1");
 +
 +#endif // CHATTABACCESSOR_H
---- git.orig/src/plugins/include/contactinfoaccessinghost.h
-+++ git/src/plugins/include/contactinfoaccessinghost.h
+new file mode 100644
+index 0000000..867bdbf
+--- /dev/null
++++ b/src/plugins/include/contactinfoaccessinghost.h
 @@ -0,0 +1,27 @@
 +#ifndef CONTACTINFOACCESSINGHOST_H
 +#define CONTACTINFOACCESSINGHOST_H
@@ -3443,8 +3520,9 @@
 +Q_DECLARE_INTERFACE(ContactInfoAccessingHost, "org.psi-im.ContactInfoAccessingHost/0.1");
 +
 +#endif // CONTACTINFOACCESSINGHOST_H
---- git.orig/src/plugins/include/contactinfoaccessor.h
-+++ git/src/plugins/include/contactinfoaccessor.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/contactinfoaccessor.h
 @@ -0,0 +1,18 @@
 +#ifndef CONTACTINFOACCESSOR_H
 +#define CONTACTINFOACCESSOR_H
@@ -3464,8 +3542,9 @@
 +
 +
 +#endif // CONTACTINFOACCESSOR_H
---- git.orig/src/plugins/include/contactstateaccessinghost.h
-+++ git/src/plugins/include/contactstateaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/contactstateaccessinghost.h
 @@ -0,0 +1,19 @@
 +#ifndef CONTACTSTATEACCESSINGHOST_H
 +#define CONTACTSTATEACCESSINGHOST_H
@@ -3486,8 +3565,10 @@
 +Q_DECLARE_INTERFACE(ContactStateAccessingHost, "org.psi-im.ContactStateAccessingHost/0.2");
 +
 +#endif // CONTACTSTATEACCESSINGHOST_H
---- git.orig/src/plugins/include/contactstateaccessor.h
-+++ git/src/plugins/include/contactstateaccessor.h
+new file mode 100644
+index 0000000..321e06e
+--- /dev/null
++++ b/src/plugins/include/contactstateaccessor.h
 @@ -0,0 +1,18 @@
 +#ifndef CONTACTSTATEACCESSOR_H
 +#define CONTACTSTATEACCESSOR_H
@@ -3507,8 +3588,10 @@
 +
 +
 +#endif // CONTACTSTATEACCESSOR_H
---- git.orig/src/plugins/include/eventcreatinghost.h
-+++ git/src/plugins/include/eventcreatinghost.h
+new file mode 100644
+index 0000000..673763e
+--- /dev/null
++++ b/src/plugins/include/eventcreatinghost.h
 @@ -0,0 +1,16 @@
 +#ifndef EVENTCREATINGHOST_H
 +#define EVENTCREATINGHOST_H
@@ -3526,8 +3609,9 @@
 +
 +Q_DECLARE_INTERFACE(EventCreatingHost, "org.psi-im.EventCreatingHost/0.1");
 +#endif
---- git.orig/src/plugins/include/eventcreator.h
-+++ git/src/plugins/include/eventcreator.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/eventcreator.h
 @@ -0,0 +1,17 @@
 +#ifndef EVENTCREATOR_H
 +#define EVENTCREATOR_H
@@ -3546,8 +3630,8 @@
 +Q_DECLARE_INTERFACE(EventCreator, "org.psi-im.EventCreator/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/eventfilter.h
-+++ git/src/plugins/include/eventfilter.h
+--- a/src/plugins/include/eventfilter.h
++++ b/src/plugins/include/eventfilter.h
 @@ -1,7 +1,8 @@
  #ifndef EVENTFILTER_H
  #define EVENTFILTER_H
@@ -3570,8 +3654,10 @@
  };
  
  Q_DECLARE_INTERFACE(EventFilter, "org.psi-im.EventFilter/0.1");
---- git.orig/src/plugins/include/gctoolbariconaccessor.h
-+++ git/src/plugins/include/gctoolbariconaccessor.h
+new file mode 100644
+index 0000000..38fd75c
+--- /dev/null
++++ b/src/plugins/include/gctoolbariconaccessor.h
 @@ -0,0 +1,22 @@
 +#ifndef GCTOOLBARICONACCESSOR_H
 +#define GCTOOLBARICONACCESSOR_H
@@ -3595,8 +3681,9 @@
 +Q_DECLARE_INTERFACE(GCToolbarIconAccessor, "org.psi-im.GCToolbarIconAccessor/0.1");
 +
 +#endif // GCTOOLBARICONACCESSOR_H
---- git.orig/src/plugins/include/iconfactoryaccessinghost.h
-+++ git/src/plugins/include/iconfactoryaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/iconfactoryaccessinghost.h
 @@ -0,0 +1,17 @@
 +#ifndef ICONFACTORYACCESSINGHOST_H
 +#define ICONFACTORYACCESSINGHOST_H
@@ -3615,8 +3702,9 @@
 +
 +Q_DECLARE_INTERFACE(IconFactoryAccessingHost, "org.psi-im.IconFactoryAccessingHost/0.1");
 +#endif // ICONFACTORYACCESSINGHOST_H
---- git.orig/src/plugins/include/iconfactoryaccessor.h
-+++ git/src/plugins/include/iconfactoryaccessor.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/iconfactoryaccessor.h
 @@ -0,0 +1,17 @@
 +#ifndef ICONFACTORYACCESSOR_H
 +#define ICONFACTORYACCESSOR_H
@@ -3635,8 +3723,8 @@
 +Q_DECLARE_INTERFACE(IconFactoryAccessor, "org.psi-im.IconFactoryAccessor/0.1");
 +
 +#endif // ICONFACTORYACCESSOR_H
---- git.orig/src/plugins/include/iqfilteringhost.h
-+++ git/src/plugins/include/iqfilteringhost.h
+--- a/src/plugins/include/iqfilteringhost.h
++++ b/src/plugins/include/iqfilteringhost.h
 @@ -1,8 +1,8 @@
  #ifndef IQFILTERINGHOST_H
  #define IQFILTERINGHOST_H
@@ -3648,8 +3736,8 @@
  
  class IqNamespaceFilter;
  
---- git.orig/src/plugins/include/iqnamespacefilter.h
-+++ git/src/plugins/include/iqnamespacefilter.h
+--- a/src/plugins/include/iqnamespacefilter.h
++++ b/src/plugins/include/iqnamespacefilter.h
 @@ -1,7 +1,7 @@
  #ifndef IQNAMESPACEFILTER_H
  #define IQNAMESPACEFILTER_H
@@ -3659,8 +3747,10 @@
  
  class IqNamespaceFilter
  {
---- git.orig/src/plugins/include/menuaccessor.h
-+++ git/src/plugins/include/menuaccessor.h
+new file mode 100644
+index 0000000..c788e9d
+--- /dev/null
++++ b/src/plugins/include/menuaccessor.h
 @@ -0,0 +1,25 @@
 +#ifndef MENUACCESSOR_H
 +#define MENUACCESSOR_H
@@ -3687,8 +3777,8 @@
 +Q_DECLARE_INTERFACE(MenuAccessor, "org.psi-im.MenuAccessor/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/optionaccessinghost.h
-+++ git/src/plugins/include/optionaccessinghost.h
+--- a/src/plugins/include/optionaccessinghost.h
++++ b/src/plugins/include/optionaccessinghost.h
 @@ -1,8 +1,8 @@
  #ifndef OPTIONACCESSINGHOST_H
  #define OPTIONACCESSINGHOST_H
@@ -3709,8 +3799,8 @@
  
  	virtual void setGlobalOption(const QString& option, const QVariant& value) = 0;
  	virtual QVariant getGlobalOption(const QString& option) = 0;
---- git.orig/src/plugins/include/optionaccessor.h
-+++ git/src/plugins/include/optionaccessor.h
+--- a/src/plugins/include/optionaccessor.h
++++ b/src/plugins/include/optionaccessor.h
 @@ -1,8 +1,7 @@
  #ifndef OPTIONACCESSOR_H
  #define OPTIONACCESSOR_H
@@ -3721,8 +3811,9 @@
  
  class OptionAccessingHost;
  
---- git.orig/src/plugins/include/plugininfoprovider.h
-+++ git/src/plugins/include/plugininfoprovider.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/plugininfoprovider.h
 @@ -0,0 +1,18 @@
 +#ifndef PLUGININFOPROVIDER_H
 +#define PLUGININFOPROVIDER_H
@@ -3742,8 +3833,9 @@
 +
 +
 +#endif // PLUGININFOPROVIDER_H
---- git.orig/src/plugins/include/popupaccessinghost.h
-+++ git/src/plugins/include/popupaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/popupaccessinghost.h
 @@ -0,0 +1,21 @@
 +#ifndef POPUPACCESSINGHOST_H
 +#define POPUPACCESSINGHOST_H
@@ -3766,8 +3858,10 @@
 +Q_DECLARE_INTERFACE(PopupAccessingHost, "org.psi-im.PopupAccessingHost/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/popupaccessor.h
-+++ git/src/plugins/include/popupaccessor.h
+new file mode 100644
+index 0000000..0fdd81c
+--- /dev/null
++++ b/src/plugins/include/popupaccessor.h
 @@ -0,0 +1,16 @@
 +#ifndef POPUPACCESSOR_H
 +#define POPUPACCESSOR_H
@@ -3785,8 +3879,10 @@
 +Q_DECLARE_INTERFACE(PopupAccessor, "org.psi-im.PopupAccessor/0.1");
 +
 +#endif // POPUPACCESSOR_H
---- git.orig/src/plugins/include/psiaccountcontroller.h
-+++ git/src/plugins/include/psiaccountcontroller.h
+new file mode 100644
+index 0000000..107342f
+--- /dev/null
++++ b/src/plugins/include/psiaccountcontroller.h
 @@ -0,0 +1,18 @@
 +#ifndef PSIACCOUNTCONTROLLER_H
 +#define PSIACCOUNTCONTROLLER_H
@@ -3806,8 +3902,9 @@
 +
 +
 +#endif // PSIACCOUNTCONTROLLER_H
---- git.orig/src/plugins/include/psiaccountcontrollinghost.h
-+++ git/src/plugins/include/psiaccountcontrollinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/psiaccountcontrollinghost.h
 @@ -0,0 +1,18 @@
 +#ifndef PSIACCOUNTCONTROLLINGHOST_H
 +#define PSIACCOUNTCONTROLLINGHOST_H
@@ -3827,8 +3924,8 @@
 +Q_DECLARE_INTERFACE(PsiAccountControllingHost, "org.psi-im.PsiAccountControllingHost/0.1");
 +
 +#endif // PSIACCOUNTCONTROLLINGHOST_H
---- git.orig/src/plugins/include/psiplugin.h
-+++ git/src/plugins/include/psiplugin.h
+--- a/src/plugins/include/psiplugin.h
++++ b/src/plugins/include/psiplugin.h
 @@ -37,8 +37,29 @@ class QWidget;
  class PsiPlugin
  {
@@ -3882,8 +3979,10 @@
 +Q_DECLARE_INTERFACE(PsiPlugin, "org.psi-im.PsiPlugin/0.4");
  
  #endif
---- git.orig/src/plugins/include/shortcutaccessinghost.h
-+++ git/src/plugins/include/shortcutaccessinghost.h
+new file mode 100644
+index 0000000..7687eba
+--- /dev/null
++++ b/src/plugins/include/shortcutaccessinghost.h
 @@ -0,0 +1,20 @@
 +#ifndef SHORTCUTACCESSINGHOST_H
 +#define SHORTCUTACCESSINGHOST_H
@@ -3905,8 +4004,10 @@
 +Q_DECLARE_INTERFACE(ShortcutAccessingHost, "org.psi-im.ShortcutAccessingHost/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/shortcutaccessor.h
-+++ git/src/plugins/include/shortcutaccessor.h
+new file mode 100644
+index 0000000..c082c1b
+--- /dev/null
++++ b/src/plugins/include/shortcutaccessor.h
 @@ -0,0 +1,18 @@
 +#ifndef SHORTCUTACCESSOR_H
 +#define SHORTCUTACCESSOR_H
@@ -3926,8 +4027,9 @@
 +Q_DECLARE_INTERFACE(ShortcutAccessor, "org.psi-im.ShortcutAccessor/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/soundaccessinghost.h
-+++ git/src/plugins/include/soundaccessinghost.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/soundaccessinghost.h
 @@ -0,0 +1,16 @@
 +#ifndef SOUNDACCESSINGHOST_H
 +#define SOUNDACCESSINGHOST_H
@@ -3945,8 +4047,9 @@
 +Q_DECLARE_INTERFACE(SoundAccessingHost, "org.psi-im.SoundAccessingHost/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/soundaccessor.h
-+++ git/src/plugins/include/soundaccessor.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/soundaccessor.h
 @@ -0,0 +1,16 @@
 +#ifndef SOUNDACCESSOR_H
 +#define SOUNDACCESSOR_H
@@ -3964,8 +4067,8 @@
 +Q_DECLARE_INTERFACE(SoundAccessor, "org.psi-im.SoundAccessor/0.1");
 +
 +#endif
---- git.orig/src/plugins/include/stanzafilter.h
-+++ git/src/plugins/include/stanzafilter.h
+--- a/src/plugins/include/stanzafilter.h
++++ b/src/plugins/include/stanzafilter.h
 @@ -1,7 +1,7 @@
  #ifndef STANZAFILTER_H
  #define STANZAFILTER_H
@@ -3985,8 +4088,8 @@
  };
  
  Q_DECLARE_INTERFACE(StanzaFilter, "org.psi-im.StanzaFilter/0.1");
---- git.orig/src/plugins/include/stanzasendinghost.h
-+++ git/src/plugins/include/stanzasendinghost.h
+--- a/src/plugins/include/stanzasendinghost.h
++++ b/src/plugins/include/stanzasendinghost.h
 @@ -1,8 +1,8 @@
  #ifndef STANZASENDINGHOST_H
  #define STANZASENDINGHOST_H
@@ -4006,8 +4109,9 @@
  };
  
  Q_DECLARE_INTERFACE(StanzaSendingHost, "org.psi-im.StanzaSendingHost/0.1");
---- git.orig/src/plugins/include/toolbariconaccessor.h
-+++ git/src/plugins/include/toolbariconaccessor.h
+new file mode 100644
+--- /dev/null
++++ b/src/plugins/include/toolbariconaccessor.h
 @@ -0,0 +1,22 @@
 +#ifndef TOOLBARICONACCESSOR_H
 +#define TOOLBARICONACCESSOR_H
@@ -4031,8 +4135,8 @@
 +Q_DECLARE_INTERFACE(ToolbarIconAccessor, "org.psi-im.ToolbarIconAccessor/0.1");
 +
 +#endif // TOOLBARICONACCESSOR_H
---- git.orig/src/plugins/plugins.pri
-+++ git/src/plugins/plugins.pri
+--- a/src/plugins/plugins.pri
++++ b/src/plugins/plugins.pri
 @@ -10,5 +10,31 @@ HEADERS += \
  	$$PWD/include/iqfilteringhost.h \
  	$$PWD/include/eventfilter.h \
@@ -4067,8 +4171,34 @@
 +	$$PWD/include/soundaccessor.h \
 +	$$PWD/include/soundaccessinghost.h \
 +	$$PWD/include/chattabaccessor.h
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -45,6 +45,9 @@
+ #ifdef HAVE_PGPUTIL
+ #include "pgputil.h"
+ #endif
++#ifdef PSI_PLUGINS
++#include "pluginmanager.h"
++#endif
+ 
+ using namespace XMPP;
+ using namespace XMLHelper;
+@@ -1361,6 +1364,13 @@ void OptionsMigration::lateMigration()
+ 	// Add default chat and groupchat toolbars
+ 	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat") {
+ 		QStringList pluginsKeys;
++#ifdef PSI_PLUGINS
++		PluginManager *pm = PluginManager::instance();
++		QStringList plugins = pm->availablePlugins();
++		foreach (const QString &plugin, plugins) {
++			pluginsKeys << pm->shortName(plugin) + "-plugin";
++		}
++#endif
+ 		ToolbarPrefs chatToolbar;
+ 		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
+ 		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
 @@ -783,6 +783,13 @@ public slots:
  		xmlRingbufWrite = (xmlRingbufWrite + 1) % xmlRingbuf.count();
  	}
@@ -4083,7 +4213,7 @@
  	void pm_proxyRemoved(QString proxykey)
  	{
  		if (acc.proxyID == proxykey) acc.proxyID = "";
-@@ -1138,6 +1145,11 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1138,6 +1145,11 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  
  	// create XMPP::Client
  	d->client = new Client;
@@ -4095,7 +4225,7 @@
  	d->client->setOSName(SystemInfo::instance()->os());
  	d->client->setClientName(ApplicationInfo::name());
  	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1195,6 +1207,7 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1195,6 +1207,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -4103,7 +4233,7 @@
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1257,11 +1270,6 @@ PsiAccount::PsiAccount(const UserAccount
+@@ -1257,11 +1270,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -4115,7 +4245,7 @@
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1831,6 +1839,9 @@ void PsiAccount::logout(bool fast, const
+@@ -1831,6 +1839,9 @@ void PsiAccount::logout(bool fast, const Status &s)
  	if(!isActive())
  		return;
  
@@ -4125,7 +4255,7 @@
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4718,6 +4729,22 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4723,6 +4734,22 @@ void PsiAccount::dj_sendMessage(const Message &m, bool log)
  			nm.setNick(nick());
  		}
  	}
@@ -4148,7 +4278,7 @@
  
  	// GSOC: stream management
  	// check whether message came from a ChatDlg
-@@ -5010,6 +5037,15 @@ static bool messageListContainsEvent(con
+@@ -5015,6 +5042,15 @@ static bool messageListContainsEvent(const QList<PsiEvent::Ptr>& messageList, co
  	return false;
  }
  
@@ -4164,7 +4294,7 @@
  // handle an incoming event
  void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationType)
  {
-@@ -5055,12 +5091,13 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5060,12 +5096,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -4181,7 +4311,7 @@
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5105,7 +5142,6 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5110,7 +5147,6 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		//if ( !ul.isEmpty() )
  		//	ulItem=ul.first();
  		if (PluginManager::instance()->processMessage(this, e->from().full(), m.body(), m.subject())) {
@@ -4189,7 +4319,7 @@
  			return;
  		}
  		//PluginManager::instance()->message(this,e->from(),ulItem,((MessageEvent*)e)->message().body());
-@@ -5303,6 +5339,13 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5308,6 +5344,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		}
  #endif
  	}
@@ -4203,7 +4333,7 @@
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5322,7 +5365,16 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5327,7 +5370,16 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		    (popupType == PopupManager::AlertAvCall    && o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PopupManager::AlertComposing && o->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
@@ -4221,7 +4351,7 @@
  		}
  		emit startBounce();
  	}
-@@ -5489,6 +5541,10 @@ void PsiAccount::queueEvent(const PsiEve
+@@ -5494,6 +5546,10 @@ void PsiAccount::queueEvent(const PsiEvent::Ptr &e, ActivationType activationTyp
  		else if (e->type() == PsiEvent::File) {
  			doPopup = PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool();
  		}
@@ -4232,7 +4362,7 @@
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5511,6 +5567,18 @@ void PsiAccount::openNextEvent(const Use
+@@ -5516,6 +5572,18 @@ void PsiAccount::openNextEvent(const UserListItem& u, ActivationType activationT
  	PsiEvent::Ptr e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;
@@ -4251,8 +4381,8 @@
  
  	psi()->processEvent(e, activationType);
  }
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
 @@ -252,6 +252,10 @@ public:
  	};
  	void playSound(SoundType onevent);
@@ -4264,8 +4394,8 @@
  	QStringList hiddenChats(const Jid &) const;
  
  	int sendMessageEncrypted(const Message &);
---- git.orig/src/psiactionlist.cpp
-+++ git/src/psiactionlist.cpp
+--- a/src/psiactionlist.cpp
++++ b/src/psiactionlist.cpp
 @@ -28,6 +28,9 @@
  
  #include "iconset.h"
@@ -4276,7 +4406,7 @@
  
  #include "mainwin_p.h"
  
-@@ -515,6 +518,23 @@ void PsiActionList::Private::createGroup
+@@ -515,6 +518,23 @@ void PsiActionList::Private::createGroupchat()
  
  void PsiActionList::Private::addPluginsActions(ActionsType type)
  {
@@ -4300,8 +4430,8 @@
  }
  
  void PsiActionList::Private::optionsChanged()
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -50,6 +50,9 @@
  #include "avcall/avcall.h"
  #include "actionlist.h"
@@ -4351,8 +4481,8 @@
  }
  
  void PsiChatDlg::updateCounter()
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
+--- a/src/psicon.cpp
++++ b/src/psicon.cpp
 @@ -598,7 +598,7 @@ bool PsiCon::init()
  
  #ifdef PSI_PLUGINS
@@ -4383,8 +4513,24 @@
  }
  
  PsiContactList* PsiCon::contactList() const
---- git.orig/src/psicontactmenu.cpp
-+++ git/src/psicontactmenu.cpp
+@@ -1325,7 +1330,14 @@ void PsiCon::openUri(const QUrl &uri)
+ 	// authority
+ 	PsiAccount *pa = 0;
+ 	//if (uri.authority().isEmpty()) {
+-		pa = d->contactList->defaultAccount();
++		TabbableWidget* tw = findActiveTab();
++		if (tw) {
++			pa = tw->account();
++		}
++		if (!pa) {
++			pa = d->contactList->defaultAccount();
++		}
++
+ 		if (!pa) {
+ 			QMessageBox::critical(0, tr("Error"), QString("You need to have an account configured and enabled to open URIs (links)."));
+ 			return;
+--- a/src/psicontactmenu.cpp
++++ b/src/psicontactmenu.cpp
 @@ -39,6 +39,7 @@
  #include "statusdlg.h"
  #include "xmpp_tasks.h"
@@ -4405,8 +4551,8 @@
  			menu_->addMenu(inviteToGroupchatMenu_);
  			menu_->addSeparator();
  			mngMenu_ = menu_->addMenu(IconsetFactory::icon("psi/manageContact").icon(), tr("Manage &Contact"));
---- git.orig/src/psievent.cpp
-+++ git/src/psievent.cpp
+--- a/src/psievent.cpp
++++ b/src/psievent.cpp
 @@ -208,6 +208,49 @@ void PsiEvent::setId(int id)
  }
  #endif
@@ -4457,8 +4603,8 @@
  //----------------------------------------------------------------------------
  // MessageEvent
  //----------------------------------------------------------------------------
---- git.orig/src/psievent.h
-+++ git/src/psievent.h
+--- a/src/psievent.h
++++ b/src/psievent.h
 @@ -64,6 +64,10 @@ public:
  		//Status
  		HttpAuth,
@@ -4503,8 +4649,8 @@
  // normal, chat, error, headline, etc
  class MessageEvent : public PsiEvent
  {
---- git.orig/src/psioptions.cpp
-+++ git/src/psioptions.cpp
+--- a/src/psioptions.cpp
++++ b/src/psioptions.cpp
 @@ -31,6 +31,9 @@
  #include "statuspreset.h"
  #include "psitoolbar.h"
@@ -4529,29 +4675,24 @@
  		ToolbarPrefs chatToolbar;
  		chatToolbar.on = true;
  		chatToolbar.name = "Chat";
---- git.orig/src/psi_profiles.cpp
-+++ git/src/psi_profiles.cpp
-@@ -45,6 +45,9 @@
- #ifdef HAVE_PGPUTIL
- #include "pgputil.h"
- #endif
-+#ifdef PSI_PLUGINS
-+#include "pluginmanager.h"
-+#endif
+--- a/src/tabs/tabdlg.cpp
++++ b/src/tabs/tabdlg.cpp
+@@ -921,3 +921,8 @@ void TabDlg::updateVSplitters(int log, int chat)
+ 		w->setVSplitterPosition(log, chat);
+ 	}
+ }
++
++TabbableWidget* TabDlg::getCurrentTab() const
++{
++	return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
++}
+--- a/src/tabs/tabdlg.h
++++ b/src/tabs/tabdlg.h
+@@ -88,6 +88,7 @@ public:
+ 	void setTabBarShownForSingles(bool enabled); // default enabled
+ 	void setSimplifiedCaptionEnabled(bool enabled); // default disabled
+ 	void setTabIcon(QWidget *,const QIcon &);
++	TabbableWidget* getCurrentTab() const;
  
- using namespace XMPP;
- using namespace XMLHelper;
-@@ -1361,6 +1364,13 @@ void OptionsMigration::lateMigration()
- 	// Add default chat and groupchat toolbars
- 	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat") {
- 		QStringList pluginsKeys;
-+#ifdef PSI_PLUGINS
-+		PluginManager *pm = PluginManager::instance();
-+		QStringList plugins = pm->availablePlugins();
-+		foreach (const QString &plugin, plugins) {
-+			pluginsKeys << pm->shortName(plugin) + "-plugin";
-+		}
-+#endif
- 		ToolbarPrefs chatToolbar;
- 		chatToolbar.on = PsiOptions::instance()->getOption("options.ui.chat.central-toolbar").toBool();
- 		PsiOptions::instance()->removeOption("options.ui.chat.central-toolbar");
+ protected:
+ 	void setShortcuts();
