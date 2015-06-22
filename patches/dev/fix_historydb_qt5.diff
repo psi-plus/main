@@ -35,7 +35,7 @@
  #include "common.h"
  #include "applicationinfo.h"
  #include "psievent.h"
-@@ -1388,8 +1393,13 @@ bool EDBSqLite::appendEvent(const QStrin
+@@ -1388,8 +1393,14 @@ bool EDBSqLite::appendEvent(const QStrin
  					urlList.append(QVariant(urlItem));
  				}
  			xepList["jabber:x:oob"] = QVariant(urlList);
@@ -43,13 +43,14 @@
  			QJson::Serializer serializer;
  			extraData = QString::fromUtf8(serializer.serialize(xepList));
 +#else
-+			extraData = QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(xepList)).toBinaryData());
++			QJsonDocument doc(QJsonObject::fromVariantMap(xepList));
++			extraData = QString::fromUtf8(doc.toBinaryData());
 +#endif
 +
  		}
  		query->bindValue(":extra_data", extraData);
  	}
-@@ -1430,9 +1440,15 @@ PsiEvent::Ptr EDBSqLite::getEvent(const
+@@ -1430,9 +1441,17 @@ PsiEvent::Ptr EDBSqLite::getEvent(const
  		m.setSpooled(true);
  		QString extraStr = record.value("extra_data").toString();
  		if (!extraStr.isEmpty()) {
@@ -60,7 +61,9 @@
 +#ifndef HAVE_QT5
  			QVariantMap extraData = parser.parse(extraStr.toUtf8(), &fOk).toMap();
 +#else
-+			QVariantMap extraData = QJsonDocument::fromJson(extraStr.toUtf8()).object().toVariantMap();
++			QJsonDocument doc = QJsonDocument::fromJson(extraStr.toUtf8());
++			fOk = !doc.isNull();
++			QVariantMap extraData = doc.object().toVariantMap();
 +#endif
  			if (fOk) {
  				foreach (const QVariant &urlItem, extraData["jabber:x:oob"].toList()) {
