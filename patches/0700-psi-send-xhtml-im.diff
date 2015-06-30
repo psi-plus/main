@@ -1,6 +1,8 @@
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
-@@ -690,6 +690,11 @@ void ChatDlg::doSend()
+Заходим в «iris»
+Заходим в «src/libpsi»
+--- a/src/chatdlg.cpp
++++ b/src/chatdlg.cpp
+@@ -681,6 +681,11 @@ void ChatDlg::doSend()
  	if (isEncryptionEnabled()) {
  		m.setWasEncrypted(true);
  	}
@@ -12,18 +14,18 @@
  	QString id = account()->client()->genUniqueId();
  	m.setId(id); // we need id early for message manipulations in chatview
  
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
 @@ -207,7 +207,7 @@ public:
  	QString password;
  	QString topic;
  	bool nonAnonymous;		 // got status code 100 ?
--	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark;
-+	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_ps, *act_templates, *act_bookmark, *act_html_text;
+-	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_bookmark, *act_ps, *act_templates;
++	IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_bookmark, *act_ps, *act_templates, *act_html_text;
  	TypeAheadFindBar *typeahead;
  #ifdef WHITEBOARDING
  	IconAction *act_whiteboard;
-@@ -676,6 +676,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -680,6 +680,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	d->act_configure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("&Configure Room"), 0, this);
  	connect(d->act_configure, SIGNAL(triggered()), SLOT(configureRoom()));
  
@@ -33,7 +35,7 @@
  #ifdef WHITEBOARDING
  	d->act_whiteboard = new IconAction(tr("Open a Whiteboard"), "psi/whiteboard", tr("Open a &Whiteboard"), 0, this);
  	connect(d->act_whiteboard, SIGNAL(triggered()), SLOT(openWhiteboard()));
-@@ -722,6 +725,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -725,6 +728,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.toolbar->addAction(d->act_clear);
  	ui_.toolbar->addAction(d->act_find);
  	ui_.toolbar->addAction(d->act_configure);
@@ -41,7 +43,7 @@
  #ifdef WHITEBOARDING
  	ui_.toolbar->addAction(d->act_whiteboard);
  #endif
-@@ -1071,6 +1075,11 @@ void GCMainDlg::mle_returnPressed()
+@@ -1074,6 +1078,11 @@ void GCMainDlg::mle_returnPressed()
  	Message m(jid());
  	m.setType("groupchat");
  	m.setBody(str);
@@ -53,7 +55,7 @@
  	m.setTimeStamp(QDateTime::currentDateTime());
  	emit d->mle()->appendMessageHistory(m.body());
  
-@@ -1752,6 +1761,7 @@ void GCMainDlg::setLooks()
+@@ -1819,6 +1828,7 @@ void GCMainDlg::setLooks()
  	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
  	if (!css.isEmpty()) {
  		setStyleSheet(css);
@@ -61,8 +63,9 @@
  	}
  	ui_.vsplitter->optionsChanged();
  	ui_.mle->optionsChanged();
---- git.orig/src/htmltextcontroller.cpp
-+++ git/src/htmltextcontroller.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/htmltextcontroller.cpp
 @@ -0,0 +1,320 @@
 +/*
 + * htmltextcontroller.cpp
@@ -384,8 +387,9 @@
 +}
 +
 +#include "htmltextcontroller.moc"
---- git.orig/src/htmltextcontroller.h
-+++ git/src/htmltextcontroller.h
+new file mode 100644
+--- /dev/null
++++ b/src/htmltextcontroller.h
 @@ -0,0 +1,58 @@
 +/*
 + * htmltextcontroller.h
@@ -445,9 +449,9 @@
 +};
 +
 +#endif // HTMLTEXTCONTROLLER_H
---- git.orig/src/messageview.cpp
-+++ git/src/messageview.cpp
-@@ -102,7 +102,12 @@ void MessageView::setPlainText(const QSt
+--- a/src/messageview.cpp
++++ b/src/messageview.cpp
+@@ -102,7 +102,12 @@ void MessageView::setPlainText(const QString &text)
  void MessageView::setHtml(const QString &text)
  {
  	if (_type == Message) {
@@ -461,9 +465,9 @@
  	}
  	_text = text;
  }
---- git.orig/src/msgmle.cpp
-+++ git/src/msgmle.cpp
-@@ -37,6 +37,8 @@
+--- a/src/msgmle.cpp
++++ b/src/msgmle.cpp
+@@ -38,6 +38,8 @@
  #include "spellchecker/spellhighlighter.h"
  #include "spellchecker/spellchecker.h"
  #include "psioptions.h"
@@ -472,7 +476,7 @@
  
  //----------------------------------------------------------------------------
  // ChatEdit
-@@ -47,6 +49,8 @@ ChatEdit::ChatEdit(QWidget *parent)
+@@ -48,6 +50,8 @@ ChatEdit::ChatEdit(QWidget *parent)
  	, check_spelling_(false)
  	, spellhighlighter_(0)
  {
@@ -481,7 +485,7 @@
  	setWordWrapMode(QTextOption::WordWrap);
  	setAcceptRichText(false);
  
-@@ -68,6 +72,7 @@ ChatEdit::~ChatEdit()
+@@ -69,6 +73,7 @@ ChatEdit::~ChatEdit()
  {
  	clearMessageHistory();
  	delete spellhighlighter_;
@@ -489,7 +493,7 @@
  }
  
  void ChatEdit::initActions()
-@@ -107,6 +112,12 @@ QSize ChatEdit::sizeHint() const
+@@ -108,6 +113,12 @@ QSize ChatEdit::sizeHint() const
  	return minimumSizeHint();
  }
  
@@ -502,7 +506,7 @@
  bool ChatEdit::checkSpellingGloballyEnabled()
  {
  	return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
-@@ -355,6 +366,47 @@ void ChatEdit::clearMessageHistory()
+@@ -356,6 +367,47 @@ void ChatEdit::clearMessageHistory()
  	typedMsgsIndex = 0;
  }
  
@@ -550,8 +554,8 @@
  //----------------------------------------------------------------------------
  // LineEdit
  //----------------------------------------------------------------------------
---- git.orig/src/msgmle.h
-+++ git/src/msgmle.h
+--- a/src/msgmle.h
++++ b/src/msgmle.h
 @@ -23,6 +23,8 @@
  
  #include <QTextEdit>
@@ -595,8 +599,8 @@
  };
  
  
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -270,6 +270,7 @@ void PsiChatDlg::setLooks()
  	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
  	if (!css.isEmpty()) {
@@ -623,8 +627,8 @@
  	ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
  	ui_.toolbar->addAction(act_icon_);
  	((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
---- git.orig/src/psichatdlg.h
-+++ git/src/psichatdlg.h
+--- a/src/psichatdlg.h
++++ b/src/psichatdlg.h
 @@ -85,6 +85,7 @@ private:
  	IconAction* act_find;
  	IconAction* act_ps_;
@@ -633,9 +637,9 @@
  	QAction *act_mini_cmd_, *act_minimize_;
  
  	MCmdManager mCmdManager_;
---- git.orig/src/src.pri
-+++ git/src/src.pri
-@@ -122,6 +122,7 @@ HEADERS += \
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -125,6 +125,7 @@ HEADERS += \
  	$$PWD/accountregdlg.h \
  	$$PWD/accountmodifydlg.h \
  	$$PWD/changepwdlg.h \
@@ -643,7 +647,7 @@
  	$$PWD/msgmle.h \
  	$$PWD/chatviewcommon.h \
  	$$PWD/chatview.h \
-@@ -267,6 +268,7 @@ SOURCES += \
+@@ -270,6 +271,7 @@ SOURCES += \
  	$$PWD/accountregdlg.cpp \
  	$$PWD/accountmodifydlg.cpp \
  	$$PWD/changepwdlg.cpp \
