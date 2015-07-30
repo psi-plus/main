@@ -10,7 +10,7 @@
    </dep>
 --- git.orig/qcm/hunspell.qcm
 +++ git/qcm/hunspell.qcm
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,99 @@
 +/*
 +-----BEGIN QCMOD-----
 +name: hunspell
@@ -90,45 +90,19 @@
 +		qc_hunspell_libs += QString("-l") + libname_success;
 +		qc_hunspell_have = true;
 +#else
-+		s = conf->getenv("QC_WITH_HUNSPELL_INC");
-+		if(!s.isEmpty()) {
-+			if(!conf->checkHeader(s, "hunspell.hxx")) {
-+				conf->debug("Hunspell includes not found!");
-+				return false;
-+			}
-+			qc_hunspell_incs += s;
-+		}
-+		else {
-+			QStringList sl;
-+			sl += "/usr/include/hunspell";
-+			sl += "/usr/local/include/hunspell";
-+			sl += "/sw/include/hunspell";
-+			if(!conf->findHeader("hunspell.hxx", sl, &s)) {
-+				conf->debug("Hunspell includes not found!");
-+				return false;
-+			}
-+			qc_hunspell_incs += s;
-+		}
++		qc_hunspell_have = false;
++		qc_hunspell_defs.clear();
++		qc_hunspell_incs.clear();
++		qc_hunspell_libs.clear();
 +
-+		s = conf->getenv("QC_WITH_HUNSPELL_LIB");
-+		if(!s.isEmpty()) {
-+			if(!conf->checkLibrary(s, "hunspell")) {
-+				conf->debug("Hunspell libraries not found!");
-+				return false;
-+			}
-+			qc_hunspell_libs += QString("-L") + s;
-+		}
-+		else {
-+			if(!conf->findLibrary("hunspell", &s)) {
-+				conf->debug("Hunspell libraries not found!");
-+				return false;
-+			}
-+			if (!s.isEmpty())
-+				qc_hunspell_libs += QString("-L") + s;
-+		}
++		QStringList incs;
++		QString version, libs, other;
++		if(!conf->findPkgConfig("hunspell", VersionMin, "1.3.0", &version, &incs, &libs, &other))
++                        return false;
 +
 +		qc_hunspell_defs += "HAVE_HUNSPELL";
-+		qc_hunspell_libs += "-lhunspell-1.3";
++		qc_hunspell_incs += incs;
++		qc_hunspell_libs += libs;
 +		qc_hunspell_have = true;
 +#endif
 +
@@ -219,7 +193,7 @@
 +		QSet<QString> dictPathSet;
 +		QString pathFromEnv = QString::fromLocal8Bit(qgetenv("MYSPELL_DICT_DIR"));
 +		if (!pathFromEnv.isEmpty())
-+		dictPathSet << pathFromEnv;
++			dictPathSet << pathFromEnv;
 +#if defined(Q_OS_WIN)
 +		dictPathSet << QCoreApplication::applicationDirPath() + QLatin1String(stringify(DICTSUBDIR))
 +			    << ApplicationInfo::homeDir(ApplicationInfo::DataLocation) + "/myspell/dicts";
@@ -241,13 +215,13 @@
 +	foreach (const QString &dictPath, dictPaths_) {
 +		QDir dir(dictPath);
 +		if (dir.exists()) {
-+		QFileInfo affInfo(dir.filePath(language + QLatin1String(".aff")));
-+		QFileInfo dicInfo(dir.filePath(language + QLatin1String(".dic")));
-+		if (affInfo.isReadable() && dicInfo.isReadable()) {
-+			aff = affInfo;
-+			dic = dicInfo;
-+			return true;
-+		}
++			QFileInfo affInfo(dir.filePath(language + QLatin1String(".aff")));
++			QFileInfo dicInfo(dir.filePath(language + QLatin1String(".dic")));
++			if (affInfo.isReadable() && dicInfo.isReadable()) {
++				aff = affInfo;
++				dic = dicInfo;
++				return true;
++			}
 +		}
 +	}
 +	return false;
@@ -259,13 +233,13 @@
 +	foreach (const QString &dictPath, dictPaths_) {
 +		QDir dir(dictPath);
 +		if (!dir.exists()) {
-+		continue;
++			continue;
 +		}
 +		foreach (const QFileInfo &fi, dir.entryInfoList(QStringList() << "*.dic", QDir::Files)) {
-+		QLocale locale(fi.baseName());
-+		if (locale != QLocale::c())  {
-+			retHash.insert(locale.nativeLanguageName()+locale.nativeCountryName(), locale);
-+		}
++			QLocale locale(fi.baseName());
++			if (locale != QLocale::c())  {
++				retHash.insert(locale.nativeLanguageName()+locale.nativeCountryName(), locale);
++			}
 +		}
 +	}
 +	supportedLangs_ = retHash.values();
@@ -294,7 +268,7 @@
 +		int sugNum = li.hunspell_->suggest(&result, li.codec->fromUnicode(word));
 +		if (sugNum != 0) {
 +			QStringList qtResult;
-+			for(int i=0; i < sugNum; i++) {
++			for (int i=0; i < sugNum; i++) {
 +				qtResult << li.codec->toUnicode(result[i]);
 +			}
 +			return qtResult;
@@ -314,7 +288,7 @@
 +}
 +bool HunspellChecker::add(const QString& word)
 +{
-+	if(!word.isEmpty()) {
++	if (!word.isEmpty()) {
 +		QString trimmed_word = word.trimmed();
 +		foreach (const LangItem &li, languages_) {
 +			if (li.hunspell_->add(li.codec->fromUnicode(trimmed_word)) != 0) {
@@ -339,7 +313,7 @@
 +}
 --- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.h
 +++ git/src/libpsi/tools/spellchecker/hunspellchecker.h
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,72 @@
 +/*
 + * hunspellchecker.h
 + *
@@ -373,7 +347,6 @@
 +#include <QLocale>
 +#include <QFileInfo>
 +#include <QStringList>
-+#include <QSharedPointer>
 +#include "spellchecker.h"
 +
 +class Hunspell;
