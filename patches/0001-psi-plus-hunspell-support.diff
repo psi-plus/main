@@ -131,7 +131,7 @@
  			return true;
 --- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.cpp
 +++ git/src/libpsi/tools/spellchecker/hunspellchecker.cpp
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,177 @@
 +/*
 + * hunspellchecker.cpp
 + *
@@ -251,8 +251,8 @@
 +	QFileInfo aff, dic;
 +	if (scanDictPaths(language, aff, dic)) {
 +		LangItem li;
-+		li.hunspell_ = new Hunspell(aff.absoluteFilePath().toLocal8Bit(),
-+					    dic.absoluteFilePath().toLocal8Bit());
++		li.hunspell_ = HunspellPtr(new Hunspell(aff.absoluteFilePath().toLocal8Bit(),
++							dic.absoluteFilePath().toLocal8Bit()));
 +		li.codec = QTextCodec::codecForName(QByteArray(li.hunspell_->get_dic_encoding()));
 +		li.info.language = locale.language();
 +		li.info.country = locale.country();
@@ -267,11 +267,10 @@
 +	foreach (const LangItem &li, languages_) {
 +		char **result;
 +		int sugNum = li.hunspell_->suggest(&result, li.codec->fromUnicode(word));
-+		if (sugNum != 0) {
-+			for (int i=0; i < sugNum; i++) {
-+				qtResult << li.codec->toUnicode(result[i]);
-+			}
++		for (int i=0; i < sugNum; i++) {
++			qtResult << li.codec->toUnicode(result[i]);
 +		}
++		li.hunspell_->free_list(&result, sugNum);
 +	}
 +	return qtResult;
 +}
@@ -300,7 +299,7 @@
 +bool HunspellChecker::available() const
 +{
 +	foreach (const LangItem &li, languages_) {
-+		if (li.hunspell_ != NULL) {
++		if (li.hunspell_) {
 +			return true;
 +		}
 +	}
@@ -312,7 +311,7 @@
 +}
 --- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.h
 +++ git/src/libpsi/tools/spellchecker/hunspellchecker.h
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,75 @@
 +/*
 + * hunspellchecker.h
 + *
@@ -346,10 +345,13 @@
 +#include <QLocale>
 +#include <QFileInfo>
 +#include <QStringList>
++#include <QSharedPointer>
 +#include "spellchecker.h"
 +
 +class Hunspell;
 +class QTextCodec;
++
++typedef QSharedPointer<Hunspell> HunspellPtr;
 +
 +class HunspellChecker : public SpellChecker
 +{
@@ -369,7 +371,7 @@
 +		QString filename;
 +	};
 +	struct LangItem {
-+		Hunspell *hunspell_;
++		HunspellPtr hunspell_;
 +		DictInfo info;
 +		QTextCodec *codec;
 +	};
