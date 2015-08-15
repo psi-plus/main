@@ -1,5 +1,5 @@
-diff --git a/options/default.xml b/options/default.xml
-index 4abb214..0472700 100644
+Заходим в «iris»
+Заходим в «src/libpsi»
 --- a/options/default.xml
 +++ b/options/default.xml
 @@ -510,6 +510,7 @@ QLineEdit#le_status_text {
@@ -10,8 +10,6 @@ index 4abb214..0472700 100644
  			</tabs>
  		</ui>
  		<shortcuts comment="Shortcuts">
-diff --git a/src/widgets/psitabbar.cpp b/src/widgets/psitabbar.cpp
-index b93bf77..b60dc77 100644
 --- a/src/widgets/psitabbar.cpp
 +++ b/src/widgets/psitabbar.cpp
 @@ -32,7 +32,7 @@
@@ -41,8 +39,6 @@ index b93bf77..b60dc77 100644
  #if QT_VERSION < 0x040500
  	QPainter painter(this);
  	QPen pen(Qt::cyan);
-diff --git a/src/widgets/psitabbar.h b/src/widgets/psitabbar.h
-index aa0d5b8..27b6328 100644
 --- a/src/widgets/psitabbar.h
 +++ b/src/widgets/psitabbar.h
 @@ -21,12 +21,12 @@
@@ -60,8 +56,6 @@ index aa0d5b8..27b6328 100644
  {
  	Q_OBJECT
  
-diff --git a/src/widgets/psitabwidget.cpp b/src/widgets/psitabwidget.cpp
-index 065fc41..67de434 100644
 --- a/src/widgets/psitabwidget.cpp
 +++ b/src/widgets/psitabwidget.cpp
 @@ -38,7 +38,10 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
@@ -123,8 +117,6 @@ index 065fc41..67de434 100644
  /**
   * Selects the page for the specified widget.
   */
-diff --git a/src/widgets/psitabwidget.h b/src/widgets/psitabwidget.h
-index 4d4b49e..e1a00f3 100644
 --- a/src/widgets/psitabwidget.h
 +++ b/src/widgets/psitabwidget.h
 @@ -22,7 +22,6 @@
@@ -154,12 +146,10 @@ index 4d4b49e..e1a00f3 100644
  	QVBoxLayout *layout_;
  	QHBoxLayout *barLayout_;
  	QStackedLayout *stacked_;
-diff --git a/src/widgets/tabbar.cpp b/src/widgets/tabbar.cpp
 new file mode 100644
-index 0000000..0452cb9
 --- /dev/null
 +++ b/src/widgets/tabbar.cpp
-@@ -0,0 +1,676 @@
+@@ -0,0 +1,683 @@
 +/*
 + * tabbar.cpp
 + * Copyright (C) 2013-2014  Ivan Romanov <drizt@land.ru>
@@ -636,7 +626,9 @@ index 0000000..0452cb9
 +		QStyleOptionTabBarBaseV2 optTabBase;
 +		initStyleBaseOption(&optTabBase, this, size());
 +
-+		optTabBase.selectedTabRect = tabs[selected].rect;
++		if (selected >= 0) {
++			optTabBase.selectedTabRect = tabs[selected].rect;
++		}
 +
 +		for (int i = 0; i < tabs.size(); ++i)
 +			optTabBase.tabBarRect |= tabs[i].rect;
@@ -644,7 +636,12 @@ index 0000000..0452cb9
 +		p.drawPrimitive(QStyle::PE_FrameTabBarBase, optTabBase);
 +	}
 +
-+	int rowHeight = tabs[selected].rect.height();
++	int rowHeight = 0;
++	if (selected >= 0) {
++		rowHeight = tabs[selected].rect.height();
++	} else if (tabs.count()) {
++		rowHeight = tabs[0].rect.height();
++	}
 +
 +	// There is some problems when tabs are painted not in first row.
 +	// Draw on a pixmap like a painting in the first row. Then move image
@@ -836,9 +833,7 @@ index 0000000..0452cb9
 +}
 +
 +#include "tabbar.moc"
-diff --git a/src/widgets/tabbar.h b/src/widgets/tabbar.h
 new file mode 100644
-index 0000000..84f4188
 --- /dev/null
 +++ b/src/widgets/tabbar.h
 @@ -0,0 +1,62 @@
@@ -904,8 +899,6 @@ index 0000000..84f4188
 +	class Private;
 +	Private *d;
 +};
-diff --git a/src/widgets/widgets.pri b/src/widgets/widgets.pri
-index a2e1290..cbd770b 100644
 --- a/src/widgets/widgets.pri
 +++ b/src/widgets/widgets.pri
 @@ -18,8 +18,8 @@ SOURCES += \
