@@ -149,6 +149,56 @@
 +	emit clicked(point,Qt::MidButton);
 +}
 +#endif
+--- git.orig/src/psitrayicon.h
++++ git/src/psitrayicon.h
+@@ -5,11 +5,24 @@
+ #include <QRgb>
+ #include <QSystemTrayIcon>
+ 
++#ifdef USE_KDE
++#ifndef USE_KDE5
++#include <kstatusnotifieritem.h>
++#else
++#include <KStatusNotifierItem>
++#endif
++#include <QSharedPointer>
++typedef QSharedPointer<KStatusNotifierItem> KStatusNotifierItemPtr;
++#endif
++
++
+ class PsiIcon;
+ class QMenu;
+ class QPoint;
+ class QPixmap;
+ 
++typedef QSharedPointer<QSystemTrayIcon> QSystemTrayIconPtr;
++
+ class PsiTrayIcon : public QObject
+ {
+ 	Q_OBJECT
+@@ -38,6 +51,10 @@ public slots:
+ private slots:
+ 	void animate();
+ 	void trayicon_activated(QSystemTrayIcon::ActivationReason);
++#ifdef USE_KDE
++	void iconActivated(bool isIt, QPoint point);
++	void iconActivatedSecondary(QPoint point);
++#endif
+ 
+ protected:
+ 	QPixmap makeIcon();
+@@ -46,7 +63,10 @@ protected:
+ 
+ private:
+ 	PsiIcon* icon_;
+-	QSystemTrayIcon* trayicon_;
++#ifdef USE_KDE
++	KStatusNotifierItemPtr newIcon_;
++#endif
++	QSystemTrayIconPtr trayicon_;
+ 	quintptr realIcon_;
+ };
+ 
 --- git.orig/src/src.pri
 +++ git/src/src.pri
 @@ -631,6 +631,19 @@ dbus {
