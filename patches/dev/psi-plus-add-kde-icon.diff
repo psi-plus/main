@@ -66,7 +66,7 @@
  	if ( icon_ ) {
  		icon_->disconnect();
  		icon_->stop();
-@@ -35,13 +69,23 @@ PsiTrayIcon::~PsiTrayIcon()
+@@ -35,13 +69,29 @@ PsiTrayIcon::~PsiTrayIcon()
  
  void PsiTrayIcon::setContextMenu(QMenu* menu)
  {
@@ -74,9 +74,15 @@
 +	if (trayicon_) {
 +		trayicon_->setContextMenu(menu);
 +	}
++#ifdef USE_KDE
 +	else {
-+
++#ifndef USE_KDE5
++		newIcon_->setContextMenu(static_cast<KMenu*>(menu));
++#else
++		newIcon_->setContextMenu(menu);
++#endif
 +	}
++#endif
  }
  
  void PsiTrayIcon::setToolTip(const QString &str)
@@ -91,7 +97,7 @@
  #else
  	Q_UNUSED(str)
  #endif
-@@ -90,12 +134,22 @@ bool PsiTrayIcon::isWMDock()
+@@ -90,12 +140,22 @@ bool PsiTrayIcon::isWMDock()
  
  void PsiTrayIcon::show()
  {
@@ -116,7 +122,7 @@
  }
  
  
-@@ -197,7 +251,14 @@ void PsiTrayIcon::animate()
+@@ -197,7 +257,14 @@ void PsiTrayIcon::animate()
  		p = makeIcon();
  		QPixmapCache::insert( cachedName, p );
  	}
@@ -132,7 +138,7 @@
  }
  
  bool PsiTrayIcon::eventFilter(QObject *obj, QEvent *event)
-@@ -208,3 +269,16 @@ bool PsiTrayIcon::eventFilter(QObject *o
+@@ -208,3 +275,16 @@ bool PsiTrayIcon::eventFilter(QObject *o
  	}
  	return QObject::eventFilter(obj, event);
  }
