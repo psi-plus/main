@@ -1,3 +1,5 @@
+diff --git a/options/default.xml b/options/default.xml
+index bfc7271..63be8e0 100644
 --- a/options/default.xml
 +++ b/options/default.xml
 @@ -377,6 +377,9 @@
@@ -10,6 +12,8 @@
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
  				<use-tabs type="bool">true</use-tabs>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
+diff --git a/src/tabs/tabdlg.cpp b/src/tabs/tabdlg.cpp
+index 39a4518..9ebbcd5 100644
 --- a/src/tabs/tabdlg.cpp
 +++ b/src/tabs/tabdlg.cpp
 @@ -161,6 +161,7 @@ TabDlg::TabDlg(TabManager* tabManager, const QString& geometryOption, TabDlgDele
@@ -44,6 +48,8 @@
   * Set the icon of the tab.
   */
  void TabDlg::setTabIcon(QWidget *widget,const QIcon &icon)
+diff --git a/src/tabs/tabdlg.h b/src/tabs/tabdlg.h
+index a31b61d..3d036a1 100644
 --- a/src/tabs/tabdlg.h
 +++ b/src/tabs/tabdlg.h
 @@ -121,6 +121,7 @@ public slots:
@@ -54,6 +60,8 @@
  
  signals:
  	void resized(QSize size);
+diff --git a/src/widgets/psitabbar.cpp b/src/widgets/psitabbar.cpp
+index d5fca8d..5224e7e 100644
 --- a/src/widgets/psitabbar.cpp
 +++ b/src/widgets/psitabbar.cpp
 @@ -24,6 +24,9 @@
@@ -66,21 +74,19 @@
  
  /**
   * Constructor
-@@ -32,6 +35,13 @@ PsiTabBar::PsiTabBar(PsiTabWidget *parent)
+@@ -32,6 +35,11 @@ PsiTabBar::PsiTabBar(PsiTabWidget *parent)
  		: QTabBar(parent)
  		, dragsEnabled_(true) {
  	//setAcceptDrops(true);
 +
-+#if QT_VERSION >= 0x040500
 +	setMovable(true);
 +	setTabsClosable(true);
 +	setSelectionBehaviorOnRemove ( QTabBar::SelectPreviousTab );
-+#endif
 +	currTab=-1;
  }
  
  /**
-@@ -71,20 +81,42 @@ int PsiTabBar::findTabUnder(const QPoint &pos) {
+@@ -71,21 +79,23 @@ int PsiTabBar::findTabUnder(const QPoint &pos) {
  }
  
  void PsiTabBar::mousePressEvent(QMouseEvent *event) {
@@ -90,10 +96,16 @@
 -		dragTab_ = tabno;
 -		if (tabno != -1) {
 -			setCurrentIndex(tabno);
+-		}
+-	} else if (event->button() == Qt::MidButton) {
+-		if (tabno != -1) {
+-			emit mouseMiddleClickTab(tabno);
+-		}
+-	}
 +	QTabBar::mousePressEvent(event);
-+	event->accept();
-+}
-+
+ 	event->accept();
+ }
+ 
 +void PsiTabBar::mouseReleaseEvent ( QMouseEvent * event )
 +{
 +	if (event->button() == Qt::MidButton && findTabUnder(event->pos())!=-1) {
@@ -102,38 +114,15 @@
 +	}
 +	QTabBar::mouseReleaseEvent(event);
 +
-+#if QT_VERSION >= 0x040500
 +	if ((dragTab_ != -1) && (event->button() != Qt::MidButton)) {
 +		this->setCurrentIndex(currentIndex());
 +	}
-+#else
-+	if ((dragTab_ != currTab)&&(currTab!=-1)&&(dragTab_!=-1)) {
-+		if (dragTab_ < currTab) {
-+			this->insertTab(isOnTheLeft ? currTab : currTab+1, this->tabIcon(dragTab_), this->tabText(dragTab_));
-+			this->removeTab(dragTab_);
-+			emit tabMoved(dragTab_, isOnTheLeft ? currTab-1 : currTab);
- 		}
--	} else if (event->button() == Qt::MidButton) {
--		if (tabno != -1) {
--			emit mouseMiddleClickTab(tabno);
-+		else {
-+			this->insertTab(isOnTheLeft ? currTab : currTab+1, this->tabIcon(dragTab_), this->tabText(dragTab_));
-+			this->removeTab(dragTab_+1);
-+			emit tabMoved(dragTab_, isOnTheLeft ? currTab : currTab+1);
- 		}
- 	}
-+
-+	dragTab_ = -1;
-+	currTab = -1;
-+	this->update();
- 	event->accept();
--}
-+#endif
 +};
- 
++
  /*
   * Used for starting drags of tabs
-@@ -94,6 +126,7 @@ void PsiTabBar::mouseMoveEvent(QMouseEvent *event) {
+  */
+@@ -94,6 +104,7 @@ void PsiTabBar::mouseMoveEvent(QMouseEvent *event) {
  		return;
  	}
  	if (!(event->buttons() & Qt::LeftButton)) {
@@ -141,10 +130,11 @@
  		return;
  	}
  	if ((event->pos() - dragStartPosition_).manhattanLength()
-@@ -102,22 +135,21 @@ void PsiTabBar::mouseMoveEvent(QMouseEvent *event) {
+@@ -101,23 +112,7 @@ void PsiTabBar::mouseMoveEvent(QMouseEvent *event) {
+ 		return;
  	}
  
- 	if (dragTab_ != -1) {
+-	if (dragTab_ != -1) {
 -		QDrag *drag = new QDrag(this);
 -		QMimeData *mimeData = new QMimeData;
 -		QByteArray data;
@@ -158,26 +148,14 @@
 -
 -		Qt::DropAction dropAction = drag->start(Qt::MoveAction);
 -		Q_UNUSED(dropAction);
-+#if QT_VERSION < 0x040500
-+	currTab = findTabUnder(event->pos());
-+	this->update(this->tabRect(currTab));
-+
-+	if (tabRect(currTab).center().x() - event->pos().x() > 0)
-+		isOnTheLeft = 1;
-+	else
-+		isOnTheLeft = 0;
-+#endif
- 	}
+-	}
 -
-+#if QT_VERSION >= 0x040500
+-	event->accept();
 +	QTabBar::mouseMoveEvent(event);
-+#else
- 	event->accept();
-+#endif
  }
  
  void PsiTabBar::contextMenuEvent(QContextMenuEvent *event) {
-@@ -126,6 +158,9 @@ void PsiTabBar::contextMenuEvent(QContextMenuEvent *event) {
+@@ -126,6 +121,9 @@ void PsiTabBar::contextMenuEvent(QContextMenuEvent *event) {
  }
  
  void PsiTabBar::wheelEvent(QWheelEvent *event) {
@@ -187,7 +165,7 @@
  	int numDegrees = event->delta() / 8;
  	int numSteps = numDegrees / 15;
  
-@@ -147,3 +182,28 @@ void PsiTabBar::wheelEvent(QWheelEvent *event) {
+@@ -147,3 +145,13 @@ void PsiTabBar::wheelEvent(QWheelEvent *event) {
  void PsiTabBar::setDragsEnabled(bool enabled) {
  	dragsEnabled_ = enabled;
  }
@@ -195,40 +173,17 @@
 +void PsiTabBar::paintEvent(QPaintEvent *event)
 +{
 +	QTabBar::paintEvent(event);
-+#if QT_VERSION < 0x040500
-+	QPainter painter(this);
-+	QPen pen(Qt::cyan);
-+	pen.setWidth(4);
-+	pen.setStyle(Qt::SolidLine);
-+	painter.setPen(pen);
-+	if ( currTab != -1) {
-+		if (isOnTheLeft)
-+			painter.drawLine(tabRect(currTab).topLeft().x()+3, tabRect(currTab).topLeft().y(),
-+			tabRect(currTab).bottomLeft().x()+3, tabRect(currTab ).bottomLeft().y());
-+		else
-+			painter.drawLine(tabRect(currTab).topRight().x(), tabRect(currTab).topRight().y(),
-+			tabRect(currTab).bottomRight().x(), tabRect(currTab ).bottomRight().y());
-+	}
-+#endif
 +};
 +
 +void PsiTabBar::resizeEvent(QResizeEvent * event)
 +{
 +	QTabBar::resizeEvent(event);
 +};
+diff --git a/src/widgets/psitabbar.h b/src/widgets/psitabbar.h
+index 0c98dda..20e3363 100644
 --- a/src/widgets/psitabbar.h
 +++ b/src/widgets/psitabbar.h
-@@ -41,6 +41,9 @@ signals:
- 	void mouseDoubleClickTab(int tab);
- 	void mouseMiddleClickTab(int tab);
- 	void tabDropped(int tab, PsiTabBar *source);
-+#if QT_VERSION <= 0x040500
-+	void tabMoved(int from, int to);
-+#endif
- 	// context menu on the blank space will have tab==-1
- 	void contextMenu(QContextMenuEvent *event, int tab);
- 
-@@ -52,11 +55,16 @@ protected:
+@@ -52,11 +52,16 @@ protected:
  	void mousePressEvent(QMouseEvent *event);
  	void contextMenuEvent(QContextMenuEvent *event);
  	void wheelEvent(QWheelEvent *event);
@@ -245,17 +200,17 @@
  	bool dragsEnabled_;
  };
  
+diff --git a/src/widgets/psitabwidget.cpp b/src/widgets/psitabwidget.cpp
+index 94cef66..b5483dc 100644
 --- a/src/widgets/psitabwidget.cpp
 +++ b/src/widgets/psitabwidget.cpp
-@@ -79,11 +79,18 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
+@@ -79,11 +79,16 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
  		closeButton_->hide();
  		downButton_->hide();
  	}
-+#if QT_VERSION >= 0x040500
 +	if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-close-buttons").toBool()){
 +		tabBar_->setTabsClosable(false);
 +	}
-+#endif
  	connect( tabBar_, SIGNAL(mouseDoubleClickTab(int)), SLOT(mouseDoubleClickTab(int)));
  	connect( tabBar_, SIGNAL(mouseMiddleClickTab(int)), SLOT(mouseMiddleClickTab(int)));
  	connect( tabBar_, SIGNAL( currentChanged(int)), SLOT(tab_currentChanged(int)));
@@ -266,7 +221,7 @@
  }
  
  void PsiTabWidget::setCloseIcon(const QIcon& icon) {
-@@ -348,3 +355,25 @@ void PsiTabWidget::setTabButtonsShown(bool shown) {
+@@ -348,3 +353,22 @@ void PsiTabWidget::setTabButtonsShown(bool shown) {
  void PsiTabWidget::setDragsEnabled(bool enabled) {
  	((PsiTabBar *)tabBar_)->setDragsEnabled(enabled);
  }
@@ -286,12 +241,11 @@
 +		stacked_->insertWidget(to,widgets_[to]);
 +	}
 +
-+#if QT_VERSION <= 0x040500
-+	setCurrentPage(to);
-+#endif
 +	emit currentChanged(currentPage());
 +
 +};
+diff --git a/src/widgets/psitabwidget.h b/src/widgets/psitabwidget.h
+index 1f623a9..73c7e4b 100644
 --- a/src/widgets/psitabwidget.h
 +++ b/src/widgets/psitabwidget.h
 @@ -74,6 +74,7 @@ signals:
