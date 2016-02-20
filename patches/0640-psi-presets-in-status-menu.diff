@@ -103,7 +103,7 @@ new file mode 100644
 +      }
 +}
 new file mode 100644
-index 0000000..1d8f89a
+index 0000000..fe2711b
 --- /dev/null
 +++ b/src/libpsi/tools/priorityvalidator.h
 @@ -0,0 +1,34 @@
@@ -155,7 +155,7 @@ index 0000000..1d8f89a
  	$$PWD/iodeviceopener.cpp
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -58,6 +58,7 @@
+@@ -60,6 +60,7 @@
  				<maximum comment="The maximum number of recently joined rooms that should be remembered" type="int">10</maximum>
  			</recent-joins>
  			<reasons type="QStringList" />
@@ -163,15 +163,15 @@ index 0000000..1d8f89a
  		</muc>
  		<pgp comment="PGP encryption options">
  			<enable comment="Enable PGP globally" type="bool">true</enable>
-@@ -117,6 +118,7 @@
+@@ -118,6 +119,7 @@
+ 				<warn-before-clear type="bool">true</warn-before-clear>
  				<css type="QString" />
- 				<only-paste-template type="bool">false</only-paste-template>
  				<hide-when-closing type="bool">false</hide-when-closing>
 +				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  			</chat>
  			<save>
  				<toolbars-state type="QByteArray"/>
-@@ -286,6 +288,8 @@ QLineEdit#le_status_text {
+@@ -287,6 +289,8 @@ QLineEdit#le_status_text {
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
@@ -777,9 +777,9 @@ index 0000000..3effaad
 +		connect(statusMenu_, SIGNAL(statusPresetDialogForced(const QString &)), account->account(), SLOT(showStatusDialog(const QString &)));
 +		connect(statusMenu_, SIGNAL(reconnectActivated()), account->account(), SLOT(reconnectOnce()));
  
- 		moodAction_ = new IconAction(tr("Mood"), this, QString(("mood/%1")).arg(account->account()->mood().typeValue()));
- 		connect(moodAction_, SIGNAL(triggered()), SLOT(setMood()));
-@@ -183,7 +187,7 @@ private slots:
+ 		QString moodIcon = account->account()->mood().typeValue();
+ 		if (!moodIcon.isNull()) {
+@@ -187,7 +191,7 @@ private slots:
  		if (!account)
  			return;
  
@@ -788,7 +788,7 @@ index 0000000..3effaad
  #ifndef USE_PEP
  		moodAction_->setVisible(false);
  		activityAction_->setVisible(false);
-@@ -233,12 +237,12 @@ private slots:
+@@ -237,12 +241,12 @@ private slots:
  		adminDeleteMotdAction_->setVisible(newMessageAction_->isVisible());
  	}
  
@@ -890,7 +890,7 @@ index 0000000..17474bd
 +#endif // GLOBALSTATUSMENU_H
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -1362,9 +1362,8 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1405,9 +1405,8 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		GCUserViewItem* contact = (GCUserViewItem*) ui_.lv_users->findEntry(nick);
  		if (contact == NULL) {
  			//contact joining
@@ -901,7 +901,7 @@ index 0000000..17474bd
  				if ( options_->getOption("options.muc.show-role-affiliation").toBool() ) {
  					if (s.mucItem().role() != MUCItem::NoRole) {
  						if (s.mucItem().affiliation() != MUCItem::NoAffiliation) {
-@@ -1383,6 +1382,15 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1426,6 +1425,15 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  				} else {
  					message = message.arg(nick);
  				}
@@ -917,7 +917,7 @@ index 0000000..17474bd
  				appendSysMsg(message);
  			}
  		}
-@@ -1407,14 +1415,11 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1450,14 +1458,11 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  				}
  			}
  			if ( !d->connecting && options_->getOption("options.muc.show-status-changes").toBool() ) {
@@ -4000,7 +4000,7 @@ new file mode 100644
  {
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
-@@ -367,6 +367,7 @@ public:
+@@ -366,6 +366,7 @@ public:
  		, psi(0)
  		, account(parent)
  		, client(0)
@@ -4008,7 +4008,7 @@ new file mode 100644
  		, eventQueue(0)
  		, xmlConsole(0)
  		, blockTransportPopupList(0)
-@@ -418,6 +419,7 @@ public:
+@@ -417,6 +418,7 @@ public:
  	Jid jid, nextJid;
  	Status loginStatus;
  	bool loginWithPriority;
@@ -4016,7 +4016,7 @@ new file mode 100644
  	EventQueue *eventQueue;
  	XmlConsole *xmlConsole;
  	UserList userList;
-@@ -872,11 +874,9 @@ public:
+@@ -871,11 +873,9 @@ public:
  	{
  		if (!account->isAvailable())
  			return;
@@ -4031,7 +4031,7 @@ new file mode 100644
  			account->setStatusDirect(status, withPriority);
  		}
  	}
-@@ -901,14 +901,26 @@ public:
+@@ -900,14 +900,26 @@ public:
  private:
  	Status lastManualStatus_;
  
@@ -4061,7 +4061,7 @@ new file mode 100644
  			}
  
  			switch (autoAway) {
-@@ -1564,16 +1576,38 @@ void PsiAccount::autoLogin()
+@@ -1563,16 +1575,38 @@ void PsiAccount::autoLogin()
  	if (enabled()) {
  		bool autoLogin = d->acc.opt_auto;
  		if (autoLogin) {
@@ -4106,7 +4106,7 @@ new file mode 100644
  // logs on with the active account settings
  void PsiAccount::login()
  {
-@@ -1707,7 +1741,7 @@ void PsiAccount::forceDisconnect(bool fast, const XMPP::Status &s)
+@@ -1706,7 +1740,7 @@ void PsiAccount::forceDisconnect(bool fast, const XMPP::Status &s)
  		d->client->removeExtension("pep");
  
  		// send logout status
@@ -4115,7 +4115,7 @@ new file mode 100644
  		d->client->setPresence(s);
  
  		// we are not going to restore session if we a here?
-@@ -2816,7 +2850,7 @@ Status PsiAccount::loggedOutStatus()
+@@ -2806,7 +2840,7 @@ Status PsiAccount::loggedOutStatus()
  #ifdef YAPSI
  	return Status(Status::Offline);
  #else
@@ -4124,7 +4124,7 @@ new file mode 100644
  #endif
  }
  
-@@ -2824,10 +2858,16 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
+@@ -2814,10 +2848,16 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
  {
  	Status s = _s;
  	if (!withPriority)
@@ -4142,7 +4142,7 @@ new file mode 100644
  	}
  
  	// Block all transports' contacts' status change popups from popping
-@@ -2895,18 +2935,37 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
+@@ -2885,18 +2925,37 @@ void PsiAccount::setStatus(const Status &_s,  bool withPriority, bool isManualSt
  	}
  }
  
@@ -4182,7 +4182,7 @@ new file mode 100644
  
  	// using pgp?
  	if(!d->cur_pgpSecretKey.isNull()) {
-@@ -3687,25 +3746,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
+@@ -3677,25 +3736,61 @@ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  	return c;
  }
  
@@ -4258,7 +4258,7 @@ new file mode 100644
  	}
  }
  
-@@ -5455,7 +5550,7 @@ void PsiAccount::groupChatLeave(const QString &host, const QString &room)
+@@ -5450,7 +5545,7 @@ void PsiAccount::groupChatLeave(const QString &host, const QString &room)
  {
  	Jid j(room + '@' + host);
  	d->groupchats.removeAll(j.bare());
@@ -4645,7 +4645,7 @@ new file mode 100644
  		w->show();
 --- a/src/psiiconset.cpp
 +++ b/src/psiiconset.cpp
-@@ -625,7 +625,7 @@ PsiIcon *PsiIconset::event2icon(const PsiEvent::Ptr &e)
+@@ -661,7 +661,7 @@ PsiIcon *PsiIconset::event2icon(const PsiEvent::Ptr &e)
  	return d->jid2icon(e->from(), icon);
  }
  
@@ -4656,7 +4656,7 @@ new file mode 100644
  	switch ( s ) {
 --- a/src/psiiconset.h
 +++ b/src/psiiconset.h
-@@ -103,4 +103,6 @@ private:
+@@ -104,4 +104,6 @@ private:
  	bool loadClients();
  };
  
@@ -4665,7 +4665,7 @@ new file mode 100644
  #endif
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -470,6 +470,8 @@ newcontactlist {
+@@ -469,6 +469,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.h \
  		$$PWD/contactupdatesmanager.h \
  		$$PWD/statusmenu.h \
@@ -4674,7 +4674,7 @@ new file mode 100644
  		$$PWD/psirosterwidget.h \
  		$$PWD/psifilteredcontactlistview.h
  
-@@ -500,6 +502,8 @@ newcontactlist {
+@@ -499,6 +501,8 @@ newcontactlist {
  		$$PWD/contactlistitemproxy.cpp \
  		$$PWD/contactupdatesmanager.cpp \
  		$$PWD/statusmenu.cpp \
