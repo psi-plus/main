@@ -1,5 +1,5 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -534,6 +534,7 @@ QLineEdit#le_status_text {
  				<show_self type="QKeySequence" comment="Show Self"></show_self>
  				<show_statusmsg type="QKeySequence" comment="Show Status Message"></show_statusmsg>
@@ -8,8 +8,9 @@
  				<status_all type="QKeySequence" comment="Status All"></status_all>
  				<status_group type="QKeySequence" comment="Status Group"></status_group>
  				<status_chat type="QKeySequence" comment="Status Chat"></status_chat>
---- git.orig/src/activecontactsmenu.cpp
-+++ git/src/activecontactsmenu.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/activecontactsmenu.cpp
 @@ -0,0 +1,70 @@
 +/*
 + * activecontactsmenu.cpp
@@ -81,8 +82,10 @@
 +
 +
 +#include "activecontactsmenu.moc"
---- git.orig/src/activecontactsmenu.h
-+++ git/src/activecontactsmenu.h
+new file mode 100644
+index 0000000..d9edf4d
+--- /dev/null
++++ b/src/activecontactsmenu.h
 @@ -0,0 +1,38 @@
 +/*
 + * activecontactsmenu.h
@@ -122,8 +125,8 @@
 +};
 +
 +#endif
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
 @@ -74,6 +74,7 @@
  #include "mooddlg.h"
  #include "activitydlg.h"
@@ -132,7 +135,7 @@
  
  #include "mainwin_p.h"
  
-@@ -660,6 +661,8 @@ void MainWin::registerAction( IconAction
+@@ -660,6 +661,8 @@ void MainWin::registerAction( IconAction* action )
  	} actionlist[] = {
  		{ "choose_status", activated, this, SLOT( actChooseStatusActivated() ) },
  		{ "reconnect_all", activated, this, SLOT( actReconnectActivated() ) },
@@ -156,8 +159,8 @@
  void MainWin::activatedAccOption(PsiAccount* pa, int x)
  {
  	if(x == 0) {
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+--- a/src/mainwin.h
++++ b/src/mainwin.h
 @@ -148,6 +148,7 @@ private slots:
  	void actSetMoodActivated();
  	void actSetActivityActivated();
@@ -166,9 +169,9 @@
  
  	bool showDockMenu(const QPoint &);
  	void dockActivated();
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -3330,6 +3330,17 @@ QList<ChatDlg*> PsiAccount::findChatDial
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -3326,6 +3326,17 @@ QList<ChatDlg*> PsiAccount::findChatDialogs(const Jid& jid, bool compareResource
  	return findDialogs<ChatDlg*>(jid, compareResource);
  }
  
@@ -186,8 +189,8 @@
  QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
  {
  	return d->findDialog(mo, jid, compareResource);
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
 @@ -166,6 +166,8 @@ public:
  	ChatDlg* findChatDialogEx(const Jid& jid) const;
  	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
@@ -197,9 +200,9 @@
  	template<typename T>
  	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const {
  		return static_cast<T>(findDialog(((T)0)->staticMetaObject, jid, compareResource));
---- git.orig/src/psiactionlist.cpp
-+++ git/src/psiactionlist.cpp
-@@ -190,9 +190,13 @@ void PsiActionList::Private::createMainW
+--- a/src/psiactionlist.cpp
++++ b/src/psiactionlist.cpp
+@@ -190,9 +190,13 @@ void PsiActionList::Private::createMainWin()
  		IconAction *eventNotifier = new EventNotifierAction(this, "EventNotifierAction");
  		eventNotifier->setWhatsThis (tr("Special item that displays number of pending events"));
  
@@ -213,9 +216,9 @@
  			{ "event_notifier", eventNotifier },
  			{ "", 0 }
  		};
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
-@@ -33,6 +33,7 @@
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
+@@ -32,6 +32,7 @@
  #include "messageview.h"
  #include "iconselect.h"
  #include "avatars.h"
@@ -223,17 +226,17 @@
  #include "psitooltip.h"
  #include "psioptions.h"
  #include "coloropt.h"
-@@ -496,6 +497,9 @@ void PsiChatDlg::initToolButtons()
+@@ -472,6 +473,9 @@ void PsiChatDlg::initToolButtons()
  
- 	act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
- 	act_templates_->setMenu(getTemplateMenu());
+ 	act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
+ 	connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
 +
 +	act_active_contacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
 +	connect(act_active_contacts, SIGNAL(triggered()), SLOT(actActiveContacts()));
  }
  
  void PsiChatDlg::initToolBar()
-@@ -524,6 +528,7 @@ void PsiChatDlg::initToolBar()
+@@ -496,6 +500,7 @@ void PsiChatDlg::initToolBar()
  		ui_.toolbar->addAction(act_voice_);
  	}
  	ui_.toolbar->addAction(act_add_contact);
@@ -241,7 +244,7 @@
  }
  
  void PsiChatDlg::contextMenuEvent(QContextMenuEvent *)
-@@ -681,6 +686,14 @@ void PsiChatDlg::updateJidWidget(const Q
+@@ -653,6 +658,14 @@ void PsiChatDlg::updateJidWidget(const QList<UserListItem*> &ul, int status, boo
  	internal_change = false;
  }
  
@@ -256,17 +259,17 @@
  void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString)
  {
  	Q_UNUSED(statusString);
---- git.orig/src/psichatdlg.h
-+++ git/src/psichatdlg.h
-@@ -61,6 +61,7 @@ private slots:
- 	void contactChanged();
+--- a/src/psichatdlg.h
++++ b/src/psichatdlg.h
+@@ -52,6 +52,7 @@ private slots:
  	QString makeContactName(const QString &name, const Jid &jid) const;
  	void doSwitchJidMode();
+ 	void copyUserJid();
 +	void actActiveContacts();
  
- private:
- 	void initToolBar();
-@@ -109,6 +110,7 @@ private:
+ 	// reimplemented
+ 	void chatEditCreated();
+@@ -103,6 +104,7 @@ private:
  
  	ActionLineEdit *le_autojid;
  	IconAction *act_autojid;
@@ -274,8 +277,8 @@
  
  	MCmdManager mCmdManager_;
  	MCmdSimpleSite mCmdSite_;
---- git.orig/src/psicontact.cpp
-+++ git/src/psicontact.cpp
+--- a/src/psicontact.cpp
++++ b/src/psicontact.cpp
 @@ -540,6 +540,17 @@ bool PsiContact::isAnimated() const
  }
  
@@ -294,8 +297,8 @@
   * Contact should always be visible if it's alerting.
   */
  bool PsiContact::shouldBeVisible() const
---- git.orig/src/psicontact.h
-+++ git/src/psicontact.h
+--- a/src/psicontact.h
++++ b/src/psicontact.h
 @@ -66,6 +66,8 @@ public:
  
  	virtual bool isAnimated() const;
@@ -305,9 +308,9 @@
  	void activate();
  
  	virtual void setEditing(bool editing);
---- git.orig/src/src.pri
-+++ git/src/src.pri
-@@ -130,6 +130,7 @@ HEADERS += \
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -133,6 +133,7 @@ HEADERS += \
  	$$PWD/statusdlg.h \
  	$$PWD/statuscombobox.h \
  	$$PWD/eventdlg.h \
@@ -315,7 +318,7 @@
  	$$PWD/chatdlg.h \
  	$$PWD/psichatdlg.h \
  	$$PWD/chatsplitter.h \
-@@ -276,6 +277,7 @@ SOURCES += \
+@@ -281,6 +282,7 @@ SOURCES += \
  	$$PWD/statusdlg.cpp \
  	$$PWD/statuscombobox.cpp \
  	$$PWD/eventdlg.cpp \
