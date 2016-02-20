@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -124,6 +124,8 @@
+@@ -125,6 +125,8 @@
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
  				<log-height type="int">325</log-height>
  				<chatedit-height type="int">10</chatedit-height>
@@ -154,7 +154,7 @@
            </widget>
           </item>
           <item>
-@@ -366,6 +378,15 @@
+@@ -363,6 +375,15 @@
     <header>iconlabel.h</header>
    </customwidget>
   </customwidgets>
@@ -172,7 +172,7 @@
  </ui>
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
-@@ -2726,9 +2726,9 @@ void PsiAccount::processIncomingMessage(const Message &_m)
+@@ -2716,9 +2716,9 @@ void PsiAccount::processIncomingMessage(const Message &_m)
  	else
  		j = ul.first()->jid();
  
@@ -184,7 +184,7 @@
  
  	if(m.type() == "error") {
  		Stanza::Error err = m.error();
-@@ -2760,6 +2760,13 @@ void PsiAccount::processIncomingMessage(const Message &_m)
+@@ -2750,6 +2750,13 @@ void PsiAccount::processIncomingMessage(const Message &_m)
  			else if (type == "chat")
  				m.setType("chat");
  			else if (type == "current-open") {
@@ -198,7 +198,7 @@
  				if (c != NULL && !c->isHidden())
  					m.setType("chat");
  				else
-@@ -3214,9 +3221,33 @@ bool PsiAccount::validRosterExchangeItem(const RosterExchangeItem& item)
+@@ -3204,9 +3211,33 @@ bool PsiAccount::validRosterExchangeItem(const RosterExchangeItem& item)
  	return false;
  }
  
@@ -234,7 +234,7 @@
  }
  
  QWidget* PsiAccount::findDialog(const QMetaObject& mo, const Jid& jid, bool compareResource) const
-@@ -3731,7 +3762,8 @@ EventDlg *PsiAccount::ensureEventDlg(const Jid &j)
+@@ -3721,7 +3752,8 @@ EventDlg *PsiAccount::ensureEventDlg(const Jid &j)
  
  ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  {
@@ -244,7 +244,7 @@
  	if(!c) {
  		// create the chatbox
  		c = ChatDlg::create(j, this, d->tabManager);
-@@ -3749,6 +3781,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
+@@ -3739,6 +3771,7 @@ ChatDlg *PsiAccount::ensureChatDlg(const Jid &j)
  #endif
  	}
  	else {
@@ -252,7 +252,7 @@
  		// on X11, do a special reparent to open on the right desktop
  #ifdef HAVE_X11
  		/* KIS added an exception for tabs here. We do *not* want chats flying
-@@ -4932,12 +4965,12 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -4927,12 +4960,12 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		}
  		else if (m.messageReceipt() == ReceiptReceived) {
  			if (o->getOption("options.ui.notifications.request-receipts").toBool()) {
@@ -271,7 +271,7 @@
  				}
  			}
  			return;
-@@ -4946,11 +4979,9 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -4941,11 +4974,9 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		// Pass message events to chat window
  		if ((m.containsEvents() || m.chatState() != StateNone) && m.body().isEmpty()) {
  			if (o->getOption("options.messages.send-composing-events").toBool()) {
@@ -285,7 +285,7 @@
  					c->incomingMessage(m);
  				}
  			}
-@@ -4966,11 +4997,8 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -4961,11 +4992,8 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  
  		// pass chat messages directly to a chat window if possible (and deal with sound)
  		else if(m.type() == "chat") {
@@ -299,7 +299,7 @@
  				c->setJid(e->from());
  
  			//if the chat exists, and is either open in a tab,
-@@ -5441,12 +5469,12 @@ void PsiAccount::messageStanzasAcked(int n) {
+@@ -5436,12 +5464,12 @@ void PsiAccount::messageStanzasAcked(int n) {
  void PsiAccount::processChatsHelper(const Jid& j, bool removeEvents)
  {
  	//printf("processing chats for [%s]\n", j.full().latin1());
@@ -329,7 +329,7 @@
  	inline T findDialog(const Jid& jid = Jid(), bool compareResource = true) const {
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -199,6 +199,28 @@ PsiChatDlg::~PsiChatDlg()
+@@ -182,6 +182,28 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
  void PsiChatDlg::initUi()
  {
  	ui_.setupUi(this);
@@ -358,7 +358,7 @@
  	ui_.lb_ident->setAccount(account());
  	ui_.lb_ident->setShowJid(false);
  
-@@ -545,6 +567,110 @@ void PsiChatDlg::setContactToolTip(QString text)
+@@ -517,6 +539,110 @@ void PsiChatDlg::setContactToolTip(QString text)
  	ui_.avatar->setToolTip(text);
  }
  
@@ -469,7 +469,7 @@
  void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& statusString)
  {
  	Q_UNUSED(statusString);
-@@ -575,22 +701,6 @@ void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& stat
+@@ -547,22 +673,6 @@ void PsiChatDlg::contactUpdated(UserListItem* u, int status, const QString& stat
  	}
  
  	if (u) {
@@ -492,7 +492,7 @@
  		UserResourceList srl = u->userResourceList();
  		if(!srl.isEmpty()) {
  			UserResource r;
-@@ -885,4 +995,76 @@ void PsiChatDlg::setMargins()
+@@ -812,4 +922,76 @@ void PsiChatDlg::setMargins()
  	}
  }
  
@@ -580,17 +580,17 @@
  
  class IconAction;
  class PsiContact;
-@@ -55,6 +57,9 @@ private slots:
- 	void sendTemp(const QString &);
- 	void psButtonEnabled();
+@@ -46,6 +48,9 @@ private slots:
+ 	void updateContactAdding(PsiContact* c = 0);
+ 	void updateContactAdding(const Jid &j);
  	void verticalSplitterMoved(int, int);
 +	void contactChanged();
 +	QString makeContactName(const QString &name, const Jid &jid) const;
 +	void doSwitchJidMode();
  
- private:
- 	void initToolBar();
-@@ -64,6 +69,7 @@ private:
+ 	// reimplemented
+ 	void chatEditCreated();
+@@ -58,6 +63,7 @@ private:
  	void initUi();
  	void capsChanged();
  	bool isEncryptionEnabled() const;
@@ -598,7 +598,7 @@
  	void contactUpdated(UserListItem* u, int status, const QString& statusString);
  	void updateAvatar();
  	void optionsUpdate();
-@@ -76,6 +82,8 @@ private:
+@@ -70,6 +76,8 @@ private:
  	ChatView* chatView() const;
  	ChatEdit* chatEdit() const;
  	void setMargins();
@@ -607,9 +607,9 @@
  
  private:
  	Ui::ChatDlg ui_;
-@@ -98,6 +106,9 @@ private:
- 	IconAction* act_add_contact;
- 	QAction *act_mini_cmd_, *act_minimize_;
+@@ -92,6 +100,9 @@ private:
+ 	QAction *act_minimize_;
+ 	TypeAheadFindBar *typeahead_;
  
 +	ActionLineEdit *le_autojid;
 +	IconAction *act_autojid;
@@ -619,7 +619,7 @@
  
 --- a/src/psicon.cpp
 +++ b/src/psicon.cpp
-@@ -1731,9 +1731,9 @@ void PsiCon::processEvent(const PsiEvent::Ptr &e, ActivationType activationType)
+@@ -1724,9 +1724,9 @@ void PsiCon::processEvent(const PsiEvent::Ptr &e, ActivationType activationType)
  		if ( PsiOptions::instance()->getOption("options.ui.chat.alert-for-already-open-chats").toBool() && sentToChatWindow ) {
  			// Message already displayed, need only to pop up chat dialog, so that
  			// it will be read (or marked as read)
