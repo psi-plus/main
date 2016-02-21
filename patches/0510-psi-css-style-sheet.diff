@@ -126,13 +126,14 @@
  	act = pm->exec(QCursor::pos());
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -1749,6 +1749,10 @@ QString GCMainDlg::desiredCaption() const
+@@ -1749,6 +1749,11 @@ QString GCMainDlg::desiredCaption() const
  
  void GCMainDlg::setLooks()
  {
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	if (!css.isEmpty()) {
 +		setStyleSheet(css);
++		d->mle()->setCssString(css);
 +	}
  	ui_.vsplitter->optionsChanged();
  	ui_.mle->optionsChanged();
@@ -162,13 +163,14 @@
  void MainWin::registerAction( IconAction* action )
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -249,6 +249,10 @@ void PsiChatDlg::setLooks()
+@@ -249,6 +249,11 @@ void PsiChatDlg::setLooks()
  {
  	ChatDlg::setLooks();
  
 +	const QString css = PsiOptions::instance()->getOption("options.ui.chat.css").toString();
 +	if (!css.isEmpty()) {
 +		setStyleSheet(css);
++		chatEdit()->setCssString(css);
 +	}
  	ui_.splitter->optionsChanged();
  	ui_.mle->optionsChanged();
@@ -321,3 +323,29 @@
  	return m;
  }
  
+diff --git a/src/statusmenu.cpp b/src/statusmenu.cpp
+index 1e13682..cff1cbe 100755
+--- a/src/statusmenu.cpp
++++ b/src/statusmenu.cpp
+@@ -36,6 +36,10 @@
+ StatusMenu::StatusMenu(QWidget* parent, PsiCon* _psi )
+ 	: QMenu(parent), psi(_psi)
+ {
++	const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
++	if (!css.isEmpty()) {
++		setStyleSheet(css);
++	}
+ 	connect(psi, SIGNAL(statusPresetsChanged()), this, SLOT(presetsChanged()));
+ 	installEventFilter(this);
+ }
+@@ -65,6 +69,10 @@ void StatusMenu::fill()
+ 		IconActionGroup* submenu = new IconActionGroup(this);
+ 		submenu->setText(tr("Presets"));
+ 		submenu->setPsiIcon("psi/action_templates");
++		const QString css = o->getOption("options.ui.contactlist.css").toString();
++		if (!css.isEmpty()) {
++			submenu->popup()->setStyleSheet(css);
++		}
+ 		addPresets(submenu);
+ 		submenu->popup()->installEventFilter(this);
+ 	}
