@@ -1,14 +1,14 @@
---- git.temp.orig/src/contactlistaccountmenu.cpp
-+++ git.temp/src/contactlistaccountmenu.cpp
+--- a/src/contactlistaccountmenu.cpp
++++ b/src/contactlistaccountmenu.cpp
 @@ -32,6 +32,7 @@
  #include "privacy/privacydlg.h"
  #include "psiiconset.h"
  #include "common.h"
 +#include "contactmanager/contactmanagerdlg.h"
+ #include "mucjoindlg.h"
  
  class ContactListAccountMenu::Private : public QObject
- {
-@@ -45,6 +46,7 @@ class ContactListAccountMenu::Private :
+@@ -46,6 +47,7 @@ class ContactListAccountMenu::Private : public QObject
  	QAction* setAvatarAction_;
  	QMenu* avatarMenu_;
  	QAction* unsetAvatarAction_;
@@ -16,17 +16,17 @@
  	QMenu* bookmarksMenu_;
  	QAction* bookmarksManageAction_;
  	QList<QAction*> bookmarksJoinActions_;
-@@ -95,6 +97,9 @@ public:
+@@ -105,6 +107,9 @@ public:
  		unsetAvatarAction_ = new QAction(tr("Unset Avatar"), this);
  		connect(unsetAvatarAction_, SIGNAL(triggered()), SLOT(unsetAvatar()));
  
 +		contactManagerAction_ = new IconAction(tr("&Contacts Manager"), this, "psi/action_contacts_manager");
 +		connect(contactManagerAction_, SIGNAL(triggered()), SLOT(contactManager()));
 +
- 		bookmarksManageAction_ = new QAction(tr("Manage..."), this);
+ 		bookmarksManageAction_ = new QAction(tr("Manage Bookmarks"), this);
  		connect(bookmarksManageAction_, SIGNAL(triggered()), SLOT(bookmarksManage()));
  
-@@ -144,6 +149,7 @@ public:
+@@ -159,6 +164,7 @@ public:
  		menu->addAction(addContactAction_);
  		menu->addAction(serviceDiscoveryAction_);
  		menu->addAction(newMessageAction_);
@@ -34,7 +34,7 @@
  		menu->addAction(privacyListsAction_);
  		menu->addSeparator();
  		menu->addAction(xmlConsoleAction_);
-@@ -205,6 +211,7 @@ private slots:
+@@ -223,6 +229,7 @@ private slots:
  		newMessageAction_->setEnabled(account->account()->isAvailable());
  		addContactAction_->setEnabled(account->account()->isAvailable());
  		serviceDiscoveryAction_->setEnabled(account->account()->isAvailable());
@@ -42,12 +42,10 @@
  		privacyListsAction_->setEnabled(account->account()->isAvailable());
  		if (!PsiOptions::instance()->getOption("options.ui.menu.account.admin").toBool()) {
  			adminMenu_->menuAction()->setVisible(false);
-@@ -319,6 +326,19 @@ private slots:
- 			dlg->show();
- 		} else
+@@ -348,6 +355,19 @@ private slots:
  			bringToFront(dlg);
-+	}
-+
+ 	}
+ 
 +	void contactManager()
 +	{
 +		if (!account)
@@ -59,11 +57,14 @@
 +			dlg->show();
 +		} else
 +			bringToFront(dlg);
- 	}
- 
++	}
++
  	void xmlConsole()
+ 	{
+ 		if (!account)
+new file mode 100644
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanager.pri
++++ b/src/contactmanager/contactmanager.pri
 @@ -0,0 +1,7 @@
 +HEADERS += $$PWD/contactmanagerdlg.h \
 +    $$PWD/contactmanagermodel.h \
@@ -72,8 +73,9 @@
 +    $$PWD/contactmanagermodel.cpp \
 +	$$PWD/contactmanagerview.cpp
 +FORMS += $$PWD/contactmanagerdlg.ui
+new file mode 100644
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagerdlg.cpp
++++ b/src/contactmanager/contactmanagerdlg.cpp
 @@ -0,0 +1,318 @@
 +/*
 + * contactmanagerdlg.cpp
@@ -393,8 +395,10 @@
 +		file.close();
 +	}
 +}
+new file mode 100644
+index 0000000..3b37a6f
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagerdlg.h
++++ b/src/contactmanager/contactmanagerdlg.h
 @@ -0,0 +1,60 @@
 +/*
 + * contactmanagerdlg.h
@@ -456,8 +460,10 @@
 +};
 +
 +#endif // CONTACTMANAGERDLG_H
+new file mode 100644
+index 0000000..8fd702a
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagerdlg.ui
++++ b/src/contactmanager/contactmanagerdlg.ui
 @@ -0,0 +1,203 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
@@ -662,8 +668,10 @@
 +  </connection>
 + </connections>
 +</ui>
+new file mode 100644
+index 0000000..a48b52c
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagermodel.cpp
++++ b/src/contactmanager/contactmanagermodel.cpp
 @@ -0,0 +1,304 @@
 +/*
 + * contactmanagermodel.cpp
@@ -969,8 +977,9 @@
 +		i++;
 +	}
 +}
+new file mode 100644
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagermodel.h
++++ b/src/contactmanager/contactmanagermodel.h
 @@ -0,0 +1,93 @@
 +/*
 + * contactmanagermodel.h
@@ -1065,8 +1074,9 @@
 +};
 +
 +#endif // CONTACTMANAGERMODEL_H
+new file mode 100644
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagerview.cpp
++++ b/src/contactmanager/contactmanagerview.cpp
 @@ -0,0 +1,96 @@
 +/*
 + * contactmanagerview.cpp
@@ -1164,8 +1174,9 @@
 +		e->ignore();
 +	}
 +}
+new file mode 100644
 --- /dev/null
-+++ git.temp/src/contactmanager/contactmanagerview.h
++++ b/src/contactmanager/contactmanagerview.h
 @@ -0,0 +1,38 @@
 +/*
 + * contactmanagerview.h
@@ -1205,9 +1216,9 @@
 +};
 +
 +#endif // CONTACTMANAGERVIEW_H
---- git.temp.orig/src/src.pri
-+++ git.temp/src/src.pri
-@@ -15,6 +15,7 @@ include($$PWD/privacy/privacy.pri)
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -18,6 +18,7 @@ include($$PWD/privacy/privacy.pri)
  include($$PWD/capabilities/capabilities.pri)
  include($$PWD/tabs/tabs.pri)
  include($$PWD/Certificates/Certificates.pri)
