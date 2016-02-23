@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -551,6 +551,7 @@ QLineEdit#le_status_text {
+@@ -601,6 +601,7 @@ QLineEdit#le_status_text {
  				<show-messageFirst type="QKeySequence" comment="Show first message" >Alt+End</show-messageFirst>
  				<show-messageNext type="QKeySequence" comment="Show next message" >Ctrl+Down</show-messageNext>
  				<show-messagePrev type="QKeySequence" comment="Show prev message" >Ctrl+Up</show-messagePrev>
@@ -10,16 +10,17 @@
  				<assign-custom-avatar type="QKeySequence" comment="Assign a custom avatar to the selected contact"/>
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -214,7 +214,7 @@ public:
- #endif
+@@ -223,7 +223,8 @@ public:
+ //	IconAction *act_whiteboard;
+ //#endif
  	QAction *act_send, *act_scrollup, *act_scrolldown, *act_close;
- 
--	QAction *act_mini_cmd, *act_nick, *act_hide;
-+	QAction *act_mini_cmd, *act_nick, *act_hide, *act_minimize;
+-	QAction *act_mini_cmd, *act_nick, *act_hide, *act_copy_muc_jid;
++	QAction *act_mini_cmd, *act_nick, *act_hide, *act_copy_muc_jid
++	QAction *act_minimize;
  
  	MCmdSimpleSite mCmdSite;
  	MCmdManager mCmdManager;
-@@ -704,6 +704,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -786,6 +787,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateBookmarkIcon()));
  	connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
  
@@ -29,8 +30,8 @@
 +
  	int s = PsiIconset::instance()->system().iconSize();
  	ui_.toolbar->setIconSize(QSize(s,s));
- 	ui_.toolbar->addAction(d->act_clear);
-@@ -812,6 +816,11 @@ void GCMainDlg::horizSplitterMoved()
+ 
+@@ -896,6 +901,11 @@ void GCMainDlg::horizSplitterMoved()
  	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
@@ -42,7 +43,7 @@
  void GCMainDlg::ensureTabbedCorrectly()
  {
  	TabbableWidget::ensureTabbedCorrectly();
-@@ -854,6 +863,7 @@ void GCMainDlg::setShortcuts()
+@@ -939,6 +949,7 @@ void GCMainDlg::setShortcuts()
  	d->act_scrollup->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-up"));
  	d->act_scrolldown->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-down"));
  	d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
@@ -52,19 +53,17 @@
  void GCMainDlg::scrollUp()
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -140,6 +140,9 @@ private slots:
+@@ -141,6 +141,7 @@ private slots:
  #endif
  	void chatEditCreated();
  	void horizSplitterMoved();
 +	void doMinimize();
-+
-+
+ 	void avatarUpdated(const Jid& jid);
  
  public:
- 	class Private;
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -312,6 +312,11 @@ void PsiChatDlg::setShortcuts()
+@@ -350,6 +350,11 @@ void PsiChatDlg::setShortcuts()
  
  	act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
@@ -76,8 +75,8 @@
  }
  
  void PsiChatDlg::updateIdentityVisibility()
-@@ -679,6 +684,10 @@ void PsiChatDlg::doMiniCmd()
- 	mCmdManager_.open(new MCmdSimpleState(MCMDCHAT, tr("Command>")), QStringList() );
+@@ -885,6 +890,10 @@ void PsiChatDlg::chatEditCreated()
+ 	tabCompletion.setTextEdit(chatEdit());
  }
  
 +void PsiChatDlg::doMinimize()
@@ -85,23 +84,23 @@
 +	window()->showMinimized();
 +}
  
- bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
- 	if ( obj == chatEdit() && ev->type() == QEvent::KeyPress ) {
+ void PsiChatDlg::doSend() {
+ 	tabCompletion.reset();
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
-@@ -33,6 +33,7 @@ private slots:
+@@ -36,6 +36,7 @@ private slots:
  	void toggleSmallChat();
  	void doClearButton();
  	void doMiniCmd();
 +	void doMinimize();
+ 	void addContact();
  	void buildMenu();
  	void updateCounter();
- 	void updateIdentityVisibility();
-@@ -77,6 +78,7 @@ private:
- 	IconAction* act_find_;
+@@ -85,6 +86,7 @@ private:
  
+ 	ActionList* actions_;
  	QAction *act_mini_cmd_;
 +	QAction *act_minimize_;
  	TypeAheadFindBar *typeahead_;
  
- 	MCmdManager mCmdManager_;
+ 	ActionLineEdit *le_autojid;

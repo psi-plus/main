@@ -35,20 +35,21 @@
  				<size comment="Remembered window size" type="QSize">
  				</size><!-- will be invalid when converted to QSize so we can detect first load -->
  				<opacity comment="Opacity percentage of chat dialogs" type="int">100</opacity>
-@@ -110,10 +110,10 @@
+@@ -110,11 +110,11 @@
  				</avatars>
  				<alert-for-already-open-chats type="bool">true</alert-for-already-open-chats>
  				<auto-popup type="bool">false</auto-popup>
 -				<delete-contents-after type="QString">hour</delete-contents-after>
 +				<delete-contents-after type="QString">never</delete-contents-after>
  				<raise-chat-windows-on-new-messages type="bool">false</raise-chat-windows-on-new-messages>
+ 				<switch-tab-on-new-messages type="bool">false</switch-tab-on-new-messages>
  				<use-chat-says-style type="bool">false</use-chat-says-style>
 -				<use-expanding-line-edit type="bool">true</use-expanding-line-edit>
 +				<use-expanding-line-edit type="bool">false</use-expanding-line-edit>
  				<use-small-chats type="bool">false</use-small-chats>
  				<use-message-icons type="bool">true</use-message-icons>
  				<scaled-message-icons type="bool">false</scaled-message-icons>
-@@ -194,7 +194,7 @@
+@@ -195,7 +195,7 @@
  				<use-single-click type="bool">false</use-single-click>
  				<use-status-change-animation type="bool">true</use-status-change-animation>
  				<aio-left-roster type="bool">false</aio-left-roster>
@@ -57,7 +58,7 @@
  				<saved-window-geometry type="QRect" >
  					<x>64</x>
  					<y>64</y>
-@@ -235,7 +235,7 @@
+@@ -236,7 +236,7 @@
  					<invisible comment="Enable invisibility" type="bool">false</invisible>
  				</status>
  				<view comment="Options for the view menu">
@@ -66,7 +67,7 @@
  				</view>
  			</menu>
  			<muc comment="Multi-User Chat options">
-@@ -397,8 +397,8 @@
+@@ -399,8 +399,8 @@
  					</status>
  				</passive-popups>
  				<popup-dialogs>
@@ -77,7 +78,7 @@
  				</popup-dialogs>
  				<sounds>
  					<chat-message type="QString">sound/chat2.wav</chat-message>
-@@ -417,10 +417,10 @@
+@@ -419,10 +419,10 @@
  					<system-message type="QString">sound/chat2.wav</system-message>
  					<unix-sound-player type="QString"/>
  				</sounds>
@@ -90,7 +91,7 @@
  				<automatically-get-items type="bool">false</automatically-get-items>
  				<recent-jids type="QStringList" />
  			</service-discovery>
-@@ -429,7 +429,7 @@
+@@ -431,7 +431,7 @@
  				<can-close-inactive-tab type="bool">true</can-close-inactive-tab>
  				<show-tab-close-buttons type="bool">true</show-tab-close-buttons>
  				<put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
@@ -99,7 +100,7 @@
  				<mouse-middle-button type="QString">close</mouse-middle-button> <!-- hide|close|detach -->
  				<mouse-doubleclick-action type="QString">detach</mouse-doubleclick-action>
  				<size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
-@@ -511,7 +511,7 @@
+@@ -534,7 +534,7 @@
  					<item type="QKeySequence">Enter</item>
  				</send>
  				<clear type="QKeySequence" comment="Clear the text"/>
@@ -108,7 +109,7 @@
  				<show-messageLast type="QKeySequence" comment="Show last message" >Alt+Home</show-messageLast>
  				<show-messageFirst type="QKeySequence" comment="Show first message" >Alt+End</show-messageFirst>
  				<show-messageNext type="QKeySequence" comment="Show next message" >Ctrl+Down</show-messageNext>
-@@ -520,7 +520,7 @@
+@@ -543,7 +543,7 @@
  			<contactlist comment="Shortcuts in the contactlist">
  				<assign-custom-avatar type="QKeySequence" comment="Assign a custom avatar to the selected contact"/>
  				<clear-custom-avatar type="QKeySequence" comment="Remove custom avatar from the selected contact"/>
@@ -117,7 +118,7 @@
  				<chat type="QKeySequence" comment="Open a chat to the selected contact">Ctrl+C</chat>
  				<message type="QKeySequence" comment="Send a message to the selected contact">Ctrl+M</message>
  				<event type="QKeySequence" comment="Receive incoming event">Ctrl+R</event>
-@@ -568,7 +568,7 @@
+@@ -591,7 +591,7 @@
  		</shortcuts>
  		<contactlist>
  			<hide-on-start type="bool">false</hide-on-start>
@@ -126,7 +127,7 @@
  			<use-toolwindow type="bool">false</use-toolwindow>
  			<autohide-interval type="int">0</autohide-interval>
  		</contactlist>
-@@ -585,6 +585,10 @@
+@@ -608,6 +608,10 @@
  			</emoticons>
  			<status type="QString">default</status>
  			<system type="QString">default</system>
@@ -183,13 +184,14 @@
  </psi>
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
-@@ -131,16 +131,16 @@ void UserAccount::reset()
+@@ -131,17 +131,17 @@ void UserAccount::reset()
  	port = 5222;
  	opt_host = false;
  	host = "";
 -	opt_automatic_resource = true;
 +	opt_automatic_resource = false;
  	priority_dep_on_status = true;
+ 	ignore_global_actions = false;
  	resource = ApplicationInfo::name();
 -	priority = 5;
 +	priority = 55;
@@ -206,7 +208,7 @@
  	lastStatusWithPriority = false;
 --- a/src/psioptions.cpp
 +++ b/src/psioptions.cpp
-@@ -192,10 +192,12 @@ bool PsiOptions::newProfile()
+@@ -207,10 +207,12 @@ bool PsiOptions::newProfile()
  		buttons.dock = Qt3Dock_Bottom;
  
  		ToolbarPrefs showContacts;

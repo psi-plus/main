@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -456,6 +456,7 @@ QLineEdit#le_status_text {
+@@ -482,6 +482,7 @@ QLineEdit#le_status_text {
  				</sounds>
  				<successful-subscription type="bool">true</successful-subscription>
  			</notifications>
@@ -10,7 +10,7 @@
  				<automatically-get-items type="bool">false</automatically-get-items>
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -84,6 +84,7 @@
+@@ -87,6 +87,7 @@
  #include "mcmdmanager.h"
  #include "lastactivitytask.h"
  #include "psirichtext.h"
@@ -18,7 +18,7 @@
  
  #include "mcmdsimplesite.h"
  
-@@ -238,9 +239,13 @@ public:
+@@ -247,9 +248,13 @@ public:
  
  	int logSize;
  	int rosterSize;
@@ -32,7 +32,7 @@
  public:
  	ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
  	ChatView* te_log() const { return dlg->ui_.log; }
-@@ -623,6 +628,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -677,6 +682,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.lb_ident->setAccount(account());
  	ui_.lb_ident->setShowJid(false);
  	ui_.log->setSessionData(true, jid().full(), jid().full()); //FIXME change conference name
@@ -47,7 +47,7 @@
  #ifdef WEBKIT
  	ui_.log->setAccount(account());
  #endif
-@@ -2039,6 +2052,25 @@ void GCMainDlg::resizeEvent(QResizeEvent *e)
+@@ -2185,6 +2198,25 @@ void GCMainDlg::resizeEvent(QResizeEvent *e)
  	QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
  }
  
@@ -75,9 +75,9 @@
  //----------------------------------------------------------------------------
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -163,6 +163,8 @@ private:
+@@ -166,6 +166,8 @@ private:
  
- 	void contextMenuEvent(QContextMenuEvent *);
+ 	inline XMPP::Jid jidForNick(const QString &nick) const;
  
 +	void setMargins();
 +
@@ -86,27 +86,27 @@
  class GCFindDlg : public QDialog
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
-@@ -146,6 +146,8 @@ public:
- 	QTimer *hideTimer;
- 	int hideTimerInterval; //interval in sec
- 	bool useAutohide;
+@@ -135,6 +135,7 @@ public:
+ 	int tabsSize;
+ 	int rosterSize;
+ 	bool isLeftRoster;
 +	bool isHide;
-+
  
- #ifdef Q_OS_WIN
- 	DWORD deactivationTickCount;
-@@ -570,6 +572,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
- 	d->hideTimerInterval = PsiOptions::instance()->getOption("options.contactlist.autohide-interval").toInt();
- 	d->hideTimer->setInterval(d->hideTimerInterval*1000);
- 	optionChanged("options.contactlist.use-autohide");
+ 	PopupAction* optionsButton, *statusButton;
+ 	IconActionGroup* statusGroup, *viewGroups;
+@@ -584,6 +585,9 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon* psi)
+ 		connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
+ 	optionChanged("options.ui.contactlist.css");
+ 
 +	setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
 +	setMouseTracking(!isBorder());
++
+ 	reinitAutoHide();
  }
  
- MainWin::~MainWin()
-@@ -624,6 +628,11 @@ void MainWin::optionChanged(const QString& option)
- 		if(d->useAutohide)
- 			d->hideTimer->start();
+@@ -623,6 +627,11 @@ void MainWin::optionChanged(const QString& option)
+ 			setStyleSheet(css);
+ 		}
  	}
 +	else if (option == "options.ui.decorate-windows") {
 +		setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
@@ -115,8 +115,8 @@
 +	}
  }
  
- void MainWin::hideTimerTimeout()
-@@ -793,13 +802,19 @@ void MainWin::setWindowOpts(bool _onTop, bool _asTool)
+ void MainWin::registerAction( IconAction* action )
+@@ -812,13 +821,19 @@ void MainWin::setWindowOpts(bool _onTop, bool _asTool)
  	d->onTop = _onTop;
  	d->asTool = _asTool;
  
@@ -137,7 +137,7 @@
  
  	setWindowFlags(flags);
  	show();
-@@ -1729,6 +1744,7 @@ void MainWin::statusClicked(int x)
+@@ -1783,6 +1798,7 @@ void MainWin::statusClicked(int x)
  {
  	if(x == Qt::MidButton) {
  		recvNextEvent();
@@ -145,7 +145,7 @@
  	}
  }
  
-@@ -1982,4 +1998,32 @@ void MainWin::resizeEvent(QResizeEvent *e)
+@@ -2036,4 +2052,32 @@ void MainWin::resizeEvent(QResizeEvent *e)
  	}
  }
  
@@ -188,7 +188,7 @@
  
  #include "advwidget.h"
  #include "xmpp_status.h"
-@@ -84,6 +85,8 @@ protected:
+@@ -88,6 +89,8 @@ protected:
  #ifdef Q_OS_WIN
  	bool winEvent(MSG *, long *);
  #endif
@@ -255,7 +255,7 @@
    <tabstop>ck_dockToolMW</tabstop>
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -175,6 +175,8 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
+@@ -179,6 +179,8 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
  	connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
  	connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
  	mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
@@ -264,7 +264,7 @@
  }
  
  void PsiChatDlg::initUi()
-@@ -230,6 +232,11 @@ void PsiChatDlg::initUi()
+@@ -260,6 +262,11 @@ void PsiChatDlg::initUi()
  	act_mini_cmd_->setText(tr("Input command..."));
  	connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
  	addAction(act_mini_cmd_);
@@ -274,9 +274,9 @@
 +	}
 +	setMargins();
  
+ 	ui_.log->realTextWidget()->installEventFilter(this);
  	ui_.mini_prompt->hide();
- 
-@@ -458,6 +465,22 @@ void PsiChatDlg::activated()
+@@ -528,6 +535,22 @@ void PsiChatDlg::activated()
  	ChatDlg::activated();
  
  	updateCountVisibility();
@@ -299,9 +299,9 @@
  }
  
  void PsiChatDlg::setContactToolTip(QString text)
-@@ -747,4 +770,23 @@ bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
+@@ -1031,4 +1054,23 @@ void PsiChatDlg::doSwitchJidMode()
+ 	}
  }
- 
  
 +void PsiChatDlg::setMargins()
 +{
@@ -330,18 +330,18 @@
  #include "ui_chatdlg.h"
  #include "typeaheadfind.h"
 +#include "psiwindowheader.h"
+ #include "widgets/actionlineedit.h"
+ #include "actionlist.h"
  
- class IconAction;
- class PsiContact;
-@@ -65,6 +66,7 @@ private:
- 	void appendSysMsg(const QString &);
- 	ChatView* chatView() const;
+@@ -78,6 +79,7 @@ private:
  	ChatEdit* chatEdit() const;
+ 	void updateAutojidIcon();
+ 	void setJidComboItem(int pos, const QString &text, const Jid &jid, const QString &icon_str);
 +	void setMargins();
  
  private:
  	Ui::ChatDlg ui_;
-@@ -100,6 +102,8 @@ private:
+@@ -107,6 +109,8 @@ private:
  	int unacked_messages;
  
  	static PsiIcon *throbber_icon;

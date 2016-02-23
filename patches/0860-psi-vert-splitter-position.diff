@@ -1,14 +1,14 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -120,6 +120,8 @@
+@@ -123,6 +123,8 @@
  				<css type="QString" />
  				<hide-when-closing type="bool">false</hide-when-closing>
  				<status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
 +				<log-height type="int">325</log-height>
 +				<chatedit-height type="int">10</chatedit-height>
+ 				<default-jid-mode comment="Default jid mode: barejid | auto" type="QString">barejid</default-jid-mode>
+ 				<default-jid-mode-ignorelist comment="Default autojid mode ignore list: jid1,jid2,..." type="QString"></default-jid-mode-ignorelist>
  			</chat>
- 			<save>
- 				<toolbars-state type="QByteArray"/>
 --- a/src/chatsplitter.cpp
 +++ b/src/chatsplitter.cpp
 @@ -75,6 +75,15 @@ void ChatSplitter::setSizes(const QList<int>& list)
@@ -58,7 +58,7 @@
  	void updateLayout();
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -240,6 +240,9 @@ public:
+@@ -249,6 +249,9 @@ public:
  	int logSize;
  	int rosterSize;
  
@@ -68,7 +68,7 @@
  public:
  	bool trackBar;
  
-@@ -769,6 +772,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -844,6 +847,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
  	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
@@ -76,7 +76,7 @@
  
  	// resize the horizontal splitter
  	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
-@@ -786,10 +790,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -861,10 +865,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
  	// resize the vertical splitter
@@ -90,7 +90,7 @@
  
  	X11WM_CLASS("groupchat");
  
-@@ -835,6 +838,26 @@ void GCMainDlg::horizSplitterMoved()
+@@ -915,6 +918,26 @@ void GCMainDlg::horizSplitterMoved()
  	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
@@ -127,17 +127,17 @@
  
  protected:
  	void setShortcuts();
-@@ -140,6 +141,7 @@ private slots:
+@@ -141,6 +142,7 @@ private slots:
  #endif
  	void chatEditCreated();
  	void horizSplitterMoved();
 +	void verticalSplitterMoved(int, int);
  	void doMinimize();
- 
+ 	void avatarUpdated(const Jid& jid);
  
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -219,10 +219,11 @@ void PsiChatDlg::initUi()
+@@ -249,10 +249,11 @@ void PsiChatDlg::initUi()
  
  	connect(account()->capsManager(), SIGNAL(capsChanged(const Jid&)), SLOT(capsChanged(const Jid&)));
  
@@ -153,7 +153,7 @@
  
  	smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
   	ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
-@@ -248,6 +249,26 @@ void PsiChatDlg::initUi()
+@@ -278,6 +279,26 @@ void PsiChatDlg::initUi()
  	unacked_messages = 0;
  }
  
@@ -182,7 +182,7 @@
  	if (PsiOptions::instance()->getOption("options.ui.message.show-character-count").toBool() && !smallChat_) {
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
-@@ -21,6 +21,8 @@ class PsiChatDlg : public ChatDlg
+@@ -23,6 +23,8 @@ class PsiChatDlg : public ChatDlg
  public:
  	PsiChatDlg(const Jid& jid, PsiAccount* account, TabManager* tabManager);
  
@@ -191,15 +191,15 @@
  protected:
  	// reimplemented
  	void contextMenuEvent(QContextMenuEvent *);
-@@ -43,6 +45,7 @@ private slots:
+@@ -45,6 +47,7 @@ private slots:
  	void updateCountVisibility();
  	void updateContactAdding(PsiContact* c = 0);
  	void updateContactAdding(const Jid &j);
 +	void verticalSplitterMoved(int, int);
- 
- 	// reimplemented
- 	void chatEditCreated();
-@@ -104,6 +107,9 @@ private:
+ 	void contactChanged();
+ 	QString makeContactName(const QString &name, const Jid &jid) const;
+ 	void updateToolbuttons();
+@@ -111,6 +114,9 @@ private:
  	static PsiIcon *throbber_icon;
  	bool tabmode;
  	QPointer <PsiWindowHeader> winHeader_;

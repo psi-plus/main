@@ -1,5 +1,3 @@
-diff --git a/src/chatview_te.cpp b/src/chatview_te.cpp
-index abeb859..1e3904c 100644
 --- a/src/chatview_te.cpp
 +++ b/src/chatview_te.cpp
 @@ -35,6 +35,8 @@
@@ -11,7 +9,7 @@ index abeb859..1e3904c 100644
  
  static const char *informationalColorOpt = "options.ui.look.colors.messages.informational";
  
-@@ -58,6 +60,12 @@ ChatView::ChatView(QWidget *parent)
+@@ -59,6 +61,12 @@ ChatView::ChatView(QWidget *parent)
  	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
  	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
  #endif
@@ -24,7 +22,7 @@ index abeb859..1e3904c 100644
  
  	useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
  	if (useMessageIcons_) {
-@@ -123,10 +131,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
+@@ -135,10 +143,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
  		e->accept();
  	}
  	else {
@@ -46,7 +44,7 @@ index abeb859..1e3904c 100644
  void ChatView::addLogIconsResources()
  {
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
-@@ -188,6 +206,24 @@ void ChatView::autoCopy()
+@@ -203,6 +221,24 @@ void ChatView::autoCopy()
  }
  
  /**
@@ -71,8 +69,6 @@ index abeb859..1e3904c 100644
   * Handle KeyPress events that happen in ChatEdit widget. This is used
   * to 'fix' the copy shortcut.
   * \param object object that should receive the event
-diff --git a/src/chatview_te.h b/src/chatview_te.h
-index b3a3f1e..cf643d2 100644
 --- a/src/chatview_te.h
 +++ b/src/chatview_te.h
 @@ -47,6 +47,7 @@ public:
@@ -83,7 +79,7 @@ index b3a3f1e..cf643d2 100644
  
  	void init();
  	void setDialog(QWidget* dialog);
-@@ -82,12 +83,15 @@ protected:
+@@ -85,12 +86,15 @@ protected:
  
  protected slots:
  	void autoCopy();
@@ -99,28 +95,24 @@ index b3a3f1e..cf643d2 100644
  
  private:
  	bool isMuc_;
-@@ -102,6 +106,7 @@ private:
- 	QPixmap logIconDelivered;
+@@ -109,6 +113,7 @@ private:
+ 	QPixmap logIconDeliveredPgp;
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
 +	QAction *actQuote_;
  };
  
  #endif
-diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index fcdc942..53e6f87 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -819,6 +819,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
- 	setShortcuts();
+@@ -881,6 +881,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	invalidateTab();
  	setConnecting();
+ 
 +	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
+ 	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
  }
  
- GCMainDlg::~GCMainDlg()
-diff --git a/src/msgmle.cpp b/src/msgmle.cpp
-index 773e45b..852ab9c 100644
 --- a/src/msgmle.cpp
 +++ b/src/msgmle.cpp
 @@ -33,6 +33,7 @@
@@ -216,8 +208,6 @@ index 773e45b..852ab9c 100644
  //----------------------------------------------------------------------------
  // LineEdit
  //----------------------------------------------------------------------------
-diff --git a/src/msgmle.h b/src/msgmle.h
-index a18d69f..a32c064 100644
 --- a/src/msgmle.h
 +++ b/src/msgmle.h
 @@ -49,6 +49,7 @@ public:
@@ -254,21 +244,16 @@ index a18d69f..a32c064 100644
  	QString currentText;
  	HTMLTextController *controller_;
  };
-diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index c5e5087..f7f9c08 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -256,6 +256,8 @@ void PsiChatDlg::initUi()
+@@ -267,6 +267,7 @@ void PsiChatDlg::initUi()
+ 		ui_.vboxLayout1->insertWidget(0, winHeader_);
  	}
  	setMargins();
- 
 +	connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
-+	
- 	ui_.mini_prompt->hide();
  
- 	if (throbber_icon == 0) {
-diff --git a/src/webview.cpp b/src/webview.cpp
-index 1648b4a..9069fc6 100644
+ 	ui_.log->realTextWidget()->installEventFilter(this);
+ 	ui_.mini_prompt->hide();
 --- a/src/webview.cpp
 +++ b/src/webview.cpp
 @@ -45,6 +45,11 @@ WebView::WebView(QWidget* parent) : QWebView(parent), possibleDragging(false), i
@@ -303,8 +288,6 @@ index 1648b4a..9069fc6 100644
  		} else {
  			if (!menu->isEmpty()) {
  				menu->addSeparator();
-diff --git a/src/webview.h b/src/webview.h
-index 77489af..e8ff0ba 100644
 --- a/src/webview.h
 +++ b/src/webview.h
 @@ -100,13 +100,17 @@ private:
@@ -325,8 +308,6 @@ index 77489af..e8ff0ba 100644
  };
  
  
-diff --git a/src/widgets/psitextview.cpp b/src/widgets/psitextview.cpp
-index 804f640..47c694a 100644
 --- a/src/widgets/psitextview.cpp
 +++ b/src/widgets/psitextview.cpp
 @@ -25,6 +25,7 @@
@@ -405,8 +386,6 @@ index 804f640..47c694a 100644
  	menu->exec(e->globalPos());
  	e->accept();
  	delete menu;
-diff --git a/src/widgets/psitextview.h b/src/widgets/psitextview.h
-index 5c1c3c1..377365f 100644
 --- a/src/widgets/psitextview.h
 +++ b/src/widgets/psitextview.h
 @@ -32,6 +32,9 @@ class PsiTextView : public QTextEdit
