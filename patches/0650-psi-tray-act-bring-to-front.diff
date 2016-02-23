@@ -1,15 +1,15 @@
---- a/options/default.xml
-+++ b/options/default.xml
-@@ -213,6 +213,7 @@ QLineEdit#le_status_text {
+--- git.orig/options/default.xml
++++ git/options/default.xml
+@@ -216,6 +216,7 @@ QLineEdit#le_status_text {
  				<lockdown-roster type="bool">false</lockdown-roster>
  				<raise-on-new-event type="bool">false</raise-on-new-event>
  				<quit-on-close type="bool">false</quit-on-close>
 +				<raise-inactive type="bool">true</raise-inactive>
- 				<show-roster-avatar-frame type="bool">false</show-roster-avatar-frame>
+ 				<show-avatar-frame type="bool">false</show-avatar-frame>
  				<show>
  					<agent-contacts type="bool">true</agent-contacts>
---- a/src/mainwin.cpp
-+++ b/src/mainwin.cpp
+--- git.orig/src/mainwin.cpp
++++ git/src/mainwin.cpp
 @@ -83,6 +83,10 @@
  #include "rosteravatarframe.h"
  #include "avatars.h"
@@ -21,18 +21,18 @@
  using namespace XMPP;
  
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
-@@ -143,6 +147,10 @@ public:
- 	int hideTimerInterval; //interval in sec
- 	bool useAutohide;
+@@ -155,6 +159,10 @@ public:
+ 	PsiRosterWidget* rosterWidget_;
+ #endif
  
 +#ifdef Q_OS_WIN
 +	DWORD deactivationTickCount;
 +#endif
 +
- 	QSignalMapper* statusMapper;
- 
- 	PsiIcon* nextAnim;
-@@ -1426,7 +1434,23 @@ void MainWin::closeEvent(QCloseEvent* e)
+ 	void registerActions();
+ 	IconAction* getAction( QString name );
+ 	void updateMenu(QStringList actions, QMenu* menu);
+@@ -1425,7 +1433,23 @@ void MainWin::closeEvent(QCloseEvent* e)
  
  void MainWin::changeEvent(QEvent *event)
  {
@@ -57,7 +57,7 @@
  	    event->type() == QEvent::WindowStateChange)
  	{
  		if (d->mainTabs) {
-@@ -1552,18 +1576,42 @@ void MainWin::optionsUpdate()
+@@ -1551,18 +1575,42 @@ void MainWin::optionsUpdate()
  	updateTray();
  }
  
@@ -106,7 +106,7 @@
  	if (!d->tray) {
  		return;
  	}
-@@ -1581,32 +1629,21 @@ void MainWin::trayClicked(const QPoint &, int button)
+@@ -1580,32 +1628,21 @@ void MainWin::trayClicked(const QPoint &
  		return;
  	}
  
@@ -147,9 +147,9 @@
  }
  
  void MainWin::trayShow()
---- a/src/mainwin.h
-+++ b/src/mainwin.h
-@@ -175,7 +175,7 @@ public slots:
+--- git.orig/src/mainwin.h
++++ git/src/mainwin.h
+@@ -177,7 +177,7 @@ public slots:
  	void optionsUpdate();
  	void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
  
@@ -158,9 +158,9 @@
  
  	void avcallConfig();
  
---- a/src/src.pri
-+++ b/src/src.pri
-@@ -215,6 +215,10 @@ HEADERS += \
+--- git.orig/src/src.pri
++++ git/src/src.pri
+@@ -217,6 +217,10 @@ HEADERS += \
  	$$PWD/geolocationdlg.h \
  	$$PWD/rosteravatarframe.h
  
@@ -171,10 +171,8 @@
  
  HEADERS += tabcompletion.h
  SOURCES += tabcompletion.cpp
-new file mode 100644
-index 0000000..ea1ae7d
---- /dev/null
-+++ b/src/x11windowsystem.cpp
+--- git.orig/src/x11windowsystem.cpp
++++ git/src/x11windowsystem.cpp
 @@ -0,0 +1,215 @@
 +#include "x11windowsystem.h"
 +
@@ -391,9 +389,8 @@ index 0000000..ea1ae7d
 +	}
 +	return false;
 +}
-new file mode 100644
---- /dev/null
-+++ b/src/x11windowsystem.h
+--- git.orig/src/x11windowsystem.h
++++ git/src/x11windowsystem.h
 @@ -0,0 +1,44 @@
 +#ifndef X11WINDOWSYSTEM_H
 +#define X11WINDOWSYSTEM_H
