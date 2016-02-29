@@ -45,7 +45,7 @@ index eb92cf4..4d0e75e 100644
  		setSuccess(true);
  	}
 diff --git a/src/xmpp/xmpp-im/xmpp_discoitem.cpp b/src/xmpp/xmpp-im/xmpp_discoitem.cpp
-index 59e9551..3be33dc 100644
+index 59e9551..d13dafa 100644
 --- a/src/xmpp/xmpp-im/xmpp_discoitem.cpp
 +++ b/src/xmpp/xmpp-im/xmpp_discoitem.cpp
 @@ -18,35 +18,38 @@
@@ -160,7 +160,7 @@ index 59e9551..3be33dc 100644
 +		}
 +	}
 +
-+	QByteArray ba = (prep.join('<') + '<').toUtf8();
++	QByteArray ba = (prep.join(QLatin1String("<")) + QLatin1Char('<')).toUtf8();
 +	return QString::fromLatin1(QCryptographicHash::hash(ba, algo).toBase64());
 +}
 +
@@ -238,7 +238,7 @@ index 59e9551..3be33dc 100644
  const Jid &DiscoItem::jid() const
  {
  	return d->jid;
-@@ -167,6 +292,15 @@ void DiscoItem::setIdentities(const Identities &i)
+@@ -167,6 +292,25 @@ void DiscoItem::setIdentities(const Identities &i)
  		setName( i.first().name );
  }
  
@@ -251,10 +251,20 @@ index 59e9551..3be33dc 100644
 +{
 +	d->exts = extlist;
 +}
++
++XData DiscoItem::registeredExtension(const QString &ns) const
++{
++	foreach (const XData &xd, d->exts) {
++		if (xd.registrarType() == ns) {
++			return xd;
++		}
++	}
++	return XData();
++}
  
  DiscoItem::Action DiscoItem::string2action(QString s)
  {
-@@ -197,3 +331,19 @@ QString DiscoItem::action2string(Action a)
+@@ -197,3 +341,19 @@ QString DiscoItem::action2string(Action a)
  }
  
  
@@ -275,7 +285,7 @@ index 59e9551..3be33dc 100644
 +	return r < 0;
 +}
 diff --git a/src/xmpp/xmpp-im/xmpp_discoitem.h b/src/xmpp/xmpp-im/xmpp_discoitem.h
-index 8380ba5..dee515b 100644
+index 8380ba5..969dd09 100644
 --- a/src/xmpp/xmpp-im/xmpp_discoitem.h
 +++ b/src/xmpp/xmpp-im/xmpp_discoitem.h
 @@ -22,12 +22,16 @@
@@ -295,7 +305,7 @@ index 8380ba5..dee515b 100644
  	class DiscoItem
  	{
  	public:
-@@ -57,14 +61,24 @@ namespace XMPP {
+@@ -57,14 +61,25 @@ namespace XMPP {
  		struct Identity
  		{
  			QString category;
@@ -318,10 +328,11 @@ index 8380ba5..dee515b 100644
 +
 +		const QList<XData> &extensions() const;
 +		void setExtensions(const QList<XData> &extlist);
++		XData registeredExtension(const QString &ns) const;
  
  		// some useful helper functions
  		static Action string2action(QString s);
-@@ -77,10 +91,16 @@ namespace XMPP {
+@@ -77,10 +92,16 @@ namespace XMPP {
  		AgentItem toAgentItem() const;
  		void fromAgentItem(const AgentItem &);
  
