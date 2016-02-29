@@ -1,0 +1,743 @@
+diff --git a/iris b/iris
+--- a/iris
++++ b/iris
+@@ -1 +1 @@
+-Subproject commit 230575f0d2ad196840ddc785049be564e99b24aa
++Subproject commit 230575f0d2ad196840ddc785049be564e99b24aa-dirty
+diff --git a/src/ahcservermanager.cpp b/src/ahcservermanager.cpp
+index c690180..6c44922 100644
+--- a/src/ahcservermanager.cpp
++++ b/src/ahcservermanager.cpp
+@@ -87,9 +87,8 @@ bool JT_AHCServer::commandListQuery(const QDomElement& e)
+ 		}
+ 		else if (q.attribute("xmlns") == "http://jabber.org/protocol/disco#info" && q.attribute("node") == AHC_NS) {
+ 			QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
+-			QDomElement query = doc()->createElement("query");
+-			query.setAttribute("xmlns", "http://jabber.org/protocol/disco#info");
+-			iq.appendChild(query);
++			DiscoItem item;
++			QDomElement query = query.appendChild(item.toDiscoInfoResult(doc())).toElement();
+ 			send(iq);
+ 			return true;
+ 		}
+@@ -104,25 +103,11 @@ bool JT_AHCServer::commandListQuery(const QDomElement& e)
+ 		}
+ 		else if (q.attribute("xmlns") == "http://jabber.org/protocol/disco#info" && manager_->hasServer(q.attribute("node"), Jid(e.attribute("from")))) {
+ 			QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
+-			QDomElement query = doc()->createElement("query");
+-			query.setAttribute("xmlns", "http://jabber.org/protocol/disco#info");
+-			query.setAttribute("node",q.attribute("node"));
+-			iq.appendChild(query);
+-
+-			QDomElement identity;
+-			identity = doc()->createElement("identity");
+-			identity.setAttribute("category", "automation");
+-			identity.setAttribute("type", "command-node");
+-			query.appendChild(identity);
+-
+-			QDomElement feature;
+-			feature = doc()->createElement("feature");
+-			feature.setAttribute("var", AHC_NS);
+-			query.appendChild(feature);
+-
+-			feature = doc()->createElement("feature");
+-			feature.setAttribute("var", "jabber:x:data");
+-			query.appendChild(feature);
++			DiscoItem item;
++			item.setNode(q.attribute("node"));
++			item.setIdentities(XMPP::DiscoItem::Identity("automation", "command-node"));
++			item.setFeatures(Features(QStringList() << AHC_NS << "jabber:x:data"));
++			QDomElement query = query.appendChild(item.toDiscoInfoResult(doc())).toElement();
+ 
+ 			send(iq);
+ 			return true;
+diff --git a/src/applicationinfo.cpp b/src/applicationinfo.cpp
+index 45346a7..456fc1f 100644
+--- a/src/applicationinfo.cpp
++++ b/src/applicationinfo.cpp
+@@ -46,7 +46,7 @@
+ #define PROG_VERSION PSI_VERSION
+ //#define PROG_VERSION "0.15-dev" " (" __DATE__ ")" //CVS Builds are dated
+ //#define PROG_VERSION "0.15";
+-#define PROG_CAPS_NODE "http://psi-im.org/caps"
++#define PROG_CAPS_NODE "http://psi-im.org"
+ #define PROG_CAPS_VERSION "caps-b75d8d2b25"
+ #define PROG_IPC_NAME "org.psi-im.Psi"	// must not contain '\\' character on Windows
+ #define PROG_OPTIONS_NS "http://psi-im.org/options"
+diff --git a/src/capabilities/capsmanager.cpp b/src/capabilities/capsmanager.cpp
+index 45ebf83..e13d567 100755
+--- a/src/capabilities/capsmanager.cpp
++++ b/src/capabilities/capsmanager.cpp
+@@ -87,20 +87,20 @@ void CapsManager::setEnabled(bool b)
+  * @param ver The entity's caps version
+  * @param ext The entity's caps extensions
+  */
+-void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext)
++void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo)
+ {
+ 	if (jid.compare(jid_,false))
+ 		return;
+ 
+-	CapsSpec c(node,ver,ext);
+-	CapsSpecs caps = c.flatten();
++	CapsSpec c(node,ver,ext,hashAlgo);
++	QStringList nodes = c.flatten();
+ 	if (capsSpecs_[jid.full()] != c) {
+ 		//qDebug() << QString("caps.cpp: Updating caps for %1 (node=%2,ver=%3,ext=%4)").arg(QString(jid.full()).replace('%',"%%")).arg(node).arg(ver).arg(ext);
+ 
+ 		// Unregister from all old caps nodes
+-		CapsSpecs old_caps = capsSpecs_[jid.full()].flatten();
+-		foreach(CapsSpec s, old_caps) {
+-			if (s != CapsSpec()) {
++		QStringList old_nodes = capsSpecs_[jid.full()].flatten();
++		foreach(const QString &s, old_nodes) {
++			if (!s.isEmpty()) {
+ 				capsJids_[s].removeAll(jid.full());
+ 			}
+ 		}
+@@ -108,7 +108,7 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
+ 		if (!node.isEmpty() && !ver.isEmpty()) {
+ 			// Register with all new caps nodes
+ 			capsSpecs_[jid.full()] = c;
+-			foreach(CapsSpec s, caps) {
++			foreach(const QString &s, nodes) {
+ 				if (!capsJids_[s].contains(jid.full())) {
+ 					capsJids_[s].push_back(jid.full());
+ 				}
+@@ -118,10 +118,10 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
+ 
+ 			// Register new caps and check if we need to discover features
+ 			if (isEnabled()) {
+-				foreach(CapsSpec s, caps) {
++				foreach(const QString &s, nodes) {
+ 					if (!registry_->isRegistered(s) && capsJids_[s].count() == 1) {
+ 						//qDebug() << QString("caps.cpp: Sending disco request to %1, node=%2").arg(QString(jid.full()).replace('%',"%%")).arg(node + "#" + s.extensions());
+-						discoInfoQuerier_->getDiscoInfo(jid,node + '#' + s.extensions());
++						discoInfoQuerier_->getDiscoInfo(jid,s);
+ 					}
+ 				}
+ 			}
+@@ -134,7 +134,7 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
+ 	}
+ 	else {
+ 		// Add to the list of jids
+-		foreach(CapsSpec s, caps) {
++		foreach(const QString &s, nodes) {
+ 			capsJids_[s].push_back(jid.full());
+ 		}
+ 	}
+@@ -149,9 +149,9 @@ void CapsManager::disableCaps(const Jid& jid)
+ {
+ 	//qDebug() << QString("caps.cpp: Disabling caps for %1.").arg(QString(jid.full()).replace('%',"%%"));
+ 	if (capsEnabled(jid)) {
+-		CapsSpecs cs = capsSpecs_[jid.full()].flatten();
+-		foreach(CapsSpec s, cs) {
+-			if (s != CapsSpec()) {
++		QStringList nodes = capsSpecs_[jid.full()].flatten();
++		foreach(const QString &s, nodes) {
++			if (!s.isEmpty()) {
+ 				capsJids_[s].removeAll(jid.full());
+ 			}
+ 		}
+@@ -175,7 +175,7 @@ void CapsManager::getDiscoInfo_success(const XMPP::Jid& jid, const QString& node
+ 	if (!ok) {
+ 		return;
+ 	}
+-	registry_->registerCaps(cs,item.identities(),item.features().list());
++	registry_->registerCaps(cs, item);
+ }
+ 
+ void CapsManager::getDiscoInfo_error(const XMPP::Jid& jid, const QString& node, int, const QString&)
+@@ -193,11 +193,11 @@ CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& di
+ 		return CapsSpec();
+     }
+ 	QString node = disco_node.left(hash_index);
+-	QString ext = disco_node.right(disco_node.length() - hash_index - 1);
++	QString ver = disco_node.right(disco_node.length() - hash_index - 1);
+ 	CapsSpec jid_cs = capsSpecs_[jid.full()];
+ 	if (jid_cs.node() == node) {
+ 		ok = true;
+-		return CapsSpec(node,jid_cs.version(),ext);
++		return CapsSpec(node,ver,QString(),QString());
+ 	}
+ 	else {
+ 		ok = false;
+@@ -212,7 +212,7 @@ CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& di
+ void CapsManager::capsRegistered(const CapsSpec& cs)
+ {
+ 	// Notify affected jids.
+-	foreach(QString s, capsJids_[cs]) {
++	foreach(const QString &s, capsJids_[cs.flatten(false).first()]) {
+ 		//qDebug() << QString("caps.cpp: Notifying %1.").arg(s.replace('%',"%%"));
+ 		emit capsChanged(s);
+ 	}
+@@ -235,8 +235,8 @@ XMPP::Features CapsManager::features(const Jid& jid) const
+ 	//qDebug() << "caps.cpp: Retrieving features of " << jid.full();
+ 	QStringList f;
+ 	if (capsEnabled(jid)) {
+-		CapsSpecs cs = capsSpecs_[jid.full()].flatten();
+-		foreach(CapsSpec s, cs) {
++		QStringList nodes = capsSpecs_[jid.full()].flatten();
++		foreach(const QString &s, nodes) {
+ 			//qDebug() << QString("    %1").arg(registry_->features(s).list().join("\n"));
+ 			f += registry_->features(s).list();
+ 		}
+@@ -251,11 +251,19 @@ XMPP::Features CapsManager::features(const Jid& jid) const
+ QString CapsManager::clientName(const Jid& jid) const
+ {
+ 	if (capsEnabled(jid)) {
+-		QString name;
+ 		CapsSpec cs = capsSpecs_[jid.full()];
+-		const DiscoItem::Identities& i = registry_->identities(CapsSpec(cs.node(),cs.version(),cs.version()));
+-		if (i.count() > 0) {
+-			name = i.first().name;
++		QString name;
++
++		QString cs_str = cs.flatten(false).first();
++		if (registry_->isRegistered(cs_str)) {
++			name = registry_->extensions(cs_str).extensionValue("urn:xmpp:dataforms:softwareinfo", "software");
++
++			if (name.isEmpty()) {
++				const DiscoItem::Identities& i = registry_->identities(cs_str);
++				if (i.count() > 0) {
++					name = i.first().name;
++				}
++			}
+ 		}
+ 
+ 		// Try to be intelligent about the name
+@@ -286,5 +294,38 @@ QString CapsManager::clientName(const Jid& jid) const
+  */
+ QString CapsManager::clientVersion(const Jid& jid) const
+ {
+-	return (capsEnabled(jid) ? capsSpecs_[jid.full()].version() : QString());
++	if (!capsEnabled(jid))
++		return QString();
++
++	QString version;
++	const CapsSpec &cs = capsSpecs_[jid.full()];
++	QString cs_str = cs.flatten(false).first();
++	if (registry_->isRegistered(cs_str))
++		version = registry_->extensions(cs_str).extensionValue("urn:xmpp:dataforms:softwareinfo", "software_version");
++
++	if (version.isEmpty())
++		version = cs.version();
++
++	return version;
++}
++
++/**
++ * \brief Returns the OS version of a given jid.
++ */
++QString CapsManager::osVersion(const Jid &jid) const
++{
++	QString os_str;
++	if (capsEnabled(jid)) {
++		QString cs_str = capsSpecs_[jid.full()].flatten(false).first();
++		if (registry_->isRegistered(cs_str)) {
++			XMPP::DiscoExtList el = registry_->extensions(cs_str);
++			os_str = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os").trimmed();
++			if (!os_str.isEmpty()) {
++				QString os_ver = el.extensionValue("urn:xmpp:dataforms:softwareinfo", "os_version").trimmed();
++				if (!os_ver.isEmpty())
++					os_str.append(" " + os_ver);
++			}
++		}
++	}
++	return os_str;
+ }
+diff --git a/src/capabilities/capsmanager.h b/src/capabilities/capsmanager.h
+index c779e30..9c2e8b7 100755
+--- a/src/capabilities/capsmanager.h
++++ b/src/capabilities/capsmanager.h
+@@ -48,12 +48,13 @@ public:
+ 	bool isEnabled();
+ 	void setEnabled(bool);
+ 
+-	void updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext);
++	void updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo);
+ 	void disableCaps(const Jid& jid);
+ 	bool capsEnabled(const Jid& jid) const;
+ 	XMPP::Features features(const Jid& jid) const;
+ 	QString clientName(const Jid& jid) const;
+ 	QString clientVersion(const Jid& jid) const;
++	QString osVersion(const Jid& jid) const;
+ 
+ signals:
+ 	/**
+@@ -76,7 +77,7 @@ private:
+ 	QPointer<Protocol::DiscoInfoQuerier> discoInfoQuerier_;
+ 	bool isEnabled_;
+ 	QMap<QString,CapsSpec> capsSpecs_;
+-	QMap<CapsSpec,QList<QString> > capsJids_;
++	QMap<QString,QList<QString> > capsJids_;
+ };
+ 
+ 
+diff --git a/src/capabilities/capsregistry.cpp b/src/capabilities/capsregistry.cpp
+index 01db836..1d5adba 100755
+--- a/src/capabilities/capsregistry.cpp
++++ b/src/capabilities/capsregistry.cpp
+@@ -32,99 +32,20 @@ using namespace XMPP;
+ 
+ // -----------------------------------------------------------------------------
+ 
+-CapsRegistry::CapsInfo::CapsInfo()
+-{
+-	updateLastSeen();
+-}
+-
+-const XMPP::Features& CapsRegistry::CapsInfo::features() const
+-{
+-	return features_;
+-}
+ 
+-const DiscoItem::Identities& CapsRegistry::CapsInfo::identities() const
++QDomElement CapsInfo::toXml(QDomDocument *doc) const
+ {
+-	return identities_;
+-}
+ 
+-void CapsRegistry::CapsInfo::setIdentities(const DiscoItem::Identities& i)
+-{
+-	identities_ = i;
+ }
+ 
+-void CapsRegistry::CapsInfo::setFeatures(const XMPP::Features& f)
++CapsInfo CapsInfo::fromXml(QDomElement ci)
+ {
+-	features_ = f;
+-}
+ 
+-void CapsRegistry::CapsInfo::updateLastSeen()
+-{
+-	lastSeen_ = QDateTime::currentDateTime();
+ }
+ 
+-QDomElement CapsRegistry::CapsInfo::toXml(QDomDocument *doc) const
+-{
+-	QDomElement info = doc->createElement("info");
+-	info.setAttribute("last-seen",lastSeen_.toString(Qt::ISODate));
+-
+-	// Identities
+-	for (DiscoItem::Identities::ConstIterator i = identities_.begin(); i != identities_.end(); ++i) {
+-		QDomElement identity = doc->createElement("identity");
+-		identity.setAttribute("category",(*i).category);
+-		identity.setAttribute("name",(*i).name);
+-		identity.setAttribute("type",(*i).type);
+-		info.appendChild(identity);
+-	}
+-
+-	// Features
+-	foreach(QString f, features_.list()) {
+-		QDomElement feature = doc->createElement("feature");
+-		feature.setAttribute("node",f);
+-		info.appendChild(feature);
+-	}
+-
+-	return info;
+-}
+-
+-void CapsRegistry::CapsInfo::fromXml(const QDomElement& e)
+-{
+-	if (e.tagName() != "info") {
+-		qWarning("caps.cpp: Invalid info element");
+-		return;
+-	}
+-
+-	if (!e.attribute("last-seen").isEmpty()) {
+-		QDateTime last = QDateTime::fromString(e.attribute("last-seen"),Qt::ISODate);
+-		if (last.isValid())
+-			lastSeen_ = last;
+-		else
+-			qWarning("Invalid date in caps registry");
+-	}
+-
+-	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling()) {
+-		QDomElement i = n.toElement();
+-		if(i.isNull()) {
+-			qWarning("caps.cpp: Null element");
+-			continue;
+-		}
+-
+-		if(i.tagName() == "identity") {
+-			DiscoItem::Identity id;
+-			id.category = i.attribute("category");
+-			id.name = i.attribute("name");
+-			id.type = i.attribute("type");
+-			identities_ += id;
+-		}
+-		else if (i.tagName() == "feature") {
+-			features_.addFeature(i.attribute("node"));
+-		}
+-		else {
+-			qWarning("caps.cpp: Unknown element");
+-		}
+-	}
+-}
+ 
+ // -----------------------------------------------------------------------------
++
+ /**
+  * \class CapsRegistry
+  * \brief A singleton class managing the capabilities of clients.
+@@ -146,12 +67,10 @@ void CapsRegistry::save(QIODevice& out)
+ 	QDomDocument doc;
+ 	QDomElement capabilities = doc.createElement("capabilities");
+ 	doc.appendChild(capabilities);
+-	QMap<CapsSpec,CapsInfo>::ConstIterator i = capsInfo_.begin();
++	QMap<QString,CapsInfo>::ConstIterator i = capsInfo_.begin();
+ 	for( ; i != capsInfo_.end(); i++) {
+ 		QDomElement info = i.value().toXml(&doc);
+-		info.setAttribute("node",i.key().node());
+-		info.setAttribute("ver",i.key().version());
+-		info.setAttribute("ext",i.key().extensions());
++		info.setAttribute("node",i.key());
+ 		capabilities.appendChild(info);
+ 	}
+ 
+@@ -199,9 +118,15 @@ void CapsRegistry::load(QIODevice& in)
+ 		if(i.tagName() == "info") {
+ 			CapsInfo info;
+ 			info.fromXml(i);
+-			CapsSpec spec(i.attribute("node"),i.attribute("ver"),i.attribute("ext"));
+-			capsInfo_[spec] = info;
+-			//qDebug() << QString("Read %1 %2 %3").arg(spec.node()).arg(spec.version()).arg(spec.extensions());
++			QString node = i.attribute("node");
++			int sep = node.indexOf('#');
++			if (sep > 0 && sep + 1 < node.length()) {
++				capsInfo_[node] = info;
++				//qDebug() << QString("Read %1 %2").arg(node).arg(ver);
++			}
++			else {
++				qWarning() << "capsregistry.cpp: Node" << node << "invalid";
++			}
+ 		}
+ 		else {
+ 			qWarning("capsregistry.cpp: Unknown element");
+@@ -212,13 +137,12 @@ void CapsRegistry::load(QIODevice& in)
+ /**
+  * \brief Registers capabilities of a client.
+  */
+-void CapsRegistry::registerCaps(const CapsSpec& spec,const XMPP::DiscoItem::Identities& identities,const XMPP::Features& features)
++void CapsRegistry::registerCaps(const CapsSpec& spec, const DiscoItem &item)
+ {
+-	if (!isRegistered(spec)) {
+-		CapsInfo info;
+-		info.setIdentities(identities);
+-		info.setFeatures(features);
+-		capsInfo_[spec] = info;
++	QString dnode = spec.flatten(false).first();
++	if (!isRegistered(dnode)) {
++		CapsInfo info(item);
++		capsInfo_[dnode] = info;
+ 		emit registered(spec);
+ 	}
+ }
+@@ -226,7 +150,7 @@ void CapsRegistry::registerCaps(const CapsSpec& spec,const XMPP::DiscoItem::Iden
+ /**
+  * \brief Checks if capabilities have been registered.
+  */
+-bool CapsRegistry::isRegistered(const CapsSpec& spec) const
++bool CapsRegistry::isRegistered(const QString& spec) const
+ {
+ 	return capsInfo_.contains(spec);
+ }
+@@ -235,7 +159,7 @@ bool CapsRegistry::isRegistered(const CapsSpec& spec) const
+ /**
+  * \brief Retrieves the features of a given caps spec.
+  */
+-XMPP::Features CapsRegistry::features(const CapsSpec& spec) const
++XMPP::Features CapsRegistry::features(const QString& spec) const
+ {
+ 	return capsInfo_[spec].features();
+ }
+@@ -243,7 +167,13 @@ XMPP::Features CapsRegistry::features(const CapsSpec& spec) const
+ /**
+  * \brief Retrieves the identities of a given caps spec.
+  */
+-XMPP::DiscoItem::Identities CapsRegistry::identities(const CapsSpec& spec) const
++XMPP::DiscoItem::Identities CapsRegistry::identities(const QString& spec) const
+ {
+ 	return capsInfo_[spec].identities();
+ }
++
++const XData &CapsRegistry::extensions(const QString &spec) const
++{
++	return capsInfo_.constFind(spec).value().extensions();
++	//return capsInfo_[spec].extensions();
++}
+diff --git a/src/capabilities/capsregistry.h b/src/capabilities/capsregistry.h
+index b448796..a48339c 100755
+--- a/src/capabilities/capsregistry.h
++++ b/src/capabilities/capsregistry.h
+@@ -37,6 +37,21 @@
+ class QDomDocument;
+ class QDomElement;
+ 
++class CapsInfo
++{
++public:
++	inline CapsInfo(const XMPP::DiscoItem &disco) :
++		_lastSeen(QDateTime::currentDateTime()), _disco(disco) {}
++	inline const QDateTime &lastSeen() const { return _lastSeen; }
++	inline const XMPP::DiscoItem &disco() const { return _disco; }
++	QDomElement toXml(QDomDocument *doc) const;
++	static CapsInfo fromXml(QDomElement ci);
++
++private:
++	QDateTime _lastSeen;
++	XMPP::DiscoItem _disco;
++};
++
+ class CapsRegistry : public QObject
+ {
+ 	Q_OBJECT
+@@ -44,10 +59,11 @@ class CapsRegistry : public QObject
+ public:
+ 	CapsRegistry();
+ 
+-	void registerCaps(const CapsSpec&, const XMPP::DiscoItem::Identities&, const XMPP::Features& features);
+-	bool isRegistered(const CapsSpec&) const;
+-	XMPP::Features features(const CapsSpec&) const;
+-	XMPP::DiscoItem::Identities identities(const CapsSpec&) const;
++	void registerCaps(const CapsSpec&, const XMPP::DiscoItem &item);
++	bool isRegistered(const QString &) const;
++	XMPP::Features features(const QString&) const;
++	XMPP::DiscoItem::Identities identities(const QString&) const;
++	const QMap<QString,XMPP::XData> &extensions(const QString& spec) const;
+ 
+ signals:
+ 	void registered(const CapsSpec&);
+@@ -57,28 +73,7 @@ public slots:
+ 	void save(QIODevice& target);
+ 
+ private:
+-	class CapsInfo
+-	{
+-		public:
+-			CapsInfo();
+-			const XMPP::Features& features() const;
+-			const XMPP::DiscoItem::Identities& identities() const;
+-
+-			void setIdentities(const XMPP::DiscoItem::Identities&);
+-			void setFeatures(const XMPP::Features&);
+-
+-			QDomElement toXml(QDomDocument *) const;
+-			void fromXml(const QDomElement&);
+-
+-		protected:
+-			void updateLastSeen();
+-
+-		private:
+-			XMPP::Features features_;
+-			XMPP::DiscoItem::Identities identities_;
+-			QDateTime lastSeen_;
+-	};
+-	QMap<CapsSpec,CapsInfo> capsInfo_;
++	QHash<QString,CapsInfo> capsInfo_;
+ };
+ 
+ 
+diff --git a/src/capabilities/capsspec.cpp b/src/capabilities/capsspec.cpp
+index 880f8d8..b4e0cda 100755
+--- a/src/capabilities/capsspec.cpp
++++ b/src/capabilities/capsspec.cpp
+@@ -44,8 +44,17 @@ CapsSpec::CapsSpec()
+  * @param ven the version
+  * @param ext the list of extensions (separated by spaces)
+  */
+-CapsSpec::CapsSpec(const QString& node, const QString& ver, const QString& ext) : node_(node), ver_(ver), ext_(ext)
++CapsSpec::CapsSpec(const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo)
++	: node_(node)
++	, ver_(ver)
++	, ext_(ext)
++	, hashAlgo_(hashAlgo)
+ {
++	if (!hashAlgo.isEmpty()) { // XEP-0115
++		hashVal_ = ver;
++		ver_ = QString();
++		ext_ = QString(); // this attribute is deprecated in XEP-0115
++	}
+ }
+ 
+ 
+@@ -75,6 +84,17 @@ const QString& CapsSpec::extensions() const
+ 	return ext_;
+ }
+ 
++const QString& CapsSpec::hashAlgorithm() const
++{
++	return hashAlgo_;
++}
++
++
++const QString& CapsSpec::hash() const
++{
++	return hashVal_;
++}
++
+ 
+ /**
+  * \brief Flattens the caps specification into the set of 'simple'
+@@ -88,13 +108,20 @@ const QString& CapsSpec::extensions() const
+  *	node=http://psi-im.org, ver=0.10, ext=achat
+  *	node=http://psi-im.org, ver=0.10, ext=vchat
+  */
+-CapsSpecs CapsSpec::flatten() const
++QStringList CapsSpec::flatten(bool withExt) const
+ {
+-	CapsSpecs l;
+-	l.append(CapsSpec(node(),version(),version()));
+-	QStringList exts(extensions().split(' ',QString::SkipEmptyParts));
+-	for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
+-		l.append(CapsSpec(node(),version(),*i));
++	QStringList l;
++	if (!hashAlgo_.isEmpty()) {
++		l.append(node_ + "#" + hashVal_);
++	}
++	else {
++		l.append(node_ + "#" + ver_);
++	}
++	if (withExt) {
++		QStringList exts(extensions().split(' ',QString::SkipEmptyParts));
++		for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
++			l.append(node_ + "#" + *i);
++		}
+ 	}
+ 	return l;
+ }
+diff --git a/src/capabilities/capsspec.h b/src/capabilities/capsspec.h
+index bc8c114..00bc7a0 100755
+--- a/src/capabilities/capsspec.h
++++ b/src/capabilities/capsspec.h
+@@ -24,25 +24,24 @@
+ #include <QList>
+ #include <QString>
+ 
+-class CapsSpec;
+-typedef QList<CapsSpec> CapsSpecs;
+-
+ class CapsSpec
+ {
+ 	public:
+ 		CapsSpec();
+-		CapsSpec(const QString&, const QString&, const QString&);
++		CapsSpec(const QString&, const QString&, const QString&, const QString&);
+ 		const QString& node() const;
+ 		const QString& version() const;
+ 		const QString& extensions() const;
+-		CapsSpecs flatten() const;
++		const QString& hashAlgorithm() const;
++		const QString& hash() const;
++		QStringList flatten(bool withExt = true) const;
+ 
+ 		bool operator==(const CapsSpec&) const;
+ 		bool operator!=(const CapsSpec&) const;
+ 		bool operator<(const CapsSpec&) const;
+ 
+ 	private:
+-		QString node_, ver_, ext_;
++		QString node_, ver_, ext_, hashAlgo_, hashVal_;
+ };
+ 
+ 
+diff --git a/src/discodlg.cpp b/src/discodlg.cpp
+index f97d680..5e8e6f2 100644
+--- a/src/discodlg.cpp
++++ b/src/discodlg.cpp
+@@ -497,6 +497,7 @@ void DiscoListItem::browseFinished()
+ 
+ void DiscoListItem::doAgents(bool parentAutoItems)
+ {
++	/* TODO remove jabber:iq:agents. it's obsoleted ince 2003 */
+ 	if ( parentAutoItems ) {
+ 		// save traffic
+ 		if ( alreadyItems )
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+index bc136ed..4201e41 100644
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -1663,7 +1663,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+ 
+ 	if (!s.capsNode().isEmpty()) {
+ 		Jid caps_jid(s.mucItem().jid().isEmpty() || !d->nonAnonymous ? Jid(jid()).withResource(nick) : s.mucItem().jid());
+-		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
++		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt(),s.capsHashAlgorithm());
+ 	}
+ 
+ 	if(!nick.isEmpty())
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index 196410b..8905056 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -2536,8 +2536,12 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+ 
+ 			UserResource ur(r);
+ 			//ur.setSecurityEnabled(true);
+-			if(local)
++			if(local) {
+ 				ur.setClient(ApplicationInfo::name(),ApplicationInfo::version(),SystemInfo::instance()->os());
++			}
++			else {
++				ur.setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),capsManager()->osVersion(j));
++			}
+ 
+ 			u->userResourceList().append(ur);
+ 			rp = &u->userResourceList().last();
+@@ -2601,14 +2605,13 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+ 	// Update entity capabilities.
+ 	// This has to happen after the userlist item has been created.
+ 	if (!r.status().capsNode().isEmpty()) {
+-		capsManager()->updateCaps(j,r.status().capsNode(),r.status().capsVersion(),r.status().capsExt());
++		capsManager()->updateCaps(j,r.status().capsNode(),r.status().capsVersion(),r.status().capsExt(),r.status().capsHashAlgorithm());
+ 
+ 		// Update the client version
+ 		foreach(UserListItem* u, findRelevant(j)) {
+ 			UserResourceList::Iterator rit = u->userResourceList().find(j.resource());
+ 			if (rit != u->userResourceList().end()) {
+-				//(*rit).setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),"");
+-				(*rit).setClient(QString(),QString(),"");
++				(*rit).setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),capsManager()->osVersion(j));
+ 				cpUpdate(*u,(*rit).name());
+ 			}
+ 		}
+@@ -3168,14 +3171,19 @@ void PsiAccount::capsChanged(const Jid& j)
+ 
+ 	QString name = capsManager()->clientName(j);
+ 	QString version = (name.isEmpty() ? QString() : capsManager()->clientVersion(j));
++	QString os;
++
++	if (!name.isEmpty()) {
++		version = capsManager()->clientVersion(j);
++		os = capsManager()->osVersion(j);
++	}
+ 
+ 	foreach(UserListItem *u, findRelevant(j)) {
+ 		UserResourceList::Iterator rit = u->userResourceList().find(j.resource());
+ 		bool found = (rit == u->userResourceList().end()) ? false: true;
+ 		if(!found)
+ 			continue;
+-		//(*rit).setClient(name,version,"");
+-		(*rit).setClient(QString(),QString(),"");
++		(*rit).setClient(name,version,os);
+ 		cpUpdate(*u);
+ 	}
+ }
+diff --git a/src/psicon.cpp b/src/psicon.cpp
+index eabbf28..ca3ac53 100644
+--- a/src/psicon.cpp
++++ b/src/psicon.cpp
+@@ -755,9 +755,10 @@ void PsiCon::registerCaps(const QString& ext, const QStringList& features)
+ 	identities += identity;
+ 
+ 	d->capsRegistry->registerCaps(CapsSpec(ApplicationInfo::capsNode(),
+-										   ApplicationInfo::capsVersion(), ext),
++										   ApplicationInfo::capsVersion(), ext, QString()),
+ 								  identities,
+-								  Features(features));
++								  Features(features),
++								  XMPP::DiscoExtList());
+ }
+ 
+ void PsiCon::deinit()
