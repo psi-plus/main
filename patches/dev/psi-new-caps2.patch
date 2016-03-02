@@ -64,124 +64,182 @@ index 45346a7..456fc1f 100644
  #define PROG_CAPS_VERSION "caps-b75d8d2b25"
  #define PROG_IPC_NAME "org.psi-im.Psi"	// must not contain '\\' character on Windows
  #define PROG_OPTIONS_NS "http://psi-im.org/options"
+diff --git a/src/capabilities/capabilities.pri b/src/capabilities/capabilities.pri
+index bc9c29f..b07aeab 100644
+--- a/src/capabilities/capabilities.pri
++++ b/src/capabilities/capabilities.pri
+@@ -2,11 +2,9 @@ INCLUDEPATH *= $$PWD
+ DEPENDPATH *= $$PWD
+ 
+ HEADERS += \
+-	$$PWD/capsspec.h \
+ 	$$PWD/capsregistry.h \
+ 	$$PWD/capsmanager.h
+ 
+ SOURCES += \
+-	$$PWD/capsspec.cpp \
+ 	$$PWD/capsregistry.cpp \
+ 	$$PWD/capsmanager.cpp
 diff --git a/src/capabilities/capsmanager.cpp b/src/capabilities/capsmanager.cpp
-index 45ebf83..515e761 100755
+index 45ebf83..7e30a0f 100755
 --- a/src/capabilities/capsmanager.cpp
 +++ b/src/capabilities/capsmanager.cpp
-@@ -87,20 +87,20 @@ void CapsManager::setEnabled(bool b)
+@@ -33,6 +33,7 @@
+ 
+ #include "capsregistry.h"
+ #include "capsmanager.h"
++#include "xmpp_discoinfotask.h"
+ 
+ 
+ //#define REQUEST_TIMEOUT 3000
+@@ -87,56 +88,49 @@ void CapsManager::setEnabled(bool b)
   * @param ver The entity's caps version
   * @param ext The entity's caps extensions
   */
 -void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext)
-+void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo)
++void CapsManager::updateCaps(const Jid& jid, const CapsSpec &c)
  {
  	if (jid.compare(jid_,false))
  		return;
  
 -	CapsSpec c(node,ver,ext);
 -	CapsSpecs caps = c.flatten();
-+	CapsSpec c(node,ver,ext,hashAlgo);
-+	QStringList nodes = c.flatten();
++	QString fullNode = c.flatten();
  	if (capsSpecs_[jid.full()] != c) {
  		//qDebug() << QString("caps.cpp: Updating caps for %1 (node=%2,ver=%3,ext=%4)").arg(QString(jid.full()).replace('%',"%%")).arg(node).arg(ver).arg(ext);
  
- 		// Unregister from all old caps nodes
+-		// Unregister from all old caps nodes
 -		CapsSpecs old_caps = capsSpecs_[jid.full()].flatten();
 -		foreach(CapsSpec s, old_caps) {
 -			if (s != CapsSpec()) {
-+		QStringList old_nodes = capsSpecs_[jid.full()].flatten();
-+		foreach(const QString &s, old_nodes) {
-+			if (!s.isEmpty()) {
- 				capsJids_[s].removeAll(jid.full());
- 			}
- 		}
-@@ -108,7 +108,7 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
- 		if (!node.isEmpty() && !ver.isEmpty()) {
+-				capsJids_[s].removeAll(jid.full());
+-			}
+-		}
++		// Unregister from all old caps node
++		capsJids_[capsSpecs_[jid.full()].flatten()].removeAll(jid.full());
+ 
+-		if (!node.isEmpty() && !ver.isEmpty()) {
++		if (c.isValid()) {
  			// Register with all new caps nodes
  			capsSpecs_[jid.full()] = c;
 -			foreach(CapsSpec s, caps) {
-+			foreach(const QString &s, nodes) {
- 				if (!capsJids_[s].contains(jid.full())) {
- 					capsJids_[s].push_back(jid.full());
- 				}
-@@ -118,10 +118,10 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
+-				if (!capsJids_[s].contains(jid.full())) {
+-					capsJids_[s].push_back(jid.full());
+-				}
++			if (!capsJids_[fullNode].contains(jid.full())) {
++				capsJids_[fullNode].push_back(jid.full());
+ 			}
+ 
+ 			emit capsChanged(jid);
  
  			// Register new caps and check if we need to discover features
  			if (isEnabled()) {
 -				foreach(CapsSpec s, caps) {
-+				foreach(const QString &s, nodes) {
- 					if (!registry_->isRegistered(s) && capsJids_[s].count() == 1) {
- 						//qDebug() << QString("caps.cpp: Sending disco request to %1, node=%2").arg(QString(jid.full()).replace('%',"%%")).arg(node + "#" + s.extensions());
+-					if (!registry_->isRegistered(s) && capsJids_[s].count() == 1) {
+-						//qDebug() << QString("caps.cpp: Sending disco request to %1, node=%2").arg(QString(jid.full()).replace('%',"%%")).arg(node + "#" + s.extensions());
 -						discoInfoQuerier_->getDiscoInfo(jid,node + '#' + s.extensions());
-+						discoInfoQuerier_->getDiscoInfo(jid,s);
- 					}
+-					}
++				if (!registry_->isRegistered(fullNode) && capsJids_[fullNode].count() == 1) {
++					//qDebug() << QString("caps.cpp: Sending disco request to %1, node=%2").arg(QString(jid.full()).replace('%',"%%")).arg(node + "#" + s.extensions());
++					JT_DiscoInfo* disco = new JT_DiscoInfo(client_->rootTask());
++					connect(disco, SIGNAL(finished()), SLOT(discoFinished()));
++					disco->get(jid, fullNode);
++					disco->go(true);
++
++					discoInfoQuerier_->getDiscoInfo(jid, fullNode);
  				}
  			}
-@@ -134,7 +134,7 @@ void CapsManager::updateCaps(const Jid& jid, const QString& node, const QString&
+ 		}
+ 		else {
+ 			// Remove all caps specifications
+-			qWarning() << QString("caps.cpp: Illegal caps info from %1: node=%2, ver=%3").arg(QString(jid.full()).replace('%',"%%")).arg(node).arg(ver);
++			qWarning() << QString("caps.cpp: Illegal caps info from %1: node=%2, ver=%3").arg(QString(jid.full()).replace('%',"%%")).arg(fullNode).arg(c.version());
+ 			capsSpecs_.remove(jid.full());
+ 		}
  	}
  	else {
  		// Add to the list of jids
 -		foreach(CapsSpec s, caps) {
-+		foreach(const QString &s, nodes) {
- 			capsJids_[s].push_back(jid.full());
- 		}
+-			capsJids_[s].push_back(jid.full());
+-		}
++		capsJids_[fullNode].push_back(jid.full());
  	}
-@@ -149,9 +149,9 @@ void CapsManager::disableCaps(const Jid& jid)
+ }
+ 
+@@ -149,11 +143,9 @@ void CapsManager::disableCaps(const Jid& jid)
  {
  	//qDebug() << QString("caps.cpp: Disabling caps for %1.").arg(QString(jid.full()).replace('%',"%%"));
  	if (capsEnabled(jid)) {
 -		CapsSpecs cs = capsSpecs_[jid.full()].flatten();
 -		foreach(CapsSpec s, cs) {
 -			if (s != CapsSpec()) {
-+		QStringList nodes = capsSpecs_[jid.full()].flatten();
-+		foreach(const QString &s, nodes) {
-+			if (!s.isEmpty()) {
- 				capsJids_[s].removeAll(jid.full());
- 			}
+-				capsJids_[s].removeAll(jid.full());
+-			}
++		QString node = capsSpecs_[jid.full()].flatten();
++		if (!node.isEmpty()) {
++			capsJids_[node].removeAll(jid.full());
  		}
-@@ -175,7 +175,7 @@ void CapsManager::getDiscoInfo_success(const XMPP::Jid& jid, const QString& node
- 	if (!ok) {
+ 		capsSpecs_.remove(jid.full());
+ 		emit capsChanged(jid);
+@@ -166,43 +158,16 @@ void CapsManager::disableCaps(const Jid& jid)
+  * features database for the requested node, and all the affected jids are
+  * put in the queue for update notification.
+  */
+-void CapsManager::getDiscoInfo_success(const XMPP::Jid& jid, const QString& node, const XMPP::DiscoItem& item)
++void CapsManager::discoFinished()
+ {
+ 	//qDebug() << QString("caps.cpp: Disco response from %1, node=%2").arg(QString(jid.full()).replace('%',"%%")).arg(node);
+ 	// Update features
+-	bool ok = false;
+-	CapsSpec cs(getCapsSpecForNode(jid, node, ok));
+-	if (!ok) {
++	JT_DiscoInfo *task = (JT_DiscoInfo *)sender();
++	CapsSpec cs = capsSpecs_.value(task->jid().full());
++	if (!cs.isValid()) {
  		return;
  	}
 -	registry_->registerCaps(cs,item.identities(),item.features().list());
-+	registry_->registerCaps(cs, item);
- }
- 
- void CapsManager::getDiscoInfo_error(const XMPP::Jid& jid, const QString& node, int, const QString&)
-@@ -186,18 +186,18 @@ void CapsManager::getDiscoInfo_error(const XMPP::Jid& jid, const QString& node,
- 
- CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& disco_node, bool& ok) const
- {
+-}
+-
+-void CapsManager::getDiscoInfo_error(const XMPP::Jid& jid, const QString& node, int, const QString&)
+-{
+-	qWarning() << QString("capsmanager.cpp: Disco to '%1' at node '%2' failed.").arg(jid.full()).arg(node);
+-}
+-
+-
+-CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& disco_node, bool& ok) const
+-{
 -    int hash_index = disco_node.indexOf('#');
 -    if (hash_index == -1) {
-+	int hash_index = disco_node.indexOf('#');
-+	if (hash_index == -1) {
- 		qWarning() << "CapsManager: Node" << disco_node << "invalid";
- 		ok = false;
- 		return CapsSpec();
+-		qWarning() << "CapsManager: Node" << disco_node << "invalid";
+-		ok = false;
+-		return CapsSpec();
 -    }
-+	}
- 	QString node = disco_node.left(hash_index);
+-	QString node = disco_node.left(hash_index);
 -	QString ext = disco_node.right(disco_node.length() - hash_index - 1);
-+	QString ver = disco_node.right(disco_node.length() - hash_index - 1);
- 	CapsSpec jid_cs = capsSpecs_[jid.full()];
- 	if (jid_cs.node() == node) {
- 		ok = true;
+-	CapsSpec jid_cs = capsSpecs_[jid.full()];
+-	if (jid_cs.node() == node) {
+-		ok = true;
 -		return CapsSpec(node,jid_cs.version(),ext);
-+		return CapsSpec(node,ver,QString(),QString());
- 	}
- 	else {
- 		ok = false;
-@@ -212,7 +212,7 @@ CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& di
+-	}
+-	else {
+-		ok = false;
+-		return CapsSpec();
+-	}
++	registry_->registerCaps(cs, task->item());
+ }
+ 
+ /**
+@@ -212,7 +177,7 @@ CapsSpec CapsManager::getCapsSpecForNode(const XMPP::Jid& jid, const QString& di
  void CapsManager::capsRegistered(const CapsSpec& cs)
  {
  	// Notify affected jids.
 -	foreach(QString s, capsJids_[cs]) {
-+	foreach(const QString &s, capsJids_[cs.flatten(false).first()]) {
++	foreach(const QString &s, capsJids_[cs.flatten()]) {
  		//qDebug() << QString("caps.cpp: Notifying %1.").arg(s.replace('%',"%%"));
  		emit capsChanged(s);
  	}
-@@ -235,10 +235,11 @@ XMPP::Features CapsManager::features(const Jid& jid) const
+@@ -235,10 +200,11 @@ XMPP::Features CapsManager::features(const Jid& jid) const
  	//qDebug() << "caps.cpp: Retrieving features of " << jid.full();
  	QStringList f;
  	if (capsEnabled(jid)) {
@@ -196,7 +254,7 @@ index 45ebf83..515e761 100755
  		}
  	}
  	return Features(f);
-@@ -251,11 +252,23 @@ XMPP::Features CapsManager::features(const Jid& jid) const
+@@ -251,11 +217,23 @@ XMPP::Features CapsManager::features(const Jid& jid) const
  QString CapsManager::clientName(const Jid& jid) const
  {
  	if (capsEnabled(jid)) {
@@ -224,7 +282,7 @@ index 45ebf83..515e761 100755
  		}
  
  		// Try to be intelligent about the name
-@@ -286,5 +299,40 @@ QString CapsManager::clientName(const Jid& jid) const
+@@ -286,5 +264,40 @@ QString CapsManager::clientName(const Jid& jid) const
   */
  QString CapsManager::clientVersion(const Jid& jid) const
  {
@@ -267,15 +325,23 @@ index 45ebf83..515e761 100755
 +	return os_str;
  }
 diff --git a/src/capabilities/capsmanager.h b/src/capabilities/capsmanager.h
-index c779e30..9c2e8b7 100755
+index c779e30..c46f21e 100755
 --- a/src/capabilities/capsmanager.h
 +++ b/src/capabilities/capsmanager.h
-@@ -48,12 +48,13 @@ public:
+@@ -28,7 +28,6 @@
+ #include <QPointer>
+ 
+ #include "protocol/discoinfoquerier.h"
+-#include "capsspec.h"
+ #include "capsregistry.h"
+ #include "xmpp_features.h"
+ 
+@@ -48,12 +47,13 @@ public:
  	bool isEnabled();
  	void setEnabled(bool);
  
 -	void updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext);
-+	void updateCaps(const Jid& jid, const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo);
++	void updateCaps(const Jid& jid, const CapsSpec& caps);
  	void disableCaps(const Jid& jid);
  	bool capsEnabled(const Jid& jid) const;
  	XMPP::Features features(const Jid& jid) const;
@@ -285,7 +351,22 @@ index c779e30..9c2e8b7 100755
  
  signals:
  	/**
-@@ -76,7 +77,7 @@ private:
+@@ -61,13 +61,8 @@ signals:
+ 	 */
+ 	void capsChanged(const Jid& jid);
+ 
+-protected:
+-	CapsSpec getCapsSpecForNode(const XMPP::Jid& jid, const QString& disco_node, bool& ok) const;
+-
+ protected slots:
+-	void getDiscoInfo_success(const XMPP::Jid& jid, const QString& node, const XMPP::DiscoItem& item);
+-	void getDiscoInfo_error(const XMPP::Jid& jid, const QString& node, int error_code, const QString& error_string);
+-
++	void discoFinished();
+ 	void capsRegistered(const CapsSpec&);
+ 
+ private:
+@@ -76,7 +71,7 @@ private:
  	QPointer<Protocol::DiscoInfoQuerier> discoInfoQuerier_;
  	bool isEnabled_;
  	QMap<QString,CapsSpec> capsSpecs_;
@@ -295,7 +376,7 @@ index c779e30..9c2e8b7 100755
  
  
 diff --git a/src/capabilities/capsregistry.cpp b/src/capabilities/capsregistry.cpp
-index 01db836..f1e5eff 100755
+index 01db836..f9fcc52 100755
 --- a/src/capabilities/capsregistry.cpp
 +++ b/src/capabilities/capsregistry.cpp
 @@ -32,99 +32,25 @@ using namespace XMPP;
@@ -456,7 +537,7 @@ index 01db836..f1e5eff 100755
 -		info.setIdentities(identities);
 -		info.setFeatures(features);
 -		capsInfo_[spec] = info;
-+	QString dnode = spec.flatten(false).first();
++	QString dnode = spec.flatten();
 +	if (!isRegistered(dnode)) {
 +		CapsInfo info(item);
 +		capsInfo_[dnode] = info;
@@ -493,10 +574,17 @@ index 01db836..f1e5eff 100755
 +	return ci.disco();
  }
 diff --git a/src/capabilities/capsregistry.h b/src/capabilities/capsregistry.h
-index b448796..26e00ce 100755
+index b448796..ee68e07 100755
 --- a/src/capabilities/capsregistry.h
 +++ b/src/capabilities/capsregistry.h
-@@ -37,6 +37,24 @@
+@@ -31,12 +31,29 @@
+ 
+ #include "xmpp_features.h"
+ #include "xmpp_discoitem.h"
+-
+-#include "capsspec.h"
++#include "xmpp_status.h"
+ 
  class QDomDocument;
  class QDomElement;
  
@@ -521,7 +609,7 @@ index b448796..26e00ce 100755
  class CapsRegistry : public QObject
  {
  	Q_OBJECT
-@@ -44,10 +62,9 @@ class CapsRegistry : public QObject
+@@ -44,41 +61,19 @@ class CapsRegistry : public QObject
  public:
  	CapsRegistry();
  
@@ -529,13 +617,16 @@ index b448796..26e00ce 100755
 -	bool isRegistered(const CapsSpec&) const;
 -	XMPP::Features features(const CapsSpec&) const;
 -	XMPP::DiscoItem::Identities identities(const CapsSpec&) const;
-+	void registerCaps(const CapsSpec&, const XMPP::DiscoItem &item);
++	void registerCaps(const XMPP::CapsSpec&, const XMPP::DiscoItem &item);
 +	bool isRegistered(const QString &) const;
 +	XMPP::DiscoItem disco(const QString&) const;
  
  signals:
- 	void registered(const CapsSpec&);
-@@ -57,28 +74,7 @@ public slots:
+-	void registered(const CapsSpec&);
++	void registered(const XMPP::CapsSpec&);
+ 
+ public slots:
+ 	void load(QIODevice& target);
  	void save(QIODevice& target);
  
  private:
@@ -566,108 +657,184 @@ index b448796..26e00ce 100755
  
  
 diff --git a/src/capabilities/capsspec.cpp b/src/capabilities/capsspec.cpp
-index 880f8d8..b4e0cda 100755
+deleted file mode 100755
+index 880f8d8..0000000
 --- a/src/capabilities/capsspec.cpp
-+++ b/src/capabilities/capsspec.cpp
-@@ -44,8 +44,17 @@ CapsSpec::CapsSpec()
-  * @param ven the version
-  * @param ext the list of extensions (separated by spaces)
-  */
++++ /dev/null
+@@ -1,118 +0,0 @@
+-/*
+- * capsspec.cpp
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-
+-#include <QString>
+-#include <QStringList>
+-
+-#include "capsspec.h"
+-
+-/**
+- * \class CapsSpec
+- * \brief A class representing an entity capability specification.
+- * An entity capability is a combination of a node, a version, and a set of
+- * extensions.
+- */
+-
+-/**
+- * Default constructor.
+- */
+-CapsSpec::CapsSpec()
+-{
+-}
+-
+-
+-/**
+- * \brief Basic constructor.
+- * @param node the node
+- * @param ven the version
+- * @param ext the list of extensions (separated by spaces)
+- */
 -CapsSpec::CapsSpec(const QString& node, const QString& ver, const QString& ext) : node_(node), ver_(ver), ext_(ext)
-+CapsSpec::CapsSpec(const QString& node, const QString& ver, const QString& ext, const QString& hashAlgo)
-+	: node_(node)
-+	, ver_(ver)
-+	, ext_(ext)
-+	, hashAlgo_(hashAlgo)
- {
-+	if (!hashAlgo.isEmpty()) { // XEP-0115
-+		hashVal_ = ver;
-+		ver_ = QString();
-+		ext_ = QString(); // this attribute is deprecated in XEP-0115
-+	}
- }
- 
- 
-@@ -75,6 +84,17 @@ const QString& CapsSpec::extensions() const
- 	return ext_;
- }
- 
-+const QString& CapsSpec::hashAlgorithm() const
-+{
-+	return hashAlgo_;
-+}
-+
-+
-+const QString& CapsSpec::hash() const
-+{
-+	return hashVal_;
-+}
-+
- 
- /**
-  * \brief Flattens the caps specification into the set of 'simple'
-@@ -88,13 +108,20 @@ const QString& CapsSpec::extensions() const
-  *	node=http://psi-im.org, ver=0.10, ext=achat
-  *	node=http://psi-im.org, ver=0.10, ext=vchat
-  */
+-{
+-}
+-
+-
+-/**
+- * \brief Returns the node of the capabilities specification.
+- */
+-const QString& CapsSpec::node() const
+-{
+-	return node_;
+-}
+-
+-
+-/**
+- * \brief Returns the version of the capabilities specification.
+- */
+-const QString& CapsSpec::version() const
+-{
+-	return ver_;
+-}
+-
+-
+-/**
+- * \brief Returns the extensions of the capabilities specification.
+- */
+-const QString& CapsSpec::extensions() const
+-{
+-	return ext_;
+-}
+-
+-
+-/**
+- * \brief Flattens the caps specification into the set of 'simple'
+- * specifications.
+- * A 'simple' specification is a specification with exactly one extension,
+- * or with the version number as the extension.
+- *
+- * Example: A caps specification with node=http://psi-im.org, version=0.10,
+- * and ext='achat vchat' would be expanded into the following list of specs:
+- *	node=http://psi-im.org, ver=0.10, ext=0.10
+- *	node=http://psi-im.org, ver=0.10, ext=achat
+- *	node=http://psi-im.org, ver=0.10, ext=vchat
+- */
 -CapsSpecs CapsSpec::flatten() const
-+QStringList CapsSpec::flatten(bool withExt) const
- {
+-{
 -	CapsSpecs l;
 -	l.append(CapsSpec(node(),version(),version()));
 -	QStringList exts(extensions().split(' ',QString::SkipEmptyParts));
 -	for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
 -		l.append(CapsSpec(node(),version(),*i));
-+	QStringList l;
-+	if (!hashAlgo_.isEmpty()) {
-+		l.append(node_ + "#" + hashVal_);
-+	}
-+	else {
-+		l.append(node_ + "#" + ver_);
-+	}
-+	if (withExt) {
-+		QStringList exts(extensions().split(' ',QString::SkipEmptyParts));
-+		for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
-+			l.append(node_ + "#" + *i);
-+		}
- 	}
- 	return l;
- }
+-	}
+-	return l;
+-}
+-
+-bool CapsSpec::operator==(const CapsSpec& s) const
+-{
+-	return (node() == s.node() && version() == s.version() && extensions() == s.extensions());
+-}
+-
+-bool CapsSpec::operator!=(const CapsSpec& s) const
+-{
+-	return !((*this) == s);
+-}
+-
+-bool CapsSpec::operator<(const CapsSpec& s) const
+-{
+-	return (node() != s.node() ? node() < s.node() :
+-			(version() != s.version() ? version() < s.version() :
+-			 extensions() < s.extensions()));
+-}
+-
 diff --git a/src/capabilities/capsspec.h b/src/capabilities/capsspec.h
-index bc8c114..00bc7a0 100755
+deleted file mode 100755
+index bc8c114..0000000
 --- a/src/capabilities/capsspec.h
-+++ b/src/capabilities/capsspec.h
-@@ -24,25 +24,24 @@
- #include <QList>
- #include <QString>
- 
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*
+- * capsspec.h
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-
+-#ifndef CAPSSPEC_H
+-#define CAPSSPEC_H
+-
+-#include <QList>
+-#include <QString>
+-
 -class CapsSpec;
 -typedef QList<CapsSpec> CapsSpecs;
 -
- class CapsSpec
- {
- 	public:
- 		CapsSpec();
+-class CapsSpec
+-{
+-	public:
+-		CapsSpec();
 -		CapsSpec(const QString&, const QString&, const QString&);
-+		CapsSpec(const QString&, const QString&, const QString&, const QString&);
- 		const QString& node() const;
- 		const QString& version() const;
- 		const QString& extensions() const;
+-		const QString& node() const;
+-		const QString& version() const;
+-		const QString& extensions() const;
 -		CapsSpecs flatten() const;
-+		const QString& hashAlgorithm() const;
-+		const QString& hash() const;
-+		QStringList flatten(bool withExt = true) const;
- 
- 		bool operator==(const CapsSpec&) const;
- 		bool operator!=(const CapsSpec&) const;
- 		bool operator<(const CapsSpec&) const;
- 
- 	private:
+-
+-		bool operator==(const CapsSpec&) const;
+-		bool operator!=(const CapsSpec&) const;
+-		bool operator<(const CapsSpec&) const;
+-
+-	private:
 -		QString node_, ver_, ext_;
-+		QString node_, ver_, ext_, hashAlgo_, hashVal_;
- };
- 
- 
+-};
+-
+-
+-#endif
 diff --git a/src/discodlg.cpp b/src/discodlg.cpp
 index f97d680..5e8e6f2 100644
 --- a/src/discodlg.cpp
@@ -681,20 +848,23 @@ index f97d680..5e8e6f2 100644
  		// save traffic
  		if ( alreadyItems )
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index bc136ed..4201e41 100644
+index bc136ed..26d2422 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -1663,7 +1663,7 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -1661,9 +1661,9 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+ 		ui_.lv_users->removeEntry(nick);
+ 	}
  
- 	if (!s.capsNode().isEmpty()) {
+-	if (!s.capsNode().isEmpty()) {
++	if (s.caps().isValid()) {
  		Jid caps_jid(s.mucItem().jid().isEmpty() || !d->nonAnonymous ? Jid(jid()).withResource(nick) : s.mucItem().jid());
 -		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
-+		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt(),s.capsHashAlgorithm());
++		account()->capsManager()->updateCaps(caps_jid, s.caps());
  	}
  
  	if(!nick.isEmpty())
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
-index 196410b..8905056 100644
+index 196410b..c15b838 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -2536,8 +2536,12 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
@@ -711,12 +881,14 @@ index 196410b..8905056 100644
  
  			u->userResourceList().append(ur);
  			rp = &u->userResourceList().last();
-@@ -2601,14 +2605,13 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+@@ -2600,15 +2604,14 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+ 
  	// Update entity capabilities.
  	// This has to happen after the userlist item has been created.
- 	if (!r.status().capsNode().isEmpty()) {
+-	if (!r.status().capsNode().isEmpty()) {
 -		capsManager()->updateCaps(j,r.status().capsNode(),r.status().capsVersion(),r.status().capsExt());
-+		capsManager()->updateCaps(j,r.status().capsNode(),r.status().capsVersion(),r.status().capsExt(),r.status().capsHashAlgorithm());
++	if (r.status().caps().isValid()) {
++		capsManager()->updateCaps(j, r.status().caps());
  
  		// Update the client version
  		foreach(UserListItem* u, findRelevant(j)) {
@@ -728,7 +900,18 @@ index 196410b..8905056 100644
  				cpUpdate(*u,(*rit).name());
  			}
  		}
-@@ -3168,14 +3171,19 @@ void PsiAccount::capsChanged(const Jid& j)
+@@ -3108,9 +3111,7 @@ void PsiAccount::setStatusActual(const Status &_s)
+ 
+ 	// Add entity capabilities information
+ 	if (capsManager()->isEnabled()) {
+-		s.setCapsNode(d->client->capsNode());
+-		s.setCapsVersion(d->client->capsVersion());
+-		s.setCapsExt(d->client->capsExt());
++		s.setCaps(CapsSpec(d->client->capsNode(),d->client->capsVersion(),d->client->capsAlgorythm()));
+ 	}
+ 
+ 	if (!presenceSent) {
+@@ -3168,14 +3169,19 @@ void PsiAccount::capsChanged(const Jid& j)
  
  	QString name = capsManager()->clientName(j);
  	QString version = (name.isEmpty() ? QString() : capsManager()->clientVersion(j));

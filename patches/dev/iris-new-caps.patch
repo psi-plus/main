@@ -1,3 +1,563 @@
+diff --git a/src/xmpp/xmpp-im/types.cpp b/src/xmpp/xmpp-im/types.cpp
+index b0d5d05..e2b45ac 100644
+--- a/src/xmpp/xmpp-im/types.cpp
++++ b/src/xmpp/xmpp-im/types.cpp
+@@ -2199,69 +2199,216 @@ bool Subscription::fromString(const QString &s)
+ //---------------------------------------------------------------------------
+ // Status
+ //---------------------------------------------------------------------------
++/**
++ * Default constructor.
++ */
++CapsSpec::CapsSpec()
++{
++}
++
++
++/**
++ * \brief Basic constructor.
++ * @param node the node
++ * @param ven the version
++ * @param ext the list of extensions (separated by spaces)
++ */
++CapsSpec::CapsSpec(const QString& node, const QString& ver, const QString& hashAlgo)
++	: node_(node)
++	, ver_(ver)
++	, hashAlgo_(hashAlgo)
++{}
++
++/**
++ * @brief Checks for validity
++ * @return true on valid
++ */
++bool CapsSpec::isValid() const
++{
++	return !node_.isEmpty() && !ver_.isEmpty() && !hashAlgo_.isEmpty();
++}
++
++
++/**
++ * \brief Returns the node of the capabilities specification.
++ */
++const QString& CapsSpec::node() const
++{
++	return node_;
++}
++
++
++/**
++ * \brief Returns the version of the capabilities specification.
++ */
++const QString& CapsSpec::version() const
++{
++	return ver_;
++}
++
++const QString& CapsSpec::hashAlgorithm() const
++{
++	return hashAlgo_;
++}
++
++QDomElement CapsSpec::toXml(QDomDocument *doc) const
++{
++	QDomElement c = doc->createElement("c");
++	c.setAttribute("xmlns","http://jabber.org/protocol/caps");
++	c.setAttribute("hash",hashAlgo_);
++	c.setAttribute("node",node_);
++	c.setAttribute("ver",ver_);
++	return c;
++}
++
++CapsSpec CapsSpec::fromXml(const QDomElement &e)
++{
++	QString node = e.attribute("node");
++	QString ver = e.attribute("ver");
++	QString hashAlgo = e.attribute("hash");
++	return CapsSpec(node, ver, hashAlgo);
++}
++
++/**
++ * \brief Flattens the caps specification into the set of 'simple'
++ * specifications.
++ * A 'simple' specification is a specification with exactly one extension,
++ * or with the version number as the extension.
++ *
++ * Example: A caps specification with node=http://psi-im.org, version=0.10,
++ * and ext='achat vchat' would be expanded into the following list of specs:
++ *	node=http://psi-im.org, ver=0.10, ext=0.10
++ *	node=http://psi-im.org, ver=0.10, ext=achat
++ *	node=http://psi-im.org, ver=0.10, ext=vchat
++ */
++QString CapsSpec::flatten() const
++{
++	if (isValid())
++		return node_ + QLatin1String("#") + ver_;
++	return QString();
++}
++
++bool CapsSpec::operator==(const CapsSpec& s) const
++{
++	return (node() == s.node() && version() == s.version() && hashAlgorithm() == s.hashAlgorithm());
++}
++
++bool CapsSpec::operator!=(const CapsSpec& s) const
++{
++	return !((*this) == s);
++}
++
++bool CapsSpec::operator<(const CapsSpec& s) const
++{
++	return (node() != s.node() ? node() < s.node() :
++			(version() != s.version() ? version() < s.version() :
++			 hashAlgorithm() < s.hashAlgorithm()));
++}
++
++
++class StatusPrivate : public QSharedData
++{
++public:
++	StatusPrivate() :
++		hasPhotoHash(false),
++		isMUC(false),
++		hasMUCItem(false),
++		hasMUCDestroy(false),
++		mucHistoryMaxChars(-1),
++		mucHistoryMaxStanzas(-1),
++		mucHistorySeconds(-1),
++		ecode(-1)
++	{}
++
++	int priority;
++	QString show, status, key;
++	QDateTime timeStamp;
++	bool isAvailable;
++	bool isInvisible;
++	QString photoHash;
++	bool hasPhotoHash;
++
++	QString xsigned;
++	// gabber song extension
++	QString songTitle;
++	CapsSpec caps;
++	QList<BoBData> bobDataList;
++
++	// MUC
++	bool isMUC, hasMUCItem, hasMUCDestroy;
++	MUCItem mucItem;
++	MUCDestroy mucDestroy;
++	QList<int> mucStatuses;
++	QString mucPassword;
++	int mucHistoryMaxChars, mucHistoryMaxStanzas, mucHistorySeconds;
++	QDateTime mucHistorySince;
++
++	int ecode;
++	QString estr;
++};
++
+ 
+ Status::Status(const QString &show, const QString &status, int priority, bool available)
+ {
+-	v_isAvailable = available;
+-	v_show = show;
+-	v_status = status;
+-	v_priority = priority;
+-	v_timeStamp = QDateTime::currentDateTime();
+-	v_isInvisible = false;
+-	v_hasPhotoHash = false;
+-	v_isMUC = false;
+-	v_hasMUCItem = false;
+-	v_hasMUCDestroy = false;
+-	v_mucHistoryMaxChars = -1;
+-	v_mucHistoryMaxStanzas = -1;
+-	v_mucHistorySeconds = -1;
+-	ecode = -1;
++	d = new StatusPrivate;
++
++	d->isAvailable = available;
++	d->show = show;
++	d->status = status;
++	d->priority = priority;
++	d->timeStamp = QDateTime::currentDateTime();
++	d->isInvisible = false;
+ }
+ 
+ Status::Status(Type type, const QString& status, int priority)
+ {
+-	v_status = status;
+-	v_priority = priority;
+-	v_timeStamp = QDateTime::currentDateTime();
+-	v_hasPhotoHash = false;
+-	v_isMUC = false;
+-	v_hasMUCItem = false;
+-	v_hasMUCDestroy = false;
+-	v_mucHistoryMaxChars = -1;
+-	v_mucHistoryMaxStanzas = -1;
+-	v_mucHistorySeconds = -1;
+-	ecode = -1;
++	d = new StatusPrivate;
++
++	d->status = status;
++	d->priority = priority;
++	d->timeStamp = QDateTime::currentDateTime();
+ 	setType(type);
+ }
+ 
++Status::Status(const Status &other) :
++	d(other.d)
++{
++}
++
++Status &Status::operator=(const Status &other)
++{
++	d = other.d;
++	return *this;
++}
++
+ Status::~Status()
+ {
+ }
+ 
+ bool Status::hasError() const
+ {
+-	return (ecode != -1);
++	return (d->ecode != -1);
+ }
+ 
+ void Status::setError(int code, const QString &str)
+ {
+-	ecode = code;
+-	estr = str;
++	d->ecode = code;
++	d->estr = str;
+ }
+ 
+ void Status::setIsAvailable(bool available)
+ {
+-	v_isAvailable = available;
++	d->isAvailable = available;
+ }
+ 
+ void Status::setIsInvisible(bool invisible)
+ {
+-	v_isInvisible = invisible;
++	d->isInvisible = invisible;
+ }
+ 
+ void Status::setPriority(int x)
+ {
+-	v_priority = x;
++	d->priority = x;
+ }
+ 
+ void Status::setType(Status::Type _type)
+@@ -2310,124 +2457,109 @@ void Status::setType(QString stat)
+ 
+ void Status::setShow(const QString & _show)
+ {
+-	v_show = _show;
++	d->show = _show;
+ }
+ 
+ void Status::setStatus(const QString & _status)
+ {
+-	v_status = _status;
++	d->status = _status;
+ }
+ 
+ void Status::setTimeStamp(const QDateTime & _timestamp)
+ {
+-	v_timeStamp = _timestamp;
++	d->timeStamp = _timestamp;
+ }
+ 
+ void Status::setKeyID(const QString &key)
+ {
+-	v_key = key;
++	d->key = key;
+ }
+ 
+ void Status::setXSigned(const QString &s)
+ {
+-	v_xsigned = s;
++	d->xsigned = s;
+ }
+ 
+ void Status::setSongTitle(const QString & _songtitle)
+ {
+-	v_songTitle = _songtitle;
+-}
+-
+-void Status::setCapsNode(const QString & _capsNode)
+-{
+-	v_capsNode = _capsNode;
++	d->songTitle = _songtitle;
+ }
+ 
+-void Status::setCapsVersion(const QString & _capsVersion)
++void Status::setCaps(const CapsSpec & caps)
+ {
+-	v_capsVersion = _capsVersion;
+-}
+-
+-void Status::setCapsHashAlgorithm(const QString & _capsHashAlgorithm)
+-{
+-	v_capsHashAlgorithm = _capsHashAlgorithm;
+-}
+-
+-void Status::setCapsExt(const QString & _capsExt)
+-{
+-	v_capsExt = _capsExt;
++	d->caps = caps;
+ }
+ 
+ void Status::setMUC()
+ {
+-	v_isMUC = true;
++	d->isMUC = true;
+ }
+ 
+ void Status::setMUCItem(const MUCItem& i)
+ {
+-	v_hasMUCItem = true;
+-	v_mucItem = i;
++	d->hasMUCItem = true;
++	d->mucItem = i;
+ }
+ 
+ void Status::setMUCDestroy(const MUCDestroy& i)
+ {
+-	v_hasMUCDestroy = true;
+-	v_mucDestroy = i;
++	d->hasMUCDestroy = true;
++	d->mucDestroy = i;
+ }
+ 
+ void Status::setMUCHistory(int maxchars, int maxstanzas, int seconds, const QDateTime &since)
+ {
+-	v_mucHistoryMaxChars = maxchars;
+-	v_mucHistoryMaxStanzas = maxstanzas;
+-	v_mucHistorySeconds = seconds;
+-	v_mucHistorySince = since;
++	d->mucHistoryMaxChars = maxchars;
++	d->mucHistoryMaxStanzas = maxstanzas;
++	d->mucHistorySeconds = seconds;
++	d->mucHistorySince = since;
+ }
+ 
+ 
+ const QString& Status::photoHash() const
+ {
+-	return v_photoHash;
++	return d->photoHash;
+ }
+ 
+ void Status::setPhotoHash(const QString& h)
+ {
+-	v_photoHash = h;
+-	v_hasPhotoHash = true;
++	d->photoHash = h;
++	d->hasPhotoHash = true;
+ }
+ 
+ bool Status::hasPhotoHash() const
+ {
+-	return v_hasPhotoHash;
++	return d->hasPhotoHash;
+ }
+ 
+ void Status::addBoBData(const BoBData &bob)
+ {
+-	v_bobDataList.append(bob);
++	d->bobDataList.append(bob);
+ }
+ 
+ QList<BoBData> Status::bobDataList() const
+ {
+-	return v_bobDataList;
++	return d->bobDataList;
+ }
+ 
+ bool Status::isAvailable() const
+ {
+-	return v_isAvailable;
++	return d->isAvailable;
+ }
+ 
+ bool Status::isAway() const
+ {
+-	return (v_show == "away" || v_show == "xa" || v_show == "dnd");
++	return (d->show == "away" || d->show == "xa" || d->show == "dnd");
+ }
+ 
+ bool Status::isInvisible() const
+ {
+-	return v_isInvisible;
++	return d->isInvisible;
+ }
+ 
+ int Status::priority() const
+ {
+-	return v_priority;
++	return d->priority;
+ }
+ 
+ Status::Type Status::type() const
+@@ -2471,131 +2603,116 @@ QString Status::typeString() const
+ 
+ const QString & Status::show() const
+ {
+-	return v_show;
++	return d->show;
+ }
+ const QString & Status::status() const
+ {
+-	return v_status;
++	return d->status;
+ }
+ 
+ QDateTime Status::timeStamp() const
+ {
+-	return v_timeStamp;
++	return d->timeStamp;
+ }
+ 
+ const QString & Status::keyID() const
+ {
+-	return v_key;
++	return d->key;
+ }
+ 
+ const QString & Status::xsigned() const
+ {
+-	return v_xsigned;
++	return d->xsigned;
+ }
+ 
+ const QString & Status::songTitle() const
+ {
+-	return v_songTitle;
++	return d->songTitle;
+ }
+ 
+-const QString & Status::capsNode() const
++const CapsSpec & Status::caps() const
+ {
+-	return v_capsNode;
+-}
+-
+-const QString & Status::capsVersion() const
+-{
+-	return v_capsVersion;
+-}
+-
+-const QString & Status::capsHashAlgorithm() const
+-{
+-	return v_capsHashAlgorithm;
+-}
+-
+-const QString & Status::capsExt() const
+-{
+-	return v_capsExt;
++	return d->caps;
+ }
+ 
+ bool Status::isMUC() const
+ {
+-	return v_isMUC || !v_mucPassword.isEmpty() || hasMUCHistory();
++	return d->isMUC || !d->mucPassword.isEmpty() || hasMUCHistory();
+ }
+ 
+ bool Status::hasMUCItem() const
+ {
+-	return v_hasMUCItem;
++	return d->hasMUCItem;
+ }
+ 
+ const MUCItem& Status::mucItem() const
+ {
+-	return v_mucItem;
++	return d->mucItem;
+ }
+ 
+ bool Status::hasMUCDestroy() const
+ {
+-	return v_hasMUCDestroy;
++	return d->hasMUCDestroy;
+ }
+ 
+ const MUCDestroy& Status::mucDestroy() const
+ {
+-	return v_mucDestroy;
++	return d->mucDestroy;
+ }
+ 
+ const QList<int>& Status::getMUCStatuses() const
+ {
+-	return v_mucStatuses;
++	return d->mucStatuses;
+ }
+ 
+ void Status::addMUCStatus(int i)
+ {
+-	v_mucStatuses += i;
++	d->mucStatuses += i;
+ }
+ 
+ const QString& Status::mucPassword() const
+ {
+-	return v_mucPassword;
++	return d->mucPassword;
+ }
+ 
+ bool Status::hasMUCHistory() const
+ {
+-	return v_mucHistoryMaxChars >= 0 || v_mucHistoryMaxStanzas >= 0 || v_mucHistorySeconds >= 0 || !v_mucHistorySince.isNull();
++	return d->mucHistoryMaxChars >= 0 || d->mucHistoryMaxStanzas >= 0 || d->mucHistorySeconds >= 0 || !d->mucHistorySince.isNull();
+ }
+ 
+ int Status::mucHistoryMaxChars() const
+ {
+-	return v_mucHistoryMaxChars;
++	return d->mucHistoryMaxChars;
+ }
+ 
+ int Status::mucHistoryMaxStanzas() const
+ {
+-	return v_mucHistoryMaxStanzas;
++	return d->mucHistoryMaxStanzas;
+ }
+ 
+ int Status::mucHistorySeconds() const
+ {
+-	return v_mucHistorySeconds;
++	return d->mucHistorySeconds;
+ }
+ 
+ const QDateTime & Status::mucHistorySince() const
+ {
+-	return v_mucHistorySince;
++	return d->mucHistorySince;
+ }
+ 
+ void Status::setMUCPassword(const QString& i)
+ {
+-	v_mucPassword = i;
++	d->mucPassword = i;
+ }
+ 
+ int Status::errorCode() const
+ {
+-	return ecode;
++	return d->ecode;
+ }
+ 
+ const QString & Status::errorString() const
+ {
+-	return estr;
++	return d->estr;
+ }
+ 
+ 
 diff --git a/src/xmpp/xmpp-im/xmpp_discoinfotask.cpp b/src/xmpp/xmpp-im/xmpp_discoinfotask.cpp
 index eb92cf4..4d0e75e 100644
 --- a/src/xmpp/xmpp-im/xmpp_discoinfotask.cpp
@@ -351,19 +911,142 @@ index 8380ba5..969dd09 100644
  }
  
  #endif
+diff --git a/src/xmpp/xmpp-im/xmpp_status.h b/src/xmpp/xmpp-im/xmpp_status.h
+index f7c88ea..8d34352 100644
+--- a/src/xmpp/xmpp-im/xmpp_status.h
++++ b/src/xmpp/xmpp-im/xmpp_status.h
+@@ -30,6 +30,30 @@
+ 
+ namespace XMPP
+ {
++	class CapsSpec
++	{
++		public:
++			CapsSpec();
++			CapsSpec(const QString& node, const QString& ver, const QString& hashAlgo);
++			bool isValid() const;
++			const QString& node() const;
++			const QString& version() const;
++			const QString& hashAlgorithm() const;
++			QString flatten() const;
++
++			bool operator==(const CapsSpec&) const;
++			bool operator!=(const CapsSpec&) const;
++			bool operator<(const CapsSpec&) const;
++
++			QDomElement toXml(QDomDocument *doc) const;
++			static CapsSpec fromXml(const QDomElement &e);
++
++		private:
++			QString node_, ver_, hashAlgo_;
++	};
++
++	class StatusPrivate;
++
+ 	class Status
+ 	{
+ 	public:
+@@ -37,6 +61,8 @@ namespace XMPP
+ 
+ 		Status(const QString &show=QString(), const QString &status=QString(), int priority=0, bool available=true);
+ 		Status(Type type, const QString& status=QString(), int priority=0);
++		Status(const Status &);
++		Status &operator=(const Status &);
+ 		~Status();
+ 
+ 		int priority() const;
+@@ -55,10 +81,7 @@ namespace XMPP
+ 
+ 		const QString & xsigned() const;
+ 		const QString & songTitle() const;
+-		const QString & capsNode() const;
+-		const QString & capsVersion() const;
+-		const QString & capsHashAlgorithm() const;
+-		const QString & capsExt() const;
++		const CapsSpec & caps() const;
+ 
+ 		bool isMUC() const;
+ 		bool hasMUCItem() const;
+@@ -85,10 +108,7 @@ namespace XMPP
+ 		void setIsAvailable(bool);
+ 		void setIsInvisible(bool);
+ 		void setError(int, const QString &);
+-		void setCapsNode(const QString&);
+-		void setCapsVersion(const QString&);
+-		void setCapsHashAlgorithm(const QString&);
+-		void setCapsExt(const QString&);
++		void setCaps(const CapsSpec&);
+ 
+ 		void setMUC();
+ 		void setMUCItem(const MUCItem&);
+@@ -110,31 +130,7 @@ namespace XMPP
+ 		QList<BoBData> bobDataList() const;
+ 
+ 	private:
+-		int v_priority;
+-		QString v_show, v_status, v_key;
+-		QDateTime v_timeStamp;
+-		bool v_isAvailable;
+-		bool v_isInvisible;
+-		QString v_photoHash;
+-		bool v_hasPhotoHash;
+-
+-		QString v_xsigned;
+-		// gabber song extension
+-		QString v_songTitle;
+-		QString v_capsNode, v_capsVersion, v_capsHashAlgorithm, v_capsExt;
+-		QList<BoBData> v_bobDataList;
+-
+-		// MUC
+-		bool v_isMUC, v_hasMUCItem, v_hasMUCDestroy;
+-		MUCItem v_mucItem;
+-		MUCDestroy v_mucDestroy;
+-		QList<int> v_mucStatuses;
+-		QString v_mucPassword;
+-		int v_mucHistoryMaxChars, v_mucHistoryMaxStanzas, v_mucHistorySeconds;
+-		QDateTime v_mucHistorySince;
+-
+-		int ecode;
+-		QString estr;
++		QSharedDataPointer<StatusPrivate> d;
+ 	};
+ 
+ }
 diff --git a/src/xmpp/xmpp-im/xmpp_tasks.cpp b/src/xmpp/xmpp-im/xmpp_tasks.cpp
-index 8a9aa6c..a391ec7 100644
+index 8a9aa6c..2172ae4 100644
 --- a/src/xmpp/xmpp-im/xmpp_tasks.cpp
 +++ b/src/xmpp/xmpp-im/xmpp_tasks.cpp
-@@ -766,6 +766,7 @@ bool JT_PushPresence::take(const QDomElement &e)
-  			p.setCapsNode(i.attribute("node"));
-  			p.setCapsVersion(i.attribute("ver"));
-  			p.setCapsExt(i.attribute("ext"));
-+			p.setCapsHashAlgorithm(i.attribute("hash"));
+@@ -588,16 +588,8 @@ void JT_Presence::pres(const Status &s)
+ 			tag.appendChild(x);
+ 		}
+ 
+-		if(!s.capsNode().isEmpty() && !s.capsVersion().isEmpty()) {
+-			QDomElement c = doc()->createElement("c");
+-			c.setAttribute("xmlns","http://jabber.org/protocol/caps");
+-			if (!s.capsHashAlgorithm().isEmpty())
+-				c.setAttribute("hash",s.capsHashAlgorithm());
+-			c.setAttribute("node",s.capsNode());
+-			c.setAttribute("ver",s.capsVersion());
+-			if (!s.capsExt().isEmpty())
+-				c.setAttribute("ext",s.capsExt());
+-			tag.appendChild(c);
++		if (s.caps().isValid()) {
++			tag.appendChild(s.caps().toXml(doc()));
+ 		}
+ 
+ 		if(s.isMUC()) {
+@@ -763,9 +755,7 @@ bool JT_PushPresence::take(const QDomElement &e)
+ 			p.setKeyID(tagContent(i));
+ 		}
+  		else if(i.tagName() == "c" && i.attribute("xmlns") == "http://jabber.org/protocol/caps") {
+- 			p.setCapsNode(i.attribute("node"));
+- 			p.setCapsVersion(i.attribute("ver"));
+- 			p.setCapsExt(i.attribute("ext"));
++			p.setCaps(CapsSpec::fromXml(i));
    		}
  		else if(i.tagName() == "x" && i.attribute("xmlns") == "vcard-temp:x:update") {
  			QDomElement t;
-@@ -1486,72 +1487,32 @@ bool JT_ServInfo::take(const QDomElement &e)
+@@ -1486,72 +1476,32 @@ bool JT_ServInfo::take(const QDomElement &e)
  			node = q.attribute("node");
  
  		QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
@@ -453,7 +1136,7 @@ index 8a9aa6c..a391ec7 100644
  			}
  
  			if (node.isEmpty()) {
-@@ -1560,9 +1521,7 @@ bool JT_ServInfo::take(const QDomElement &e)
+@@ -1560,9 +1510,7 @@ bool JT_ServInfo::take(const QDomElement &e)
  				for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
  					const QStringList& l = client()->extension(*i).list();
  					for ( QStringList::ConstIterator j = l.begin(); j != l.end(); ++j ) {
@@ -464,7 +1147,7 @@ index 8a9aa6c..a391ec7 100644
  					}
  				}
  			}
-@@ -1572,9 +1531,7 @@ bool JT_ServInfo::take(const QDomElement &e)
+@@ -1572,9 +1520,7 @@ bool JT_ServInfo::take(const QDomElement &e)
  			if (client()->extensions().contains(ext)) {
  				const QStringList& l = client()->extension(ext).list();
  				for ( QStringList::ConstIterator it = l.begin(); it != l.end(); ++it ) {
@@ -475,7 +1158,7 @@ index 8a9aa6c..a391ec7 100644
  				}
  			}
  			else {
-@@ -1586,6 +1543,8 @@ bool JT_ServInfo::take(const QDomElement &e)
+@@ -1586,6 +1532,8 @@ bool JT_ServInfo::take(const QDomElement &e)
  		}
  
  		if (!invalid_node) {
