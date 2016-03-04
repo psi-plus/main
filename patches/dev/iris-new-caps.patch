@@ -6,7 +6,7 @@ index 0000000..4dde12a
 @@ -0,0 +1 @@
 +#include "../../src/xmpp/xmpp-im/xmpp_caps.h"
 diff --git a/src/xmpp/xmpp-im/client.cpp b/src/xmpp/xmpp-im/client.cpp
-index 6106497..a7a5488 100644
+index 6106497..bafb502 100644
 --- a/src/xmpp/xmpp-im/client.cpp
 +++ b/src/xmpp/xmpp-im/client.cpp
 @@ -69,34 +69,19 @@
@@ -78,6 +78,39 @@ index 6106497..a7a5488 100644
  bool Client::isActive() const
  {
  	return d->active;
+@@ -1125,32 +1118,6 @@ const Features& Client::features() const
+ 	return d->features;
+ }
+ 
+-void Client::addExtension(const QString& ext, const Features& features)
+-{
+-	if (!ext.isEmpty()) {
+-		d->extension_features[ext] = features;
+-		d->capsExt = extensions().join(" ");
+-	}
+-}
+-
+-void Client::removeExtension(const QString& ext)
+-{
+-	if (d->extension_features.contains(ext)) {
+-		d->extension_features.remove(ext);
+-		d->capsExt = extensions().join(" ");
+-	}
+-}
+-
+-QStringList Client::extensions() const
+-{
+-	return d->extension_features.keys();
+-}
+-
+-const Features& Client::extension(const QString& ext) const
+-{
+-	return d->extension_features[ext];
+-}
+-
+ void Client::s5b_incomingReady()
+ {
+ 	handleIncoming(d->s5bman->takeIncoming());
 diff --git a/src/xmpp/xmpp-im/types.cpp b/src/xmpp/xmpp-im/types.cpp
 index b0d5d05..e2b45ac 100644
 --- a/src/xmpp/xmpp-im/types.cpp
@@ -640,10 +673,10 @@ index b0d5d05..e2b45ac 100644
  
 diff --git a/src/xmpp/xmpp-im/xmpp_caps.cpp b/src/xmpp/xmpp-im/xmpp_caps.cpp
 new file mode 100644
-index 0000000..877a0bf
+index 0000000..d91768d
 --- /dev/null
 +++ b/src/xmpp/xmpp-im/xmpp_caps.cpp
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,457 @@
 +/*
 + * capsregistry.cpp
 + * Copyright (C) 2006-2016  Remko Troncon, Rion
@@ -662,6 +695,13 @@ index 0000000..877a0bf
 + * along with this library; if not, write to the Free Software
 + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 + *
++ */
++
++/*
++ * We have one global CapsRegistry to cache disco results from all application.
++ * Each Client has its own CapsManager to control caps just for an Account.
++ * Caps result is stored in CapsInfo class and <c> node from presence
++ * goes to CapsSpec.
 + */
 +
 +#include <QCoreApplication>
@@ -835,10 +875,11 @@ index 0000000..877a0bf
 +| |    / _` | '_ \/ __| |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
 +| |___| (_| | |_) \__ \ |  | | (_| | | | | (_| | (_| |  __/ |
 + \_____\__,_| .__/|___/_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|
-+			| |                                  __/ |
-+			|_|                                 |___/
++            | |                                  __/ |
++            |_|                                 |___/
 +
 +--------------------------------------------------------------*/
++
 +/**
 + * \class CapsManager
 + * \brief A class managing all the capabilities of JIDs and their
@@ -996,7 +1037,7 @@ index 0000000..877a0bf
 +		return Features();
 +	}
 +	QString node = capsSpecs_[jid.full()].flatten();
-+	//qDebug() << QString("    %1").arg(CapsRegistry::instance()->features(s).list().join("\n"));
++	//qDebug() << QString("	%1").arg(CapsRegistry::instance()->features(s).list().join("\n"));
 +	return CapsRegistry::instance()->disco(node).features();
 +}
 +
@@ -1095,7 +1136,7 @@ index 0000000..877a0bf
 +} // namespace XMPP
 diff --git a/src/xmpp/xmpp-im/xmpp_caps.h b/src/xmpp/xmpp-im/xmpp_caps.h
 new file mode 100644
-index 0000000..b145e3d
+index 0000000..4592a3e
 --- /dev/null
 +++ b/src/xmpp/xmpp-im/xmpp_caps.h
 @@ -0,0 +1,120 @@
@@ -1171,8 +1212,8 @@ index 0000000..b145e3d
 +	void save();
 +
 +protected:
-+	virtual void saveData(const QByteArray &data);
-+	virtual QByteArray loadData();
++	virtual void saveData(const QByteArray &data); // reimplmenet these two functions
++	virtual QByteArray loadData();                 // to have permanent cache
 +
 +private:
 +	static CapsRegistry *instance_;
@@ -1220,7 +1261,7 @@ index 0000000..b145e3d
 +
 +#endif // CAPS_H
 diff --git a/src/xmpp/xmpp-im/xmpp_client.h b/src/xmpp/xmpp-im/xmpp_client.h
-index 156312d..d8a8709 100644
+index 156312d..cbee588 100644
 --- a/src/xmpp/xmpp-im/xmpp_client.h
 +++ b/src/xmpp/xmpp-im/xmpp_client.h
 @@ -48,6 +48,7 @@ namespace XMPP {
@@ -1231,7 +1272,16 @@ index 156312d..d8a8709 100644
  }
  
  namespace XMPP
-@@ -121,6 +122,7 @@ namespace XMPP
+@@ -112,15 +113,11 @@ namespace XMPP
+ 		void setFeatures(const Features& f);
+ 		const Features& features() const;
+ 
+-		void addExtension(const QString& ext, const Features& f);
+-		void removeExtension(const QString& ext);
+-		const Features& extension(const QString& ext) const;
+-		QStringList extensions() const;
+-
+ 		S5BManager *s5bManager() const;
  		IBBManager *ibbManager() const;
  		BoBManager *bobManager() const;
  		JidLinkManager *jidLinkManager() const;
@@ -1694,7 +1744,7 @@ index f7c88ea..8d34352 100644
  
  }
 diff --git a/src/xmpp/xmpp-im/xmpp_tasks.cpp b/src/xmpp/xmpp-im/xmpp_tasks.cpp
-index 8a9aa6c..2172ae4 100644
+index 8a9aa6c..b4fb32d 100644
 --- a/src/xmpp/xmpp-im/xmpp_tasks.cpp
 +++ b/src/xmpp/xmpp-im/xmpp_tasks.cpp
 @@ -588,16 +588,8 @@ void JT_Presence::pres(const Status &s)
@@ -1727,7 +1777,7 @@ index 8a9aa6c..2172ae4 100644
    		}
  		else if(i.tagName() == "x" && i.attribute("xmlns") == "vcard-temp:x:update") {
  			QDomElement t;
-@@ -1486,72 +1476,32 @@ bool JT_ServInfo::take(const QDomElement &e)
+@@ -1486,99 +1476,32 @@ bool JT_ServInfo::take(const QDomElement &e)
  			node = q.attribute("node");
  
  		QDomElement iq = createIQ(doc(), "result", e.attribute("from"), e.attribute("id"));
@@ -1746,11 +1796,6 @@ index 8a9aa6c..2172ae4 100644
 -			if (!identity.name.isEmpty()) {
 -				id.setAttribute("name",identity.name);
 -			}
--		}
--		else {
--			// Default values
--			id.setAttribute("category","client");
--			id.setAttribute("type","pc");
 +		DiscoItem item;
 +		item.setNode(node);
 +		DiscoItem::Identity id = client()->identity();
@@ -1758,6 +1803,11 @@ index 8a9aa6c..2172ae4 100644
 +			id.category = "client";
 +			id.type = "pc";
  		}
+-		else {
+-			// Default values
+-			id.setAttribute("category","client");
+-			id.setAttribute("type","pc");
+-		}
 -		query.appendChild(id);
 +		item.setIdentities(id);
  
@@ -1813,33 +1863,38 @@ index 8a9aa6c..2172ae4 100644
 -				feature = doc()->createElement("feature");
 -				feature.setAttribute("var", i);
 -				query.appendChild(feature);
-+				features.addFeature(i);
- 			}
- 
- 			if (node.isEmpty()) {
-@@ -1560,9 +1510,7 @@ bool JT_ServInfo::take(const QDomElement &e)
- 				for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
- 					const QStringList& l = client()->extension(*i).list();
- 					for ( QStringList::ConstIterator j = l.begin(); j != l.end(); ++j ) {
+-			}
+-
+-			if (node.isEmpty()) {
+-				// Extended features
+-				const QStringList exts = client()->extensions();
+-				for (QStringList::ConstIterator i = exts.begin(); i != exts.end(); ++i) {
+-					const QStringList& l = client()->extension(*i).list();
+-					for ( QStringList::ConstIterator j = l.begin(); j != l.end(); ++j ) {
 -						feature = doc()->createElement("feature");
 -						feature.setAttribute("var", *j);
 -						query.appendChild(feature);
-+						features.addFeature(*j);
- 					}
- 				}
- 			}
-@@ -1572,9 +1520,7 @@ bool JT_ServInfo::take(const QDomElement &e)
- 			if (client()->extensions().contains(ext)) {
- 				const QStringList& l = client()->extension(ext).list();
- 				for ( QStringList::ConstIterator it = l.begin(); it != l.end(); ++it ) {
+-					}
+-				}
+-			}
+-		}
+-		else if (node.startsWith(client()->capsNode() + "#")) {
+-			QString ext = node.right(node.length()-client()->capsNode().length()-1);
+-			if (client()->extensions().contains(ext)) {
+-				const QStringList& l = client()->extension(ext).list();
+-				for ( QStringList::ConstIterator it = l.begin(); it != l.end(); ++it ) {
 -					feature = doc()->createElement("feature");
 -					feature.setAttribute("var", *it);
 -					query.appendChild(feature);
-+					features.addFeature(*it);
- 				}
+-				}
+-			}
+-			else {
+-				invalid_node = true;
++				features.addFeature(i);
  			}
- 			else {
-@@ -1586,6 +1532,8 @@ bool JT_ServInfo::take(const QDomElement &e)
+ 		}
+ 		else {
+@@ -1586,6 +1509,8 @@ bool JT_ServInfo::take(const QDomElement &e)
  		}
  
  		if (!invalid_node) {

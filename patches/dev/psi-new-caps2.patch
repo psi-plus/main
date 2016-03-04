@@ -1297,7 +1297,7 @@ index f97d680..5e8e6f2 100644
  		// save traffic
  		if ( alreadyItems )
 diff --git a/src/gcuserview.cpp b/src/gcuserview.cpp
-index 39db8b3..8ddad7b 100644
+index 39db8b3..d8ec2bb 100644
 --- a/src/gcuserview.cpp
 +++ b/src/gcuserview.cpp
 @@ -27,7 +27,6 @@
@@ -1328,8 +1328,20 @@ index 39db8b3..8ddad7b 100644
  				UserResource ur;
  				ur.setClient(client_name,client_version,"");
  				u.userResourceList().append(ur);
+@@ -550,8 +551,9 @@ bool GCUserView::maybeTip(const QPoint &pos)
+ 
+ 	// Find out capabilities info
+ 	Jid caps_jid(dlg->jid().withResource(nick));
+-	QString client_name = dlg->account()->capsManager()->clientName(caps_jid);
+-	QString client_version = (client_name.isEmpty() ? QString() : dlg->account()->capsManager()->clientVersion(caps_jid));
++	CapsManager *cm = dlg->account()->client()->capsManager();
++	QString client_name = cm->clientName(caps_jid);
++	QString client_version = (client_name.isEmpty() ? QString() : cm->clientVersion(caps_jid));
+ 
+ 	// make a resource so the contact appears online
+ 	UserResource ur;
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index bc136ed..25c7a24 100644
+index bc136ed..a883973 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -57,7 +57,6 @@
@@ -1340,7 +1352,15 @@ index bc136ed..25c7a24 100644
  #include "userlist.h"
  #include "mucconfigdlg.h"
  #include "textutil.h"
-@@ -1661,9 +1660,9 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
+@@ -72,6 +71,7 @@
+ #include "iconwidget.h"
+ #include "iconselect.h"
+ #include "xmpp_tasks.h"
++#include "xmpp_caps.h"
+ #include "iconaction.h"
+ #include "psitooltip.h"
+ #include "avatars.h"
+@@ -1661,9 +1661,9 @@ void GCMainDlg::presence(const QString &nick, const Status &s)
  		ui_.lv_users->removeEntry(nick);
  	}
  
@@ -1348,7 +1368,7 @@ index bc136ed..25c7a24 100644
 +	if (s.caps().isValid()) {
  		Jid caps_jid(s.mucItem().jid().isEmpty() || !d->nonAnonymous ? Jid(jid()).withResource(nick) : s.mucItem().jid());
 -		account()->capsManager()->updateCaps(caps_jid,s.capsNode(),s.capsVersion(),s.capsExt());
-+		account()->capsManager()->updateCaps(caps_jid, s.caps());
++		account()->client()->capsManager()->updateCaps(caps_jid, s.caps());
  	}
  
  	if(!nick.isEmpty())
@@ -1365,8 +1385,364 @@ index c546fd9..478c604 100644
  	}
  }
  #else
+diff --git a/src/physicallocation.cpp b/src/physicallocation.cpp
+deleted file mode 100644
+index d371e80..0000000
+--- a/src/physicallocation.cpp
++++ /dev/null
+@@ -1,272 +0,0 @@
+-/*
+- * physicallocation.cpp
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-/*
+-#include <QDomDocument>
+-#include <QDomElement>
+-#include <QStringList>
+-
+-#include "physicallocation.h"
+-
+-PhysicalLocation::PhysicalLocation()
+-{
+-}
+-
+-PhysicalLocation::PhysicalLocation(const QDomElement& el)
+-{
+-	fromXml(el);
+-}
+-
+-QDomElement PhysicalLocation::toXml(QDomDocument& doc)
+-{
+-	QDomElement physloc = doc.createElement("physloc");
+-	physloc.setAttribute("xmlns", "http://jabber.org/protocol/physloc");
+-
+-	if (!country_.isEmpty()) {
+-		QDomElement e = doc.createElement("country");
+-		e.appendChild(doc.createTextNode(country_));
+-		physloc.appendChild(e);
+-	}
+-	if (!region_.isEmpty()) {
+-		QDomElement e = doc.createElement("region");
+-		e.appendChild(doc.createTextNode(region_));
+-		physloc.appendChild(e);
+-	}
+-	if (!locality_.isEmpty()) {
+-		QDomElement e = doc.createElement("locality");
+-		e.appendChild(doc.createTextNode(locality_));
+-		physloc.appendChild(e);
+-	}
+-	if (!area_.isEmpty()) {
+-		QDomElement e = doc.createElement("area");
+-		e.appendChild(doc.createTextNode(area_));
+-		physloc.appendChild(e);
+-	}
+-	if (!street_.isEmpty()) {
+-		QDomElement e = doc.createElement("street");
+-		e.appendChild(doc.createTextNode(street_));
+-		physloc.appendChild(e);
+-	}
+-	if (!building_.isEmpty()) {
+-		QDomElement e = doc.createElement("building");
+-		e.appendChild(doc.createTextNode(building_));
+-		physloc.appendChild(e);
+-	}
+-	if (!floor_.isEmpty()) {
+-		QDomElement e = doc.createElement("floor");
+-		e.appendChild(doc.createTextNode(floor_));
+-		physloc.appendChild(e);
+-	}
+-	if (!room_.isEmpty()) {
+-		QDomElement e = doc.createElement("room");
+-		e.appendChild(doc.createTextNode(room_));
+-		physloc.appendChild(e);
+-	}
+-	if (!postalcode_.isEmpty()) {
+-		QDomElement e = doc.createElement("postalcode");
+-		e.appendChild(doc.createTextNode(postalcode_));
+-		physloc.appendChild(e);
+-	}
+-	if (!text_.isEmpty()) {
+-		QDomElement e = doc.createElement("text");
+-		e.appendChild(doc.createTextNode(text_));
+-		physloc.appendChild(e);
+-	}
+-
+-	return physloc;
+-}
+-
+-void PhysicalLocation::fromXml(const QDomElement& e)
+-{
+-	if (e.tagName() != "physloc")
+-		return;
+-
+-	for(QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling()) {
+-		QDomElement m = n.toElement();
+-		if (m.tagName() == "country")
+-			country_ = m.text();
+-		else if (m.tagName() == "region")
+-			region_ = m.text();
+-		else if (m.tagName() == "locality")
+-			locality_ = m.text();
+-		else if (m.tagName() == "area")
+-			area_ = m.text();
+-		else if (m.tagName() == "street")
+-			street_ = m.text();
+-		else if (m.tagName() == "building")
+-			building_ = m.text();
+-		else if (m.tagName() == "floor")
+-			floor_ = m.text();
+-		else if (m.tagName() == "room")
+-			room_ = m.text();
+-		else if (m.tagName() == "postalcode")
+-			postalcode_ = m.text();
+-		else if (m.tagName() == "text")
+-			text_ = m.text();
+-	}
+-}
+-
+-const QString& PhysicalLocation::country() const
+-{
+-	return country_;
+-}
+-
+-const QString& PhysicalLocation::region() const
+-{
+-	return region_;
+-}
+-
+-const QString& PhysicalLocation::locality() const
+-{
+-	return locality_;
+-}
+-
+-const QString& PhysicalLocation::area() const
+-{
+-	return area_;
+-}
+-
+-const QString& PhysicalLocation::street() const
+-{
+-	return street_;
+-}
+-
+-const QString& PhysicalLocation::building() const
+-{
+-	return building_;
+-}
+-
+-const QString& PhysicalLocation::floor() const
+-{
+-	return floor_;
+-}
+-
+-const QString& PhysicalLocation::room() const
+-{
+-	return room_;
+-}
+-
+-const QString& PhysicalLocation::postalcode() const
+-{
+-	return postalcode_;
+-}
+-
+-const QString& PhysicalLocation::text() const
+-{
+-	return text_;
+-}
+-
+-bool PhysicalLocation::isNull() const
+-{
+-	return country_.isNull() && region_.isNull() && locality_.isNull() && area_.isNull() && street_.isNull() && building_.isNull() && floor_.isNull() && room_.isNull() && postalcode_.isNull() && text_.isNull();
+-}
+-
+-bool PhysicalLocation::operator==(const PhysicalLocation& o) const
+-{
+-	return country() == o.country() && region() == o.region() && locality() == o.locality() && area() == o.area() && street() == o.street() && building() == o.building() && floor() == o.floor() && room() == o.room() && postalcode() == o.postalcode() && text() == o.text();
+-
+-}
+-
+-bool PhysicalLocation::operator!=(const PhysicalLocation& o) const
+-{
+-	return !((*this) == o);
+-}
+-
+-void PhysicalLocation::setCountry(const QString& s)
+-{
+-	country_ = s;
+-}
+-
+-void PhysicalLocation::setRegion(const QString& s)
+-{
+-	region_ = s;
+-}
+-
+-void PhysicalLocation::setLocality(const QString& s)
+-{
+-	locality_ = s;
+-}
+-
+-void PhysicalLocation::setArea(const QString& s)
+-{
+-	area_ = s;
+-}
+-
+-void PhysicalLocation::setStreet(const QString& s)
+-{
+-	street_ = s;
+-}
+-
+-void PhysicalLocation::setBuilding(const QString& s)
+-{
+-	building_ = s;
+-}
+-
+-void PhysicalLocation::setFloor(const QString& s)
+-{
+-	floor_ = s;
+-}
+-
+-void PhysicalLocation::setRoom(const QString& s)
+-{
+-	room_ = s;
+-}
+-
+-void PhysicalLocation::setPostalcode(const QString& s)
+-{
+-	postalcode_ = s;
+-}
+-
+-void PhysicalLocation::setText(const QString& s)
+-{
+-	text_ = s;
+-}
+-
+-QString PhysicalLocation::toString() const
+-{
+-	QStringList locs;
+-	QString loc, str;
+-	if (!locality().isEmpty())
+-		locs += locality();
+-
+-	if (!region().isEmpty())
+-		locs += region();
+-
+-	if (!country().isEmpty())
+-		locs += country();
+-
+-	if (!locs.isEmpty()) {
+-		loc = locs.join(", ");
+-	}
+-
+-	if (!text().isEmpty()) {
+-		str += text();
+-		if (!loc.isEmpty())
+-			str += " (";
+-	}
+-
+-	str += loc;
+-
+-	if (!text().isEmpty() && !loc.isEmpty())
+-		str += ")";
+-
+-	return str;
+-}
+-
+-*/
+diff --git a/src/physicallocation.h b/src/physicallocation.h
+deleted file mode 100644
+index e3bf9b4..0000000
+--- a/src/physicallocation.h
++++ /dev/null
+@@ -1,72 +0,0 @@
+-/*
+- * physicallocation.h
+- * Copyright (C) 2006  Remko Troncon
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this library; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+- *
+- */
+-/*
+-#ifndef PHYSICALOCATION_H
+-#define PHYSICALOCATION_H
+-
+-#include <QString>
+-
+-class QDomElement;
+-class QDomDocument;
+-
+-class PhysicalLocation
+-{
+-public:
+-	PhysicalLocation();
+-	PhysicalLocation(const QDomElement&);
+-
+-	const QString& country() const;
+-	const QString& region() const;
+-	const QString& locality() const;
+-	const QString& area() const;
+-	const QString& street() const;
+-	const QString& building() const;
+-	const QString& floor() const;
+-	const QString& room() const;
+-	const QString& postalcode() const;
+-	const QString& text() const;
+-	bool isNull() const;
+-
+-	void setCountry(const QString& s);
+-	void setRegion(const QString& s);
+-	void setLocality(const QString& s);
+-	void setArea(const QString& s);
+-	void setStreet(const QString& s);
+-	void setBuilding(const QString& s);
+-	void setFloor(const QString& s);
+-	void setRoom(const QString& s);
+-	void setPostalcode(const QString& s);
+-	void setText(const QString& s);
+-
+-	QString toString() const;
+-	QDomElement toXml(QDomDocument&);
+-
+-	bool operator==(const PhysicalLocation&) const;
+-	bool operator!=(const PhysicalLocation&) const;
+-
+-protected:
+-	void fromXml(const QDomElement&);
+-
+-private:
+-	QString country_, region_, locality_, area_, street_, building_, floor_, room_, postalcode_, text_;
+-};
+-
+-#endif
+-*/
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
-index 196410b..262c42c 100644
+index 196410b..f69ab19 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -91,7 +91,6 @@
@@ -1377,7 +1753,15 @@ index 196410b..262c42c 100644
  #include "registrationdlg.h"
  #include "searchdlg.h"
  #include "discodlg.h"
-@@ -1062,7 +1061,7 @@ public:
+@@ -470,7 +469,6 @@ public:
+ 	BlockTransportPopupList *blockTransportPopupList;
+ 	int userCounter;
+ 	PsiPrivacyManager* privacyManager;
+-	CapsManager* capsManager;
+ 	RosterItemExchangeTask* rosterItemExchangeTask;
+ 	bool pepAvailable;
+ 	QString currentConnectionError;
+@@ -1062,7 +1060,7 @@ public:
  	bool reconnectInfrequently_;
  };
  
@@ -1386,7 +1770,7 @@ index 196410b..262c42c 100644
  {
  #ifdef NEWCONTACTLIST
  	PsiAccount* account = new PsiAccount(acc, parent, capsRegistry, tabManager);
-@@ -1077,7 +1076,7 @@ void PsiAccount::init()
+@@ -1077,7 +1075,7 @@ void PsiAccount::init()
  {
  }
  
@@ -1395,7 +1779,7 @@ index 196410b..262c42c 100644
  	: QObject(parent)
  {
  	d = new Private( this );
-@@ -1185,8 +1184,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+@@ -1185,8 +1183,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
  
  	// Caps manager
@@ -1405,7 +1789,50 @@ index 196410b..262c42c 100644
  
  	// Roster item exchange task
  	d->rosterItemExchangeTask = new RosterItemExchangeTask(d->client->rootTask());
-@@ -2536,8 +2534,12 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+@@ -1319,34 +1316,9 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	if(AvCallManager::isSupported()) {
+ 		d->avCallManager = new AvCallManager(this);
+ 		connect(d->avCallManager, SIGNAL(incomingReady()), d, SLOT(incoming_call()));
+-		QStringList features;
+-		features << "urn:xmpp:jingle:1";
+-		features << "urn:xmpp:jingle:transports:ice-udp:1";
+-		features << "urn:xmpp:jingle:apps:rtp:1";
+-		features << "urn:xmpp:jingle:apps:rtp:audio";
+-		d->client->addExtension("ca", Features(features));
+-
+-		if(AvCallManager::isVideoSupported()) {
+-			features.clear();
+-			features << "urn:xmpp:jingle:apps:rtp:video";
+-			d->client->addExtension("cv", Features(features));
+-		}
+-
+ 		d->updateAvCallSettings(acc);
+ 	}
+ 
+-	// Extended presence
+-	if (PsiOptions::instance()->getOption("options.extended-presence.notify").toBool()) {
+-		QStringList pepNodes;
+-		pepNodes += "http://jabber.org/protocol/mood+notify";
+-		pepNodes += "http://jabber.org/protocol/activity+notify";
+-		pepNodes += "http://jabber.org/protocol/tune+notify";
+-	//	pepNodes += "http://jabber.org/protocol/physloc+notify";
+-		pepNodes += "http://jabber.org/protocol/geoloc+notify";
+-		pepNodes += "urn:xmpp:avatar:metadata+notify";
+-		d->client->addExtension("ep-notify-2",Features(pepNodes));
+-	}
+-
+ 	// load event queue from disk
+ 	QTimer::singleShot(0, d, SLOT(loadQueue()));
+ 
+@@ -2396,7 +2368,6 @@ void PsiAccount::setPEPAvailable(bool b)
+ 		pepNodes += "http://jabber.org/protocol/mood";
+ 		pepNodes += "http://jabber.org/protocol/activity";
+ 		pepNodes += "http://jabber.org/protocol/tune";
+-	//	pepNodes += "http://jabber.org/protocol/physloc";
+ 		pepNodes += "http://jabber.org/protocol/geoloc";
+ 		pepNodes += "urn:xmpp:avatar:data";
+ 		pepNodes += "urn:xmpp:avatar:metadata";
+@@ -2536,8 +2507,12 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
  
  			UserResource ur(r);
  			//ur.setSecurityEnabled(true);
@@ -1419,7 +1846,7 @@ index 196410b..262c42c 100644
  
  			u->userResourceList().append(ur);
  			rp = &u->userResourceList().last();
-@@ -2600,15 +2602,14 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+@@ -2600,15 +2575,14 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
  
  	// Update entity capabilities.
  	// This has to happen after the userlist item has been created.
@@ -1438,7 +1865,7 @@ index 196410b..262c42c 100644
  				cpUpdate(*u,(*rit).name());
  			}
  		}
-@@ -3108,9 +3109,7 @@ void PsiAccount::setStatusActual(const Status &_s)
+@@ -3108,9 +3082,7 @@ void PsiAccount::setStatusActual(const Status &_s)
  
  	// Add entity capabilities information
  	if (capsManager()->isEnabled()) {
@@ -1449,7 +1876,7 @@ index 196410b..262c42c 100644
  	}
  
  	if (!presenceSent) {
-@@ -3168,14 +3167,19 @@ void PsiAccount::capsChanged(const Jid& j)
+@@ -3168,14 +3140,19 @@ void PsiAccount::capsChanged(const Jid& j)
  
  	QString name = capsManager()->clientName(j);
  	QString version = (name.isEmpty() ? QString() : capsManager()->clientVersion(j));
@@ -1471,6 +1898,37 @@ index 196410b..262c42c 100644
  		cpUpdate(*u);
  	}
  }
+@@ -3672,14 +3649,6 @@ void PsiAccount::itemRetracted(const Jid& j, const QString& n, const PubSubRetra
+ 			cpUpdate(*u);
+ 		}
+ 	}
+-	/*else if (n == "http://jabber.org/protocol/physloc") {
+-		// FIXME: try to find the right resource using JEP-33 'replyto'
+-		// see tune case above
+-		foreach(UserListItem* u, findRelevant(j)) {
+-			u->setPhysicalLocation(PhysicalLocation());
+-			cpUpdate(*u);
+-		}
+-	}*/
+ }
+ 
+ void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem& item)
+@@ -3732,15 +3701,6 @@ void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem&
+ 			cpUpdate(*u);
+ 		}
+ 	}
+-	/*else if (n == "http://jabber.org/protocol/physloc") {
+-		// FIXME: try to find the right resource using JEP-33 'replyto'
+-		// see tune case above
+-		PhysicalLocation physloc(item.payload());
+-		foreach(UserListItem* u, findRelevant(j)) {
+-			u->setPhysicalLocation(physloc);
+-			cpUpdate(*u);
+-		}
+-	}*/
+ }
+ 
+ Jid PsiAccount::realJid(const Jid &j) const
 diff --git a/src/psiaccount.h b/src/psiaccount.h
 index 32bfaa2..61e30b1 100644
 --- a/src/psiaccount.h
@@ -1515,7 +1973,7 @@ index 32bfaa2..61e30b1 100644
  	WbManager* wbManager() const;
 diff --git a/src/psicapsregsitry.cpp b/src/psicapsregsitry.cpp
 new file mode 100644
-index 0000000..d43cd32
+index 0000000..cdca513
 --- /dev/null
 +++ b/src/psicapsregsitry.cpp
 @@ -0,0 +1,31 @@
@@ -1523,13 +1981,13 @@ index 0000000..d43cd32
 +#include "iodeviceopener.h"
 +#include "applicationinfo.h"
 +
-+PsiCapsRegsitry::PsiCapsRegsitry(QObject *parent) :
++PsiCapsRegistry::PsiCapsRegistry(QObject *parent) :
 +	CapsRegistry(parent)
 +{
 +
 +}
 +
-+void PsiCapsRegsitry::saveData(const QByteArray &data)
++void PsiCapsRegistry::saveData(const QByteArray &data)
 +{
 +	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
 +	IODeviceOpener opener(&file, QIODevice::WriteOnly);
@@ -1540,7 +1998,7 @@ index 0000000..d43cd32
 +	file.write(data);
 +}
 +
-+QByteArray PsiCapsRegsitry::loadData()
++QByteArray PsiCapsRegistry::loadData()
 +{
 +	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
 +	IODeviceOpener opener(&file, QIODevice::ReadOnly);
@@ -1552,7 +2010,7 @@ index 0000000..d43cd32
 +}
 diff --git a/src/psicapsregsitry.h b/src/psicapsregsitry.h
 new file mode 100644
-index 0000000..7392fab
+index 0000000..42e1bea
 --- /dev/null
 +++ b/src/psicapsregsitry.h
 @@ -0,0 +1,17 @@
@@ -1561,12 +2019,12 @@ index 0000000..7392fab
 +
 +#include "xmpp_caps.h"
 +
-+class PsiCapsRegsitry : public XMPP::CapsRegistry
++class PsiCapsRegistry : public XMPP::CapsRegistry
 +{
 +	Q_OBJECT
 +
 +public:
-+	PsiCapsRegsitry(QObject *parent);
++	PsiCapsRegistry(QObject *parent);
 +
 +	void saveData(const QByteArray &data);
 +	QByteArray loadData();
@@ -1574,10 +2032,10 @@ index 0000000..7392fab
 +
 +#endif // PSICAPSREGSITRY_H
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 4cb2334..1793785 100644
+index 4cb2334..90218b1 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -39,7 +39,6 @@
+@@ -39,12 +39,12 @@
  #include "shortcutmanager.h"
  #include "accountlabel.h"
  #include "iconlabel.h"
@@ -1585,7 +2043,13 @@ index 4cb2334..1793785 100644
  #include "psicontactlist.h"
  #include "userlist.h"
  #include "psicontact.h"
-@@ -245,7 +244,7 @@ void PsiChatDlg::initUi()
+ #include "jidutil.h"
+ #include "xmpp_tasks.h"
++#include "xmpp_caps.h"
+ #include "lastactivitytask.h"
+ #include "avcall/avcall.h"
+ #include "actionlist.h"
+@@ -245,7 +245,7 @@ void PsiChatDlg::initUi()
  	ui_.tb_actions->setIcon(IconsetFactory::icon("psi/select").icon());
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
@@ -1595,7 +2059,7 @@ index 4cb2334..1793785 100644
  	QList<int> list;
  	list << 324;
 diff --git a/src/psicon.cpp b/src/psicon.cpp
-index eabbf28..fdef0c2 100644
+index eabbf28..e2f13e7 100644
 --- a/src/psicon.cpp
 +++ b/src/psicon.cpp
 @@ -36,6 +36,7 @@
@@ -1614,15 +2078,18 @@ index eabbf28..fdef0c2 100644
  #include "urlobject.h"
  #include "anim.h"
  #include "psioptions.h"
-@@ -106,7 +106,6 @@
+@@ -104,9 +104,9 @@
+ #include "desktoputil.h"
+ #include "tabmanager.h"
  #include "xmpp_xmlcommon.h"
++#include "psicapsregsitry.h"
  #include "psicontact.h"
  #include "contactupdatesmanager.h"
 -#include "capsmanager.h"
  #include "avcall/avcall.h"
  #include "avcall/calldlg.h"
  #include "alertmanager.h"
-@@ -300,7 +299,6 @@ public:
+@@ -300,7 +300,6 @@ public:
  	//GlobalAccelManager *globalAccelManager;
  	TuneControllerManager* tuneManager;
  	QMenuBar* defaultMenuBar;
@@ -1630,37 +2097,176 @@ index eabbf28..fdef0c2 100644
  	TabManager *tabManager;
  	bool quitting;
  	QTimer* updatedAccountTimer_;
-@@ -363,7 +361,7 @@ PsiCon::PsiCon()
+@@ -363,8 +362,8 @@ PsiCon::PsiCon()
  	d->actionList = 0;
  	d->defaultMenuBar = new QMenuBar(0);
  
 -	d->capsRegistry = new CapsRegistry();
+-	connect(d->capsRegistry, SIGNAL(registered(const CapsSpec&)), SLOT(saveCapabilities()));
 +	XMPP::CapsRegistry::setInstance(new PsiCapsRegistry(this));
- 	connect(d->capsRegistry, SIGNAL(registered(const CapsSpec&)), SLOT(saveCapabilities()));
++	connect(XMPP::CapsRegistry::instance(), SIGNAL(registered(const CapsSpec&)), SLOT(saveCapabilities()));
  }
  
-@@ -750,14 +748,16 @@ void PsiCon::updateStatusPresets()
+ PsiCon::~PsiCon()
+@@ -372,8 +371,6 @@ PsiCon::~PsiCon()
+ 	deinit();
  
- void PsiCon::registerCaps(const QString& ext, const QStringList& features)
- {
+ 	saveCapabilities();
+-	delete d->capsRegistry;
+-
+ 	delete d->autoUpdater;
+ 	delete d->actionList;
+ 	delete d->edb;
+@@ -594,53 +591,6 @@ bool PsiCon::init()
+ 	// Global shortcuts
+ 	setShortcuts();
+ 
+-	// FIXME
+-#ifdef __GNUC__
+-#warning "Temporary hard-coding caps registration of own version"
+-#endif
+-	// client()->identity()
+-
+-	registerCaps(ApplicationInfo::capsVersion(), QStringList()
+-#ifdef FILETRANSFER
+-				 << "http://jabber.org/protocol/bytestreams"
+-				 << "http://jabber.org/protocol/ibb"
+-				 << "http://jabber.org/protocol/si"
+-				 << "http://jabber.org/protocol/si/profile/file-transfer"
+-#endif
+-				 << "http://jabber.org/protocol/disco#info"
+-				 << "http://jabber.org/protocol/commands"
+-				 << "http://jabber.org/protocol/rosterx"
+-#ifdef GROUPCHAT
+-				 << "http://jabber.org/protocol/muc"
+-#endif
+-				 << "jabber:x:data"
+-				);
+-
+-	registerCaps("ep", QStringList()
+-				 << "http://jabber.org/protocol/mood"
+-				 << "http://jabber.org/protocol/activity"
+-				 << "http://jabber.org/protocol/tune"
+-				// << "http://jabber.org/protocol/physloc"
+-				 << "http://jabber.org/protocol/geoloc"
+-				 << "urn:xmpp:avatar:data"
+-				 << "urn:xmpp:avatar:metadata"
+-				);
+-
+-	registerCaps("ep-notify-2", QStringList()
+-				 << "http://jabber.org/protocol/mood+notify"
+-				 << "http://jabber.org/protocol/activity+notify"
+-				 << "http://jabber.org/protocol/tune+notify"
+-				// << "http://jabber.org/protocol/physloc+notify"
+-				 << "http://jabber.org/protocol/geoloc+notify"
+-				 << "urn:xmpp:avatar:metadata+notify"
+-				);
+-
+-	registerCaps("html", QStringList("http://jabber.org/protocol/xhtml-im"));
+-	registerCaps("cs", QStringList("http://jabber.org/protocol/chatstates"));
+-#ifdef YAPSI
+-	registerCaps("mr", QStringList("urn:xmpp:receipts"));
+-#endif
+-
+ 	// load accounts
+ 	{
+ 		QList<UserAccount> accs;
+@@ -748,18 +698,6 @@ void PsiCon::updateStatusPresets()
+ 	emit statusPresetsChanged();
+ }
+ 
+-void PsiCon::registerCaps(const QString& ext, const QStringList& features)
+-{
 -	DiscoItem::Identity identity = { "client", ApplicationInfo::name(), "pc" };
-+	DiscoItem::Identity identity("client", "pc", NULL, ApplicationInfo::name() );
- 	DiscoItem::Identities identities;
- 	identities += identity;
-+	DiscoItem item;
-+	item.setIdentities(identities);
-+	item.setFeatures(features);
- 
- 	d->capsRegistry->registerCaps(CapsSpec(ApplicationInfo::capsNode(),
+-	DiscoItem::Identities identities;
+-	identities += identity;
+-
+-	d->capsRegistry->registerCaps(CapsSpec(ApplicationInfo::capsNode(),
 -										   ApplicationInfo::capsVersion(), ext),
 -								  identities,
 -								  Features(features));
-+										   ApplicationInfo::capsVersion(), ext, QString()),
-+								  item);
+-}
+-
+ void PsiCon::deinit()
+ {
+ 	// this deletes all dialogs except for mainwin
+@@ -841,6 +779,75 @@ PopupManager* PsiCon::popupManager() const
+ 	return d->popupManager;
  }
  
- void PsiCon::deinit()
-@@ -1019,7 +1019,7 @@ PsiAccount* PsiCon::createAccount(const QString &name, const Jid &j, const QStri
++QStringList PsiCon::xmppFatures() const
++{
++	// TODO make static list and return it when necessary
++	registerCaps(ApplicationInfo::capsVersion(), QStringList()
++#ifdef FILETRANSFER
++				 << "http://jabber.org/protocol/bytestreams"
++				 << "http://jabber.org/protocol/ibb"
++				 << "http://jabber.org/protocol/si"
++				 << "http://jabber.org/protocol/si/profile/file-transfer"
++#endif
++				 << "http://jabber.org/protocol/disco#info"
++				 << "http://jabber.org/protocol/commands"
++				 << "http://jabber.org/protocol/rosterx"
++#ifdef GROUPCHAT
++				 << "http://jabber.org/protocol/muc"
++#endif
++				 << "jabber:x:data"
++				);
++
++	registerCaps("ep", QStringList()
++				 << "http://jabber.org/protocol/mood"
++				 << "http://jabber.org/protocol/activity"
++				 << "http://jabber.org/protocol/tune"
++				 << "http://jabber.org/protocol/geoloc"
++				 << "urn:xmpp:avatar:data"
++				 << "urn:xmpp:avatar:metadata"
++				);
++
++	registerCaps("ep-notify-2", QStringList()
++				 << "http://jabber.org/protocol/mood+notify"
++				 << "http://jabber.org/protocol/activity+notify"
++				 << "http://jabber.org/protocol/tune+notify"
++				 << "http://jabber.org/protocol/geoloc+notify"
++				 << "urn:xmpp:avatar:metadata+notify"
++				);
++
++	registerCaps("html", QStringList("http://jabber.org/protocol/xhtml-im"));
++	registerCaps("cs", QStringList("http://jabber.org/protocol/chatstates"));
++#ifdef YAPSI
++	registerCaps("mr", QStringList("urn:xmpp:receipts"));
++#endif
++
++	if(AvCallManager::isSupported()) {
++		QStringList features;
++		features << "urn:xmpp:jingle:1";
++		features << "urn:xmpp:jingle:transports:ice-udp:1";
++		features << "urn:xmpp:jingle:apps:rtp:1";
++		features << "urn:xmpp:jingle:apps:rtp:audio";
++		d->client->addExtension("ca", Features(features));
++
++		if(AvCallManager::isVideoSupported()) {
++			features.clear();
++			features << "urn:xmpp:jingle:apps:rtp:video";
++			d->client->addExtension("cv", Features(features));
++		}
++	}
++
++	// Extended presence
++	if (PsiOptions::instance()->getOption("options.extended-presence.notify").toBool()) {
++		QStringList pepNodes;
++		pepNodes += "http://jabber.org/protocol/mood+notify";
++		pepNodes += "http://jabber.org/protocol/activity+notify";
++		pepNodes += "http://jabber.org/protocol/tune+notify";
++		pepNodes += "http://jabber.org/protocol/geoloc+notify";
++		pepNodes += "urn:xmpp:avatar:metadata+notify";
++		d->client->addExtension("ep-notify-2",Features(pepNodes));
++	}
++}
++
+ TabManager *PsiCon::tabManager() const
+ {
+ 	return d->tabManager;
+@@ -1019,7 +1026,7 @@ PsiAccount* PsiCon::createAccount(const QString &name, const Jid &j, const QStri
  PsiAccount *PsiCon::createAccount(const UserAccount& _acc)
  {
  	UserAccount acc = _acc;
@@ -1669,7 +2275,7 @@ index eabbf28..fdef0c2 100644
  //	connect(&d->idle, SIGNAL(secondsIdle(int)), pa, SLOT(secondsIdle(int)));
  	connect(pa, SIGNAL(updatedActivity()), SLOT(pa_updatedActivity()));
  	connect(pa, SIGNAL(updatedAccount()), SLOT(pa_updatedAccount()));
-@@ -1236,8 +1236,7 @@ void PsiCon::saveAccounts()
+@@ -1236,8 +1243,7 @@ void PsiCon::saveAccounts()
  
  void PsiCon::saveCapabilities()
  {
@@ -1679,8 +2285,29 @@ index eabbf28..fdef0c2 100644
  }
  
  void PsiCon::updateMainwinStatus()
+diff --git a/src/psicon.h b/src/psicon.h
+index 9c32503..73206f1 100644
+--- a/src/psicon.h
++++ b/src/psicon.h
+@@ -130,6 +130,7 @@ public:
+ 	void updateStatusPresets();
+ 
+ 	PopupManager* popupManager() const;
++	QStringList xmppFatures() const;
+ 
+ signals:
+ 	void quit(int);
+@@ -200,8 +201,6 @@ private:
+ 	void promptUserToCreateAccount();
+ 	QString optionsFile() const;
+ 	void doQuit(int);
+-
+-	void registerCaps(const QString& ext, const QStringList& features);
+ };
+ 
+ #endif
 diff --git a/src/src.pri b/src/src.pri
-index a95cf72..efa07d9 100644
+index a95cf72..f191f70 100644
 --- a/src/src.pri
 +++ b/src/src.pri
 @@ -15,7 +15,6 @@ unix:!mac:DEFINES += HAVE_X11
@@ -1691,7 +2318,15 @@ index a95cf72..efa07d9 100644
  include($$PWD/tabs/tabs.pri)
  include($$PWD/Certificates/Certificates.pri)
  
-@@ -212,20 +211,12 @@ HEADERS += \
+@@ -180,7 +179,6 @@ HEADERS += \
+ 	$$PWD/activitycatalog.h \
+ 	$$PWD/activitydlg.h \
+ 	$$PWD/geolocation.h \
+-	$$PWD/physicallocation.h \
+ 	$$PWD/urlbookmark.h \
+ 	$$PWD/conferencebookmark.h \
+ 	$$PWD/bookmarkmanager.h \
+@@ -212,20 +210,12 @@ HEADERS += \
  	$$PWD/psicli.h \
  	$$PWD/coloropt.h \
  	$$PWD/geolocationdlg.h \
@@ -1718,7 +2353,15 @@ index a95cf72..efa07d9 100644
  
  # Source files
  SOURCES += \
-@@ -351,7 +342,13 @@ SOURCES += \
+@@ -321,7 +311,6 @@ SOURCES += \
+ 	$$PWD/activitycatalog.cpp \
+ 	$$PWD/activitydlg.cpp \
+ 	$$PWD/geolocation.cpp \
+-	$$PWD/physicallocation.cpp \
+ 	$$PWD/urlbookmark.cpp \
+ 	$$PWD/conferencebookmark.cpp \
+ 	$$PWD/bookmarkmanager.cpp \
+@@ -351,7 +340,13 @@ SOURCES += \
  	$$PWD/vcardphotodlg.cpp \
  	$$PWD/coloropt.cpp \
  	$$PWD/geolocationdlg.cpp \
