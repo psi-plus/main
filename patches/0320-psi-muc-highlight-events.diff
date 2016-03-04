@@ -1,6 +1,6 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
-@@ -327,6 +327,7 @@ QLineEdit#le_status_text {
+--- psi.orig/options/default.xml
++++ psi/options/default.xml
+@@ -328,6 +328,7 @@ QLineEdit#le_status_text {
  					<height>420</height>
  				</size>
  				<use-highlighting type="bool">true</use-highlighting><use-nick-coloring type="bool">true</use-nick-coloring><use-hash-nick-coloring type="bool">true</use-hash-nick-coloring><colored-history type="bool">true</colored-history>
@@ -8,9 +8,9 @@
  			</muc>
  			<show-deprecated comment="Deprecated functionality or protocols">
  				<service-discovery comment="Service discovery dialog">
---- git.orig/src/chatdlg.cpp
-+++ git/src/chatdlg.cpp
-@@ -448,6 +448,8 @@ void ChatDlg::ensureTabbedCorrectly()
+--- psi.orig/src/chatdlg.cpp
++++ psi/src/chatdlg.cpp
+@@ -449,6 +449,8 @@ void ChatDlg::ensureTabbedCorrectly()
  
  void ChatDlg::updateContact(const Jid &j, bool fromPresence)
  {
@@ -19,8 +19,8 @@
  	// if groupchat, only update if the resource matches
  	if (account()->findGCContact(j) && !jid().compare(j)) {
  		return;
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
+--- psi.orig/src/groupchatdlg.cpp
++++ psi/src/groupchatdlg.cpp
 @@ -199,6 +199,7 @@ public:
  		dlg = d;
  		nickSeparator = ":";
@@ -29,7 +29,7 @@
  
  		trackBar = false;
  		mCmdManager.registerProvider(this);
-@@ -237,6 +238,7 @@ public:
+@@ -236,6 +237,7 @@ public:
  	int pending;
  	int hPending; // highlight pending
  	bool connecting;
@@ -37,7 +37,7 @@
  
  	QStringList hist;
  	int histAt;
-@@ -1047,6 +1049,7 @@ void GCMainDlg::activated()
+@@ -1025,6 +1027,7 @@ void GCMainDlg::activated()
  			u->setPending(d->pending, d->hPending);
  			account()->updateEntry(*u);
  		}
@@ -45,7 +45,7 @@
  		invalidateTab();
  	}
  	doFlash(false);
-@@ -1681,11 +1684,11 @@ void GCMainDlg::avatarUpdated(const Jid
+@@ -1733,11 +1736,11 @@ void GCMainDlg::avatarUpdated(const Jid
  	}
  }
  
@@ -59,7 +59,7 @@
  
  	if (m.getMUCStatuses().contains(100)) {
  		d->nonAnonymous = true;
-@@ -1735,7 +1738,7 @@ void GCMainDlg::message(const Message &_
+@@ -1787,7 +1790,7 @@ void GCMainDlg::message(const Message &_
  
  	// code to determine if the speaker was addressing this client in chat
  	if(m.body().contains(d->self))
@@ -68,7 +68,7 @@
  
  	if (m.body().left(d->self.length()) == d->self)
  		d->lastReferrer = m.from().resource();
-@@ -1744,7 +1747,7 @@ void GCMainDlg::message(const Message &_
+@@ -1796,7 +1799,7 @@ void GCMainDlg::message(const Message &_
  		QStringList highlightWords = options->getOption("options.ui.muc.highlight-words").toStringList();
  		foreach (QString word, highlightWords) {
  			if(m.body().contains((word), Qt::CaseInsensitive)) {
@@ -77,7 +77,7 @@
  			}
  		}
  	}
-@@ -1755,13 +1758,12 @@ void GCMainDlg::message(const Message &_
+@@ -1807,13 +1810,12 @@ void GCMainDlg::message(const Message &_
  			account()->playSound(PsiAccount::eSend);
  	}
  	else {
@@ -93,7 +93,7 @@
  				UserListItem i;
  				i.setPrivate(true);
  				account()->psi()->popupManager()->doPopup(account(), PopupManager::AlertGcHighlight, jid, m.from().resource(), &i, e);
-@@ -1770,9 +1772,9 @@ void GCMainDlg::message(const Message &_
+@@ -1822,9 +1824,9 @@ void GCMainDlg::message(const Message &_
  	}
  
  	if(from.isEmpty())
@@ -105,7 +105,7 @@
  }
  
  void GCMainDlg::joined()
-@@ -1809,6 +1811,11 @@ const QDateTime & GCMainDlg::lastMsgTime
+@@ -1861,6 +1863,11 @@ const QDateTime & GCMainDlg::lastMsgTime
  	return d->te_log()->lastMsgTime();
  }
  
@@ -117,8 +117,8 @@
  void GCMainDlg::appendSysMsg(const QString &str, bool alert, const QDateTime &ts)
  {
  	MessageView mv = MessageView::fromPlainText(str, MessageView::System);
---- git.orig/src/groupchatdlg.h
-+++ git/src/groupchatdlg.h
+--- psi.orig/src/groupchatdlg.h
++++ psi/src/groupchatdlg.h
 @@ -31,6 +31,7 @@
  #include "ui_groupchatdlg.h"
  #include "mucmanager.h"
@@ -150,9 +150,9 @@
  
  public slots:
  	// reimplemented
---- git.orig/src/psiaccount.cpp
-+++ git/src/psiaccount.cpp
-@@ -2804,9 +2804,9 @@ void PsiAccount::processIncomingMessage(
+--- psi.orig/src/psiaccount.cpp
++++ psi/src/psiaccount.cpp
+@@ -2789,9 +2789,9 @@ void PsiAccount::processIncomingMessage(
  
  #ifdef GROUPCHAT
  	if(_m.type() == "groupchat") {
@@ -165,7 +165,7 @@
  		return;
  	}
  #endif
-@@ -5080,7 +5080,17 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5076,7 +5076,17 @@ void PsiAccount::handleEvent(const PsiEv
  				!(e->type() == PsiEvent::Message &&
  				 e.staticCast<MessageEvent>()->message().body().isEmpty()))
  			{
@@ -184,7 +184,7 @@
  			}
  		}
  	}
-@@ -5120,7 +5130,7 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5116,7 +5126,7 @@ void PsiAccount::handleEvent(const PsiEv
  		}
  
  		// Pass message events to chat window
@@ -193,7 +193,7 @@
  			if (o->getOption("options.messages.send-composing-events").toBool()) {
  				ChatDlg *c = findChatDialogEx(e->from());
  				if (c) {
-@@ -5184,6 +5194,22 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5180,6 +5190,22 @@ void PsiAccount::handleEvent(const PsiEv
  			doPopup = true;
  			popupType = PopupManager::AlertHeadline;
  		} // /headline
@@ -216,7 +216,7 @@
  		else if (m.type().isEmpty()) {
  			soundType = eMessage;
  			doPopup = true;
-@@ -5581,11 +5607,18 @@ void PsiAccount::processReadNext(const U
+@@ -5577,11 +5603,18 @@ void PsiAccount::processReadNext(const U
  		return;
  
  	bool isChat = false;
@@ -235,7 +235,7 @@
  	}
  
  	// if it's a chat message, just open the chat window.  there is no need to do
-@@ -5596,6 +5629,17 @@ void PsiAccount::processReadNext(const U
+@@ -5592,6 +5625,17 @@ void PsiAccount::processReadNext(const U
  		return;
  	}
  
@@ -253,7 +253,7 @@
  	// remove from queue
  	e = d->eventQueue->dequeue(u.jid());
  
-@@ -5702,6 +5746,19 @@ void PsiAccount::chatMessagesRead(const
+@@ -5696,6 +5740,19 @@ void PsiAccount::chatMessagesRead(const
  //	}
  }
  
@@ -273,7 +273,7 @@
  void PsiAccount::logEvent(const Jid &j, const PsiEvent::Ptr &e)
  {
  	if (!d->acc.opt_log)
-@@ -5724,6 +5781,7 @@ void PsiAccount::openGroupChat(const Jid
+@@ -5718,6 +5775,7 @@ void PsiAccount::openGroupChat(const Jid
  	GCMainDlg *w = new GCMainDlg(this, j, d->tabManager);
  	w->setPassword(d->client->groupChatPassword(j.domain(), j.node()));
  	connect(w, SIGNAL(aSend(const Message &)), SLOT(dj_sendMessage(const Message &)));
@@ -281,8 +281,8 @@
  	connect(d->psi, SIGNAL(emitOptionsUpdate()), w, SLOT(optionsUpdate()));
  	if(reason != MUCJoinDlg::MucAutoJoin || !PsiOptions::instance()->getOption("options.ui.muc.hide-on-autojoin").toBool()) {
  		w->ensureTabbedCorrectly();
---- git.orig/src/psiaccount.h
-+++ git/src/psiaccount.h
+--- psi.orig/src/psiaccount.h
++++ psi/src/psiaccount.h
 @@ -451,6 +451,9 @@ private slots:
  	void itemRetracted(const Jid&, const QString&, const PubSubRetraction&);
  
@@ -293,8 +293,8 @@
  
  	void slotCheckVCard();
  	void edb_finished();
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
+--- psi.orig/src/psicon.cpp
++++ psi/src/psicon.cpp
 @@ -81,6 +81,9 @@
  #include "accountscombobox.h"
  #include "tabdlg.h"
@@ -305,7 +305,7 @@
  #include "spellchecker/aspellchecker.h"
  #ifdef WEBKIT
  #include "avatars.h"
-@@ -1739,16 +1742,28 @@ void PsiCon::processEvent(const PsiEvent
+@@ -1735,16 +1738,28 @@ void PsiCon::processEvent(const PsiEvent
  	}
  
  	bool isChat = false;
@@ -339,7 +339,7 @@
  	}
  
  	if ( isChat ) {
-@@ -1780,6 +1795,17 @@ void PsiCon::processEvent(const PsiEvent
+@@ -1776,6 +1791,17 @@ void PsiCon::processEvent(const PsiEvent
  	}
  #endif
  	else {
@@ -357,8 +357,8 @@
  		// search for an already opened eventdlg
  		EventDlg *w = e->account()->findDialog<EventDlg*>(u->jid());
  
---- git.orig/src/psievent.cpp
-+++ git/src/psievent.cpp
+--- psi.orig/src/psievent.cpp
++++ psi/src/psievent.cpp
 @@ -241,6 +241,10 @@ int MessageEvent::type() const
  
  Jid MessageEvent::from() const
@@ -370,9 +370,9 @@
  	return v_m.from();
  }
  
---- git.orig/src/psiiconset.cpp
-+++ git/src/psiiconset.cpp
-@@ -650,7 +650,7 @@ PsiIcon *PsiIconset::event2icon(const Ps
+--- psi.orig/src/psiiconset.cpp
++++ psi/src/psiiconset.cpp
+@@ -686,7 +686,7 @@ PsiIcon *PsiIconset::event2icon(const Ps
  		const Message &m = me->message();
  		if(m.type() == "headline")
  			icon = "psi/headline";
