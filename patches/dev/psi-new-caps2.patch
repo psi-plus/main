@@ -52,18 +52,43 @@ index c690180..6c44922 100644
  			send(iq);
  			return true;
 diff --git a/src/applicationinfo.cpp b/src/applicationinfo.cpp
-index 45346a7..456fc1f 100644
+index 45346a7..f9446fc 100644
 --- a/src/applicationinfo.cpp
 +++ b/src/applicationinfo.cpp
-@@ -46,7 +46,7 @@
+@@ -46,8 +46,7 @@
  #define PROG_VERSION PSI_VERSION
  //#define PROG_VERSION "0.15-dev" " (" __DATE__ ")" //CVS Builds are dated
  //#define PROG_VERSION "0.15";
 -#define PROG_CAPS_NODE "http://psi-im.org/caps"
+-#define PROG_CAPS_VERSION "caps-b75d8d2b25"
 +#define PROG_CAPS_NODE "http://psi-im.org"
- #define PROG_CAPS_VERSION "caps-b75d8d2b25"
  #define PROG_IPC_NAME "org.psi-im.Psi"	// must not contain '\\' character on Windows
  #define PROG_OPTIONS_NS "http://psi-im.org/options"
+ #define PROG_STORAGE_NS "http://psi-im.org/storage"
+@@ -83,11 +82,6 @@ QString ApplicationInfo::capsNode()
+ 	return PROG_CAPS_NODE;
+ }
+ 
+-QString ApplicationInfo::capsVersion()
+-{
+-	return PROG_CAPS_VERSION;
+-}
+-
+ QString ApplicationInfo::IPCName()
+ {
+ 	return PROG_IPC_NAME;
+diff --git a/src/applicationinfo.h b/src/applicationinfo.h
+index 8fc81d8..ccfa7c4 100644
+--- a/src/applicationinfo.h
++++ b/src/applicationinfo.h
+@@ -19,7 +19,6 @@ public:
+ 	static QLatin1String sname();
+ 	static QString version();
+ 	static QString capsNode();
+-	static QString capsVersion();
+ 	static QString IPCName();
+ 
+ 	// URLs
 diff --git a/src/capabilities/capabilities.pri b/src/capabilities/capabilities.pri
 deleted file mode 100644
 index bc9c29f..0000000
@@ -1372,6 +1397,34 @@ index bc136ed..a883973 100644
  	}
  
  	if(!nick.isEmpty())
+diff --git a/src/legacypsiaccount.cpp b/src/legacypsiaccount.cpp
+index 956ee19..16f0b66 100644
+--- a/src/legacypsiaccount.cpp
++++ b/src/legacypsiaccount.cpp
+@@ -23,8 +23,8 @@
+ #include "psicon.h"
+ #include "contactview.h"
+ 
+-LegacyPsiAccount::LegacyPsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegistry* capsRegistry, TabManager *tabManager)
+-	: PsiAccount(acc, parent, capsRegistry, tabManager)
++LegacyPsiAccount::LegacyPsiAccount(const UserAccount &acc, PsiContactList *parent, TabManager *tabManager)
++	: PsiAccount(acc, parent, tabManager)
+ 	, cp_(0)
+ {
+ }
+diff --git a/src/legacypsiaccount.h b/src/legacypsiaccount.h
+index 71eeb8e..2bce7ff 100644
+--- a/src/legacypsiaccount.h
++++ b/src/legacypsiaccount.h
+@@ -27,7 +27,7 @@ class LegacyPsiAccount : public PsiAccount
+ {
+ 	Q_OBJECT
+ public:
+-	LegacyPsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegistry* capsRegistry, TabManager *tabManager);
++	LegacyPsiAccount(const UserAccount &acc, PsiContactList *parent, TabManager *tabManager);
+ 	~LegacyPsiAccount();
+ 	virtual void init();
+ 
 diff --git a/src/main.cpp b/src/main.cpp
 index c546fd9..478c604 100644
 --- a/src/main.cpp
@@ -1742,10 +1795,26 @@ index e3bf9b4..0000000
 -#endif
 -*/
 diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
-index 196410b..f69ab19 100644
+index 196410b..1911b75 100644
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
-@@ -91,7 +91,6 @@
+@@ -43,6 +43,7 @@
+ #include <QList>
+ #include <QQueue>
+ #include <QHostInfo>
++#include <QtCrypto>
+ 
+ #include "psiaccount.h"
+ #include "psiiconset.h"
+@@ -50,6 +51,7 @@
+ #include "profiles.h"
+ #include "xmpp_tasks.h"
+ #include "xmpp_xmlcommon.h"
++#include "xmpp_caps.h"
+ #include "s5b.h"
+ #ifdef FILETRANSFER
+ #include "filetransfer.h"
+@@ -91,7 +93,6 @@
  #include "infodlg.h"
  #include "adduserdlg.h"
  #include "historydlg.h"
@@ -1753,7 +1822,34 @@ index 196410b..f69ab19 100644
  #include "registrationdlg.h"
  #include "searchdlg.h"
  #include "discodlg.h"
-@@ -470,7 +469,6 @@ public:
+@@ -145,7 +146,9 @@
+ #include "Certificates/CertificateHelpers.h"
+ #include "Certificates/CertificateErrorDialog.h"
+ #include "Certificates/CertificateDisplayDialog.h"
++#ifndef NEWCONTACTLIST
+ #include "legacypsiaccount.h"
++#endif
+ #include "bookmarkmanagedlg.h"
+ #include "accountloginpassword.h"
+ #include "alertmanager.h"
+@@ -161,7 +164,7 @@
+ 
+ #include "../iris/src/xmpp/xmpp-core/protocol.h"
+ 
+-#include <QtCrypto>
++
+ 
+ #include "bsocket.h"
+ /*#ifdef Q_OS_WIN
+@@ -412,7 +415,6 @@ public:
+ 		, xmlConsole(0)
+ 		, blockTransportPopupList(0)
+ 		, privacyManager(0)
+-		, capsManager(0)
+ 		, rosterItemExchangeTask(0)
+ 		, ahcManager(0)
+ 		, rcSetStatusServer(0)
+@@ -470,7 +472,6 @@ public:
  	BlockTransportPopupList *blockTransportPopupList;
  	int userCounter;
  	PsiPrivacyManager* privacyManager;
@@ -1761,7 +1857,7 @@ index 196410b..f69ab19 100644
  	RosterItemExchangeTask* rosterItemExchangeTask;
  	bool pepAvailable;
  	QString currentConnectionError;
-@@ -1062,7 +1060,7 @@ public:
+@@ -1062,12 +1063,12 @@ public:
  	bool reconnectInfrequently_;
  };
  
@@ -1769,8 +1865,15 @@ index 196410b..f69ab19 100644
 +PsiAccount* PsiAccount::create(const UserAccount &acc, PsiContactList *parent, TabManager *tabManager)
  {
  #ifdef NEWCONTACTLIST
- 	PsiAccount* account = new PsiAccount(acc, parent, capsRegistry, tabManager);
-@@ -1077,7 +1075,7 @@ void PsiAccount::init()
+-	PsiAccount* account = new PsiAccount(acc, parent, capsRegistry, tabManager);
++	PsiAccount* account = new PsiAccount(acc, parent, tabManager);
+ #else
+-	PsiAccount* account = new LegacyPsiAccount(acc, parent, capsRegistry, tabManager);
++	PsiAccount* account = new LegacyPsiAccount(acc, parent, tabManager);
+ #endif
+ 	account->init();
+ 	return account;
+@@ -1077,7 +1078,7 @@ void PsiAccount::init()
  {
  }
  
@@ -1779,17 +1882,86 @@ index 196410b..f69ab19 100644
  	: QObject(parent)
  {
  	d = new Private( this );
-@@ -1185,8 +1183,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+@@ -1126,8 +1127,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	d->client->setOSName(SystemInfo::instance()->os());
+ 	d->client->setClientName(ApplicationInfo::name());
+ 	d->client->setClientVersion(ApplicationInfo::version());
+-	d->client->setCapsNode(ApplicationInfo::capsNode());
+-	d->client->setCapsVersion(ApplicationInfo::capsVersion());
++	d->client->setCaps(CapsSpec(ApplicationInfo::capsNode(), QCryptographicHash::Sha1));
+ 	d->client->bobManager()->setCache(BoBFileCache::instance()); // xep-0231
+ 
+ 	DiscoItem::Identity identity;
+@@ -1135,16 +1135,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	identity.type = "pc";
+ 	identity.name = ApplicationInfo::name();
+ 	d->client->setIdentity(identity);
+-
+-	QStringList features;
+-	features << "http://jabber.org/protocol/commands";
+-	features << "http://jabber.org/protocol/rosterx";
+-#ifdef GROUPCHAT
+-	features << "http://jabber.org/protocol/muc";
+-#endif
+-	features << "jabber:x:data";
+-	features << "jabber:iq:version";
+-	d->client->setFeatures(Features(features));
++	updateFeatures();
+ 
+ #ifdef FILETRANSFER
+ 	d->client->setFileTransferEnabled(true);
+@@ -1152,9 +1143,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	d->client->setFileTransferEnabled(false);
+ #endif
+ 
+-	setSendChatState(PsiOptions::instance()->getOption("options.messages.send-composing-events").toBool());
+-	setReceipts(PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool());
+-
+ 	//connect(d->client, SIGNAL(connected()), SLOT(client_connected()));
+ 	//connect(d->client, SIGNAL(handshaken()), SLOT(client_handshaken()));
+ 	//connect(d->client, SIGNAL(error(const StreamError &)), SLOT(client_error(const StreamError &)));
+@@ -1185,8 +1173,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
  
  	// Caps manager
 -	d->capsManager = new CapsManager(d->client->jid(), capsRegistry, new IrisProtocol::DiscoInfoQuerier(d->client));
 -	d->capsManager->setEnabled(PsiOptions::instance()->getOption("options.service-discovery.enable-entity-capabilities").toBool());
-+	d->client->capsManager->setEnabled(PsiOptions::instance()->getOption("options.service-discovery.enable-entity-capabilities").toBool());
++	d->client->capsManager()->setEnabled(PsiOptions::instance()->getOption("options.service-discovery.enable-entity-capabilities").toBool());
  
  	// Roster item exchange task
  	d->rosterItemExchangeTask = new RosterItemExchangeTask(d->client->rootTask());
-@@ -1319,34 +1316,9 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+@@ -1246,13 +1233,8 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	//Idle server
+ 	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
+ 		new IdleServer(this, d->client->rootTask());
+-		d->client->addExtension("last-act", QStringList("jabber:iq:last"));
+ 	}
+ 
+-	// HTML
+-	if(PsiOptions::instance()->getOption("options.html.chat.render").toBool())
+-		d->client->addExtension("html",Features("http://jabber.org/protocol/xhtml-im"));
+-
+ 	d->selfContact = new PsiSelfContact(d->self, this);
+ 
+ 	// restore cached roster
+@@ -1283,7 +1265,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	d->setEnabled(enabled());
+ 
+ 	// Listen to the capabilities manager
+-	connect(capsManager(),SIGNAL(capsChanged(const Jid&)),SLOT(capsChanged(const Jid&)));
++	connect(d->client->capsManager(),SIGNAL(capsChanged(const Jid&)),SLOT(capsChanged(const Jid&)));
+ 
+ 	//printf("PsiAccount: [%s] loaded\n", name().latin1());
+ 
+@@ -1302,7 +1284,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
+ 	d->voiceCaller = new JingleVoiceCaller(this);
+ #endif
+ 	if (d->voiceCaller) {
+-		d->client->addExtension("voice-v1", Features(QString("http://www.google.com/xmpp/protocol/voice/v1")));
+ 		connect(d->voiceCaller,SIGNAL(incoming(const Jid&)),SLOT(incomingVoiceCall(const Jid&)));
+ 	}
+ 
+@@ -1319,34 +1300,9 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, CapsRegis
  	if(AvCallManager::isSupported()) {
  		d->avCallManager = new AvCallManager(this);
  		connect(d->avCallManager, SIGNAL(incomingReady()), d, SLOT(incoming_call()));
@@ -1824,7 +1996,57 @@ index 196410b..f69ab19 100644
  	// load event queue from disk
  	QTimer::singleShot(0, d, SLOT(loadQueue()));
  
-@@ -2396,7 +2368,6 @@ void PsiAccount::setPEPAvailable(bool b)
+@@ -1381,7 +1337,6 @@ PsiAccount::~PsiAccount()
+ 
+ 	delete d->ahcManager;
+ 	delete d->privacyManager;
+-	delete d->capsManager;
+ 	delete d->pepManager;
+ 	delete d->serverInfoManager;
+ #ifdef WHITEBOARDING
+@@ -1561,11 +1516,6 @@ PrivacyManager* PsiAccount::privacyManager() const
+ 	return d->privacyManager;
+ }
+ 
+-CapsManager* PsiAccount::capsManager() const
+-{
+-	return d->capsManager;
+-}
+-
+ bool PsiAccount::hasPGP() const
+ {
+ 	return !d->cur_pgpSecretKey.isNull();
+@@ -1662,6 +1612,19 @@ QString PsiAccount::nameWithJid() const
+ 	return (name() + " (" + JIDUtil::toString(jid(),true) + ')');
+ }
+ 
++void PsiAccount::updateFeatures()
++{
++	QStringList features = d->psi->xmppFatures();
++	// TODO update features depending on account settings and plugins' features
++
++	if (d->voiceCaller) {
++		features << "http://www.google.com/xmpp/protocol/voice/v1"; // isn't obsoleted?
++	}
++
++	// TODO reset hash
++	d->client->setFeatures(Features(features));
++}
++
+ void PsiAccount::autoLogin()
+ {
+ 	// auto-login ?
+@@ -1829,9 +1792,6 @@ void PsiAccount::forceDisconnect(bool fast, const XMPP::Status &s)
+ 		if (PsiOptions::instance()->getOption("options.extended-presence.tune.publish").toBool() && !d->lastTune.isNull())
+ 			publishTune(Tune());
+ 
+-		d->client->removeExtension("ep");
+-		d->client->removeExtension("pep");
+-
+ 		// send logout status
+ 		d->client->groupChatLeaveAll(PsiOptions::instance()->getOption("options.muc.leave-status-message").toString());
+ 		d->client->setPresence(s);
+@@ -2396,7 +2356,6 @@ void PsiAccount::setPEPAvailable(bool b)
  		pepNodes += "http://jabber.org/protocol/mood";
  		pepNodes += "http://jabber.org/protocol/activity";
  		pepNodes += "http://jabber.org/protocol/tune";
@@ -1832,7 +2054,7 @@ index 196410b..f69ab19 100644
  		pepNodes += "http://jabber.org/protocol/geoloc";
  		pepNodes += "urn:xmpp:avatar:data";
  		pepNodes += "urn:xmpp:avatar:metadata";
-@@ -2536,8 +2507,12 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+@@ -2536,8 +2495,13 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
  
  			UserResource ur(r);
  			//ur.setSecurityEnabled(true);
@@ -1841,19 +2063,21 @@ index 196410b..f69ab19 100644
  				ur.setClient(ApplicationInfo::name(),ApplicationInfo::version(),SystemInfo::instance()->os());
 +			}
 +			else {
-+				ur.setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),capsManager()->osVersion(j));
++				CapsManager *cm = d->client->capsManager();
++				ur.setClient(cm->clientName(j),cm->clientVersion(j),cm->osVersion(j));
 +			}
  
  			u->userResourceList().append(ur);
  			rp = &u->userResourceList().last();
-@@ -2600,15 +2575,14 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
+@@ -2600,15 +2564,15 @@ void PsiAccount::client_resourceAvailable(const Jid &j, const Resource &r)
  
  	// Update entity capabilities.
  	// This has to happen after the userlist item has been created.
 -	if (!r.status().capsNode().isEmpty()) {
 -		capsManager()->updateCaps(j,r.status().capsNode(),r.status().capsVersion(),r.status().capsExt());
 +	if (r.status().caps().isValid()) {
-+		capsManager()->updateCaps(j, r.status().caps());
++		CapsManager *cm = d->client->capsManager();
++		cm->updateCaps(j, r.status().caps());
  
  		// Update the client version
  		foreach(UserListItem* u, findRelevant(j)) {
@@ -1861,30 +2085,38 @@ index 196410b..f69ab19 100644
  			if (rit != u->userResourceList().end()) {
 -				//(*rit).setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),"");
 -				(*rit).setClient(QString(),QString(),"");
-+				(*rit).setClient(capsManager()->clientName(j),capsManager()->clientVersion(j),capsManager()->osVersion(j));
++				(*rit).setClient(cm->clientName(j),cm->clientVersion(j),cm->osVersion(j));
  				cpUpdate(*u,(*rit).name());
  			}
  		}
-@@ -3108,9 +3082,7 @@ void PsiAccount::setStatusActual(const Status &_s)
+@@ -3106,13 +3070,6 @@ void PsiAccount::setStatusActual(const Status &_s)
+ {
+ 	Status s = _s;
  
- 	// Add entity capabilities information
- 	if (capsManager()->isEnabled()) {
+-	// Add entity capabilities information
+-	if (capsManager()->isEnabled()) {
 -		s.setCapsNode(d->client->capsNode());
 -		s.setCapsVersion(d->client->capsVersion());
 -		s.setCapsExt(d->client->capsExt());
-+		s.setCaps(CapsSpec(d->client->capsNode(),d->client->capsVersion(),d->client->capsAlgorythm()));
- 	}
- 
+-	}
+-
  	if (!presenceSent) {
-@@ -3168,14 +3140,19 @@ void PsiAccount::capsChanged(const Jid& j)
+ 		simulateRosterOffline();
+ 	}
+@@ -3166,16 +3123,22 @@ void PsiAccount::capsChanged(const Jid& j)
+ 	if (!loggedIn())
+ 		return;
  
- 	QString name = capsManager()->clientName(j);
- 	QString version = (name.isEmpty() ? QString() : capsManager()->clientVersion(j));
+-	QString name = capsManager()->clientName(j);
+-	QString version = (name.isEmpty() ? QString() : capsManager()->clientVersion(j));
++	CapsManager *cm = d->client->capsManager();
++	QString name = cm->clientName(j);
++	QString version = (name.isEmpty() ? QString() : cm->clientVersion(j));
 +	QString os;
 +
 +	if (!name.isEmpty()) {
-+		version = capsManager()->clientVersion(j);
-+		os = capsManager()->osVersion(j);
++		version = cm->clientVersion(j);
++		os = cm->osVersion(j);
 +	}
  
  	foreach(UserListItem *u, findRelevant(j)) {
@@ -1898,7 +2130,7 @@ index 196410b..f69ab19 100644
  		cpUpdate(*u);
  	}
  }
-@@ -3672,14 +3649,6 @@ void PsiAccount::itemRetracted(const Jid& j, const QString& n, const PubSubRetra
+@@ -3672,14 +3635,6 @@ void PsiAccount::itemRetracted(const Jid& j, const QString& n, const PubSubRetra
  			cpUpdate(*u);
  		}
  	}
@@ -1913,7 +2145,7 @@ index 196410b..f69ab19 100644
  }
  
  void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem& item)
-@@ -3732,15 +3701,6 @@ void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem&
+@@ -3732,15 +3687,6 @@ void PsiAccount::itemPublished(const Jid& j, const QString& n, const PubSubItem&
  			cpUpdate(*u);
  		}
  	}
@@ -1929,8 +2161,73 @@ index 196410b..f69ab19 100644
  }
  
  Jid PsiAccount::realJid(const Jid &j) const
+@@ -6274,12 +6220,6 @@ void PsiAccount::optionsUpdate()
+ 	}
+ #endif
+ 
+-	// Chat states
+-	setSendChatState(o->getOption("options.messages.send-composing-events").toBool());
+-
+-	//Receipts
+-	setReceipts(o->getOption("options.ui.notifications.send-receipts").toBool()); //FIXME second presence?
+-
+ 	// Remote Controlling
+ 	setRCEnabled(o->getOption("options.external-control.adhoc-remote-control.enable").toBool());
+ 
+@@ -6287,7 +6227,13 @@ void PsiAccount::optionsUpdate()
+ 	d->rosterItemExchangeTask->setIgnoreNonRoster(o->getOption("options.messages.ignore-non-roster-contacts").toBool());
+ 
+ 	// Caps manager
+-	d->capsManager->setEnabled(o->getOption("options.service-discovery.enable-entity-capabilities").toBool());
++	d->client->capsManager()->setEnabled(o->getOption("options.service-discovery.enable-entity-capabilities").toBool());
++
++	updateFeatures();
++
++	if (isConnected()) {
++		setStatusActual(d->loginStatus);
++	}
+ }
+ 
+ 
+@@ -6311,36 +6257,6 @@ void PsiAccount::setRCEnabled(bool b)
+ 	}
+ }
+ 
+-void PsiAccount::setSendChatState(bool b)
+-{
+-	if (b && !d->client->extensions().contains("cs")) {
+-		d->client->addExtension("cs",Features("http://jabber.org/protocol/chatstates"));
+-		if (isConnected()) {
+-			setStatusActual(d->loginStatus);
+-		}
+-	}
+-	else if (!b && d->client->extensions().contains("cs")) {
+-		d->client->removeExtension("cs");
+-		if (isConnected()) {
+-			setStatusActual(d->loginStatus);
+-		}
+-	}
+-}
+-
+-void PsiAccount::setReceipts(bool b)
+-{
+-	if (b && !d->client->extensions().contains("mr")) {
+-		d->client->addExtension("mr",Features("urn:xmpp:receipts"));
+-		if (isConnected())
+-			setStatusActual(d->loginStatus);
+-	}
+-	else if (!b && d->client->extensions().contains("mr")) {
+-		d->client->removeExtension("mr");
+-		if (isConnected())
+-			setStatusActual(d->loginStatus);
+-	}
+-}
+-
+ void PsiAccount::invokeGCMessage(const Jid &j)
+ {
+ 	GCContact *c = findGCContact(j);
 diff --git a/src/psiaccount.h b/src/psiaccount.h
-index 32bfaa2..61e30b1 100644
+index 32bfaa2..a8b77a3 100644
 --- a/src/psiaccount.h
 +++ b/src/psiaccount.h
 @@ -66,7 +66,6 @@ class BookmarkManager;
@@ -1963,7 +2260,15 @@ index 32bfaa2..61e30b1 100644
  	virtual ~PsiAccount();
  
  	bool enabled() const;
-@@ -136,7 +134,6 @@ public:
+@@ -129,6 +127,7 @@ public:
+ 	const Jid & jid() const;
+ 	QString nameWithJid() const;
+ 
++	void updateFeatures();
+ 	XMPP::Client *client() const;
+ 	virtual ContactProfile *contactProfile() const;
+ 	EventQueue *eventQueue() const;
+@@ -136,7 +135,6 @@ public:
  	PsiCon *psi() const;
  	AvatarFactory *avatarFactory() const;
  	PrivacyManager* privacyManager() const;
@@ -1971,6 +2276,15 @@ index 32bfaa2..61e30b1 100644
  	VoiceCaller* voiceCaller() const;
  #ifdef WHITEBOARDING
  	WbManager* wbManager() const;
+@@ -478,8 +476,6 @@ protected:
+ 	QString localHostName();
+ 
+ 	void publishTune(const Tune&);
+-	void setSendChatState(bool);
+-	void setReceipts(bool);
+ 	void setRCEnabled(bool);
+ 	void sessionStarted();
+ 
 diff --git a/src/psicapsregsitry.cpp b/src/psicapsregsitry.cpp
 new file mode 100644
 index 0000000..cdca513
@@ -2010,7 +2324,7 @@ index 0000000..cdca513
 +}
 diff --git a/src/psicapsregsitry.h b/src/psicapsregsitry.h
 new file mode 100644
-index 0000000..42e1bea
+index 0000000..62be161
 --- /dev/null
 +++ b/src/psicapsregsitry.h
 @@ -0,0 +1,17 @@
@@ -2024,7 +2338,7 @@ index 0000000..42e1bea
 +	Q_OBJECT
 +
 +public:
-+	PsiCapsRegistry(QObject *parent);
++	PsiCapsRegistry(QObject *parent = 0);
 +
 +	void saveData(const QByteArray &data);
 +	QByteArray loadData();
@@ -2059,7 +2373,7 @@ index 4cb2334..90218b1 100644
  	QList<int> list;
  	list << 324;
 diff --git a/src/psicon.cpp b/src/psicon.cpp
-index eabbf28..e2f13e7 100644
+index eabbf28..9120f41 100644
 --- a/src/psicon.cpp
 +++ b/src/psicon.cpp
 @@ -36,6 +36,7 @@
@@ -2097,27 +2411,29 @@ index eabbf28..e2f13e7 100644
  	TabManager *tabManager;
  	bool quitting;
  	QTimer* updatedAccountTimer_;
-@@ -363,8 +362,8 @@ PsiCon::PsiCon()
+@@ -363,17 +362,16 @@ PsiCon::PsiCon()
  	d->actionList = 0;
  	d->defaultMenuBar = new QMenuBar(0);
  
 -	d->capsRegistry = new CapsRegistry();
 -	connect(d->capsRegistry, SIGNAL(registered(const CapsSpec&)), SLOT(saveCapabilities()));
 +	XMPP::CapsRegistry::setInstance(new PsiCapsRegistry(this));
-+	connect(XMPP::CapsRegistry::instance(), SIGNAL(registered(const CapsSpec&)), SLOT(saveCapabilities()));
++	XMPP::CapsRegistry *pcr = XMPP::CapsRegistry::instance();
++	connect(pcr, SIGNAL(destroyed(QObject*)), pcr, SLOT(save()));
++	connect(pcr, SIGNAL(registered(const XMPP::CapsSpec&)), pcr, SLOT(save()));
  }
  
  PsiCon::~PsiCon()
-@@ -372,8 +371,6 @@ PsiCon::~PsiCon()
+ {
  	deinit();
  
- 	saveCapabilities();
+-	saveCapabilities();
 -	delete d->capsRegistry;
 -
  	delete d->autoUpdater;
  	delete d->actionList;
  	delete d->edb;
-@@ -594,53 +591,6 @@ bool PsiCon::init()
+@@ -594,53 +592,6 @@ bool PsiCon::init()
  	// Global shortcuts
  	setShortcuts();
  
@@ -2171,7 +2487,7 @@ index eabbf28..e2f13e7 100644
  	// load accounts
  	{
  		QList<UserAccount> accs;
-@@ -748,18 +698,6 @@ void PsiCon::updateStatusPresets()
+@@ -748,18 +699,6 @@ void PsiCon::updateStatusPresets()
  	emit statusPresetsChanged();
  }
  
@@ -2190,83 +2506,73 @@ index eabbf28..e2f13e7 100644
  void PsiCon::deinit()
  {
  	// this deletes all dialogs except for mainwin
-@@ -841,6 +779,75 @@ PopupManager* PsiCon::popupManager() const
+@@ -841,6 +780,65 @@ PopupManager* PsiCon::popupManager() const
  	return d->popupManager;
  }
  
 +QStringList PsiCon::xmppFatures() const
 +{
-+	// TODO make static list and return it when necessary
-+	registerCaps(ApplicationInfo::capsVersion(), QStringList()
-+#ifdef FILETRANSFER
-+				 << "http://jabber.org/protocol/bytestreams"
-+				 << "http://jabber.org/protocol/ibb"
-+				 << "http://jabber.org/protocol/si"
-+				 << "http://jabber.org/protocol/si/profile/file-transfer"
-+#endif
-+				 << "http://jabber.org/protocol/disco#info"
-+				 << "http://jabber.org/protocol/commands"
-+				 << "http://jabber.org/protocol/rosterx"
++	QStringList features = QStringList() << "http://jabber.org/protocol/commands"
++		<< "http://jabber.org/protocol/rosterx"
 +#ifdef GROUPCHAT
-+				 << "http://jabber.org/protocol/muc"
++		<< "http://jabber.org/protocol/muc"
 +#endif
-+				 << "jabber:x:data"
-+				);
++		<< "http://jabber.org/protocol/mood"
++		<< "http://jabber.org/protocol/activity"
++		<< "http://jabber.org/protocol/tune"
++		<< "http://jabber.org/protocol/geoloc"
++		<< "urn:xmpp:avatar:data"
++		<< "urn:xmpp:avatar:metadata"
 +
-+	registerCaps("ep", QStringList()
-+				 << "http://jabber.org/protocol/mood"
-+				 << "http://jabber.org/protocol/activity"
-+				 << "http://jabber.org/protocol/tune"
-+				 << "http://jabber.org/protocol/geoloc"
-+				 << "urn:xmpp:avatar:data"
-+				 << "urn:xmpp:avatar:metadata"
-+				);
++		<< "http://jabber.org/protocol/mood+notify"
++		<< "http://jabber.org/protocol/activity+notify"
++		<< "http://jabber.org/protocol/tune+notify"
++		<< "http://jabber.org/protocol/geoloc+notify"
++		<< "urn:xmpp:avatar:metadata+notify"
 +
-+	registerCaps("ep-notify-2", QStringList()
-+				 << "http://jabber.org/protocol/mood+notify"
-+				 << "http://jabber.org/protocol/activity+notify"
-+				 << "http://jabber.org/protocol/tune+notify"
-+				 << "http://jabber.org/protocol/geoloc+notify"
-+				 << "urn:xmpp:avatar:metadata+notify"
-+				);
-+
-+	registerCaps("html", QStringList("http://jabber.org/protocol/xhtml-im"));
-+	registerCaps("cs", QStringList("http://jabber.org/protocol/chatstates"));
-+#ifdef YAPSI
-+	registerCaps("mr", QStringList("urn:xmpp:receipts"));
-+#endif
++		<< "http://jabber.org/protocol/xhtml-im"
++		<< "http://jabber.org/protocol/chatstates"
++		<< "urn:xmpp:receipts";
 +
 +	if(AvCallManager::isSupported()) {
-+		QStringList features;
 +		features << "urn:xmpp:jingle:1";
 +		features << "urn:xmpp:jingle:transports:ice-udp:1";
 +		features << "urn:xmpp:jingle:apps:rtp:1";
 +		features << "urn:xmpp:jingle:apps:rtp:audio";
-+		d->client->addExtension("ca", Features(features));
 +
 +		if(AvCallManager::isVideoSupported()) {
-+			features.clear();
 +			features << "urn:xmpp:jingle:apps:rtp:video";
-+			d->client->addExtension("cv", Features(features));
 +		}
 +	}
 +
-+	// Extended presence
-+	if (PsiOptions::instance()->getOption("options.extended-presence.notify").toBool()) {
-+		QStringList pepNodes;
-+		pepNodes += "http://jabber.org/protocol/mood+notify";
-+		pepNodes += "http://jabber.org/protocol/activity+notify";
-+		pepNodes += "http://jabber.org/protocol/tune+notify";
-+		pepNodes += "http://jabber.org/protocol/geoloc+notify";
-+		pepNodes += "urn:xmpp:avatar:metadata+notify";
-+		d->client->addExtension("ep-notify-2",Features(pepNodes));
++	struct FMap {
++		QString option;
++		QStringList feature;
++	};
++	static QList<FMap> fmap = QList<FMap>()
++	        << FMap{"options.service-discovery.last-activity", QStringList() << "jabber:iq:last"}
++	        << FMap{"options.html.chat.render", QStringList() << "http://jabber.org/protocol/xhtml-im"}
++	        << FMap{"options.extended-presence.notify", QStringList() << "http://jabber.org/protocol/mood+notify"
++	                                                                  << "http://jabber.org/protocol/activity+notify"
++	                                                                  << "http://jabber.org/protocol/tune+notify"
++	                                                                  << "http://jabber.org/protocol/geoloc+notify"
++			                                                          << "urn:xmpp:avatar:metadata+notify"}
++	        << FMap{"options.messages.send-composing-events", QStringList() << "http://jabber.org/protocol/chatstates"}
++	        << FMap{"options.ui.notifications.send-receipts", QStringList() << "urn:xmpp:receipts"};
++
++	foreach (const FMap &f, fmap) {
++		if(PsiOptions::instance()->getOption(f.option).toBool()) {
++			features << f.feature;
++		}
 +	}
++
++	return features;
 +}
 +
  TabManager *PsiCon::tabManager() const
  {
  	return d->tabManager;
-@@ -1019,7 +1026,7 @@ PsiAccount* PsiCon::createAccount(const QString &name, const Jid &j, const QStri
+@@ -1019,7 +1017,7 @@ PsiAccount* PsiCon::createAccount(const QString &name, const Jid &j, const QStri
  PsiAccount *PsiCon::createAccount(const UserAccount& _acc)
  {
  	UserAccount acc = _acc;
@@ -2275,18 +2581,21 @@ index eabbf28..e2f13e7 100644
  //	connect(&d->idle, SIGNAL(secondsIdle(int)), pa, SLOT(secondsIdle(int)));
  	connect(pa, SIGNAL(updatedActivity()), SLOT(pa_updatedActivity()));
  	connect(pa, SIGNAL(updatedAccount()), SLOT(pa_updatedAccount()));
-@@ -1236,8 +1243,7 @@ void PsiCon::saveAccounts()
- 
- void PsiCon::saveCapabilities()
- {
--	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
--	d->capsRegistry->save(file);
-+	CapsRegistry::instance()->save();
+@@ -1234,12 +1232,6 @@ void PsiCon::saveAccounts()
+ 	d->saveProfile(acc);
  }
  
+-void PsiCon::saveCapabilities()
+-{
+-	QFile file(ApplicationInfo::homeDir(ApplicationInfo::CacheLocation) + "/caps.xml");
+-	d->capsRegistry->save(file);
+-}
+-
  void PsiCon::updateMainwinStatus()
+ {
+ 	bool active = false;
 diff --git a/src/psicon.h b/src/psicon.h
-index 9c32503..73206f1 100644
+index 9c32503..549fc43 100644
 --- a/src/psicon.h
 +++ b/src/psicon.h
 @@ -130,6 +130,7 @@ public:
@@ -2297,7 +2606,15 @@ index 9c32503..73206f1 100644
  
  signals:
  	void quit(int);
-@@ -200,8 +201,6 @@ private:
+@@ -178,7 +179,6 @@ public slots:
+ 
+ private slots:
+ 	void saveAccounts();
+-	void saveCapabilities();
+ 	void optionChanged(const QString& option);
+ 	void forceSavePreferences();
+ 	void startBounce();
+@@ -200,8 +200,6 @@ private:
  	void promptUserToCreateAccount();
  	QString optionsFile() const;
  	void doQuit(int);
@@ -2306,6 +2623,140 @@ index 9c32503..73206f1 100644
  };
  
  #endif
+diff --git a/src/serverinfomanager.cpp b/src/serverinfomanager.cpp
+index fa2173e..ee83c2c 100644
+--- a/src/serverinfomanager.cpp
++++ b/src/serverinfomanager.cpp
+@@ -20,6 +20,7 @@
+ 
+ #include "serverinfomanager.h"
+ #include "xmpp_tasks.h"
++#include "xmpp_caps.h"
+ 
+ using namespace XMPP;
+ 
+@@ -28,6 +29,7 @@ ServerInfoManager::ServerInfoManager(Client* client) : client_(client)
+ 	deinitialize();
+ 	connect(client_, SIGNAL(rosterRequestFinished(bool, int, const QString &)), SLOT(initialize()));
+ 	connect(client_, SIGNAL(disconnected()), SLOT(deinitialize()));
++	connect(client_->capsManager(), SIGNAL(capsChanged(Jid)), SLOT(capsChanged(Jid)));
+ }
+ 
+ void ServerInfoManager::reset()
+@@ -38,10 +40,22 @@ void ServerInfoManager::reset()
+ 
+ void ServerInfoManager::initialize()
+ {
+-	JT_DiscoInfo *jt = new JT_DiscoInfo(client_->rootTask());
+-	connect(jt, SIGNAL(finished()), SLOT(disco_finished()));
+-	jt->get(client_->jid().domain());
+-	jt->go(true);
++	if (client_->capsManager()->isEnabled()) {
++		CapsSpec cs = client_->serverCaps();
++		if (cs.isValid()) {
++			Jid serverJid(client_->jid().domain());
++			if (client_->capsManager()->capsEnabled(serverJid)) {
++				handleReceivedFeatures(client_->capsManager()->disco(serverJid));
++			} else {
++				client_->capsManager()->updateCaps(serverJid, cs);
++			}
++		}
++	} else {
++		JT_DiscoInfo *jt = new JT_DiscoInfo(client_->rootTask());
++		connect(jt, SIGNAL(finished()), SLOT(disco_finished()));
++		jt->get(client_->jid().domain());
++		jt->go(true);
++	}
+ }
+ 
+ void ServerInfoManager::deinitialize()
+@@ -60,25 +74,38 @@ bool ServerInfoManager::hasPEP() const
+ 	return hasPEP_;
+ }
+ 
++void ServerInfoManager::capsChanged(const Jid &jid)
++{
++	Jid serverJid(client_->jid().domain());
++	if (jid == serverJid) {
++		handleReceivedFeatures(client_->capsManager()->disco(serverJid));
++	}
++}
++
+ void ServerInfoManager::disco_finished()
+ {
+ 	JT_DiscoInfo *jt = (JT_DiscoInfo *)sender();
+ 	if (jt->success()) {
+-		// Features
+-		Features f = jt->item().features();
+-		if (f.canMulticast())
+-			multicastService_ = client_->jid().domain();
+-		// TODO: Remove this, this is legacy
+-		if (f.test(QStringList("http://jabber.org/protocol/pubsub#pep")))
+-			hasPEP_ = true;
++		handleReceivedFeatures(jt->item());
++	}
++}
+ 
+-		// Identities
+-		DiscoItem::Identities is = jt->item().identities();
+-		foreach(DiscoItem::Identity i, is) {
+-			if (i.category == "pubsub" && i.type == "pep")
+-				hasPEP_ = true;
+-		}
++void ServerInfoManager::handleReceivedFeatures(const DiscoItem &item)
++{
++	const Features &f = item.features();
++
++	if (f.canMulticast())
++		multicastService_ = client_->jid().domain();
++	// TODO: Remove this, this is legacy
++	if (f.test(QStringList("http://jabber.org/protocol/pubsub#pep")))
++		hasPEP_ = true;
+ 
+-		emit featuresChanged();
++	// Identities
++	DiscoItem::Identities is = item.identities();
++	foreach(DiscoItem::Identity i, is) {
++		if (i.category == "pubsub" && i.type == "pep")
++			hasPEP_ = true;
+ 	}
++
++	emit featuresChanged();
+ }
+diff --git a/src/serverinfomanager.h b/src/serverinfomanager.h
+index 01b0f5a..95c1f81 100644
+--- a/src/serverinfomanager.h
++++ b/src/serverinfomanager.h
+@@ -26,8 +26,13 @@
+ 
+ namespace XMPP {
+ 	class Client;
++	class Features;
++	class Jid;
++	class DiscoItem;
+ }
+ 
++using namespace XMPP;
++
+ class ServerInfoManager : public QObject
+ {
+ 	Q_OBJECT
+@@ -38,10 +43,15 @@ public:
+ 	const QString& multicastService() const;
+ 	bool hasPEP() const;
+ 
++private:
++	void handleReceivedFeatures(const XMPP::DiscoItem &f);
++
+ signals:
+ 	void featuresChanged();
+ 
+ private slots:
++
++	void capsChanged(const Jid &jid);
+ 	void disco_finished();
+ 	void initialize();
+ 	void deinitialize();
 diff --git a/src/src.pri b/src/src.pri
 index a95cf72..f191f70 100644
 --- a/src/src.pri
