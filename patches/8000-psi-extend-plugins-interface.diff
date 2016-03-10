@@ -10,7 +10,7 @@
  	debug(QString("Client: outgoing: [\n%1]\n").arg(out));
 --- a/iris/src/xmpp/xmpp-im/xmpp_client.h
 +++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
-@@ -148,6 +148,7 @@ namespace XMPP
+@@ -150,6 +150,7 @@ namespace XMPP
  		void debugText(const QString &);
  		void xmlIncoming(const QString &);
  		void xmlOutgoing(const QString &);
@@ -4303,10 +4303,10 @@ new file mode 100644
 +#ifdef PSI_PLUGINS
 +	PluginManager::instance()->addAccount(this, d->client);
 +#endif
- 	d->client->setOSName(SystemInfo::instance()->os());
+ 	d->client->setOSName(SystemInfo::instance()->osName());
+ 	d->client->setOSVersion(SystemInfo::instance()->osVersion());
  	d->client->setClientName(ApplicationInfo::name());
- 	d->client->setClientVersion(ApplicationInfo::version());
-@@ -1181,6 +1193,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
+@@ -1182,6 +1194,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -4314,7 +4314,7 @@ new file mode 100644
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1238,11 +1251,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
+@@ -1239,11 +1252,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -4326,7 +4326,7 @@ new file mode 100644
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1788,6 +1796,9 @@ void PsiAccount::logout(bool fast, const Status &s)
+@@ -1792,6 +1800,9 @@ void PsiAccount::logout(bool fast, const Status &s)
  	if(!isActive())
  		return;
  
@@ -4336,7 +4336,7 @@ new file mode 100644
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4658,6 +4669,22 @@ void PsiAccount::dj_sendMessage(const Message &m, bool log)
+@@ -4662,6 +4673,22 @@ void PsiAccount::dj_sendMessage(const Message &m, bool log)
  			nm.setNick(nick());
  		}
  	}
@@ -4359,7 +4359,7 @@ new file mode 100644
  
  	// GSOC: stream management
  	// check whether message came from a ChatDlg
-@@ -4950,6 +4977,15 @@ static bool messageListContainsEvent(const QList<PsiEvent::Ptr>& messageList, co
+@@ -4954,6 +4981,15 @@ static bool messageListContainsEvent(const QList<PsiEvent::Ptr>& messageList, co
  	return false;
  }
  
@@ -4375,7 +4375,7 @@ new file mode 100644
  // handle an incoming event
  void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationType)
  {
-@@ -4995,12 +5031,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -4999,12 +5035,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  	e->setJid(j);
  
  #ifdef PSI_PLUGINS
@@ -4392,7 +4392,7 @@ new file mode 100644
  #endif
  
  	if (d->psi->filterEvent(this, e)) {
-@@ -5045,7 +5082,6 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -5049,7 +5086,6 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		//if ( !ul.isEmpty() )
  		//	ulItem=ul.first();
  		if (PluginManager::instance()->processMessage(this, e->from().full(), m.body(), m.subject())) {
@@ -4400,7 +4400,7 @@ new file mode 100644
  			return;
  		}
  		//PluginManager::instance()->message(this,e->from(),ulItem,((MessageEvent*)e)->message().body());
-@@ -5243,6 +5279,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -5247,6 +5283,13 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		}
  #endif
  	}
@@ -4414,7 +4414,7 @@ new file mode 100644
  	else {
  		putToQueue = false;
  		doPopup = false;
-@@ -5262,7 +5305,16 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+@@ -5266,7 +5309,16 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
  		    (popupType == PopupManager::AlertAvCall    && o->getOption("options.ui.notifications.passive-popups.incoming-message").toBool()) ||
  		    (popupType == PopupManager::AlertComposing && o->getOption("options.ui.notifications.passive-popups.composing").toBool()))
  		{
@@ -4432,7 +4432,7 @@ new file mode 100644
  		}
  		emit startBounce();
  	}
-@@ -5429,6 +5481,10 @@ void PsiAccount::queueEvent(const PsiEvent::Ptr &e, ActivationType activationTyp
+@@ -5433,6 +5485,10 @@ void PsiAccount::queueEvent(const PsiEvent::Ptr &e, ActivationType activationTyp
  		else if (e->type() == PsiEvent::File) {
  			doPopup = PsiOptions::instance()->getOption("options.ui.file-transfer.auto-popup").toBool();
  		}
@@ -4443,7 +4443,7 @@ new file mode 100644
  		else {
  			doPopup = PsiOptions::instance()->getOption("options.ui.message.auto-popup").toBool();
  		}
-@@ -5451,6 +5507,18 @@ void PsiAccount::openNextEvent(const UserListItem& u, ActivationType activationT
+@@ -5455,6 +5511,18 @@ void PsiAccount::openNextEvent(const UserListItem& u, ActivationType activationT
  	PsiEvent::Ptr e = d->eventQueue->peek(u.jid());
  	if(!e)
  		return;
