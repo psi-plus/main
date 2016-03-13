@@ -1,0 +1,503 @@
+diff --git a/iris b/iris
+index 1383242..4f35112 160000
+--- a/iris
++++ b/iris
+@@ -1 +1 @@
+-Subproject commit 138324243157fdf4ac155e6b2b7d3ca95eac2a84
++Subproject commit 4f35112acb810a51c4ca8dd62fc74efbf8436ccb
+diff --git a/src/psicontactlistviewdelegate.cpp b/src/psicontactlistviewdelegate.cpp
+index 079204b..35b1129 100644
+--- a/src/psicontactlistviewdelegate.cpp
++++ b/src/psicontactlistviewdelegate.cpp
+@@ -56,17 +56,14 @@ static const QString statusIconsetOptionPath = "options.iconsets.status";
+ 
+ PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
+ 	: ContactListViewDelegate(parent)
+-	, font_(0)
+-	, fontMetrics_(0)
+ {
+-	alertTimer_ = new QTimer(this);
+-	alertTimer_->setInterval(100);
+-	alertTimer_->setSingleShot(false);
+-	connect(alertTimer_, SIGNAL(timeout()), SLOT(updateAlerts()));
++	alertTimer_.setInterval(100);
++	alertTimer_.setSingleShot(false);
++	connect(&alertTimer_, SIGNAL(timeout()), SLOT(updateAlerts()));
+ 
+ 	connect(PsiOptions::instance(), SIGNAL(optionChanged(const QString&)), SLOT(optionChanged(const QString&)));
+ 	connect(PsiIconset::instance(), SIGNAL(rosterIconsSizeChanged(int)), SLOT(rosterIconsSizeChanged(int)));
+-	statusIconSize_ = PsiIconset::instance()->roster.value(PsiOptions::instance()->getOption(statusIconsetOptionPath).toString())->iconSize();
++	statusIconRect_.setSize(PsiIconset::instance()->roster.value(PsiOptions::instance()->getOption(statusIconsetOptionPath).toString())->iconSize());
+ 	optionChanged(slimGroupsOptionPath);
+ 	optionChanged(outlinedGroupsOptionPath);
+ 	optionChanged(contactListFontOptionPath);
+@@ -91,14 +88,13 @@ PsiContactListViewDelegate::PsiContactListViewDelegate(ContactListView* parent)
+ 
+ PsiContactListViewDelegate::~PsiContactListViewDelegate()
+ {
+-	delete font_;
+-	delete fontMetrics_;
++
+ }
+ 
+ int PsiContactListViewDelegate::avatarSize() const
+ {
+ 	return showAvatars_ ?
+-		qMax(avatarSize_ + 2, rowHeight_) : rowHeight_;
++		qMax(avatarRect_.height() + 2 * ContactVMargin, nickIconsLineHeight_) : nickIconsLineHeight_;
+ }
+ 
+ QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
+@@ -111,7 +107,7 @@ QPixmap PsiContactListViewDelegate::statusPixmap(const QModelIndex& index) const
+ 		if (index.data(ContactListModel::IsAlertingRole).toBool()) {
+ 			if (!alertingIndexes_.contains(index)) {
+ 				alertingIndexes_[index] = true;
+-				alertTimer_->start();
++				alertTimer_.start();
+ 			}
+ 
+ 			QVariant alertData = index.data(ContactListModel::AlertPictureRole);
+@@ -166,7 +162,7 @@ QList<QPixmap> PsiContactListViewDelegate::clientPixmap(const QModelIndex& index
+ 
+ QPixmap PsiContactListViewDelegate::avatarIcon(const QModelIndex& index) const
+ {
+-	int avSize = showAvatars_ ? avatarSize_ : 0;
++	int avSize = showAvatars_ ? avatarRect_.height() : 0;
+ 	QPixmap av = index.data(ContactListModel::IsMucRole).toBool() ? QPixmap() : index.data(ContactListModel::AvatarRole).value<QPixmap>();
+ 	if(av.isNull() && useDefaultAvatar_)
+ 		av = IconsetFactory::iconPixmap("psi/default_avatar");
+@@ -178,12 +174,13 @@ QSize PsiContactListViewDelegate::sizeHint(const QStyleOptionViewItem& /*option*
+ {
+ 	if (index.isValid()) {
+ 		if(index.data(ContactListModel::TypeRole) == ContactListModel::ContactType) {
+-			if(!statusSingle_ || !showStatusMessages_)
+-				return QSize(16, avatarSize());
+-			else
+-				return QSize(16, qMax(avatarSize(), rowHeight_*3/2));
++			int height = qMax(avatarRectHeight_, nickIconsLineHeight_ + statusLineHeight_);
++			if (statusLineHeight_) {
++				height += NickToStatusLinesVMargin;
++			}
++			return QSize(16, height + 2 * ContactVMargin);
+ 		} else {
+-			return QSize(16, rowHeight_);
++			return QSize(16, nickIconsLineHeight_ + 2 * ContactVMargin);
+ 		}
+ 	}
+ 
+@@ -218,36 +215,52 @@ static QRect relativeRect(const QStyleOption& option,
+ 
+ void PsiContactListViewDelegate::drawContact(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+ {
++	/* We have few possible ways to draw contact
++	 * 1) Avatar is hidden or on the left or on the right
++	 * 2) remaining space near avatar can be splitten into two lines if we want to draw status text in second line
++	 * 3) first line contains all possible icons (status icon may sometimes be drawn over avatar) and nick name.
++	 * 4) nick name considers RTL so icons position depends on it too (left/right)
++	 *
++	 * Algo:
++	 * 1) Devide space in 3 rectangles: avatar, nickname with icons and status text if any
++	 * 2) Calculate full height as MAX(avatar height, MAX(nick text height, highest icon) + status text height) + gaps.
++	 * 3) Align avatar to the center of its rect and draw it.
++	 * 4) Align status text to one side(consider RTL) and vertical center and draw it
++	 * 5) If status icon should be shown over avatar (corresponding option is enabled and avatars enabled too),
++	 *    The draw it over avatar
++	 * 6) Calculate space required for remaining icons
++	 * 7) Divide nickname/icons rectangle into two for icons and for nickname/status_icon. (icons are in favor for space)
++	 * 8) If nickname rectangle has zero size just skip nickname/status icon drawing and go to p.13
++	 * 9) If status icon is not over avatar then align status based on RTL settings and vertically and draw it
++	 * 10) Recalculate rectangle for nickname and other icons (status outside)
++	 * 11) Align nick name with respect to RTL and vertically in its rectangle and draw it
++	 * 12) on the other side of nickname rectangle draw transparent gradient if it intersects nick space to hide nickname softly
++	 * 13) Draw icons in its rectangle aligned vertically starting from opposite side on nickname start
++	 */
++
++
+ 	drawBackground(painter, option, index);
+ 
+-	QRect r = option.rect;
++	QRect r = option.rect; // our full contact space to draw
++
++	QRect avatarRect(avatarRect_);
++	QRect nickIconsRect(nickIconsLineRect_);
++	QRect statusLineRect(statusLineRect_);
++	QRect statusIconRect(statusIconRect_);
+ 
+-	QRect avatarRect(r);
+ 	if(showAvatars_) {
+ 		const QPixmap avatarPixmap = avatarIcon(index);
+-		int size = avatarSize_;
+-		avatarRect.setSize(QSize(size,size));
+-		if(avatarAtLeft_) {
+-			avatarRect.translate(enableGroups_ ? -5:-1, 1);
+-			r.setLeft(avatarRect.right() + 3);
+-		}
+-		else {
+-			avatarRect.moveTopRight(r.topRight());
+-			avatarRect.translate(-1,1);
+-			r.setRight(avatarRect.left() - 3);
+-		}
+-		int row = (statusSingle_ && showStatusMessages_) ? rowHeight_*3/2 : rowHeight_; // height required for nick
+-		int h = (size - row)/2; // padding from top to center it
+-		if(h > 0) {
+-			r.setTop(r.top() + h);
+-			r.setHeight(row);
+-		}
+-		else {
+-			avatarRect.setTop(avatarRect.top() - h);
++		avatarRect.moveTop(r.top() + (r.height() - avatarRect.height()) / 2); // vertical centre avatar rect
++		if (avatarAtLeft_) {
++			avatarRect.setLeft(r.left() + ContacHMargin);
++			nickIconsRect.setLeft(avatarRect.right() + AvatarToNickHMargin);
++		} else {
++			avatarRect.setRight(r.right() + ContacHMargin);
++			nickIconsRect.setRight(avatarRect.left() - AvatarToNickHMargin);
+ 		}
+ 
+ 		if(!avatarPixmap.isNull()) {
+-			painter->drawPixmap(avatarRect.topLeft(), avatarPixmap);
++			painter->drawPixmap(avatarRect, avatarPixmap);
+ 		}
+ 	}
+ 
+@@ -296,9 +309,9 @@ void PsiContactListViewDelegate::drawContact(QPainter* painter, const QStyleOpti
+ 	}
+ 
+ 	QStyleOptionViewItemV2 o = option;
+-	o.font = *font_;
++	o.font = font_;
+ 	o.font.setItalic(index.data(ContactListModel::BlockRole).toBool());
+-	o.fontMetrics = *fontMetrics_;
++	o.fontMetrics = fontMetrics_;
+ 	QPalette palette = o.palette;
+ 	palette.setColor(QPalette::Text, textColor);
+ 	o.palette = palette;
+@@ -436,8 +449,8 @@ void PsiContactListViewDelegate::drawContact(QPainter* painter, const QStyleOpti
+ void PsiContactListViewDelegate::drawGroup(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+ {
+ 	QStyleOptionViewItemV2 o = option;
+-	o.font = *font_;
+-	o.fontMetrics = *fontMetrics_;
++	o.font = font_;
++	o.fontMetrics = fontMetrics_;
+ 	QPalette palette = o.palette;
+ 	QColor background = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-background");
+ 	QColor foreground = ColorOpt::instance()->color("options.ui.look.colors.contactlist.grouping.header-foreground");
+@@ -470,7 +483,7 @@ void PsiContactListViewDelegate::drawGroup(QPainter* painter, const QStyleOption
+ 
+ 	if(slimGroup_ && !(option.state & QStyle::State_Selected)) {
+ 		int h = r.y() + (r.height() / 2);
+-		int x = r.left() + fontMetrics_->width(text) + 8;
++		int x = r.left() + fontMetrics_.width(text) + 8;
+ 		painter->setPen(QPen(background,2));
+ 		painter->drawLine(x, h, r.right(), h);
+ 	}
+@@ -479,8 +492,8 @@ void PsiContactListViewDelegate::drawGroup(QPainter* painter, const QStyleOption
+ void PsiContactListViewDelegate::drawAccount(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+ {
+ 	QStyleOptionViewItemV2 o = option;
+-	o.font = *font_;
+-	o.fontMetrics = *fontMetrics_;
++	o.font = font_;
++	o.fontMetrics = fontMetrics_;
+ 	QPalette palette = o.palette;
+ 	palette.setColor(QPalette::Base, ColorOpt::instance()->color("options.ui.look.colors.contactlist.profile.header-background"));
+ 	QColor foreground = ColorOpt::instance()->color("options.ui.look.colors.contactlist.profile.header-foreground");
+@@ -534,16 +547,118 @@ QRect PsiContactListViewDelegate::editorRect(const QRect& nameRect) const
+ 	return nameRect;
+ }
+ 
++void PsiContactListViewDelegate::recomputeGeometry()
++{
++	// this function recompute just some parameters. others will be computed during rendering
++	// when bounding rect is known. For now main unknown parameter is available width,
++	// so compute for something small like 16px.
++
++	nickRect_.setSize(QSize(16, fontMetrics_.height()));
++	statusLineRect_.setSize(QSize(16, statusFontMetrics_.height()));
++
++	int pepSize = 0;
++	if (showMoodIcons_ && PsiIconset::instance()->moods.iconSize() > pepSize) {
++		pepSize = PsiIconset::instance()->moods.iconSize();
++	}
++	if (showActivityIcons_ && PsiIconset::instance()->activities.iconSize() > pepSize) {
++		pepSize = PsiIconset::instance()->activities.iconSize();
++	}
++	if (showClientIcons_ && PsiIconset::instance()->clients.iconSize() > pepSize) {
++		pepSize = PsiIconset::instance()->clients.iconSize();
++	}
++	if ((showGeolocIcons_ || showTuneIcons_)  && PsiIconset::instance()->system().iconSize() > pepSize) {
++		pepSize = PsiIconset::instance()->system().iconSize();
++	}
++	pepIconsRect_.setSize(QSize(pepSize, pepSize));
++	// statusIconRect_.setSize(); // not needed. set by other functions
++	// avatarRect_.setSize(avatarSize_, avatarSize_); // not needed. set by other functions
++
++	// Ok, all basic elements seems to be computed. Now something more complex.
++	if (showAvatars_) {
++		avatarStatusRect_.setSize(avatarRect_.size());
++		// if we want status icon to a little go beyond the avatar then use QRect::united instead for avatarStatusRect_
++	} else {
++		avatarStatusRect_.setSize(QSize(0, 0));
++	}
++
++	firstLineRect_.setSize(QSize(
++	    pepIconsRect_.width() + nickRect_.width() + (statusIconsOverAvatars_? 0 : StatusIconToNickHMargin + statusIconRect_.width()),
++	    qMax(qMax(pepSize, nickRect_.height()), statusIconsOverAvatars_? 0: statusIconRect_.height())
++	));
++
++	secondLineRect_.setSize(statusLineRect_.size());
++	secondLineRect_.setWidth(firstLineRect_.width()); // first line is wider y algo above. so use it
++
++	int totalLinesHeight = firstLineRect_.height() + ((showStatusMessages_ && statusSingle_)?
++	                                                      NickToStatusLinesVMargin + statusLineRect_.height() : 0);
++	// compute very total height of row. it's for sizeHint mostly
++	contactRowHeight_ = qMax(avatarStatusRect_.height(), totalLinesHeight) + 2 * ContactVMargin;
++
++	int firstLineTop = 0;
++	int secondLineGap = NickToStatusLinesVMargin;
++	if (showAvatars_) {
++		// we have to do some vertical align for avatar and lines to look nice
++		int avatarStatusTop = 0;
++		if (avatarStatusRect_.height() > totalLinesHeight) {
++			// big avatar. try to center lines
++			firstLineTop = (avatarStatusRect_.height() - totalLinesHeight) / 2;
++			if (showStatusMessages_ && statusSingle_) {
++				int m = (avatarStatusRect_.height() - totalLinesHeight) / 3;
++				if (m > NickToStatusLinesVMargin) { // if too much free space slide apart the lines as well
++					firstLineTop = m;
++					secondLineGap = m;
++				}
++			}
++		} else if (avatarStatusRect_.height() < totalLinesHeight) {
++			// big lines. center avatar
++			avatarStatusTop = (totalLinesHeight - avatarStatusRect_.height()) / 2;
++		}
++		avatarStatusRect_.moveTop(ContactVMargin + avatarStatusTop);
++	}
++	firstLineRect_.moveTop(ContactVMargin + firstLineTop);
++	secondLineRect_.moveTop(firstLineRect_.bottom() + secondLineGap);
++
++	// top-level containers are now aligned vertically. let's align contents as well
++	if (showAvatars_) {
++		if (avatarAtLeft_) {
++			avatarStatusRect_.moveLeft(ContacHMargin);
++			if (statusIconsOverAvatars_) {
++				statusIconRect_.moveBottomRight(avatarStatusRect_.bottomRight());
++			}
++			firstLineRect_.moveLeft(avatarStatusRect_.right() + AvatarToNickHMargin);
++			secondLineRect_.moveLeft(avatarStatusRect_.right() + AvatarToNickHMargin);
++		} else {
++			firstLineRect_.moveLeft(ContacHMargin);
++			secondLineRect_.moveLeft(ContacHMargin);
++			avatarStatusRect_.moveLeft(firstLineRect_.right() + AvatarToNickHMargin); // lines are the same width. so it does not matter which
++			if (statusIconsOverAvatars_) {
++				statusIconRect_.moveBottomLeft(avatarStatusRect_.bottomLeft());
++			}
++		}
++	} else {
++		firstLineRect_.moveLeft(ContacHMargin);
++		secondLineRect_.moveLeft(ContacHMargin);
++	}
++
++	// top-level containers are now on their positions in our small emulation. align remaining internals now
++	// We don't know anything about RTL atm so just align vertically.
++	if (!statusIconsOverAvatars_) {
++		statusIconRect_.moveTop(firstLineRect_.top() + (firstLineRect_.height() - statusIconRect_.height()) / 2);
++	}
++	pepIconsRect_.moveTop(firstLineRect_.top() + (firstLineRect_.height() - pepIconsRect_.height()) / 2);
++	nickRect_.moveTop(firstLineRect_.top() + (firstLineRect_.height() - nickRect_.height()) / 2);
++	statusLineRect_.moveTop(secondLineRect_.top() + (secondLineRect_.height() - statusLineRect_.height()) / 2);
++}
++
+ void PsiContactListViewDelegate::optionChanged(const QString& option)
+ {
+ 	if (option == contactListFontOptionPath) {
+-		delete font_;
+-		delete fontMetrics_;
++		font_.fromString(PsiOptions::instance()->getOption(contactListFontOptionPath).toString());
++		fontMetrics_ = QFontMetrics(font_);
++		statusFont_.setPointSize(qMax(font_.pointSize()-2, 7));
++		statusFontMetrics_ = QFontMetrics(statusFont_);
+ 
+-		font_ = new QFont();
+-		font_->fromString(PsiOptions::instance()->getOption(contactListFontOptionPath).toString());
+-		fontMetrics_ = new QFontMetrics(*font_);
+-		rowHeight_ = qMax(fontMetrics_->height()+2, statusIconSize_+2);
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if (option == contactListBackgroundOptionPath) {
+@@ -554,30 +669,40 @@ void PsiContactListViewDelegate::optionChanged(const QString& option)
+ 	}
+ 	else if (option == showStatusMessagesOptionPath) {
+ 		showStatusMessages_ = PsiOptions::instance()->getOption(showStatusMessagesOptionPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showClientIconsPath) {
+-		showClientIcons_ = PsiOptions::instance()->getOption(showClientIconsPath).toBool();
++		showClientIcons_ = PsiOptions::instance()->getOption(showClientIconsPath).toBool() &&
++	        PsiIconset::instance()->clients.count() > 0;
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showMoodIconsPath) {
+-		showMoodIcons_ = PsiOptions::instance()->getOption(showMoodIconsPath).toBool();
++		showMoodIcons_ = PsiOptions::instance()->getOption(showMoodIconsPath).toBool() &&
++	        PsiIconset::instance()->moods.count() > 0;
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showActivityIconsPath) {
+-		showActivityIcons_ = PsiOptions::instance()->getOption(showActivityIconsPath).toBool();
++		showActivityIcons_ = PsiOptions::instance()->getOption(showActivityIconsPath).toBool() &&
++	        PsiIconset::instance()->activities.count() > 0;
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showTuneIconsPath) {
+ 		showTuneIcons_ = PsiOptions::instance()->getOption(showTuneIconsPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showGeolocIconsPath) {
+ 		showGeolocIcons_ = PsiOptions::instance()->getOption(showGeolocIconsPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == showAvatarsPath) {
+ 		showAvatars_ = PsiOptions::instance()->getOption(showAvatarsPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == useDefaultAvatarPath) {
+@@ -589,7 +714,9 @@ void PsiContactListViewDelegate::optionChanged(const QString& option)
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == avatarSizeOptionPath) {
+-		avatarSize_ = PsiOptions::instance()->getOption(avatarSizeOptionPath).toInt();
++	    int s = PsiOptions::instance()->getOption(avatarSizeOptionPath).toInt();
++		avatarRect_.setSize(QSize(s, s));
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == avatarRadiusOptionPath) {
+@@ -598,10 +725,12 @@ void PsiContactListViewDelegate::optionChanged(const QString& option)
+ 	}
+ 	else if(option == showStatusIconsPath) {
+ 		showStatusIcons_ = PsiOptions::instance()->getOption(showStatusIconsPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == statusIconsOverAvatarsPath) {
+ 		statusIconsOverAvatars_ = PsiOptions::instance()->getOption(statusIconsOverAvatarsPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ 	else if(option == allClientsOptionPath) {
+@@ -622,14 +751,15 @@ void PsiContactListViewDelegate::optionChanged(const QString& option)
+ 	}
+ 	else if(option == statusSingleOptionPath) {
+ 		statusSingle_ = !PsiOptions::instance()->getOption(statusSingleOptionPath).toBool();
++		recomputeGeometry();
+ 		contactList()->viewport()->update();
+ 	}
+ }
+ 
+ void PsiContactListViewDelegate::rosterIconsSizeChanged(int size)
+ {
+-	statusIconSize_ = size;
+-	rowHeight_ = qMax(fontMetrics_->height()+2, statusIconSize_+2);
++	statusIconRect_.setSize(QSize(size, size));
++	recomputeGeometry();
+ 	contactList()->viewport()->update();
+ }
+ 
+@@ -650,15 +780,15 @@ void PsiContactListViewDelegate::contactAlert(const QModelIndex& index)
+ 		alertingIndexes_.remove(index);
+ 
+ 	if (alertingIndexes_.isEmpty())
+-		alertTimer_->stop();
++		alertTimer_.stop();
+ 	else
+-		alertTimer_->start();
++		alertTimer_.start();
+ }
+ 
+ void PsiContactListViewDelegate::clearAlerts()
+ {
+ 	alertingIndexes_.clear();
+-	alertTimer_->stop();
++	alertTimer_.stop();
+ }
+ 
+ void PsiContactListViewDelegate::updateAlerts()
+diff --git a/src/psicontactlistviewdelegate.h b/src/psicontactlistviewdelegate.h
+index 0bf42ef..28c01f8 100644
+--- a/src/psicontactlistviewdelegate.h
++++ b/src/psicontactlistviewdelegate.h
+@@ -27,6 +27,13 @@ class PsiContactListViewDelegate : public ContactListViewDelegate
+ {
+ 	Q_OBJECT
+ public:
++	static const int ContactVMargin = 1;
++	static const int ContacHMargin = 1;
++	static const int AvatarToNickHMargin = 3; // a gap between avatar and remaining data
++	static const int NickToStatusLinesVMargin = 2;
++	static const int StatusIconToNickHMargin = 3; // space between status icon and nickname
++	static const int NickConcealerWidth = 5;
++
+ 	PsiContactListViewDelegate(ContactListView* parent);
+ 	~PsiContactListViewDelegate();
+ 
+@@ -55,23 +62,40 @@ protected:
+ 	virtual QList<QPixmap> clientPixmap(const QModelIndex& index) const;
+ 	virtual QPixmap avatarIcon(const QModelIndex& index) const;
+ 
++	virtual void recomputeGeometry();
++
+ private slots:
+ 	void optionChanged(const QString& option);
+ 	void updateAlerts();
+ 	void rosterIconsSizeChanged(int size);
+ 
+ private:
+-	QTimer* alertTimer_;
+-	QFont* font_;
+-	QFontMetrics* fontMetrics_;
+-	bool statusSingle_;
+-	int rowHeight_;
+-	bool showStatusMessages_, slimGroup_, outlinedGroup_, showClientIcons_, showMoodIcons_, showActivityIcons_, showGeolocIcons_, showTuneIcons_;
+-	bool showAvatars_, useDefaultAvatar_, avatarAtLeft_, showStatusIcons_, statusIconsOverAvatars_;
++	QTimer alertTimer_;
++	mutable QHash<QModelIndex, bool> alertingIndexes_;
++
++	// options
+ 	int avatarSize_, avatarRadius_;
++	bool useDefaultAvatar_, avatarAtLeft_, statusIconsOverAvatars_;
++	bool slimGroup_, outlinedGroup_;
++	bool statusSingle_; // status text on its own line
++	bool showStatusMessages_, showClientIcons_, showMoodIcons_, showActivityIcons_, showGeolocIcons_, showTuneIcons_;
++	bool showAvatars_, showStatusIcons_;
+ 	bool enableGroups_, allClients_;
+-	mutable QHash<QModelIndex, bool> alertingIndexes_;
+-	int statusIconSize_;
++	// end of options
++
++	// computed from options values
++	int contactRowHeight_;
++	QFont font_, statusFont_;
++	QFontMetrics fontMetrics_, statusFontMetrics_;
++	QRect avatarStatusRect_; // for avatar and status icon[optional]
++	QRect linesRect_; // contains first and second lines. locates side by side with avatarStatusRect_
++	QRect firstLineRect_; // first line: pepIconsRect_, nickRect_, statusIconRect_[optional]
++	QRect secondLineRect_; // second line: statusLineRect_, any not implemented buttons like voice call
++	QRect avatarRect_; // just for avatar. most likely square
++	QRect statusIconRect_; // just for status icon
++	QRect statusLineRect_;
++	QRect pepIconsRect_;
++	QRect nickRect_;
+ };
+ 
+ #endif
