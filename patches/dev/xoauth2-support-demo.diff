@@ -1,0 +1,591 @@
+diff --git a/iris b/iris
+index 4f35112..5816954 160000
+--- a/iris
++++ b/iris
+@@ -1 +1 @@
+-Subproject commit 4f35112acb810a51c4ca8dd62fc74efbf8436ccb
++Subproject commit 58169540be15b3283cd376ee6b1c9646e2c8e9f8-dirty
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index 75f2b82..6fddd03 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -1758,6 +1758,9 @@ void PsiAccount::login()
+ 	} else {
+ 		d->stream->setNoopTime(0);
+ 	}
++#ifdef XOAUTH2
++	d->stream->setSaslMechanismProvider("X-OAUTH2", "oauth2sasl");
++#endif
+ 	connect(d->stream, SIGNAL(connected()), SLOT(cs_connected()));
+ 	connect(d->stream, SIGNAL(securityLayerActivated(int)), SLOT(cs_securityLayerActivated(int)));
+ 	connect(d->stream, SIGNAL(needAuthParams(bool, bool, bool)), SLOT(cs_needAuthParams(bool, bool, bool)));
+diff --git a/src/psicon.cpp b/src/psicon.cpp
+index ebb8832..a3e8966 100644
+--- a/src/psicon.cpp
++++ b/src/psicon.cpp
+@@ -112,6 +112,7 @@
+ #include "alertmanager.h"
+ #include "bosskey.h"
+ #include "popupmanager.h"
++#include "xoauth2authenticator.h"
+ #ifdef WHITEBOARDING
+ #include "whiteboarding/wbmanager.h"
+ #endif
+@@ -687,6 +688,20 @@ bool PsiCon::init()
+ 	//init spellchecker
+ 	optionChanged("options.ui.spell-check.langs");
+ 
++
++	bool found = false;
++	foreach(QCA::Provider *p, QCA::providers()) {
++		if(p->name() == "oauth2sasl") {
++			found = true;
++			break;
++		}
++	}
++	if(!found) {
++		// install with low-priority
++		QCA::insertProvider(createProviderOAuth2());
++		QCA::setProviderPriority("oauth2sasl", 9);
++	}
++
+ 	return result;
+ }
+ 
+diff --git a/src/src.pri b/src/src.pri
+index f191f70..cbedfee 100644
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -651,6 +651,16 @@ else {
+ 	SOURCES += 	$$PWD/chatview_te.cpp
+ }
+ 
++CONFIG+=xoauth2
++xoauth2 {
++	SOURCES += $$PWD/xoauth2authenticator.cpp
++	HEADERS += $$PWD/xoauth2authenticator.h
++	DEFINES += XOAUTH2
++	lessThan(QT_MAJOR_VERSION, 5) {
++		LIBS += -lqjson
++	}
++}
++
+ mac {
+ 	QMAKE_LFLAGS += -framework Carbon -framework IOKit -framework AppKit
+ }
+diff --git a/src/xoauth2authenticator.cpp b/src/xoauth2authenticator.cpp
+new file mode 100644
+index 0000000..99de356
+--- /dev/null
++++ b/src/xoauth2authenticator.cpp
+@@ -0,0 +1,494 @@
++#include <QUrl>
++#include <QInputDialog>
++#include <QNetworkAccessManager>
++#include <QNetworkRequest>
++#include <QNetworkReply>
++#include <qca.h>
++#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
++# include <qjson/parser.h>
++#else
++# include <QJsonDocument>
++# include <QJsonObject>
++# include <QUrlQuery>
++#endif
++
++#include "xoauth2authenticator.h"
++#include "desktoputil.h"
++
++static QString client_id = "516554794757-8g1enhjh2ndlkltn0qc98l7cofqpe2uk.apps.googleusercontent.com";
++static QString client_secret = "y0QxOE2gIYLpkoWd_SSAb8js";
++static QUrl baseUrl("https://accounts.google.com");
++static QString REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
++static QString OAuth2Mech = "X-OAUTH2";
++
++class OAuth2SASLContext : public QCA::SASLContext
++{
++	Q_OBJECT
++
++public:
++		class ParamsMutable
++		{
++		public:
++			/**
++			   User is held
++			*/
++			bool user;
++
++			/**
++			   Authorization ID is held
++			*/
++			bool authzid;
++
++			/**
++			   Password is held
++			*/
++			bool pass;
++
++			/**
++			   Realm is held
++			*/
++			bool realm;
++		};
++	// core props
++	QString service, host;
++
++	// state
++	int step;
++	bool capable;
++	QByteArray out_buf, in_buf;
++	QString mechanism_;
++	QString out_mech;
++
++	ParamsMutable need;
++	ParamsMutable have;
++	QString user, authz, realm;
++	QCA::SecureArray pass;
++	Result result_;
++	QCA::SASL::AuthCondition authCondition_;
++	QByteArray result_to_net_, result_to_app_;
++	int encoded_;
++
++	// scram specific stuff
++	QByteArray client_first_message;
++	QCA::SecureArray server_signature;
++
++	//---------
++	QNetworkAccessManager nam;
++	QString unscopedToken;
++	QString scopedToken;
++
++
++	OAuth2SASLContext(QCA::Provider* p);
++
++	~OAuth2SASLContext();
++
++	void reset();
++	void getPermissions();
++	void requestScopedToken();
++	void sendAuth();
++
++	void resetState();
++	void setConstraints(QCA::SASL::AuthFlags flags, int ssfMin, int) ;
++	void setup(const QString& _service, const QString& _host, const QCA::SASLContext::HostPort*, const QCA::SASLContext::HostPort*, const QString&, int);
++	void startClient(const QStringList &mechlist, bool allowClientSendFirst);
++	void nextStep(const QByteArray &from_net);
++	void tryAgain();
++	void update(const QByteArray &from_net, const QByteArray &from_app);
++	bool waitForResultsReady(int msecs);
++	Result result() const;
++	QStringList mechlist() const;
++	QString mech() const;
++	bool haveClientInit() const;
++	QByteArray stepData() const;
++	QByteArray to_net();
++	int encoded() const;
++	QByteArray to_app();
++	int ssf() const;
++	QCA::SASL::AuthCondition authCondition() const;
++	QCA::SASL::Params clientParams() const;
++	void setClientParams(const QString *_user, const QString *_authzid, const QCA::SecureArray *_pass, const QString *_realm);
++
++	QStringList realmlist() const;
++	QString username() const;
++	QString authzid() const;
++
++	QCA::Provider::Context* clone() const;
++	void startServer(const QString &, bool);
++	void serverFirstStep(const QString &, const QByteArray *);
++
++private slots:
++	void unscopedReceived(int result);
++	void scopedReceived();
++};
++
++
++OAuth2SASLContext::OAuth2SASLContext(QCA::Provider* p) : QCA::SASLContext(p)
++{
++	reset();
++}
++
++OAuth2SASLContext::~OAuth2SASLContext()
++{
++	reset();
++}
++
++void OAuth2SASLContext::reset()
++{
++	resetState();
++
++	capable = true;
++	need.user = false;
++	need.authzid = false;
++	need.pass = false;
++	need.realm = false;
++	have.user = false;
++	have.authzid = false;
++	have.pass = false;
++	have.realm = false;
++	user = QString();
++	authz = QString();
++	pass = QCA::SecureArray();
++	realm = QString();
++}
++
++void OAuth2SASLContext::unscopedReceived(int result)
++{
++	if (result == QDialog::Accepted) {
++		unscopedToken = ((QInputDialog*)sender())->textValue();
++		requestScopedToken();
++		return;
++	}
++	result_ = Error;
++	authCondition_ = QCA::SASL::AuthFail;
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++
++void OAuth2SASLContext::getPermissions()
++{
++	QUrl url(baseUrl);
++	url.setPath("/o/oauth2/auth");
++#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
++	url.addQueryItem("client_id", client_id);
++	url.addQueryItem("redirect_uri", REDIRECT_URI);
++	url.addQueryItem("scope", "https://www.googleapis.com/auth/googletalk");
++	url.addQueryItem("response_type", "code");
++#else
++	QUrlQuery q;
++	q.addQueryItem("client_id", client_id);
++	q.addQueryItem("redirect_uri", REDIRECT_URI);
++	q.addQueryItem("scope", "https://www.googleapis.com/auth/googletalk");
++	q.addQueryItem("response_type", "code");
++	url.setQuery(q);
++#endif
++	DesktopUtil::openUrl(url);
++
++	QInputDialog *dlg = new QInputDialog;
++	dlg->setInputMode(QInputDialog::TextInput);
++	dlg->setLabelText(tr("Copy authorization code from opened web page."));
++	dlg->setWindowTitle(tr("Enter authorization code"));
++	dlg->show();
++	dlg->raise();
++	dlg->activateWindow();
++	connect(dlg, SIGNAL(finished(int)), SLOT(unscopedReceived(int)));
++}
++
++void OAuth2SASLContext::requestScopedToken()
++{
++	QUrl getToken(baseUrl);
++	getToken.setPath("/o/oauth2/token");
++#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
++	QUrl qs;
++#else
++	QUrlQuery qs;
++#endif
++	qs.addQueryItem("client_id", client_id);
++	qs.addQueryItem("client_secret", client_secret);
++	qs.addQueryItem("code", unscopedToken);
++	qs.addQueryItem("redirect_uri", REDIRECT_URI);
++	qs.addQueryItem("grant_type", "authorization_code");
++
++	QNetworkRequest request(getToken);
++#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
++	QNetworkReply *reply = nam.post(request, qs.encodedQuery());
++#else
++	QNetworkReply *reply = nam.post(request, qs.toString(QUrl::FullyEncoded).toUtf8());
++#endif
++	connect (reply, SIGNAL(finished()), SLOT(scopedReceived()));
++}
++
++void OAuth2SASLContext::scopedReceived()
++{
++	QByteArray scoped = ((QNetworkReply*)sender())->readAll();
++	do {
++		if (scoped.isEmpty()) {
++			break;
++		}
++#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
++		QJson::Parser p;
++		bool ok;
++		QVariantMap result = p.parse(scoped, &ok).toMap();
++		if (!ok) {
++			break;
++		}
++		scopedToken = result.value("access_token").toString();
++#else
++		QJsonObject obj = QJsonDocument::fromJson(scoped).object();
++		if (!obj.isEmpty()) {
++			scopedToken = obj.value("access_token").toString();
++		}
++#endif
++	} while (false);
++	sendAuth();
++}
++
++void OAuth2SASLContext::sendAuth()
++{
++	if (scopedToken.isEmpty()) {
++		result_ = Error;
++		authCondition_ = QCA::SASL::AuthFail;
++	} else {
++		result_ = Success;
++		QByteArray ba;
++		ba += '\0';
++		ba += user.toUtf8();
++		ba += '\0';
++		ba += scopedToken.toUtf8();
++		out_buf = ba;
++	}
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++
++
++
++
++
++
++void OAuth2SASLContext::resetState()
++{
++	out_mech = QString();
++	out_buf.resize(0);
++	authCondition_ = QCA::SASL::AuthFail;
++}
++
++void OAuth2SASLContext::setConstraints(QCA::SASL::AuthFlags flags, int ssfMin, int) {
++	if(flags & (QCA::SASL::RequireForwardSecrecy | QCA::SASL::RequirePassCredentials | QCA::SASL::RequireMutualAuth) || ssfMin > 0)
++		capable = false;
++	else
++		capable = true;
++}
++
++void OAuth2SASLContext::setup(const QString& _service, const QString& _host, const QCA::SASLContext::HostPort*, const QCA::SASLContext::HostPort*, const QString&, int) {
++	service = _service;
++	host = _host;
++}
++
++void OAuth2SASLContext::startClient(const QStringList &mechlist, bool allowClientSendFirst) {
++	Q_UNUSED(allowClientSendFirst);
++
++	if (!mechlist.contains("X-OAUTH2")) {
++		authCondition_ = QCA::SASL::NoMechanism;
++		qWarning("No X-OAUTH2 auth method");
++		QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++		return;
++	}
++
++	resetState();
++	result_ = Continue;
++	step = 0;
++	tryAgain();
++}
++
++void OAuth2SASLContext::nextStep(const QByteArray &from_net) {
++	in_buf = from_net;
++	tryAgain();
++}
++
++void OAuth2SASLContext::tryAgain() {
++	// All exits of the method must emit the ready signal
++	// so all exits go through a goto ready;
++	if(step == 0) {
++		if(need.user || need.pass) {
++			qWarning("simplesasl.cpp: Did not receive necessary auth parameters");
++			result_ = Error;
++			goto ready;
++		}
++		if(!have.user)
++			need.user = true;
++		if(!have.pass)
++			need.pass = true;
++		if(need.user || need.pass) {
++			result_ = Params;
++			goto ready;
++		}
++
++		if (unscopedToken.isEmpty()) {
++			getPermissions();
++			return;
++		}
++		if (scopedToken.isEmpty()) {
++			requestScopedToken();
++			return;
++		}
++		sendAuth();
++	}
++	else {
++		out_buf.resize(0);
++		result_ = Success;
++	}
++ready:
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++
++void OAuth2SASLContext::update(const QByteArray &from_net, const QByteArray &from_app) {
++	result_to_app_ = from_net;
++	result_to_net_ = from_app;
++	encoded_ = from_app.size();
++	result_ = Success;
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++
++bool OAuth2SASLContext::waitForResultsReady(int msecs) {
++
++	// TODO: for now, all operations block anyway
++	Q_UNUSED(msecs);
++	return true;
++}
++
++QCA::SASLContext::Result OAuth2SASLContext::result() const {
++	return result_;
++}
++
++QStringList OAuth2SASLContext::mechlist() const {
++	return QStringList();
++}
++
++QString OAuth2SASLContext::mech() const {
++	return "X-OAUTH2";
++}
++
++bool OAuth2SASLContext::haveClientInit() const {
++	return false;
++}
++
++QByteArray OAuth2SASLContext::stepData() const {
++	return out_buf;
++}
++
++QByteArray OAuth2SASLContext::to_net() {
++	return result_to_net_;
++}
++
++int OAuth2SASLContext::encoded() const {
++	return encoded_;
++}
++
++QByteArray OAuth2SASLContext::to_app() {
++	return result_to_app_;
++}
++
++int OAuth2SASLContext::ssf() const {
++	return 0;
++}
++
++QCA::SASL::AuthCondition OAuth2SASLContext::authCondition() const {
++	return authCondition_;
++}
++
++QCA::SASL::Params OAuth2SASLContext::clientParams() const {
++	return QCA::SASL::Params(need.user, need.authzid, need.pass, need.realm);
++}
++
++void OAuth2SASLContext::setClientParams(const QString *_user, const QString *_authzid, const QCA::SecureArray *_pass, const QString *_realm) {
++	if(_user) {
++		user = *_user;
++		need.user = false;
++		have.user = true;
++	}
++	if(_authzid) {
++		authz = *_authzid;
++		need.authzid = false;
++		have.authzid = true;
++	}
++	if(_pass) {
++		pass = *_pass;
++		need.pass = false;
++		have.pass = true;
++	}
++	if(_realm) {
++		realm = *_realm;
++		need.realm = false;
++		have.realm = true;
++	}
++}
++
++QStringList OAuth2SASLContext::realmlist() const
++{
++	// TODO
++	return QStringList();
++}
++
++QString OAuth2SASLContext::username() const {
++	return QString();
++}
++
++QString OAuth2SASLContext::authzid() const {
++	return QString();
++}
++
++QCA::Provider::Context* OAuth2SASLContext::clone() const {
++	OAuth2SASLContext* s = new OAuth2SASLContext(provider());
++	// TODO: Copy all the members
++	return s;
++}
++
++void OAuth2SASLContext::startServer(const QString &, bool) {
++	result_ =  QCA::SASLContext::Error;
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++void OAuth2SASLContext::serverFirstStep(const QString &, const QByteArray *) {
++	result_ =  QCA::SASLContext::Error;
++	QMetaObject::invokeMethod(this, "resultsReady", Qt::QueuedConnection);
++}
++
++
++
++
++
++class QCAOAuth2SASL : public QCA::Provider
++{
++public:
++	QCAOAuth2SASL() {}
++	~QCAOAuth2SASL() {}
++
++	void init()
++	{
++	}
++
++	QString name() const {
++		return "oauth2sasl";
++	}
++
++	QStringList features() const {
++		return QStringList("sasl");
++	}
++
++	QCA::Provider::Context* createContext(const QString& cap)
++	{
++		if(cap == "sasl")
++			return new OAuth2SASLContext(this);
++		return 0;
++	}
++	int qcaVersion() const
++	{
++		return QCA_VERSION;
++	}
++};
++
++QCA::Provider *createProviderOAuth2()
++{
++	return (new QCAOAuth2SASL);
++}
++
++
++#include "xoauth2authenticator.moc"
++
+diff --git a/src/xoauth2authenticator.h b/src/xoauth2authenticator.h
+new file mode 100644
+index 0000000..327c94c
+--- /dev/null
++++ b/src/xoauth2authenticator.h
+@@ -0,0 +1,10 @@
++#ifndef XOAUTH2AUTHENTICATOR_H
++#define XOAUTH2AUTHENTICATOR_H
++
++namespace QCA {
++	class Provider;
++}
++
++QCA::Provider* createProviderOAuth2();
++
++#endif // XOAUTH2AUTHENTICATOR_H
