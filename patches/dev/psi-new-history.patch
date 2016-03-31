@@ -142,7 +142,7 @@
    </dep>
 --- git.orig/qcm/qjson.qcm
 +++ git/qcm/qjson.qcm
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,166 @@
 +/*
 +-----BEGIN QCMOD-----
 +name: QJson
@@ -249,6 +249,7 @@
 +	QString shortname() const { return "qjson"; }
 +	bool exec()
 +	{
++#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 +		// get the build mode
 +#ifdef QC_BUILDMODE
 +		bool release = qc_buildmode_release;
@@ -303,6 +304,9 @@
 +		}
 +
 +		return false;
++#else
++		return true;
++#endif
 +	}
 +};
 --- git.orig/src/chatdlg.cpp
@@ -662,15 +666,21 @@
  
 --- git.orig/src/eventdb.cpp
 +++ git/src/eventdb.cpp
-@@ -28,23 +28,27 @@
+@@ -28,23 +28,32 @@
  #include <QTimer>
  #include <QTextStream>
  #include <QDateTime>
 +#include <QSqlError>
 +#include <QSqlDriver>
++#ifndef HAVE_QT5
 +#include <qjson/parser.h>
 +#include "qjson/serializer.h"
- 
+-
++#else
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
++#endif
  #include "common.h"
  #include "applicationinfo.h"
  #include "psievent.h"
@@ -1311,7 +1321,7 @@
  PsiEvent::Ptr EDBFlatFile::File::lineToEvent(const QString &line)
  {
  	// -- read the line --
-@@ -966,3 +953,811 @@ QString EDBFlatFile::File::eventToLine(c
+@@ -966,3 +958,824 @@ QString EDBFlatFile::File::eventToLine(c
  
  	return "";
  }
@@ -1750,8 +1760,13 @@
 +					urlList.append(QVariant(urlItem));
 +				}
 +			xepList["jabber:x:oob"] = QVariant(urlList);
++#ifndef HAVE_QT5
 +			QJson::Serializer serializer;
 +			extraData = QString::fromUtf8(serializer.serialize(xepList));
++#else
++			QJsonDocument doc(QJsonObject::fromVariantMap(xepList));
++			extraData = QString::fromUtf8(doc.toBinaryData());
++#endif
 +		}
 +		query->bindValue(":extra_data", extraData);
 +	}
@@ -1792,9 +1807,17 @@
 +		m.setSpooled(true);
 +		QString extraStr = record.value("extra_data").toString();
 +		if (!extraStr.isEmpty()) {
++#ifndef HAVE_QT5
 +			QJson::Parser parser;
++#endif
 +			bool fOk;
++#ifndef HAVE_QT5
 +			QVariantMap extraData = parser.parse(extraStr.toUtf8(), &fOk).toMap();
++#else
++			QJsonDocument doc = QJsonDocument::fromJson(extraStr.toUtf8());
++			fOk = !doc.isNull();
++			QVariantMap extraData = doc.object().toVariantMap();
++#endif
 +			if (fOk) {
 +				foreach (const QVariant &urlItem, extraData["jabber:x:oob"].toList()) {
 +					QVariantList itemList = urlItem.toList();
