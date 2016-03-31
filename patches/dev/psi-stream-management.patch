@@ -84,7 +84,7 @@
  			send(e);
  		} else {
  			QDomElement e = doc.createElementNS(NS_STREAM_MANAGEMENT, "enable");
-@@ -948,20 +928,19 @@ bool CoreProtocol::streamManagementHandl
+@@ -948,147 +928,39 @@ bool CoreProtocol::streamManagementHandl
  {
  	QString s = e.tagName();
  	if(s == "r") {
@@ -111,7 +111,11 @@
  		event = EAck;
  		return true;
  	} else {
-@@ -971,124 +950,15 @@ bool CoreProtocol::streamManagementHandl
++		if (sm.processNormalStanza(e))
++			startTimer(SM_TIMER_INTERVAL_SECS);
+ 		need = NNotify;
+ 		notify |= NRecv;
+ 		return false;
  	}
  }
  
@@ -244,7 +248,7 @@
  }
  
  bool CoreProtocol::grabPendingItem(const Jid &to, const Jid &from, int type, DBItem *item)
-@@ -1317,9 +1187,8 @@ bool CoreProtocol::normalStep(const QDom
+@@ -1317,9 +1189,8 @@ bool CoreProtocol::normalStep(const QDom
  			return true;
  		}
  
@@ -255,7 +259,7 @@
  			return loginComplete();
  		} else {
  			QDomElement e = doc.createElement("iq");
-@@ -1900,28 +1769,29 @@ bool CoreProtocol::normalStep(const QDom
+@@ -1900,28 +1771,29 @@ bool CoreProtocol::normalStep(const QDom
  		if (e.namespaceURI() == NS_STREAM_MANAGEMENT) {
  			if (e.localName() == "enabled") {
  #ifdef IRIS_SM_DEBUG
@@ -275,13 +279,15 @@
 -					sm_resumption_supported = true;
 -					sm_resumption_id = e.attribute("id", "");
 -
- 					if (!e.attribute("location").isEmpty()) {
+-					if (!e.attribute("location").isEmpty()) {
++					QString location = e.attribute("location").trimmed();
++					if (!location.isEmpty()) {
  						int port_off = 0;
  						QStringRef sm_host;
  						int sm_port = -1;
- 						QString location = e.attribute("location");
+-						QString location = e.attribute("location");
 -						if (location[0] == '[') { // ipv6
-+						if (location.at(0) == '[') { // ipv6
++						if (location.startsWith('[')) { // ipv6
  							port_off = location.indexOf(']');
  							if (port_off != -1) { // looks valid
  								sm_host = location.midRef(1, port_off - 1);
@@ -294,7 +300,7 @@
  							port_off = location.indexOf(':');
  							if (port_off != -1) {
  								sm_host = location.leftRef(port_off);
-@@ -1930,25 +1800,29 @@ bool CoreProtocol::normalStep(const QDom
+@@ -1930,25 +1802,29 @@ bool CoreProtocol::normalStep(const QDom
  								sm_host = location.midRef(0);
  							}
  						}
@@ -332,7 +338,7 @@
  					step = HandleFeatures;
  					event = EFeatures;
  					return true;
-@@ -1957,20 +1831,25 @@ bool CoreProtocol::normalStep(const QDom
+@@ -1957,20 +1833,25 @@ bool CoreProtocol::normalStep(const QDom
  		}
  	}
  
@@ -467,7 +473,7 @@
  		bool stepAdvancesParser() const;
 --- psi.orig/iris/src/xmpp/xmpp-core/sm.cpp
 +++ psi/iris/src/xmpp/xmpp-core/sm.cpp
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,181 @@
 +/*
 + * sm.cpp - XMPP Stream Management protocol
 + * Copyright (C) 2016  Aleksey Andreev
@@ -609,6 +615,16 @@
 +#endif
 +}
 +
++bool StreamManagement::processNormalStanza(const QDomElement &e)
++{
++	Q_UNUSED(e)
++	if (!sm_timeout_data.pause_mode) {
++		sm_timeout_data.point_time = QDateTime::currentDateTime();
++		return true;
++	}
++	return false;
++}
++
 +void StreamManagement::markStanzaHandled()
 +{
 +	++state_.received_count;
@@ -641,7 +657,7 @@
 +}
 --- psi.orig/iris/src/xmpp/xmpp-core/sm.h
 +++ psi/iris/src/xmpp/xmpp-core/sm.h
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,92 @@
 +/*
 + * sm.h - XMPP Stream Management protocol
 + * Copyright (C) 2016  Aleksey Andreev
@@ -715,6 +731,7 @@
 +		QDomElement getUnacknowledgedStanza();
 +		int  addUnacknowledgedStanza(const QDomElement &e);
 +		void processAcknowledgement(quint32 last_handled);
++		bool processNormalStanza(const QDomElement &e);
 +		void markStanzaHandled();
 +		QDomElement generateRequestStanza(QDomDocument &doc);
 +		QDomElement makeResponseStanza(QDomDocument &doc);
@@ -782,7 +799,17 @@
  	if(!self)
  		return;
  
-@@ -1059,7 +1063,8 @@ void ClientStream::processNext()
+@@ -700,7 +704,8 @@ void ClientStream::ss_bytesWritten(qint6
+ void ClientStream::ss_tlsHandshaken()
+ {
+ 	QPointer<QObject> self = this;
+-	securityLayerActivated(LayerTLS);
++	if (!d->quiet_reconnection)
++		securityLayerActivated(LayerTLS);
+ 	if(!self)
+ 		return;
+ 	d->client.setAllowPlain(d->allowPlain == AllowPlain || d->allowPlain == AllowPlainOverTLS);
+@@ -1059,7 +1064,8 @@ void ClientStream::processNext()
  				d->jid = d->client.jid();
  				d->state = Active;
  				setNoopTime(d->noop_time);
@@ -792,7 +819,7 @@
  				if(!self)
  					return;
  				break;
-@@ -1079,10 +1084,10 @@ void ClientStream::processNext()
+@@ -1079,10 +1085,10 @@ void ClientStream::processNext()
  				// store the stanza for now, announce after processing all events
  				// TODO: add a method to the stanza to mark them handled.
  				Stanza s = createStanza(d->client.recvStanza());
@@ -805,7 +832,7 @@
  				d->in.append(new Stanza(s));
  				break;
  			}
-@@ -1104,10 +1109,28 @@ void ClientStream::processNext()
+@@ -1104,10 +1110,28 @@ void ClientStream::processNext()
  				return;
  			}
  			case CoreProtocol::EAck: {
@@ -836,7 +863,17 @@
  			}
  		}
  	}
-@@ -1269,18 +1292,6 @@ void ClientStream::doNoop()
+@@ -1215,7 +1239,8 @@ bool ClientStream::handleNeed()
+ 			d->ss->setLayerSASL(d->sasl, d->client.spare);
+ 			if(d->sasl_ssf > 0) {
+ 				QPointer<QObject> self = this;
+-				securityLayerActivated(LayerSASL);
++				if (!d->quiet_reconnection)
++					securityLayerActivated(LayerSASL);
+ 				if(!self)
+ 					return false;
+ 			}
+@@ -1269,18 +1294,6 @@ void ClientStream::doNoop()
  	}
  }
  
@@ -855,7 +892,7 @@
  void ClientStream::writeDirect(const QString &s)
  {
  	if(d->state == Active) {
-@@ -1414,12 +1425,14 @@ void ClientStream::handleError()
+@@ -1414,12 +1427,14 @@ void ClientStream::handleError()
  	}
  }
  
@@ -1318,7 +1355,17 @@
  	}
  
  	isDisconnecting = true;
-@@ -2765,11 +2750,6 @@ void PsiAccount::client_messageReceived(
+@@ -2062,6 +2047,9 @@ void PsiAccount::cs_delayedCloseFinished
+ 
+ void PsiAccount::cs_warning(int w)
+ {
++	if (w == ClientStream::WarnSMReconnection)
++		return;
++
+ 	bool showNoTlsWarning = w == ClientStream::WarnNoTLS && d->acc.ssl == UserAccount::SSL_Yes;
+ 	bool doCleanupStream = !d->stream || showNoTlsWarning;
+ 
+@@ -2765,11 +2753,6 @@ void PsiAccount::client_messageReceived(
  #endif
  
  	processIncomingMessage(_m);
@@ -1330,7 +1377,7 @@
  }
  
  #ifdef WHITEBOARDING
-@@ -4752,17 +4732,7 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4752,17 +4735,7 @@ void PsiAccount::dj_sendMessage(const Me
  	}
  #endif
  
@@ -1349,7 +1396,7 @@
  
  	// only toggle if not an invite or body is not empty
  	if(m.invite().isEmpty() && !m.body().isEmpty())
-@@ -5728,14 +5698,6 @@ void PsiAccount::processReadNext(const U
+@@ -5728,14 +5701,6 @@ void PsiAccount::processReadNext(const U
  	updateReadNext(u.jid());
  }
  
