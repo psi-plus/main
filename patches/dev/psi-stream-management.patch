@@ -1549,3 +1549,41 @@
  	readBoolAttribute(a, "compress", &opt_compress);
  	readBoolAttribute(a, "require-mutual-auth", &req_mutual_auth);
  	readBoolAttribute(a, "legacy-ssl-probe", &legacy_ssl_probe);
+--- psi.orig/src/xmlconsole.cpp
++++ psi/src/xmlconsole.cpp
+@@ -99,13 +99,14 @@ bool XmlConsole::filtered(const QString&
+ {
+ 	if(ui_.ck_enable->isChecked()) {
+ 		// Only do parsing if needed
+-		if (!ui_.le_jid->text().isEmpty() || !ui_.ck_iq->isChecked() || !ui_.ck_message->isChecked() || !ui_.ck_presence->isChecked()) {
++		if (!ui_.le_jid->text().isEmpty() || !ui_.ck_iq->isChecked() || !ui_.ck_message->isChecked() || !ui_.ck_presence->isChecked() || ui_.ck_iq->isChecked()) {
+ 			QDomDocument doc;
+ 			if (!doc.setContent(str))
+ 				return true;
+ 
+ 			QDomElement e = doc.documentElement();
+-			if ((e.tagName() == "iq" && !ui_.ck_iq->isChecked()) || (e.tagName() == "message" && !ui_.ck_message->isChecked()) || ((e.tagName() == "presence" && !ui_.ck_presence->isChecked())))
++			QString tn = e.tagName();
++			if ((tn == "iq" && !ui_.ck_iq->isChecked()) || (tn == "message" && !ui_.ck_message->isChecked()) || (tn == "presence" && !ui_.ck_presence->isChecked()) || ((tn == "a" || tn == "r") && !ui_.ck_sm->isChecked()))
+ 				return true;
+ 
+ 			if (!ui_.le_jid->text().isEmpty()) {
+--- psi.orig/src/xmlconsole.ui
++++ psi/src/xmlconsole.ui
+@@ -65,6 +65,16 @@
+        </widget>
+       </item>
+       <item>
++       <widget class="QCheckBox" name="ck_sm" >
++        <property name="text" >
++         <string>SM</string>
++        </property>
++        <property name="checked" >
++         <bool>true</bool>
++        </property>
++       </widget>
++      </item>
++       <item>
+        <spacer>
+         <property name="orientation" >
+          <enum>Qt::Horizontal</enum>
