@@ -1,6 +1,6 @@
---- psi.orig/iris/src/xmpp/xmpp-im/client.cpp
-+++ psi/iris/src/xmpp/xmpp-im/client.cpp
-@@ -102,6 +102,8 @@ using namespace Jabber;*/
+--- a/iris/src/xmpp/xmpp-im/client.cpp
++++ b/iris/src/xmpp/xmpp-im/client.cpp
+@@ -87,6 +87,8 @@
  #define vsnprintf _vsnprintf
  #endif
  
@@ -9,7 +9,7 @@
  namespace XMPP
  {
  
-@@ -887,12 +889,38 @@ void Client::prRoster(const Roster &r)
+@@ -881,12 +883,38 @@ void Client::prRoster(const Roster &r)
  	importRoster(r);
  }
  
@@ -49,7 +49,7 @@
  	connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
  	r->get();
  	d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1256,13 +1284,35 @@ void LiveRosterItem::setFlagForDelete(bo
+@@ -1310,13 +1338,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -86,7 +86,7 @@
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1291,4 +1341,14 @@ LiveRoster::ConstIterator LiveRoster::fi
+@@ -1345,4 +1395,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
  	return it;
  }
  
@@ -101,9 +101,9 @@
 +}
 +
  }
---- psi.orig/iris/src/xmpp/xmpp-im/types.cpp
-+++ psi/iris/src/xmpp/xmpp-im/types.cpp
-@@ -2846,13 +2846,35 @@ bool RosterItem::fromXml(const QDomEleme
+--- a/iris/src/xmpp/xmpp-im/types.cpp
++++ b/iris/src/xmpp/xmpp-im/types.cpp
+@@ -3012,13 +3012,35 @@ bool RosterItem::fromXml(const QDomElement &item)
  //---------------------------------------------------------------------------
  // Roster
  //---------------------------------------------------------------------------
@@ -140,7 +140,7 @@
  }
  
  Roster::Iterator Roster::find(const Jid &j)
-@@ -2875,6 +2897,16 @@ Roster::ConstIterator Roster::find(const
+@@ -3041,6 +3063,16 @@ Roster::ConstIterator Roster::find(const Jid &j) const
  	return end();
  }
  
@@ -157,18 +157,18 @@
  
  //---------------------------------------------------------------------------
  // FormField
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_client.h
-@@ -79,7 +79,7 @@ namespace XMPP
+--- a/iris/src/xmpp/xmpp-im/xmpp_client.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
+@@ -81,7 +81,7 @@ namespace XMPP
  		QString resource() const;
  		Jid jid() const;
  
 -		void rosterRequest();
 +		void rosterRequest(bool withGroupsDelimiter = true);
- 		void sendMessage(const Message &, bool want_notify = false);
+ 		void sendMessage(const Message &);
  		void sendSubscription(const Jid &, const QString &, const QString& nick = QString());
  		void setPresence(const Status &);
-@@ -138,6 +138,7 @@ namespace XMPP
+@@ -136,6 +136,7 @@ namespace XMPP
  		void activated();
  		void disconnected();
  		//void authFinished(bool, int, const QString &);
@@ -176,7 +176,7 @@
  		void rosterRequestFinished(bool, int, const QString &);
  		void rosterItemAdded(const RosterItem &);
  		void rosterItemUpdated(const RosterItem &);
-@@ -171,6 +172,7 @@ namespace XMPP
+@@ -169,6 +170,7 @@ namespace XMPP
  		void streamIncomingXml(const QString &);
  		void streamOutgoingXml(const QString &);
  
@@ -184,8 +184,8 @@
  		void slotRosterRequestFinished();
  
  		// basic daemons
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+--- a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
 @@ -34,9 +34,19 @@ namespace XMPP
  		LiveRoster();
  		~LiveRoster();
@@ -206,8 +206,8 @@
  	};
  }
  
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_roster.h
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_roster.h
+--- a/iris/src/xmpp/xmpp-im/xmpp_roster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_roster.h
 @@ -36,11 +36,18 @@ namespace XMPP
  		Roster();
  		~Roster();
@@ -228,9 +228,9 @@
  	};
  }
  
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-@@ -373,9 +373,11 @@ public:
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+@@ -370,9 +370,11 @@ public:
  	Private() {}
  
  	Roster roster;
@@ -242,7 +242,7 @@
  JT_Roster::JT_Roster(Task *parent)
  :Task(parent)
  {
-@@ -413,7 +415,7 @@ void JT_Roster::set(const Jid &jid, cons
+@@ -410,7 +412,7 @@ void JT_Roster::set(const Jid &jid, const QString &name, const QStringList &grou
  
  void JT_Roster::remove(const Jid &jid)
  {
@@ -251,7 +251,7 @@
  	//to = client()->host();
  	QDomElement item = doc()->createElement("item");
  	item.setAttribute("jid", jid.full());
-@@ -421,11 +423,47 @@ void JT_Roster::remove(const Jid &jid)
+@@ -418,11 +420,47 @@ void JT_Roster::remove(const Jid &jid)
  	d->itemList += item;
  }
  
@@ -301,7 +301,7 @@
  		//to = client()->host();
  		iq = createIQ(doc(), "set", to.full(), id());
  		QDomElement query = doc()->createElement("query");
-@@ -435,6 +473,12 @@ void JT_Roster::onGo()
+@@ -432,6 +470,12 @@ void JT_Roster::onGo()
  			query.appendChild(it);
  		send(iq);
  	}
@@ -314,7 +314,7 @@
  }
  
  const Roster & JT_Roster::roster() const
-@@ -442,6 +486,11 @@ const Roster & JT_Roster::roster() const
+@@ -439,6 +483,11 @@ const Roster & JT_Roster::roster() const
  	return d->roster;
  }
  
@@ -326,7 +326,7 @@
  QString JT_Roster::toString() const
  {
  	if(type != 1)
-@@ -510,6 +559,24 @@ bool JT_Roster::take(const QDomElement &
+@@ -507,6 +556,24 @@ bool JT_Roster::take(const QDomElement &x)
  		setSuccess();
  		return true;
  	}
@@ -351,9 +351,9 @@
  
  	return false;
  }
---- psi.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.h
-+++ psi/iris/src/xmpp/xmpp-im/xmpp_tasks.h
-@@ -97,7 +97,12 @@ namespace XMPP
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+@@ -98,7 +98,12 @@ namespace XMPP
  		void set(const Jid &, const QString &name, const QStringList &groups);
  		void remove(const Jid &);
  

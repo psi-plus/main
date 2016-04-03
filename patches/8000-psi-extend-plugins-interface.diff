@@ -1,6 +1,6 @@
 --- a/iris/src/xmpp/xmpp-im/client.cpp
 +++ b/iris/src/xmpp/xmpp-im/client.cpp
-@@ -619,6 +619,7 @@ void Client::send(const QDomElement &x, bool want_notify)
+@@ -622,6 +622,7 @@ void Client::send(const QDomElement &x)
  		//printf("bad stanza??\n");
  		return;
  	}
@@ -10,7 +10,7 @@
  	debug(QString("Client: outgoing: [\n%1]\n").arg(out));
 --- a/iris/src/xmpp/xmpp-im/xmpp_client.h
 +++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
-@@ -150,6 +150,7 @@ namespace XMPP
+@@ -149,6 +149,7 @@ namespace XMPP
  		void debugText(const QString &);
  		void xmlIncoming(const QString &);
  		void xmlOutgoing(const QString &);
@@ -63,7 +63,7 @@
  #include "psichatdlg.h"
  
  static const QString geometryOption = "options.ui.chat.size";
-@@ -893,10 +897,26 @@ void ChatDlg::appendMessage(const Message &m, bool local)
+@@ -887,10 +891,26 @@ void ChatDlg::appendMessage(const Message &m, bool local)
  	}
  
  	MessageView mv(MessageView::Message);
@@ -95,7 +95,7 @@
  	mv.setLocal(local);
 --- a/src/chatdlg.h
 +++ b/src/chatdlg.h
-@@ -170,7 +170,11 @@ protected:
+@@ -168,7 +168,11 @@ protected:
  
  	void appendMessage(const Message &, bool local = false);
  	virtual bool isEncryptionEnabled() const;
@@ -839,7 +839,7 @@
  	FORMS += $$PWD/opt_plugins.ui
 --- a/src/options/optionsdlg.cpp
 +++ b/src/options/optionsdlg.cpp
-@@ -200,6 +200,7 @@ private slots:
+@@ -204,6 +204,7 @@ private slots:
  
  	//void addWidgetChangedSignal(QString widgetName, QCString signal);
  	void connectDataChanged(QWidget *);
@@ -847,7 +847,7 @@
  
  public:
  	OptionsDlg *dlg;
-@@ -240,6 +241,9 @@ OptionsDlg::Private::Private(OptionsDlg *d, PsiCon *_psi)
+@@ -244,6 +245,9 @@ OptionsDlg::Private::Private(OptionsDlg *d, PsiCon *_psi)
  		//connect(opttab, SIGNAL(addWidgetChangedSignal(QString, QCString)), SLOT(addWidgetChangedSignal(QString, QCString)));
  		connect(opttab, SIGNAL(noDirty(bool)), SLOT(noDirtySlot(bool)));
  		connect(opttab, SIGNAL(connectDataChanged(QWidget *)), SLOT(connectDataChanged(QWidget *)));
@@ -857,7 +857,7 @@
  
  		if ( opttab->id().isEmpty() )
  			continue;
-@@ -448,6 +452,11 @@ void OptionsDlg::Private::enableCommonWidgets(bool enable)
+@@ -452,6 +456,11 @@ void OptionsDlg::Private::enableCommonWidgets(bool enable)
  
  void OptionsDlg::Private::connectDataChanged(QWidget *widget)
  {
@@ -869,7 +869,7 @@
  	foreach(QWidget* w, widget->findChildren<QWidget*>()) {
  		QVariant isOption = w->property("isOption");
  		if (isOption.isValid() && !isOption.toBool()) {
-@@ -455,8 +464,8 @@ void OptionsDlg::Private::connectDataChanged(QWidget *widget)
+@@ -459,8 +468,8 @@ void OptionsDlg::Private::connectDataChanged(QWidget *widget)
  		}
  		QMap<QString, QByteArray>::Iterator it2 = changedMap.find( w->metaObject()->className() );
  		if ( it2 != changedMap.end() ) {
@@ -4264,7 +4264,7 @@ new file mode 100644
  
  using namespace XMPP;
  using namespace XMLHelper;
-@@ -1361,6 +1364,13 @@ void OptionsMigration::lateMigration()
+@@ -1367,6 +1370,13 @@ void OptionsMigration::lateMigration()
  	// Add default chat and groupchat toolbars
  	if (PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.name").toString() != "Chat") {
  		QStringList pluginsKeys;
@@ -4294,7 +4294,7 @@ new file mode 100644
  	void pm_proxyRemoved(QString proxykey)
  	{
  		if (acc.proxyID == proxykey) acc.proxyID = "";
-@@ -1137,6 +1144,11 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
+@@ -1136,6 +1143,11 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
  
  	// create XMPP::Client
  	d->client = new Client;
@@ -4306,7 +4306,7 @@ new file mode 100644
  	d->client->setOSName(SystemInfo::instance()->osName());
  	d->client->setOSVersion(SystemInfo::instance()->osVersion());
  	d->client->setClientName(ApplicationInfo::name());
-@@ -1182,6 +1194,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
+@@ -1181,6 +1193,7 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
  	connect(d->client, SIGNAL(endImportRoster()), SIGNAL(endBulkContactUpdate()));
  	connect(d->client, SIGNAL(xmlIncoming(const QString &)), d, SLOT(client_xmlIncoming(const QString &)));
  	connect(d->client, SIGNAL(xmlOutgoing(const QString &)), d, SLOT(client_xmlOutgoing(const QString &)));
@@ -4314,7 +4314,7 @@ new file mode 100644
  
  	// Privacy manager
  	d->privacyManager = new PsiPrivacyManager(d->account, d->client->rootTask());
-@@ -1239,11 +1252,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
+@@ -1238,11 +1251,6 @@ PsiAccount::PsiAccount(const UserAccount &acc, PsiContactList *parent, TabManage
  	d->rcLeaveMucServer =0;
  	setRCEnabled(PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool());
  
@@ -4326,7 +4326,7 @@ new file mode 100644
  	//Idle server
  	if(PsiOptions::instance()->getOption("options.service-discovery.last-activity").toBool()) {
  		new IdleServer(this, d->client->rootTask());
-@@ -1792,6 +1800,9 @@ void PsiAccount::logout(bool fast, const Status &s)
+@@ -1784,6 +1792,9 @@ void PsiAccount::logout(bool fast, const Status &s)
  	if(!isActive())
  		return;
  
@@ -4336,8 +4336,8 @@ new file mode 100644
  	clearCurrentConnectionError();
  
  	d->stopReconnect();
-@@ -4662,6 +4673,22 @@ void PsiAccount::dj_sendMessage(const Message &m, bool log)
- 			nm.setNick(nick());
+@@ -4665,6 +4676,22 @@ void PsiAccount::dj_sendMessage(const Message &m, bool log)
+ 			}
  		}
  	}
 +	
@@ -4357,8 +4357,8 @@ new file mode 100644
 +	}
 +#endif
  
- 	// GSOC: stream management
- 	// check whether message came from a ChatDlg
+ 	if (!nm.body().isEmpty()) {
+ 		UserListItem *u = findFirstRelevant(m.to());
 @@ -4954,6 +4981,15 @@ static bool messageListContainsEvent(const QList<PsiEvent::Ptr>& messageList, co
  	return false;
  }
@@ -4464,7 +4464,7 @@ new file mode 100644
  }
 --- a/src/psiaccount.h
 +++ b/src/psiaccount.h
-@@ -250,6 +250,10 @@ public:
+@@ -252,6 +252,10 @@ public:
  	};
  	void playSound(SoundType onevent);
  
@@ -4523,17 +4523,17 @@ new file mode 100644
  
  #define MCMDCHAT		"http://psi-im.org/ids/mcmd#chatmain"
  
-@@ -277,6 +280,9 @@ void PsiChatDlg::initUi()
+@@ -276,6 +279,9 @@ void PsiChatDlg::initUi()
+ 	if (throbber_icon == 0) {
  		throbber_icon = (PsiIcon *)IconsetFactory::iconPtr("psi/throbber");
  	}
- 	unacked_messages = 0;
 +#ifdef PSI_PLUGINS
 +	PluginManager::instance()->setupChatTab(this, account(), jid().full());
 +#endif
  }
  
  void PsiChatDlg::verticalSplitterMoved(int, int)
-@@ -429,6 +435,14 @@ void PsiChatDlg::updateToolbuttons()
+@@ -428,6 +434,14 @@ void PsiChatDlg::updateToolbuttons()
  			continue;
  		}
  
@@ -4548,7 +4548,7 @@ new file mode 100644
  		// Hack. separator action can be added only once.
  		if (actionName == "separator") {
  			ui_.toolbar->addSeparator();
-@@ -895,6 +909,12 @@ void PsiChatDlg::buildMenu()
+@@ -890,6 +904,12 @@ void PsiChatDlg::buildMenu()
  
  	pm_settings_->addAction(actions_->action("chat_info"));
  	pm_settings_->addAction(actions_->action("chat_history"));
