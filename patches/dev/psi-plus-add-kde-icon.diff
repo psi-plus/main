@@ -1,3 +1,17 @@
+--- git.orig/src/mainwin.cpp
++++ git/src/mainwin.cpp
+@@ -1323,9 +1323,10 @@ void MainWin::buildTrayMenu()
+ 	else {
+ 		d->trayMenu->addAction(tr("&Hide"), this, SLOT(trayHide()));
+ 	}
++#ifndef USE_KDE
+ 	d->optionsButton->addTo(d->trayMenu);
+ 	d->trayMenu->addMenu(d->statusMenu);
+-
++#endif
+ 	d->trayMenu->addSeparator();
+ 	// TODO!
+ 	d->getAction("menu_quit")->addTo(d->trayMenu);
 --- git.orig/src/psitrayicon.cpp
 +++ git/src/psitrayicon.cpp
 @@ -4,6 +4,16 @@
@@ -74,7 +88,7 @@
 +	if (trayicon_) {
 +		trayicon_->setContextMenu(menu);
 +	}
-+#ifdef USE_KDE
++/*#ifdef USE_KDE
 +	else {
 +#ifndef USE_KDE5
 +		newIcon_->setContextMenu(static_cast<KMenu*>(menu));
@@ -82,7 +96,7 @@
 +		newIcon_->setContextMenu(menu);
 +#endif
 +	}
-+#endif
++#endif*/
  }
  
  void PsiTrayIcon::setToolTip(const QString &str)
@@ -138,7 +152,7 @@
  }
  
  bool PsiTrayIcon::eventFilter(QObject *obj, QEvent *event)
-@@ -208,3 +275,16 @@ bool PsiTrayIcon::eventFilter(QObject *o
+@@ -208,3 +275,18 @@ bool PsiTrayIcon::eventFilter(QObject *o
  	}
  	return QObject::eventFilter(obj, event);
  }
@@ -147,12 +161,14 @@
 +void PsiTrayIcon::iconActivated(bool isIt, QPoint point)
 +{
 +	Q_UNUSED(isIt);
-+	emit doubleClicked(point);
++	Q_UNUSED(point);
++	trayicon_activated(QSystemTrayIcon::DoubleClick);
 +}
 +
 +void PsiTrayIcon::iconActivatedSecondary(QPoint point) //Middle click
 +{
-+	emit clicked(point,Qt::MidButton);
++	Q_UNUSED(point);
++	trayicon_activated(QSystemTrayIcon::MiddleClick);
 +}
 +#endif
 --- git.orig/src/psitrayicon.h
@@ -207,7 +223,7 @@
  
 --- git.orig/src/src.pri
 +++ git/src/src.pri
-@@ -631,6 +631,19 @@ dbus {
+@@ -628,6 +628,19 @@ dbus {
  			$$PWD/psidbusnotifier.cpp
  	DEFINES += USE_DBUS
  	QT += dbus
