@@ -1,0 +1,82 @@
+diff --git a/src/tools/iconset/anim.cpp b/src/tools/iconset/anim.cpp
+index a691d0b..01e4bf1 100644
+--- a/src/tools/iconset/anim.cpp
++++ b/src/tools/iconset/anim.cpp
+@@ -206,7 +206,7 @@ public slots:
+ 			frame = 0;
+ 
+ 			loop++;
+-			if ( looping && loop >= looping ) {
++			if ( looping > 0 && loop >= looping ) {
+ 				frame = numFrames() - 1;
+ 				pause();
+ 				restart();
+diff --git a/src/widgets/iconselect.cpp b/src/widgets/iconselect.cpp
+index a41b07f..f60d76d 100644
+--- a/src/widgets/iconselect.cpp
++++ b/src/widgets/iconselect.cpp
+@@ -60,6 +60,7 @@ public:
+ 	IconSelectButton(QWidget *parent)
+ 	: QAbstractButton(parent)
+ 	{
++		setMouseTracking(true);
+ 		ic = 0;
+ 		animated = false;
+ 		connect (this, SIGNAL(clicked()), SLOT(iconSelected()));
+@@ -98,6 +99,10 @@ public:
+ 	QSize sizeHint() const { return s; }
+ 	void setSizeHint(QSize sh) { s = sh; }
+ 
++protected:
++	void enterEvent(QEvent *) { iconStart(); setFocus();  update(); } // focus follows mouse mode
++	void leaveEvent(QEvent *) { iconStop(); clearFocus(); update(); }
++
+ signals:
+ 	void iconSelected(const PsiIcon *);
+ 	void textSelected(QString);
+@@ -139,9 +144,6 @@ private:
+ 		}
+ 	}
+ 
+-	void enterEvent(QEvent *) { iconStart(); setFocus();  update(); } // focus follows mouse mode
+-	void leaveEvent(QEvent *) { iconStop(); clearFocus(); update(); }
+-
+ private slots:
+ 	void iconUpdated()
+ 	{
+@@ -375,6 +377,7 @@ public slots:
+ IconSelectPopup::IconSelectPopup(QWidget *parent)
+ : QMenu(parent)
+ {
++	setWindowFlags((windowFlags() & ~Qt::Tool) | Qt::FramelessWindowHint);
+ 	d = new Private(this);
+ 	d->icsel_ = new IconSelect(this);
+ 	d->widgetAction_ = new QWidgetAction(this);
+@@ -406,4 +409,12 @@ void IconSelectPopup::mousePressEvent(QMouseEvent *e)
+ 	QMenu::mousePressEvent(e);
+ }
+ 
++bool IconSelectPopup::event(QEvent *e)
++{
++	if(e->type() == QEvent::WindowDeactivate) {
++		hide();
++	}
++	return QMenu::event(e);
++}
++
+ #include "iconselect.moc"
+diff --git a/src/widgets/iconselect.h b/src/widgets/iconselect.h
+index 7c3c0d8..e48cf57 100644
+--- a/src/widgets/iconselect.h
++++ b/src/widgets/iconselect.h
+@@ -40,6 +40,10 @@ public:
+ 	// reimplemented
+ 	void mousePressEvent(QMouseEvent *e);
+ 
++protected:
++	// reimplemented
++	bool event(QEvent *);
++
+ signals:
+ 	void iconSelected(const PsiIcon *);
+ 	void textSelected(QString);
