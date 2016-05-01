@@ -58,7 +58,7 @@
  	void updateLayout();
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -249,6 +249,9 @@ public:
+@@ -252,6 +252,9 @@ public:
  	int logSize;
  	int rosterSize;
  
@@ -68,7 +68,7 @@
  public:
  	bool trackBar;
  
-@@ -844,6 +847,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -847,6 +850,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  	ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
  	connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
@@ -76,7 +76,7 @@
  
  	// resize the horizontal splitter
  	d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
-@@ -861,10 +865,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -864,10 +868,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  		ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
  	// resize the vertical splitter
@@ -90,7 +90,7 @@
  
  	X11WM_CLASS("groupchat");
  
-@@ -915,6 +918,26 @@ void GCMainDlg::horizSplitterMoved()
+@@ -922,6 +925,26 @@ void GCMainDlg::horizSplitterMoved()
  	PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
@@ -137,7 +137,7 @@
  
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -249,10 +249,11 @@ void PsiChatDlg::initUi()
+@@ -252,10 +252,11 @@ void PsiChatDlg::initUi()
  
  	connect(account()->client()->capsManager(), SIGNAL(capsChanged(const Jid&)), SLOT(capsChanged(const Jid&)));
  
@@ -153,8 +153,8 @@
  
  	smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
   	ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
-@@ -277,6 +278,26 @@ void PsiChatDlg::initUi()
- 	}
+@@ -283,6 +284,26 @@ void PsiChatDlg::initUi()
+ #endif
  }
  
 +void PsiChatDlg::verticalSplitterMoved(int, int)
@@ -243,20 +243,23 @@
  
  	tabs_.removeAll(tab);
  	tabWidget_->removePage(tab);
-@@ -901,3 +903,10 @@ void TabDlg::setTabIcon(QWidget *widget,const QIcon &icon)
- {
+@@ -902,6 +904,13 @@ void TabDlg::setTabIcon(QWidget *widget,const QIcon &icon)
  	tabWidget_->setTabIcon(widget, icon);
  }
-+
+ 
 +void TabDlg::updateVSplitters(int log, int chat)
 +{
 +	foreach(TabbableWidget *w, tabs_) {
 +		w->setVSplitterPosition(log, chat);
 +	}
 +}
++
+ TabbableWidget* TabDlg::getCurrentTab() const
+ {
+ 	return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
 --- a/src/tabs/tabdlg.h
 +++ b/src/tabs/tabdlg.h
-@@ -145,6 +145,7 @@ private slots:
+@@ -146,6 +146,7 @@ private slots:
  	void menu_sendTabTo(QAction *act);
  	void queuedSendTabTo(TabbableWidget* chat, TabDlg *dest);
  	void showTabMenu(int tab, QPoint pos, QContextMenuEvent * event);
