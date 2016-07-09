@@ -108,7 +108,7 @@
  	mkdir -p $contentsdir/Plugins/crypto
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -129,6 +129,9 @@
+@@ -132,6 +132,9 @@
  				<chatedit-height type="int">10</chatedit-height>
  				<default-jid-mode comment="Default jid mode: barejid | auto" type="QString">barejid</default-jid-mode>
  				<default-jid-mode-ignorelist comment="Default autojid mode ignore list: jid1,jid2,..." type="QString"></default-jid-mode-ignorelist>
@@ -118,9 +118,9 @@
  			</chat>
  			<save>
  				<toolbars-state type="QByteArray"/>
-@@ -763,6 +766,9 @@ QLineEdit#le_status_text {
- 				<video-input type="QString"/>
+@@ -766,6 +769,9 @@ QLineEdit#le_status_text {
  			</devices>
+ 			<video-support type="bool">false</video-support>
  		</media>
 +		<history comment="General history options">
 +			<store-muc-private comment="Keep a history of correspondence for MUC private" type="bool">false</store-muc-private>
@@ -311,7 +311,7 @@
 +};
 --- git.orig/src/chatdlg.cpp
 +++ git/src/chatdlg.cpp
-@@ -74,8 +74,8 @@
+@@ -73,8 +73,8 @@
  #include "psicontactlist.h"
  #include "accountlabel.h"
  #include "psirichtext.h"
@@ -321,7 +321,7 @@
  
  #ifdef Q_OS_WIN
  #include <windows.h>
-@@ -95,6 +95,7 @@ ChatDlg* ChatDlg::create(const Jid& jid,
+@@ -98,6 +98,7 @@ ChatDlg* ChatDlg::create(const Jid& jid,
  ChatDlg::ChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
  	: TabbableWidget(jid, pa, tabManager)
  	, highlightersInstalled_(false)
@@ -329,7 +329,7 @@
  {
  	pending_ = 0;
  	keepOpen_ = false;
-@@ -107,6 +108,9 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
+@@ -110,6 +111,9 @@ ChatDlg::ChatDlg(const Jid& jid, PsiAcco
  
  	status_ = -1;
  
@@ -339,7 +339,7 @@
  	autoSelectContact_ = false;
  	if (PsiOptions::instance()->getOption("options.ui.chat.default-jid-mode").toString() == "auto") {
  		UserListItem *uli = account()->findFirstRelevant(jid);
-@@ -164,6 +168,8 @@ void ChatDlg::init()
+@@ -167,6 +171,8 @@ void ChatDlg::init()
  
  ChatDlg::~ChatDlg()
  {
@@ -348,7 +348,7 @@
  	account()->dialogUnregister(this);
  }
  
-@@ -434,6 +440,43 @@ UserStatus ChatDlg::userStatusFor(const
+@@ -432,6 +438,43 @@ UserStatus ChatDlg::userStatusFor(const
  	return u;
  }
  
@@ -392,7 +392,7 @@
  void ChatDlg::ensureTabbedCorrectly()
  {
  	TabbableWidget::ensureTabbedCorrectly();
-@@ -491,7 +534,7 @@ void ChatDlg::updateContact(const Jid &j
+@@ -493,7 +536,7 @@ void ChatDlg::updateContact(const Jid &j
  			if (PsiOptions::instance()->getOption("options.ui.chat.show-status-changes").toBool()
  				&& fromPresence && statusChanged)
  			{
@@ -401,7 +401,7 @@
  												dispNick_, status_,
  												statusString_, priority_));
  			}
-@@ -778,6 +821,7 @@ void ChatDlg::doSend()
+@@ -780,6 +823,7 @@ void ChatDlg::doSend()
  
  void ChatDlg::doneSend()
  {
@@ -409,7 +409,7 @@
  	appendMessage(m_, true);
  	disconnect(chatEdit(), SIGNAL(textChanged()), this, SLOT(setComposing()));
  	chatEdit()->clear();
-@@ -806,6 +850,7 @@ void ChatDlg::encryptedMessageSent(int x
+@@ -808,6 +852,7 @@ void ChatDlg::encryptedMessageSent(int x
  
  void ChatDlg::incomingMessage(const Message &m)
  {
@@ -417,7 +417,7 @@
  	if (m.body().isEmpty() && m.subject().isEmpty() && m.urlList().isEmpty()) {
  		// Event message
  		if (m.containsEvent(CancelEvent)) {
-@@ -866,14 +911,16 @@ void ChatDlg::appendMessage(const Messag
+@@ -868,14 +913,16 @@ void ChatDlg::appendMessage(const Messag
  	// figure out the encryption state
  	bool encChanged = false;
  	bool encEnabled = false;
@@ -439,7 +439,7 @@
  				encEnabled? QString("<icon name=\"psi/cryptoYes\"> ") + tr("Encryption Enabled"):
  							QString("<icon name=\"psi/cryptoNo\"> ") + tr("Encryption Disabled"),
  				MessageView::System
-@@ -889,7 +936,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -891,7 +938,9 @@ void ChatDlg::appendMessage(const Messag
  	}
  
  	if (!m.subject().isEmpty()) {
@@ -450,7 +450,7 @@
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -903,9 +952,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -921,9 +970,9 @@ void ChatDlg::appendMessage(const Messag
  	mv.setNick(whoNick(local));
  	mv.setUserId(local?account()->jid().bare():jid().bare());
  	mv.setDateTime(m.timeStamp());
@@ -462,7 +462,7 @@
  
  	if (!m.urlList().isEmpty()) {
  		UrlList urls = m.urlList();
-@@ -913,11 +962,49 @@ void ChatDlg::appendMessage(const Messag
+@@ -931,11 +980,49 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
@@ -514,7 +514,7 @@
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
-@@ -939,7 +1026,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -957,7 +1044,7 @@ void ChatDlg::appendMessage(const Messag
  	//	messagesRead(jid());
  	//}
  
@@ -533,7 +533,7 @@
  
  
  namespace XMPP
-@@ -89,6 +90,7 @@ public:
+@@ -87,6 +88,7 @@ public:
  	Jid realJid() const;
  	bool autoSelectContact() const {return autoSelectContact_;};
  	static UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource);
@@ -541,7 +541,7 @@
  
  signals:
  	void aInfo(const Jid &);
-@@ -148,6 +150,7 @@ private slots:
+@@ -146,6 +148,7 @@ private slots:
  	void addEmoticon(QString text);
  	void initComposing();
  	void setComposing();
@@ -549,7 +549,7 @@
  
  protected slots:
  	void checkComposing();
-@@ -169,6 +172,9 @@ protected:
+@@ -167,6 +170,9 @@ protected:
  	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
  
  	void appendMessage(const Message &, bool local = false);
@@ -559,7 +559,7 @@
  	virtual bool isEncryptionEnabled() const;
  
  public:
-@@ -214,9 +220,11 @@ private:
+@@ -212,9 +218,11 @@ private:
  	QTimer* composingTimer_;
  	bool isComposing_;
  	bool sendComposingEvents_;
@@ -670,12 +670,12 @@
  #include <QTimer>
  #include <QTextStream>
  #include <QDateTime>
+-
 +#include <QSqlError>
 +#include <QSqlDriver>
 +#ifndef HAVE_QT5
 +#include <qjson/parser.h>
 +#include "qjson/serializer.h"
--
 +#else
 +#include <QJsonArray>
 +#include <QJsonDocument>
@@ -703,7 +703,7 @@
  }
  
  EDBItem::~EDBItem()
-@@ -61,17 +65,6 @@ const QString & EDBItem::id() const
+@@ -61,17 +70,6 @@ const QString & EDBItem::id() const
  	return v_id;
  }
  
@@ -721,7 +721,7 @@
  //----------------------------------------------------------------------------
  // EDBHandle
  //----------------------------------------------------------------------------
-@@ -81,6 +74,7 @@ public:
+@@ -81,6 +79,7 @@ public:
  	Private() {}
  
  	EDB *edb;
@@ -729,7 +729,7 @@
  	EDBResult r;
  	bool busy;
  	bool writeSuccess;
-@@ -93,6 +87,7 @@ EDBHandle::EDBHandle(EDB *edb)
+@@ -93,6 +92,7 @@ EDBHandle::EDBHandle(EDB *edb)
  {
  	d = new Private;
  	d->edb = edb;
@@ -737,7 +737,7 @@
  	d->busy = false;
  	d->writeSuccess = false;
  	d->listeningFor = -1;
-@@ -108,53 +103,32 @@ EDBHandle::~EDBHandle()
+@@ -108,53 +108,32 @@ EDBHandle::~EDBHandle()
  	delete d;
  }
  
@@ -749,30 +749,30 @@
 -}
 -
 -void EDBHandle::getOldest(const Jid &j, int len)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getOldest(j, len);
+-}
+-
+-void EDBHandle::get(const Jid &j, const QString &id, int direction, int len)
 +void EDBHandle::get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int begin, int len)
  {
  	d->busy = true;
  	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_getOldest(j, len);
+-	d->listeningFor = d->edb->op_get(j, id, direction, len);
 +	d->listeningFor = d->edb->op_get(accId, jid, date, direction, begin, len);
  }
  
--void EDBHandle::get(const Jid &j, const QString &id, int direction, int len)
+-void EDBHandle::getByDate(const Jid &j, QDateTime first, QDateTime last)
 +void EDBHandle::find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction)
  {
  	d->busy = true;
  	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_get(j, id, direction, len);
+-	d->listeningFor = d->edb->op_getByDate(j, first, last);
 +	d->listeningFor = d->edb->op_find(accId, str, jid, date, direction);
  }
  
--void EDBHandle::getByDate(const Jid &j, QDateTime first, QDateTime last)
--{
--	d->busy = true;
--	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_getByDate(j, first, last);
--}
--
 -void EDBHandle::find(const QString &str, const Jid &j, const QString &id, int direction)
 -{
 -	d->busy = true;
@@ -799,7 +799,7 @@
  }
  
  bool EDBHandle::busy() const
-@@ -198,6 +172,11 @@ int EDBHandle::lastRequestType() const
+@@ -198,6 +177,11 @@ int EDBHandle::lastRequestType() const
  	return d->lastRequestType;
  }
  
@@ -811,7 +811,7 @@
  
  //----------------------------------------------------------------------------
  // EDB
-@@ -209,12 +188,14 @@ public:
+@@ -209,12 +193,14 @@ public:
  
  	QList<EDBHandle*> list;
  	int reqid_base;
@@ -827,7 +827,7 @@
  }
  
  EDB::~EDB()
-@@ -239,46 +220,32 @@ void EDB::unreg(EDBHandle *h)
+@@ -239,46 +225,32 @@ void EDB::unreg(EDBHandle *h)
  	d->list.removeAll(h);
  }
  
@@ -884,7 +884,7 @@
  			h->edb_resultReady(r);
  			return;
  		}
-@@ -296,6 +263,11 @@ void EDB::writeFinished(int req, bool b)
+@@ -296,6 +268,11 @@ void EDB::writeFinished(int req, bool b)
  	}
  }
  
@@ -896,7 +896,7 @@
  
  //----------------------------------------------------------------------------
  // EDBFlatFile
-@@ -304,21 +276,18 @@ struct item_file_req
+@@ -304,21 +281,18 @@ struct item_file_req
  {
  	Jid j;
  	int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
@@ -920,7 +920,7 @@
  		Type_erase
  	};
  };
-@@ -332,8 +301,8 @@ public:
+@@ -332,8 +306,8 @@ public:
  	QList<item_file_req*> rlist;
  };
  
@@ -931,7 +931,7 @@
  {
  	d = new Private;
  }
-@@ -347,64 +316,23 @@ EDBFlatFile::~EDBFlatFile()
+@@ -347,40 +321,15 @@ EDBFlatFile::~EDBFlatFile()
  	delete d;
  }
  
@@ -971,13 +971,14 @@
  	r->len = len < 1 ? 1: len;
  	r->dir = direction;
 -	r->eventId = id.toInt();
--	r->id = genUniqueId();
--	d->rlist.append(r);
--
--	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
--	return r->id;
--}
--
++	r->date = date;
+ 	r->id = genUniqueId();
+ 	d->rlist.append(r);
+ 
+@@ -388,23 +337,7 @@ int EDBFlatFile::get(const Jid &j, const
+ 	return r->id;
+ }
+ 
 -
 -int EDBFlatFile::getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last)
 -{
@@ -985,22 +986,21 @@
 -	r->j = jid;
 -	r->type = item_file_req::Type_getByDate;
 -	r->len = 1;
-+	r->date = date;
- 	r->id = genUniqueId();
- 	d->rlist.append(r);
+-	r->id = genUniqueId();
+-	d->rlist.append(r);
 -	r->first = first;
 -	r->last = last;
- 
- 	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
- 	return r->id;
- }
- 
+-
+-	QTimer::singleShot(FAKEDELAY, this, SLOT(performRequests()));
+-	return r->id;
+-}
+-
 -int EDBFlatFile::find(const QString &str, const Jid &j, const QString &id, int direction)
 +int EDBFlatFile::find(const QString &/*accId*/, const QString &str, const Jid &j, const QDateTime date, int direction)
  {
  	item_file_req *r = new item_file_req;
  	r->j = j;
-@@ -412,7 +340,7 @@ int EDBFlatFile::find(const QString &str
+@@ -412,7 +345,7 @@ int EDBFlatFile::find(const QString &str
  	r->len = 1;
  	r->dir = direction;
  	r->findStr = str;
@@ -1009,7 +1009,7 @@
  	r->id = genUniqueId();
  	d->rlist.append(r);
  
-@@ -420,8 +348,10 @@ int EDBFlatFile::find(const QString &str
+@@ -420,8 +353,10 @@ int EDBFlatFile::find(const QString &str
  	return r->id;
  }
  
@@ -1021,7 +1021,7 @@
  	item_file_req *r = new item_file_req;
  	r->j = j;
  	r->type = item_file_req::Type_append;
-@@ -438,7 +368,7 @@ int EDBFlatFile::append(const Jid &j, co
+@@ -438,7 +373,7 @@ int EDBFlatFile::append(const Jid &j, co
  	return r->id;
  }
  
@@ -1030,7 +1030,7 @@
  {
  	item_file_req *r = new item_file_req;
  	r->j = j;
-@@ -450,6 +380,22 @@ int EDBFlatFile::erase(const Jid &j)
+@@ -450,6 +385,22 @@ int EDBFlatFile::erase(const Jid &j)
  	return r->id;
  }
  
@@ -1053,7 +1053,7 @@
  EDBFlatFile::File *EDBFlatFile::findFile(const Jid &j) const
  {
  	foreach(File* i, d->flist) {
-@@ -503,25 +449,10 @@ void EDBFlatFile::performRequests()
+@@ -503,25 +454,10 @@ void EDBFlatFile::performRequests()
  
  	File *f = ensureFile(r->j);
  	int type = r->type;
@@ -1082,7 +1082,7 @@
  
  		int len;
  		if(direction == Forward) {
-@@ -538,15 +469,11 @@ void EDBFlatFile::performRequests()
+@@ -538,15 +474,11 @@ void EDBFlatFile::performRequests()
  		}
  
  		EDBResult result;
@@ -1100,7 +1100,7 @@
  				result.append(ei);
  			}
  
-@@ -555,30 +482,26 @@ void EDBFlatFile::performRequests()
+@@ -555,30 +487,26 @@ void EDBFlatFile::performRequests()
  			else
  				--id;
  		}
@@ -1136,7 +1136,7 @@
  					result.append(ei);
  					//commented line below to return ALL(instead of just first) messages that contain findStr
  					//break;
-@@ -590,40 +513,17 @@ void EDBFlatFile::performRequests()
+@@ -590,40 +518,17 @@ void EDBFlatFile::performRequests()
  			else
  				--id;
  		}
@@ -1182,7 +1182,7 @@
  	delete r;
  }
  
-@@ -676,7 +576,28 @@ EDBFlatFile::File::~File()
+@@ -676,7 +581,28 @@ EDBFlatFile::File::~File()
  
  QString EDBFlatFile::File::jidToFileName(const XMPP::Jid &j)
  {
@@ -1212,7 +1212,7 @@
  }
  
  void EDBFlatFile::File::ensureIndex()
-@@ -728,6 +649,59 @@ int EDBFlatFile::File::total() const
+@@ -728,6 +654,59 @@ int EDBFlatFile::File::total() const
  	return d->index.size();
  }
  
@@ -1272,7 +1272,7 @@
  void EDBFlatFile::File::touch()
  {
  	t->start(30000);
-@@ -738,24 +712,30 @@ void EDBFlatFile::File::timer_timeout()
+@@ -738,24 +717,30 @@ void EDBFlatFile::File::timer_timeout()
  	timeout();
  }
  
@@ -1307,7 +1307,7 @@
  	return lineToEvent(line);
  }
  
-@@ -788,6 +768,13 @@ bool EDBFlatFile::File::append(const Psi
+@@ -788,6 +773,13 @@ bool EDBFlatFile::File::append(const Psi
  	return true;
  }
  
@@ -2450,36 +2450,548 @@
  #endif
 --- git.orig/src/historydlg.cpp
 +++ git/src/historydlg.cpp
-@@ -101,7 +101,8 @@ public:
+@@ -37,6 +37,9 @@
+ #include "userlist.h"
+ #include "common.h"
+ 
++#define SEARCH_PADDING_SIZE 20
++#define DISPLAY_PAGE_SIZE   200
++
+ static const QString geometryOption = "options.ui.history.size";
+ 
+ static QString getNext(QString *str)
+@@ -95,23 +98,492 @@ static QStringList wrapString(const QStr
+ }
+ 
+ 
++SearchProxy::SearchProxy(PsiCon *p, DisplayProxy *d)
++	: QObject(0)
++	, active(false)
++{
++	psi = p;
++	dp = d;
++}
++
++void SearchProxy::find(const QString &str, const QString &acc_id, const Jid &jid, int dir)
++{
++	if (!active || str != s_string || acc_id != acc_ || jid != jid_)
++	{
++		active = true;
++		s_string = str;
++		acc_ = acc_id;
++		jid_ = jid;
++		direction = dir;
++		emit needRequest();
++		reqType = ReqFind;
++		getEDBHandle()->find(acc_id, str, jid, QDateTime(), EDB::Forward);
++		return;
++	}
++
++	if (!movePosition(dir))
++		return;
++
++	if (!dp->moveSearchCursor(dir)) { // tries to move the search cursor into the history widget
++		direction = dir;
++		emit needRequest();
++		reqType = ReqPadding;
++		int r_dir = (dir == EDB::Forward) ? EDB::Backward : EDB::Forward;
++		getEDBHandle()->get(acc_id, jid, position.date, r_dir, 0, SEARCH_PADDING_SIZE);
++	}
++}
++
++void SearchProxy::handleResult()
++{
++	EDBHandle *h = qobject_cast<EDBHandle*>(sender());
++	if (!h)
++		return;
++
++	const EDBResult r = h->result();
++	int m;
++	switch (reqType) {
++	case ReqFind:
++		m = handleFoundData(r);
++		emit found(m);
++		break;
++	case ReqPadding:
++		handlePadding(r);
++		break;
++	}
++	delete h;
++}
++
++void SearchProxy::reset()
++{
++	active = false;
++	acc_ = "";
++	jid_ = XMPP::Jid();
++	s_string = "";
++	map.clear();
++	list.clear();
++}
++
++EDBHandle *SearchProxy::getEDBHandle()
++{
++	EDBHandle *h = new EDBHandle(psi->edb());
++	connect(h, SIGNAL(finished()), this, SLOT(handleResult()));
++	return h;
++}
++
++bool SearchProxy::movePosition(int dir)
++{
++	int idx = map.value(position.date.toTime_t(), -1);
++	Q_ASSERT(idx >= 0 && idx < list.count());
++	if (dir == EDB::Forward)
++	{
++		if (list.at(idx).num == position.num)
++		{
++			if (idx == list.size() - 1)
++				return false;
++			position.num = 1;
++			position.date = list.at(idx + 1).date;
++		}
++		else
++			++position.num;
++	}
++	else
++	{
++		if (position.num == 1)
++		{
++			if (idx == 0)
++				return false;
++			position = list.at(idx - 1);
++		}
++		else
++			--position.num;
++	}
++	return true;
++}
++
++int SearchProxy::invertSearchPosition(const Position &pos, int dir)
++{
++	int num = pos.num;
++	if (dir == EDB::Backward)
++	{
++		int idx = map.value(pos.date.toTime_t(), -1);
++		Q_ASSERT(idx >= 0 && idx < list.count());
++		num = list.at(idx).num - pos.num + 1;
++		Q_ASSERT(num > 0);
++	}
++	return num;
++}
++
++int SearchProxy::handleFoundData(const EDBResult &r)
++{
++	int cnt = r.count();
++	if (cnt == 0)
++	{
++		reset();
++		return 0;
++	}
++
++	int res = 0;
++	position.num = 1;
++	map.clear();
++	list.clear();
++	for (int i = 0; i < cnt; ++i)
++	{
++		EDBItemPtr item = r.value(i);
++		PsiEvent::Ptr e(item->event());
++		MessageEvent::Ptr me = e.staticCast<MessageEvent>();
++		int m = me->message().body().count(s_string, Qt::CaseInsensitive);
++		Position pos;
++		pos.date = me->timeStamp();
++		uint t = pos.date.toTime_t();
++		int idx = map.value(t, -1);
++		if (idx == -1)
++		{
++			pos.num = m;
++			map.insert(t, list.size());
++			list.append(pos);
++		}
++		else
++			list[idx].num += m;
++		if ((direction == EDB::Forward) ? (i == 0) : (i == cnt - 1))
++			position.date = pos.date;
++		res += m;
++	}
++	position.num = invertSearchPosition(position, direction);
++
++	reqType = ReqPadding;
++	int r_dir = (direction == EDB::Forward) ? EDB::Backward : EDB::Forward;
++	getEDBHandle()->get(acc_, jid_, position.date, r_dir, 0, SEARCH_PADDING_SIZE);
++
++	return res;
++}
++
++void SearchProxy::handlePadding(const EDBResult &r)
++{
++	int s_pos = invertSearchPosition(position, direction);
++
++	int cnt = r.count();
++	if (cnt == 0)
++	{
++		dp->displayWithSearchCursor(acc_, jid_, position.date, direction, s_string, s_pos);
++		return;
++	}
++
++	EDBItemPtr item = r.value(cnt - 1);
++	PsiEvent::Ptr e(item->event());
++	QDateTime s_date = e->timeStamp();
++	int idx = map.value(position.date.toTime_t());
++	int off = ( direction == EDB::Forward) ? -1 : 1;
++	idx += off;
++	while (idx >= 0 && idx < list.count())
++	{
++		const Position &pos = list.at(idx);
++		if ((direction == EDB::Forward) ? (pos.date < s_date) : (pos.date > s_date))
++			break;
++		s_pos += pos.num;
++		idx += off;
++	}
++	dp->displayWithSearchCursor(acc_, jid_, s_date, direction, s_string, s_pos);
++}
++
++
++DisplayProxy::DisplayProxy(PsiCon *p, PsiTextView *v)
++	: QObject(0)
++{
++	psi = p;
++	viewWid = v;
++	reqType = ReqNone;
++	can_backward = false;
++	can_forward = false;
++	searchParams.searchPos = 0;
++	searchParams.cursorPos = -1;
++}
++
++void DisplayProxy::displayEarliest(const QString &acc_id, const Jid &jid)
++{
++	acc_ = acc_id;
++	jid_ = jid;
++	resetSearch();
++	updateQueryParams(EDB::Forward, 0);
++	reqType = ReqEarliest;
++	getEDBHandle()->get(acc_id, jid, QDateTime(), EDB::Forward, 0, DISPLAY_PAGE_SIZE);
++}
++
++void DisplayProxy::displayLatest(const QString &acc_id, const Jid &jid)
++{
++	acc_ = acc_id;
++	jid_ = jid;
++	resetSearch();
++	updateQueryParams(EDB::Backward, 0);
++	reqType = ReqLatest;
++	getEDBHandle()->get(acc_id, jid, QDateTime(), EDB::Backward, 0, DISPLAY_PAGE_SIZE);
++}
++
++void DisplayProxy::displayFromDate(const QString &acc_id, const Jid &jid, const QDateTime date)
++{
++	acc_ = acc_id;
++	jid_ = jid;
++	resetSearch();
++	updateQueryParams(EDB::Forward, 0, date);
++	reqType = ReqDate;
++	getEDBHandle()->get(acc_id, jid, date, EDB::Forward, 0, DISPLAY_PAGE_SIZE);
++}
++
++void DisplayProxy::displayNext()
++{
++	resetSearch();
++	updateQueryParams(EDB::Forward, DISPLAY_PAGE_SIZE);
++	reqType = ReqNext;
++	getEDBHandle()->get(acc_, jid_, queryParams.date, queryParams.direction, queryParams.offset, DISPLAY_PAGE_SIZE);
++}
++
++void DisplayProxy::displayPrevious()
++{
++	resetSearch();
++	updateQueryParams(EDB::Backward, DISPLAY_PAGE_SIZE);
++	reqType = ReqPrevious;
++	getEDBHandle()->get(acc_, jid_, queryParams.date, queryParams.direction, queryParams.offset, DISPLAY_PAGE_SIZE);
++}
++
++bool DisplayProxy::moveSearchCursor(int dir)
++{
++	if (searchParams.searchPos == 0 || searchParams.searchString.isEmpty())
++		return false;
++
++	QTextCursor t_cursor = viewWid->textCursor();
++	if (searchParams.cursorPos == -1)
++	{
++		if (dir == EDB::Forward)
++			t_cursor.movePosition(QTextCursor::Start);
++		else
++			t_cursor.movePosition(QTextCursor::End);
++	}
++	else
++	{
++		t_cursor.setPosition(searchParams.cursorPos);
++		if (dir == EDB::Forward)
++			t_cursor.movePosition(QTextCursor::Right);
++	}
++	viewWid->setTextCursor(t_cursor);
++
++	QTextDocument::FindFlags find_opt;
++	if (dir == EDB::Backward)
++		find_opt |= QTextDocument::FindBackward;
++	bool res = viewWid->find(searchParams.searchString, find_opt);
++
++	t_cursor = viewWid->textCursor();
++	t_cursor.setPosition(t_cursor.selectionStart());
++	searchParams.cursorPos = t_cursor.position();
++	return res;
++}
++
++void DisplayProxy::displayWithSearchCursor(const QString &acc_id, const Jid &jid, QDateTime start, int dir, const QString &s_str, int num)
++{
++	acc_ = acc_id;
++	jid_ = jid;
++
++	searchParams.searchDir = dir;
++	searchParams.searchPos = num;
++	searchParams.cursorPos = -1;
++	searchParams.searchString = s_str;
++
++	QDateTime ts = start;
++	if (dir == EDB::Backward && !ts.isNull())
++		ts = ts.addSecs(1);
++	updateQueryParams(dir, 0, ts);
++
++	reqType = ReqDate;
++	getEDBHandle()->get(acc_id, jid, queryParams.date, queryParams.direction, 0, DISPLAY_PAGE_SIZE);
++}
++
++void DisplayProxy::handleResult()
++{
++	EDBHandle *h = qobject_cast<EDBHandle*>(sender());
++	if (!h)
++		return;
++
++	const EDBResult r = h->result();
++	can_backward = true;
++	can_forward  = true;
++	if (r.count() < DISPLAY_PAGE_SIZE)
++	{
++		switch (reqType) {
++		case ReqEarliest:
++		case ReqNext:
++			can_forward = false;
++			break;
++		case ReqLatest:
++		case ReqPrevious:
++			can_backward = false;
++			break;
++		case ReqDate:
++			if (searchParams.searchPos == 0)
++				can_forward = false;
++			else
++			{
++				if (searchParams.searchDir == EDB::Forward)
++					can_forward = false;
++				else
++					can_backward = false;
++			}
++			break;
++		default:
++			break;
++		}
++		if (r.count() == 0)
++		{
++			emit updated();
++			delete h;
++			return;
++		}
++	}
++	if (queryParams.offset == 0 && queryParams.date.isNull())
++	{
++		if (queryParams.direction == EDB::Forward)
++			can_backward = false;
++		else
++			can_forward = false;
++	}
++	switch (reqType) {
++	case ReqDate:
++		displayResult(r, queryParams.direction);
++		for (int i = searchParams.searchPos; i > 0; --i)
++			if (!moveSearchCursor(searchParams.searchDir))
++				break;
++		break;
++	case ReqEarliest:
++		can_backward = false;
++		displayResult(r, queryParams.direction);
++		break;
++	case ReqLatest:
++		can_forward = false;
++	case ReqNext:
++	case ReqPrevious:
++		displayResult(r, queryParams.direction);
++		break;
++	default:
++		break;
++	}
++	delete h;
++}
++
++EDBHandle *DisplayProxy::getEDBHandle()
++{
++	EDBHandle *h = new EDBHandle(psi->edb());
++	connect(h, SIGNAL(finished()), this, SLOT(handleResult()));
++	return h;
++}
++
++void DisplayProxy::resetSearch()
++{
++	searchParams.searchPos = 0;
++	searchParams.cursorPos = -1;
++	searchParams.searchString = "";
++}
++
++void DisplayProxy::updateQueryParams(int dir, int increase, QDateTime date)
++{
++	if (increase == 0)
++	{
++		queryParams.direction = dir;
++		queryParams.offset = 0;
++		queryParams.date = date;
++	}
++	else if (queryParams.offset != 0 || dir == queryParams.direction || !queryParams.date.isNull())
++	{
++		if (dir == queryParams.direction)
++			queryParams.offset += increase;
++		else
++		{
++			if (queryParams.offset == 0)
++				queryParams.direction = dir;
++			else
++			{
++				Q_ASSERT(queryParams.offset >= increase);
++				queryParams.offset -= increase;
++			}
++		}
++	}
++}
++
++void DisplayProxy::displayResult(const EDBResult &r, int dir)
++{
++	viewWid->clear();
++	int i, d;
++	if (dir == EDB::Forward)
++	{
++		i = 0;
++		d = 1;
++	}
++	else
++	{
++		i = r.count() - 1;
++		d = -1;
++	}
++
++	bool fAllContacts = jid_.isEmpty();
++	while (i >= 0 && i < r.count())
++	{
++		EDBItemPtr item = r.value(i);
++		PsiEvent::Ptr e(item->event());
++		if (e->type() == PsiEvent::Message) {
++			PsiAccount *pa = e->account();
++			QString from = getNick(e->account(), e->from());
++			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
++			QString msg = me->message().body();
++			msg = TextUtil::linkify(TextUtil::plain2rich(msg));
++
++			if (emoticons)
++				msg = TextUtil::emoticonify(msg);
++			if (formatting)
++				msg = TextUtil::legacyFormat(msg);
++
++			if (me->originLocal())
++			{
++				QString nick = (pa) ? TextUtil::plain2rich(pa->nick()) : tr("deleted");
++				msg = "<span style='color:" + sentColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" + nick
++					+ ((fAllContacts) ? QString(" -> %1").arg(TextUtil::plain2rich(from)) : QString())
++					+ "&gt; " + msg + "</span>";
++			}
++			else
++				msg = "<span style='color:" + receivedColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;"
++					+  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
++
++			viewWid->appendText(msg);
++		}
++		i += d;
++	}
++	viewWid->verticalScrollBar()->setValue(viewWid->verticalScrollBar()->maximum());
++	emit updated();
++}
++
++QString DisplayProxy::getNick(PsiAccount *pa, const Jid &jid) const
++{
++	QString from;
++	if (pa)
++	{
++		UserListItem *u = pa->findFirstRelevant(jid);
++		if (u && !u->name().trimmed().isEmpty())
++			from = u->name().trimmed();
++	}
++	if (from.isEmpty())
++	{
++		from = jid.resource().trimmed(); // for offline conferences
++		if (from.isEmpty())
++			from = jid.node();
++	}
++	return from;
++}
++
++
+ class HistoryDlg::Private
+ {
+ public:
  	Jid jid;
  	PsiAccount *pa;
  	PsiCon *psi;
 -	QString id_prev, id_begin, id_end, id_next;
-+	int begin_row, end_row;
-+	bool can_backward, can_forward;
- 	HistoryDlg::RequestType reqType;
- 	QString findStr;
- 	QDate date;
-@@ -122,10 +123,12 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+-	HistoryDlg::RequestType reqType;
+-	QString findStr;
+-	QDate date;
+ #ifndef HAVE_X11
+ 	bool autoCopyText;
+ #endif
+-	bool formatting;
+-	bool emoticons;
+-	QString sentColor;
+-	QString receivedColor;
+ };
+ 
+ HistoryDlg::HistoryDlg(const Jid &jid, PsiAccount *pa)
+@@ -121,11 +593,16 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	setAttribute(Qt::WA_DeleteOnClose);
  	setModal(false);
  	d = new Private;
- 	d->reqType = TypeNone;
+-	d->reqType = TypeNone;
 -	d->pa = pa;
-+	d->begin_row = 0;
-+	d->end_row = -1;
  	d->psi = pa->psi();
  	d->jid = jid;
 -	d->pa->dialogRegister(this, d->jid);
 +	d->pa = pa;
 +	pa->dialogRegister(this, d->jid);
++
++	displayProxy = new DisplayProxy(pa->psi(), ui_.msgLog);
++	searchProxy = new SearchProxy(pa->psi(), displayProxy);
++	connect(displayProxy, SIGNAL(updated()), this, SLOT(viewUpdated()));
++	connect(searchProxy, SIGNAL(found(int)), this, SLOT(foundData(int)));
++	connect(searchProxy, SIGNAL(needRequest()), this, SLOT(startRequest()));
  
  	//workaround calendar size
  	int minWidth = ui_.calendar->minimumSizeHint().width();
-@@ -133,7 +136,11 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
- 	ui_.tb_find->setIcon(IconsetFactory::icon("psi/search").icon());
+@@ -139,20 +616,30 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ #ifndef Q_OS_MAC
+ 	setWindowIcon(IconsetFactory::icon("psi/history").icon());
+ #endif
+-	ui_.tb_find->setIcon(IconsetFactory::icon("psi/search").icon());
++	ui_.tbFindForward->setIcon(IconsetFactory::icon("psi/arrowDown").icon());
++	ui_.tbFindBackward->setIcon(IconsetFactory::icon("psi/arrowUp").icon());
  
  	ui_.msgLog->setFont(fontForOption("options.ui.look.font.chat"));
 -	ui_.jidList->setFont(fontForOption("options.ui.look.font.contactlist"));
++	setLooks(ui_.msgLog);
 +	QFont f = fontForOption("options.ui.look.font.contactlist");
 +	ui_.jidList->setFont(f);
 +	ui_.jidList2->setFont(f);
@@ -2488,19 +3000,24 @@
  
  	ui_.calendar->setFirstDayOfWeek(firstDayOfWeekFromLocale());
  
-@@ -142,7 +149,10 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	connect(ui_.searchField, SIGNAL(returnPressed()), SLOT(findMessages()));
+-	connect(ui_.searchField, SIGNAL(textChanged(const QString)), SLOT(highlightBlocks(const QString)));
++	connect(ui_.searchField, SIGNAL(textChanged(const QString)), SLOT(highlightBlocks()));
  	connect(ui_.buttonPrevious, SIGNAL(released()), SLOT(getPrevious()));
  	connect(ui_.buttonNext, SIGNAL(released()), SLOT(getNext()));
  	connect(ui_.buttonRefresh, SIGNAL(released()), SLOT(refresh()));
 -	connect(ui_.jidList, SIGNAL(itemSelectionChanged()), SLOT(openSelectedContact()));
+-	connect(ui_.tb_find, SIGNAL(clicked()), SLOT(findMessages()));
 +	connect(ui_.jidList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
 +	connect(ui_.jidList2, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
 +	connect(ui_.privList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
 +	connect(ui_.advList, SIGNAL(clicked(QModelIndex)), SLOT(openSelectedContact()));
- 	connect(ui_.tb_find, SIGNAL(clicked()), SLOT(findMessages()));
++	connect(ui_.tbFindForward, SIGNAL(clicked()), SLOT(findMessages()));
++	connect(ui_.tbFindBackward, SIGNAL(clicked()), SLOT(findMessages()));
  	connect(ui_.buttonLastest, SIGNAL(released()), SLOT(getLatest()));
  	connect(ui_.buttonEarliest, SIGNAL(released()), SLOT(getEarliest()));
-@@ -159,16 +169,19 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
+ 	connect(ui_.calendar, SIGNAL(selectionChanged()), SLOT(getDate()));
+@@ -168,26 +655,31 @@ HistoryDlg::HistoryDlg(const Jid &jid, P
  	optionUpdated("options.ui.chat.legacy-formatting");
  	connect(PsiOptions::instance(), SIGNAL(optionChanged(QString)), SLOT(optionUpdated(QString)));
  
@@ -2522,7 +3039,11 @@
  }
  
  HistoryDlg::~HistoryDlg()
-@@ -178,7 +191,7 @@ HistoryDlg::~HistoryDlg()
+ {
+ 	delete d;
++	delete searchProxy;
++	delete displayProxy;
+ }
  
  bool HistoryDlg::eventFilter(QObject *obj, QEvent *e)
  {
@@ -2531,9 +3052,11 @@
  		e->accept();
  		QTimer::singleShot(0, this, SLOT(doMenu()));
  		return true;
-@@ -199,72 +212,189 @@ void HistoryDlg::changeAccount(const QSt
+@@ -206,89 +698,205 @@ QFont HistoryDlg::fontForOption(const QS
+ void HistoryDlg::changeAccount(const QString /*accountName*/)
+ {
  	ui_.msgLog->clear();
- 	setButtons(false);
+-	setButtons(false);
  	d->jid = QString();
 -	d->pa = d->psi->contactList()->getAccountByJid(ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString());
  	loadContacts();
@@ -2702,6 +3225,7 @@
 -	UserListItem *u = currentUserListItem();
 -	if (!u)
 -		return;
++	ui_.searchResult->setVisible(false);
  
 -	setWindowTitle(u->name() + " (" + u->jid().full() + ")");
 -	d->jid = u->jid();
@@ -2751,12 +3275,46 @@
  	getLatest();
  }
  
-@@ -301,35 +431,38 @@ void HistoryDlg::findMessages()
- 	//get the oldest event as a starting point
- 	startRequest();
- 	d->reqType = TypeFindOldest;
+-void HistoryDlg::highlightBlocks(const QString text)
++void HistoryDlg::highlightBlocks()
+ {
++	const QString text = ui_.searchField->text();
++
+ 	QTextCursor cur = ui_.msgLog->textCursor();
++	QTextCursor old = cur;
++	int sc_pos = ui_.msgLog->verticalScrollBar()->value();
+ 	cur.clearSelection();
+ 	cur.movePosition(QTextCursor::Start);
+ 	ui_.msgLog->setTextCursor(cur);
+ 
+-	if (text.isEmpty()) {
+-		getLatest();
+-		return;
+-	}
+-
+ 	QList<QTextEdit::ExtraSelection> extras;
+ 	QTextEdit::ExtraSelection highlight;
+ 	highlight.format.setBackground(Qt::yellow);
+@@ -303,42 +911,49 @@ void HistoryDlg::highlightBlocks(const Q
+ 	}
+ 
+ 	ui_.msgLog->setExtraSelections(extras);
++	ui_.msgLog->setTextCursor(old);
++	ui_.msgLog->verticalScrollBar()->setValue(sc_pos);
+ }
+ 
+ void HistoryDlg::findMessages()
+ {
+-	//get the oldest event as a starting point
+-	startRequest();
+-	d->reqType = TypeFindOldest;
 -	getEDBHandle()->getOldest(d->jid, 1);
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, 0, 1);
++	const QString str = ui_.searchField->text();
++	if (str.isEmpty())
++		return;
++
++	int dir = (sender() != ui_.tbFindBackward) ? EDB::Forward : EDB::Backward;
++	searchProxy->find(str, getCurrentAccountId(), d->jid, dir);
  }
  
  void HistoryDlg::removeHistory()
@@ -2801,7 +3359,7 @@
  	QString fname = FileUtil::getSaveFileName(this,
  						  tr("Export message history"),
  						  s + ".txt",
-@@ -344,19 +477,22 @@ void HistoryDlg::exportHistory()
+@@ -353,19 +968,22 @@ void HistoryDlg::exportHistory()
  	}
  	QTextStream stream(&f);
  
@@ -2835,7 +3393,7 @@
  		while(h->busy()) {
  			qApp->processEvents();
  		}
-@@ -367,7 +503,6 @@ void HistoryDlg::exportHistory()
+@@ -376,7 +994,6 @@ void HistoryDlg::exportHistory()
  		// events are in forward order
  		for(int i = 0; i < cnt; ++i) {
  			EDBItemPtr item = r.value(i);
@@ -2843,7 +3401,7 @@
  			PsiEvent::Ptr e(item->event());
  			QString txt;
  
-@@ -375,10 +510,16 @@ void HistoryDlg::exportHistory()
+@@ -384,10 +1001,16 @@ void HistoryDlg::exportHistory()
  
  			QString nick;
  			if(e->originLocal()) {
@@ -2862,7 +3420,7 @@
  			}
  
  			if(e->type() == PsiEvent::Message) {
-@@ -401,10 +542,14 @@ void HistoryDlg::exportHistory()
+@@ -410,10 +1033,14 @@ void HistoryDlg::exportHistory()
  		}
  		delete h;
  
@@ -2879,7 +3437,7 @@
  	}
  	f.close();
  	stopRequest();
-@@ -412,11 +557,16 @@ void HistoryDlg::exportHistory()
+@@ -421,102 +1048,44 @@ void HistoryDlg::exportHistory()
  
  void HistoryDlg::doMenu()
  {
@@ -2899,10 +3457,23 @@
  }
  
  void HistoryDlg::edbFinished()
-@@ -437,28 +587,22 @@ void HistoryDlg::edbFinished()
- 			if (d->reqType == TypeLatest || d->reqType == TypePrevious)
- 			{
- 				// events are in backward order
+ {
+-	setButtons(false);
+ 	stopRequest();
+ 
+ 	EDBHandle* h = qobject_cast<EDBHandle*>(sender());
+-	if(!h) {
+-		return;
+-	}
+-
+-	const EDBResult r = h->result();
+-	if (h->lastRequestType() == EDBHandle::Read)
+-	{
+-		if (r.count() > 0)
+-		{
+-			if (d->reqType == TypeLatest || d->reqType == TypePrevious)
+-			{
+-				// events are in backward order
 -				// first entry is the end event
 -				EDBItemPtr it = r.first();
 -				d->id_end = it->id();
@@ -2912,17 +3483,11 @@
 -				d->id_begin = it->id();
 -				d->id_prev = it->prevId();
 -				displayResult(r, EDB::Forward);
-+				d->begin_row = h->beginRow();
-+				d->end_row = d->begin_row + r.count() - 1;
-+
-+				d->can_backward = (d->begin_row > 0);
-+				d->can_forward = (d->reqType != TypeLatest);
-+				displayResult(r, (d->reqType == TypeLatest) ? EDB::Forward : EDB::Backward);
- 				setButtons();
- 			}
- 			else if (d->reqType == TypeEarliest || d->reqType == TypeNext || d->reqType == TypeDate)
- 			{
- 				// events are in forward order
+-				setButtons();
+-			}
+-			else if (d->reqType == TypeEarliest || d->reqType == TypeNext || d->reqType == TypeDate)
+-			{
+-				// events are in forward order
 -				// last entry is the end event
 -				EDBItemPtr it = r.last();
 -				d->id_end = it->id();
@@ -2931,64 +3496,40 @@
 -				it = r.first();
 -				d->id_begin = it->id();
 -				d->id_prev = it->prevId();
-+				d->begin_row = h->beginRow();
-+				d->end_row = d->begin_row + r.count() - 1;
-+
-+				d->can_backward = (d->begin_row > 0);
-+				d->can_forward = true;
- 				displayResult(r, EDB::Backward);
- 				setButtons();
- 			}
-@@ -473,14 +617,15 @@ void HistoryDlg::edbFinished()
- 				{
- 					d->reqType = TypeFind;
- 					d->findStr = str;
+-				displayResult(r, EDB::Backward);
+-				setButtons();
+-			}
+-			else if (d->reqType == TypeFindOldest)
+-			{
+-				QString str = ui_.searchField->text();
+-				if (str.isEmpty())
+-				{
+-					getLatest();
+-				}
+-				else
+-				{
+-					d->reqType = TypeFind;
+-					d->findStr = str;
 -					EDBItemPtr ei = r.first();
- 					startRequest();
+-					startRequest();
 -					getEDBHandle()->find(str, d->jid, ei->id(), EDB::Forward);
-+					getEDBHandle()->find(getCurrentAccountId(), str, d->jid, QDateTime(), EDB::Forward);
- 					setButtons();
- 				}
- 			}
- 			else if (d->reqType == TypeFind)
- 			{
-+				d->begin_row = 0;
-+				d->end_row = r.count() - 1;
- 				displayResult(r, EDB::Forward);
- 				highlightBlocks(ui_.searchField->text());
- 			}
-@@ -488,7 +633,29 @@ void HistoryDlg::edbFinished()
- 		}
- 		else
- 		{
+-					setButtons();
+-				}
+-			}
+-			else if (d->reqType == TypeFind)
+-			{
+-				displayResult(r, EDB::Forward);
+-				highlightBlocks(ui_.searchField->text());
+-			}
+-
+-		}
+-		else
+-		{
 -			ui_.msgLog->clear();
-+			// no more data. TODO: visualization is needed.
-+			bool buttons_updated = false;
-+			if (d->reqType == TypePrevious)
-+			{
-+				d->can_backward = false;
-+				buttons_updated = true;
-+			}
-+			else if (d->reqType == TypeLatest || d->reqType == TypeEarliest)
-+			{
-+				d->can_backward = false;
-+				d->can_forward = false;
-+				buttons_updated = true;
-+			}
-+			else if (d->reqType == TypeNext || d->reqType == TypeDate)
-+			{
-+				d->can_forward = false;
-+				buttons_updated = true;
-+			}
-+			if (d->reqType == TypeFind)
-+				ui_.msgLog->clear();
-+
-+			if (buttons_updated)
-+				setButtons();
- 		}
- 	}
+-		}
+-	}
  	delete h;
-@@ -496,10 +663,10 @@ void HistoryDlg::edbFinished()
+ }
  
  void HistoryDlg::setButtons()
  {
@@ -2996,57 +3537,80 @@
 -	ui_.buttonNext->setEnabled(!d->id_next.isEmpty());
 -	ui_.buttonEarliest->setEnabled(!d->id_prev.isEmpty());
 -	ui_.buttonLastest->setEnabled(!d->id_next.isEmpty());
-+	ui_.buttonPrevious->setEnabled(d->can_backward);
-+	ui_.buttonNext->setEnabled(d->can_forward);
-+	ui_.buttonEarliest->setEnabled(d->can_backward);
-+	ui_.buttonLastest->setEnabled(d->can_forward);
+-}
+-
+-void HistoryDlg::setButtons(bool act)
+-{
+-	ui_.buttonPrevious->setEnabled(act);
+-	ui_.buttonNext->setEnabled(act);
+-	ui_.buttonEarliest->setEnabled(act);
+-	ui_.buttonLastest->setEnabled(act);
++	bool can_backward = displayProxy->canBackward();
++	bool can_forward  = displayProxy->canForward();
++	ui_.buttonPrevious->setEnabled(can_backward);
++	ui_.buttonNext->setEnabled(can_forward);
++	ui_.buttonEarliest->setEnabled(can_backward);
++	ui_.buttonLastest->setEnabled(can_forward);
++}
++
++void HistoryDlg::setLooks(QWidget *w)
++{
++	QPalette pal = w->palette();
++	pal.setColor(QPalette::Inactive, QPalette::HighlightedText,
++		pal.color(QPalette::Active, QPalette::HighlightedText));
++	pal.setColor(QPalette::Inactive, QPalette::Highlight,
++		pal.color(QPalette::Active, QPalette::Highlight));
++	w->setPalette(pal);
  }
  
- void HistoryDlg::setButtons(bool act)
-@@ -521,28 +688,29 @@ void HistoryDlg::getLatest()
+ void HistoryDlg::refresh()
+@@ -528,54 +1097,57 @@ void HistoryDlg::refresh()
+ 
+ void HistoryDlg::getLatest()
  {
- 	d->reqType = TypeLatest;
+-	d->reqType = TypeLatest;
  	startRequest();
 -	getEDBHandle()->getLatest(d->jid, 50);
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Backward, 0, 50);
++	displayProxy->displayLatest(getCurrentAccountId(), d->jid);
  }
  
  void HistoryDlg::getEarliest()
  {
- 	d->reqType = TypeEarliest;
+-	d->reqType = TypeEarliest;
  	startRequest();
 -	getEDBHandle()->getOldest(d->jid, 50);
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, 0, 50);
++	displayProxy->displayEarliest(getCurrentAccountId(), d->jid);
  }
  
  void HistoryDlg::getPrevious()
  {
- 	d->reqType = TypePrevious;
- 	ui_.buttonPrevious->setEnabled(false);
+-	d->reqType = TypePrevious;
+-	ui_.buttonPrevious->setEnabled(false);
 -	getEDBHandle()->get(d->jid, d->id_prev, EDB::Backward, 50);
-+	int begin = (d->begin_row < 50) ? 0 : d->begin_row - 50;
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, begin, 50);
++	startRequest();
++	displayProxy->displayPrevious();
  }
  
  void HistoryDlg::getNext()
  {
- 	d->reqType = TypeNext;
- 	ui_.buttonNext->setEnabled(false);
+-	d->reqType = TypeNext;
+-	ui_.buttonNext->setEnabled(false);
 -	getEDBHandle()->get(d->jid, d->id_next, EDB::Forward, 50);
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, QDateTime(), EDB::Forward, d->end_row + 1, 50);
++	startRequest();
++	displayProxy->displayNext();
  }
  
  void HistoryDlg::getDate()
-@@ -550,23 +718,33 @@ void HistoryDlg::getDate()
- 	const QDate date = ui_.calendar->selectedDate();
- 	d->reqType = TypeDate;
- 	d->date = date;
+ {
+-	const QDate date = ui_.calendar->selectedDate();
+-	d->reqType = TypeDate;
+-	d->date = date;
 -	QDateTime first (d->date);
 -	QDateTime last = first.addDays(1);
-+	QDateTime first(d->date);
++	QDateTime ts(ui_.calendar->selectedDate());
  	startRequest();
 -	getEDBHandle()->getByDate(d->jid, first, last);
-+	getEDBHandle()->get(getCurrentAccountId(), d->jid, first, EDB::Forward, 0, 50);
++	displayProxy->displayFromDate(getCurrentAccountId(), d->jid, ts);
  }
  
  void HistoryDlg::removedContact(PsiContact *pc)
@@ -3079,35 +3643,49 @@
  			}
  			break;
  		}
-@@ -597,38 +775,53 @@ void HistoryDlg::autoCopy()
+@@ -590,14 +1162,15 @@ void HistoryDlg::optionUpdated(const QSt
+ 	} else
+ #endif
+ 	if(option == "options.ui.look.colors.messages.sent")
+-			d->sentColor = PsiOptions::instance()->getOption(option).toString();
++		displayProxy->setSentColor(PsiOptions::instance()->getOption(option).toString());
+ 	else if(option == "options.ui.look.colors.messages.received")
+-			d->receivedColor = PsiOptions::instance()->getOption(option).toString();
++		displayProxy->setReceivedColor(PsiOptions::instance()->getOption(option).toString());
+ 	else if(option == "options.ui.emoticons.use-emoticons")
+-			d->emoticons  = PsiOptions::instance()->getOption(option).toBool();
++		displayProxy->setEmoticonsFlag(PsiOptions::instance()->getOption(option).toBool());
+ 	else if(option == "options.ui.chat.legacy-formatting")
+-			d->formatting = PsiOptions::instance()->getOption(option).toBool();
++		displayProxy->setFormattingFlag(PsiOptions::instance()->getOption(option).toBool());
+ }
++
+ #ifndef HAVE_X11
+ void HistoryDlg::autoCopy()
+ {
+@@ -606,55 +1179,32 @@ void HistoryDlg::autoCopy()
  	}
  }
  #endif
 -void HistoryDlg::displayResult(const EDBResult r, int direction, int max)
-+void HistoryDlg::displayResult(const EDBResult &r, int direction, int max)
- {
- 	int i  = (direction == EDB::Forward) ? r.count() - 1 : 0;
- 	int at = 0;
- 	ui_.msgLog->clear();
+-{
+-	int i  = (direction == EDB::Forward) ? r.count() - 1 : 0;
+-	int at = 0;
+-	ui_.msgLog->clear();
 -	QString nick = TextUtil::plain2rich(d->pa->nick());
-+	bool fAll = d->jid.isEmpty();
- 	while (i >= 0 && i <= r.count() - 1 && (max == -1 ? true : at < max))
- 	{
- 		EDBItemPtr item = r.value(i);
- 		PsiEvent::Ptr e(item->event());
+-	while (i >= 0 && i <= r.count() - 1 && (max == -1 ? true : at < max))
+-	{
+-		EDBItemPtr item = r.value(i);
+-		PsiEvent::Ptr e(item->event());
 -		UserListItem *u = d->pa->findFirstRelevant(e->from().full());
 -		if(u) {
 -			QString from = JIDUtil::nickOrJid(u->name(), u->jid().full());
 -			if (e->type() == PsiEvent::Message)
-+		if (e->type() == PsiEvent::Message) {
-+			PsiAccount *pa = e->account();
-+			QString from;
-+			if (pa)
- 			{
+-			{
 -				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
 -				QString msg = me->message().body();
 -				msg = TextUtil::linkify(TextUtil::plain2rich(msg));
--
+ 
 -				if (d->emoticons)
 -					msg = TextUtil::emoticonify(msg);
 -				if (d->formatting)
@@ -3119,42 +3697,32 @@
 -					msg = "<span style='color:"+d->receivedColor+"'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
 -
 -				ui_.msgLog->appendText(msg);
-+				UserListItem *u = pa->findFirstRelevant(e->from().full());
-+				if(u) {
-+					if (!u->name().trimmed().isEmpty())
-+						from = u->name().trimmed();
-+				}
-+			}
-+			if (from.isEmpty())
-+			{
-+				from = e->from().resource().trimmed(); // for offline conferences
-+				if (from.isEmpty())
-+						from = e->from().node();
-+			}
-+			MessageEvent::Ptr me = e.staticCast<MessageEvent>();
-+			QString msg = me->message().body();
-+			msg = TextUtil::linkify(TextUtil::plain2rich(msg));
-+
-+			if (d->emoticons)
-+				msg = TextUtil::emoticonify(msg);
-+			if (d->formatting)
-+				msg = TextUtil::legacyFormat(msg);
+-
+-			}
+-		}
++void HistoryDlg::viewUpdated()
++{
++	highlightBlocks();
++	setButtons();
++	stopRequest();
++}
  
-+			if (me->originLocal())
-+			{
-+				QString nick = (pa) ? TextUtil::plain2rich(pa->nick()) : tr("deleted");
-+				msg = "<span style='color:" + d->sentColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" + nick
-+					+ ((fAll) ? QString(" -> %1").arg(TextUtil::plain2rich(from)) : QString())
-+					+ "&gt; " + msg + "</span>";
- 			}
-+			else
-+				msg = "<span style='color:" + d->receivedColor + "'>" + me->timeStamp().toString("[dd.MM.yyyy hh:mm:ss]") + " &lt;" +  TextUtil::plain2rich(from) + "&gt; " + msg + "</span>";
-+
-+			ui_.msgLog->appendText(msg);
- 		}
+-		++at;
+-		i += (direction == EDB::Forward) ? -1 : +1;
++void HistoryDlg::foundData(int cnt)
++{
++	if (cnt > 0)
++		ui_.searchResult->setText(tr("%1 matches found").arg(cnt));
++	else
++	{
++		ui_.searchResult->setText(tr("No matches found"));
++		stopRequest();
+ 	}
+-
+-	ui_.msgLog->verticalScrollBar()->setValue(ui_.msgLog->verticalScrollBar()->maximum());
++	ui_.searchResult->setVisible(true);
+ }
  
- 		++at;
-@@ -641,11 +834,9 @@ void HistoryDlg::displayResult(const EDB
  UserListItem* HistoryDlg::currentUserListItem() const
  {
  	UserListItem* u = 0;
@@ -3169,7 +3737,7 @@
  	return u;
  }
  
-@@ -662,6 +853,7 @@ void HistoryDlg::stopRequest()
+@@ -671,6 +1221,7 @@ void HistoryDlg::stopRequest()
  	if(ui_.busy->isActive()) {
  		ui_.busy->stop();
  	}
@@ -3177,7 +3745,7 @@
  	setEnabled(true);
  #ifdef Q_OS_MAC
  	// To workaround a Qt bug
-@@ -670,9 +862,46 @@ void HistoryDlg::stopRequest()
+@@ -679,9 +1230,46 @@ void HistoryDlg::stopRequest()
  #endif
  }
  
@@ -3227,16 +3795,168 @@
 +}
 --- git.orig/src/historydlg.h
 +++ git/src/historydlg.h
-@@ -81,19 +81,23 @@ private:
+@@ -33,6 +33,113 @@ namespace XMPP {
+ 	class Jid;
+ }
+ 
++class DisplayProxy;
++
++class SearchProxy : public QObject
++{
++	Q_OBJECT
++
++public:
++	SearchProxy(PsiCon *p, DisplayProxy *d);
++	void find(const QString &str, const QString &acc_id, const XMPP::Jid &jid, int dir);
++
++private slots:
++	void handleResult();
++
++signals:
++	void found(int);
++	void needRequest();
++
++private:
++	struct Position {
++		QDateTime date;
++		int       num;
++	} position;
++	void reset();
++	EDBHandle* getEDBHandle();
++	bool movePosition(int dir);
++	int  invertSearchPosition(const Position &pos, int dir);
++	int  handleFoundData(const EDBResult &r);
++	void handlePadding(const EDBResult &r);
++
++private:
++	bool active;
++	int direction;
++	QString s_string;
++	QHash<uint, int> map;
++	QVector<Position> list;
++	PsiCon *psi;
++	DisplayProxy *dp;
++	QString acc_;
++	XMPP::Jid jid_;
++	enum RequestType { ReqFind, ReqPadding };
++	RequestType reqType;
++
++};
++
++class DisplayProxy : public QObject
++{
++	Q_OBJECT
++
++public:
++	DisplayProxy(PsiCon *p, PsiTextView *v);
++
++	void setEmoticonsFlag(bool f) { emoticons = f; }
++	void setFormattingFlag(bool f) { formatting = f; }
++	void setSentColor(const QString &c) { sentColor = c; }
++	void setReceivedColor(const QString &c) { receivedColor = c; }
++
++	bool canBackward() const { return can_backward; }
++	bool canForward() const { return can_forward; }
++
++	void displayEarliest(const QString &acc_id, const XMPP::Jid &jid);
++	void displayLatest(const QString &acc_id, const XMPP::Jid &jid);
++	void displayFromDate(const QString &acc_id, const XMPP::Jid &jid, const QDateTime date);
++	void displayNext();
++	void displayPrevious();
++	bool moveSearchCursor(int dir);
++	void displayWithSearchCursor(const QString &acc_id, const XMPP::Jid &jid, QDateTime start, int dir, const QString &s_str, int num);
++
++private slots:
++	void handleResult();
++
++signals:
++	void updated();
++
++private:
++	EDBHandle* getEDBHandle();
++	void resetSearch();
++	void updateQueryParams(int dir, int increase, QDateTime date = QDateTime());
++	void displayResult(const EDBResult &r, int dir);
++	QString getNick(PsiAccount *pa, const XMPP::Jid &jid) const;
++
++private:
++	QString acc_;
++	XMPP::Jid jid_;
++	struct {
++		int       direction;
++		int       offset;
++		QDateTime date;
++	} queryParams;
++	struct {
++		int     searchPos;
++		int     cursorPos;
++		int     searchDir;
++		QString searchString;
++	} searchParams;
++	enum RequestType { ReqNone, ReqDate, ReqEarliest, ReqLatest, ReqNext, ReqPrevious };
++	RequestType reqType;
++	PsiCon *psi;
++	PsiTextView *viewWid;
++	bool formatting;
++	bool emoticons;
++	bool can_backward;
++	bool can_forward;
++	QString sentColor;
++	QString receivedColor;
++
++};
++
+ class HistoryDlg : public AdvancedWidget<QDialog>
+ {
+ 	Q_OBJECT
+@@ -41,17 +148,6 @@ public:
+ 	HistoryDlg(const XMPP::Jid&, PsiAccount*);
+ 	virtual ~HistoryDlg();
+ 
+-	enum RequestType {
+-		TypeNone = 0,
+-		TypeNext,
+-		TypePrevious,
+-		TypeLatest,
+-		TypeEarliest,
+-		TypeFind,
+-		TypeFindOldest,
+-		TypeDate
+-	};
+-
+ private slots:
+ 	void openSelectedContact();
+ 	void getLatest();
+@@ -62,7 +158,7 @@ private slots:
+ 	void refresh();
+ 	void findMessages();
+ 	void edbFinished();
+-	void highlightBlocks(const QString text);
++	void highlightBlocks();
+ 	void changeAccount(const QString accountName);
+ 	void removeHistory();
+ 	void exportHistory();
+@@ -73,27 +169,35 @@ private slots:
+ #ifndef HAVE_X11
+ 	void autoCopy();
+ #endif
++	void viewUpdated();
++	void foundData(int cnt);
++	void startRequest();
+ 
+ protected:
+ 	bool eventFilter(QObject *, QEvent *);
+ 
+ private:
  	void setButtons();
- 	void setButtons(bool act);
+-	void setButtons(bool act);
++	void setLooks(QWidget *w);
  	void loadContacts();
 -	void displayResult(const EDBResult , int, int max=-1);
-+	void displayResult(const EDBResult &, int, int max=-1);
  	QFont fontForOption(const QString& option);
  	void listAccounts();
  	UserListItem* currentUserListItem() const;
- 	void startRequest();
+-	void startRequest();
  	void stopRequest();
 -
 +	void showProgress(int max);
@@ -3251,6 +3971,9 @@
  	Private *d;
  	Ui::HistoryDlg ui_;
 -	QStringList jids_;
++	DisplayProxy *displayProxy;
++	SearchProxy *searchProxy;
++
  };
  
  #endif
@@ -3664,7 +4387,7 @@
      <height>680</height>
     </rect>
    </property>
-@@ -34,207 +34,377 @@
+@@ -34,207 +34,438 @@
    <property name="modal">
     <bool>true</bool>
    </property>
@@ -3721,14 +4444,23 @@
 +            <x>0</x>
 +            <y>0</y>
 +            <width>220</width>
-+            <height>233</height>
++            <height>253</height>
 +           </rect>
 +          </property>
 +          <attribute name="label">
 +           <string>Roster contacts</string>
 +          </attribute>
 +          <layout class="QGridLayout" name="gridLayout">
-+           <property name="margin">
++           <property name="leftMargin">
++            <number>0</number>
++           </property>
++           <property name="topMargin">
++            <number>0</number>
++           </property>
++           <property name="rightMargin">
++            <number>0</number>
++           </property>
++           <property name="bottomMargin">
 +            <number>0</number>
 +           </property>
 +           <item row="1" column="0">
@@ -3755,14 +4487,23 @@
 +            <x>0</x>
 +            <y>0</y>
 +            <width>220</width>
-+            <height>233</height>
++            <height>253</height>
 +           </rect>
 +          </property>
 +          <attribute name="label">
 +           <string>Not in roster</string>
 +          </attribute>
 +          <layout class="QGridLayout" name="gridLayout_2">
-+           <property name="margin">
++           <property name="leftMargin">
++            <number>0</number>
++           </property>
++           <property name="topMargin">
++            <number>0</number>
++           </property>
++           <property name="rightMargin">
++            <number>0</number>
++           </property>
++           <property name="bottomMargin">
 +            <number>0</number>
 +           </property>
 +           <item row="0" column="0">
@@ -3783,14 +4524,23 @@
 +            <x>0</x>
 +            <y>0</y>
 +            <width>220</width>
-+            <height>233</height>
++            <height>253</height>
 +           </rect>
 +          </property>
 +          <attribute name="label">
 +           <string>Private</string>
 +          </attribute>
 +          <layout class="QGridLayout" name="gridLayout_3">
-+           <property name="margin">
++           <property name="leftMargin">
++            <number>0</number>
++           </property>
++           <property name="topMargin">
++            <number>0</number>
++           </property>
++           <property name="rightMargin">
++            <number>0</number>
++           </property>
++           <property name="bottomMargin">
 +            <number>0</number>
 +           </property>
 +           <item row="0" column="0">
@@ -3811,14 +4561,23 @@
 +            <x>0</x>
 +            <y>0</y>
 +            <width>220</width>
-+            <height>233</height>
++            <height>253</height>
 +           </rect>
 +          </property>
 +          <attribute name="label">
 +           <string>Advanced</string>
 +          </attribute>
 +          <layout class="QGridLayout" name="gridLayout_4">
-+           <property name="margin">
++           <property name="leftMargin">
++            <number>0</number>
++           </property>
++           <property name="topMargin">
++            <number>0</number>
++           </property>
++           <property name="rightMargin">
++            <number>0</number>
++           </property>
++           <property name="bottomMargin">
 +            <number>0</number>
 +           </property>
 +           <item row="0" column="0">
@@ -4018,35 +4777,60 @@
 -      </widget>
 +      <layout class="QVBoxLayout" name="verticalLayout_3">
 +       <item>
-+        <layout class="QHBoxLayout" name="horizontalLayout_2">
++        <layout class="QHBoxLayout" name="horizontalLayout_5">
 +         <item>
-+          <widget class="QLineEdit" name="searchField">
-+           <property name="sizePolicy">
-+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-+             <horstretch>0</horstretch>
-+             <verstretch>0</verstretch>
-+            </sizepolicy>
++          <widget class="QLabel" name="label">
++           <property name="text">
++            <string>Search:</string>
 +           </property>
 +          </widget>
 +         </item>
 +         <item>
-+          <widget class="QToolButton" name="tb_find">
-+           <property name="sizePolicy">
-+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-+             <horstretch>0</horstretch>
-+             <verstretch>0</verstretch>
-+            </sizepolicy>
-+           </property>
-+           <property name="maximumSize">
-+            <size>
-+             <width>27</width>
-+             <height>27</height>
-+            </size>
-+           </property>
-+           <property name="text">
-+            <string/>
-+           </property>
-+          </widget>
++          <layout class="QVBoxLayout" name="verticalLayout_4">
++           <item>
++            <layout class="QHBoxLayout" name="horizontalLayout_2">
++             <item>
++              <widget class="QLineEdit" name="searchField">
++               <property name="sizePolicy">
++                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
++                 <horstretch>0</horstretch>
++                 <verstretch>0</verstretch>
++                </sizepolicy>
++               </property>
++              </widget>
++             </item>
++             <item>
++              <widget class="QToolButton" name="tbFindForward">
++               <property name="sizePolicy">
++                <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
++                 <horstretch>0</horstretch>
++                 <verstretch>0</verstretch>
++                </sizepolicy>
++               </property>
++               <property name="maximumSize">
++                <size>
++                 <width>27</width>
++                 <height>27</height>
++                </size>
++               </property>
++               <property name="text">
++                <string/>
++               </property>
++              </widget>
++             </item>
++             <item>
++              <widget class="QToolButton" name="tbFindBackward"/>
++             </item>
++            </layout>
++           </item>
++           <item>
++            <widget class="QLabel" name="searchResult">
++             <property name="frameShape">
++              <enum>QFrame::StyledPanel</enum>
++             </property>
++            </widget>
++           </item>
++          </layout>
 +         </item>
 +        </layout>
 +       </item>
@@ -4065,7 +4849,7 @@
 +          </size>
 +         </property>
 +         <property name="focusPolicy">
-+          <enum>Qt::ClickFocus</enum>
++          <enum>Qt::NoFocus</enum>
 +         </property>
 +         <property name="readOnly">
 +          <bool>true</bool>
@@ -4217,15 +5001,12 @@
    </layout>
   </widget>
   <customwidgets>
-@@ -251,14 +421,13 @@
+@@ -251,16 +482,15 @@
    </customwidget>
   </customwidgets>
   <tabstops>
 +  <tabstop>accountsBox</tabstop>
    <tabstop>jidList</tabstop>
-+  <tabstop>jidList2</tabstop>
-+  <tabstop>privList</tabstop>
-+  <tabstop>advList</tabstop>
    <tabstop>calendar</tabstop>
    <tabstop>searchField</tabstop>
 -  <tabstop>buttonEarliest</tabstop>
@@ -4233,12 +5014,19 @@
 -  <tabstop>buttonNext</tabstop>
 -  <tabstop>buttonLastest</tabstop>
 -  <tabstop>accountsBox</tabstop>
-   <tabstop>tb_find</tabstop>
-   <tabstop>msgLog</tabstop>
+-  <tabstop>tb_find</tabstop>
+-  <tabstop>msgLog</tabstop>
++  <tabstop>tbFindForward</tabstop>
++  <tabstop>tbFindBackward</tabstop>
++  <tabstop>privList</tabstop>
++  <tabstop>advList</tabstop>
++  <tabstop>jidList2</tabstop>
   </tabstops>
+  <resources/>
+  <connections/>
 --- git.orig/src/psiaccount.cpp
 +++ git/src/psiaccount.cpp
-@@ -4764,11 +4764,12 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4716,11 +4716,12 @@ void PsiAccount::dj_sendMessage(const Me
  
  	// don't log groupchat, private messages, or encrypted messages
  	if(log) {
@@ -4253,7 +5041,7 @@
  		}
  	}
  
-@@ -5113,7 +5114,7 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5065,7 +5066,7 @@ void PsiAccount::handleEvent(const PsiEv
  
  			// don't log private messages
  			if (!found &&
@@ -4262,7 +5050,7 @@
  				!(e->type() == PsiEvent::Message &&
  				 e.staticCast<MessageEvent>()->message().body().isEmpty()))
  			{
-@@ -5126,7 +5127,8 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5078,7 +5079,8 @@ void PsiAccount::handleEvent(const PsiEv
  				}
  #endif
  				if (!isMuc) {
@@ -4272,7 +5060,7 @@
  				}
  			}
  		}
-@@ -5827,14 +5829,16 @@ void PsiAccount::groupChatMessagesRead(c
+@@ -5769,14 +5771,16 @@ void PsiAccount::groupChatMessagesRead(c
  }
  #endif
  
@@ -4291,7 +5079,7 @@
  }
  
  void PsiAccount::edb_finished()
-@@ -6289,7 +6293,7 @@ void PsiAccount::pgp_encryptFinished()
+@@ -6235,7 +6239,7 @@ void PsiAccount::pgp_encryptFinished()
  			MessageEvent::Ptr me(new MessageEvent(m, this));
  			me->setOriginLocal(true);
  			me->setTimeStamp(QDateTime::currentDateTime());
@@ -4313,7 +5101,7 @@
  	void updateReadNext(const Jid &);
 --- git.orig/src/psichatdlg.cpp
 +++ git/src/psichatdlg.cpp
-@@ -960,7 +960,7 @@ bool PsiChatDlg::isEncryptionEnabled() c
+@@ -924,7 +924,7 @@ bool PsiChatDlg::isEncryptionEnabled() c
  
  void PsiChatDlg::appendSysMsg(const QString &str)
  {
@@ -4324,7 +5112,7 @@
  ChatView* PsiChatDlg::chatView() const
 --- git.orig/src/psicon.cpp
 +++ git/src/psicon.cpp
-@@ -359,8 +359,7 @@ PsiCon::PsiCon()
+@@ -358,8 +358,7 @@ PsiCon::PsiCon()
  	d->ftwin = 0;
  #endif
  
@@ -4334,7 +5122,7 @@
  	d->s5bServer = 0;
  	d->tuneManager = 0;
  	d->autoUpdater = 0;
-@@ -381,7 +380,8 @@ PsiCon::~PsiCon()
+@@ -380,7 +379,8 @@ PsiCon::~PsiCon()
  
  	delete d->autoUpdater;
  	delete d->actionList;
@@ -4344,7 +5132,7 @@
  	delete d->defaultMenuBar;
  	delete d->tabManager;
  	delete d->popupManager;
-@@ -703,6 +703,12 @@ bool PsiCon::init()
+@@ -655,6 +655,12 @@ bool PsiCon::init()
  
  	checkAccountsEmpty();
  
@@ -4365,7 +5153,7 @@
  
  greaterThan(QT_MAJOR_VERSION, 4) {
    QT += widgets multimedia concurrent
-@@ -142,6 +142,7 @@ HEADERS += \
+@@ -152,6 +152,7 @@ HEADERS += \
  	$$PWD/translationmanager.h \
  	$$PWD/eventdb.h \
  	$$PWD/historydlg.h \
@@ -4373,7 +5161,7 @@
  	$$PWD/tipdlg.h \
  	$$PWD/searchdlg.h \
  	$$PWD/registrationdlg.h \
-@@ -290,6 +291,7 @@ SOURCES += \
+@@ -288,6 +289,7 @@ SOURCES += \
  	$$PWD/translationmanager.cpp \
  	$$PWD/eventdb.cpp \
  	$$PWD/historydlg.cpp \
