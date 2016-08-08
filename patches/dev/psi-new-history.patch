@@ -5026,7 +5026,7 @@
   <connections/>
 --- git.orig/src/psiaccount.cpp
 +++ git/src/psiaccount.cpp
-@@ -4716,11 +4716,12 @@ void PsiAccount::dj_sendMessage(const Me
+@@ -4722,11 +4722,12 @@ void PsiAccount::dj_sendMessage(const Me
  
  	// don't log groupchat, private messages, or encrypted messages
  	if(log) {
@@ -5041,7 +5041,7 @@
  		}
  	}
  
-@@ -5065,7 +5066,7 @@ void PsiAccount::handleEvent(const PsiEv
+@@ -5071,7 +5072,7 @@ void PsiAccount::handleEvent(const PsiEv
  
  			// don't log private messages
  			if (!found &&
@@ -5050,17 +5050,18 @@
  				!(e->type() == PsiEvent::Message &&
  				 e.staticCast<MessageEvent>()->message().body().isEmpty()))
  			{
-@@ -5078,7 +5079,8 @@ void PsiAccount::handleEvent(const PsiEv
- 				}
- #endif
- 				if (!isMuc) {
--					logEvent(e->from(), e);
-+					int type = findGCContact(e->from()) ? EDB::GroupChatContact : EDB::Contact;
-+					logEvent(e->from(), e, type);
+@@ -5092,8 +5093,8 @@ void PsiAccount::handleEvent(const PsiEv
+ 							chatJid = m.to();
+ 						}
+ 					}
+-
+-					logEvent(chatJid, e);
++					int type = findGCContact(chatJid) ? EDB::GroupChatContact : EDB::Contact;
++					logEvent(chatJid, e, type);
  				}
  			}
  		}
-@@ -5769,14 +5771,16 @@ void PsiAccount::groupChatMessagesRead(c
+@@ -5796,14 +5797,16 @@ void PsiAccount::groupChatMessagesRead(c
  }
  #endif
  
@@ -5079,7 +5080,7 @@
  }
  
  void PsiAccount::edb_finished()
-@@ -6235,7 +6239,7 @@ void PsiAccount::pgp_encryptFinished()
+@@ -6262,7 +6265,7 @@ void PsiAccount::pgp_encryptFinished()
  			MessageEvent::Ptr me(new MessageEvent(m, this));
  			me->setOriginLocal(true);
  			me->setTimeStamp(QDateTime::currentDateTime());
