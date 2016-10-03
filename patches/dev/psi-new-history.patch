@@ -450,7 +450,7 @@
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -921,9 +970,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -921,9 +970,10 @@ void ChatDlg::appendMessage(const Messag
  	mv.setNick(whoNick(local));
  	mv.setUserId(local?account()->jid().bare():jid().bare());
  	mv.setDateTime(m.timeStamp());
@@ -458,11 +458,12 @@
 +	mv.setSpooled(historyState);
  	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
 -	chatView()->dispatchMessage(mv);
++	mv.setCarbonDirection(m.carbonDirection());
 +	dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
  		UrlList urls = m.urlList();
-@@ -931,11 +980,49 @@ void ChatDlg::appendMessage(const Messag
+@@ -931,11 +981,49 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
@@ -508,13 +509,13 @@
 +	chatView()->dispatchMessage(mv);
  
  	// if we're not active, notify the user by changing the title
--	if (!isActiveTab()) {
+-	if (!isActiveTab() && m.carbonDirection() != Message::Sent) {
 +	MessageView::Type type = mv.type();
-+	if (type != MessageView::System && type != MessageView::Status && !mv.isSpooled() && !isActiveTab()) {
++	if (type != MessageView::System && type != MessageView::Status && !mv.isSpooled() && !isActiveTab() && mv.carbonDirection() != Message::Sent) {
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
-@@ -957,7 +1044,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -957,7 +1045,7 @@ void ChatDlg::appendMessage(const Messag
  	//	messagesRead(jid());
  	//}
  
@@ -5024,6 +5025,44 @@
   </tabstops>
   <resources/>
   <connections/>
+--- git.orig/src/messageview.cpp
++++ git/src/messageview.cpp
+@@ -37,6 +37,7 @@ MessageView::MessageView(Type t)
+ 	, _status(0)
+ 	, _statusPriority(0)
+ 	, _dateTime(QDateTime::currentDateTime())
++	, _carbon(XMPP::Message::NoCarbon)
+ {
+ 
+ }
+--- git.orig/src/messageview.h
++++ git/src/messageview.h
+@@ -24,6 +24,8 @@
+ #include <QDateTime>
+ #include <QVariantMap>
+ 
++#include "xmpp_message.h"
++
+ class MessageView
+ {
+ public:
+@@ -89,6 +91,8 @@ public:
+ 	inline void setDateTime(const QDateTime &dt) { _dateTime = dt; }
+ 	inline const QDateTime &dateTime() const { return _dateTime; }
+ 	inline QMap<QString, QString> urls() const { return _urls; }
++	inline void setCarbonDirection(XMPP::Message::CarbonDir c) {_carbon = c; }
++	inline XMPP::Message::CarbonDir carbonDirection() const { return _carbon; }
+ 
+ 	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
+ 
+@@ -108,6 +112,7 @@ private:
+ 	QString _userText; // rich
+ 	QDateTime _dateTime;
+ 	QMap<QString, QString> _urls;
++	XMPP::Message::CarbonDir _carbon;
+ };
+ 
+ #endif
 --- git.orig/src/psiaccount.cpp
 +++ git/src/psiaccount.cpp
 @@ -4722,11 +4722,12 @@ void PsiAccount::dj_sendMessage(const Me
@@ -5061,7 +5100,7 @@
  				}
  			}
  		}
-@@ -5796,14 +5797,16 @@ void PsiAccount::groupChatMessagesRead(c
+@@ -5801,14 +5802,16 @@ void PsiAccount::groupChatMessagesRead(c
  }
  #endif
  
@@ -5080,7 +5119,7 @@
  }
  
  void PsiAccount::edb_finished()
-@@ -6262,7 +6265,7 @@ void PsiAccount::pgp_encryptFinished()
+@@ -6267,7 +6270,7 @@ void PsiAccount::pgp_encryptFinished()
  			MessageEvent::Ptr me(new MessageEvent(m, this));
  			me->setOriginLocal(true);
  			me->setTimeStamp(QDateTime::currentDateTime());
