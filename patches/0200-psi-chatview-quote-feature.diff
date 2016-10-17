@@ -1,15 +1,14 @@
---- a/src/chatview_te.cpp
-+++ b/src/chatview_te.cpp
-@@ -35,6 +35,8 @@
+--- git.orig/src/chatview_te.cpp
++++ git/src/chatview_te.cpp
+@@ -35,6 +35,7 @@
  #include <QTimer>
  #include <QKeyEvent>
  #include <QUrl>
 +#include <QMenu>
-+#include <QTextDocumentFragment>
- 
- static const char *informationalColorOpt = "options.ui.look.colors.messages.informational";
- 
-@@ -59,6 +61,12 @@ ChatView::ChatView(QWidget *parent)
+ #include <QTextBlock>
+ #include <QTextDocumentFragment>
+ //#define CORRECTION_DEBUG
+@@ -66,6 +67,12 @@ ChatView::ChatView(QWidget *parent)
  	connect(this, SIGNAL(selectionChanged()), SLOT(autoCopy()));
  	connect(this, SIGNAL(cursorPositionChanged()), SLOT(autoCopy()));
  #endif
@@ -22,7 +21,7 @@
  
  	useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
  	if (useMessageIcons_) {
-@@ -135,10 +143,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
+@@ -144,10 +151,20 @@ void ChatView::contextMenuEvent(QContext
  		e->accept();
  	}
  	else {
@@ -44,7 +43,7 @@
  void ChatView::addLogIconsResources()
  {
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
-@@ -203,6 +221,24 @@ void ChatView::autoCopy()
+@@ -213,6 +230,24 @@ void ChatView::autoCopy()
  }
  
  /**
@@ -69,8 +68,8 @@
   * Handle KeyPress events that happen in ChatEdit widget. This is used
   * to 'fix' the copy shortcut.
   * \param object object that should receive the event
---- a/src/chatview_te.h
-+++ b/src/chatview_te.h
+--- git.orig/src/chatview_te.h
++++ git/src/chatview_te.h
 @@ -47,6 +47,7 @@ public:
  	QSize sizeHint() const;
  	void clear();
@@ -95,17 +94,17 @@
  
  private:
  	bool isMuc_;
-@@ -109,6 +113,7 @@ private:
- 	QPixmap logIconDeliveredPgp;
+@@ -110,6 +114,7 @@ private:
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
+ 	QPixmap logIconCorrected;
 +	QAction *actQuote_;
  };
  
  #endif
---- a/src/groupchatdlg.cpp
-+++ b/src/groupchatdlg.cpp
-@@ -884,6 +884,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
+@@ -893,6 +893,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  	invalidateTab();
  	setConnecting();
  
@@ -113,8 +112,8 @@
  	connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
  
  #ifdef PSI_PLUGINS
---- a/src/msgmle.cpp
-+++ b/src/msgmle.cpp
+--- git.orig/src/msgmle.cpp
++++ git/src/msgmle.cpp
 @@ -33,6 +33,7 @@
  #include <QTextDocument>
  #include <QTimer>
@@ -123,7 +122,7 @@
  
  #include "shortcutmanager.h"
  #include "spellchecker/spellhighlighter.h"
-@@ -93,6 +94,13 @@ void ChatEdit::initActions()
+@@ -95,6 +96,13 @@ void ChatEdit::initActions()
  	act_showMessageLast= new QAction(this);
  	addAction(act_showMessageLast);
  	connect(act_showMessageLast, SIGNAL(triggered()), SLOT(showHistoryMessageLast()));
@@ -137,7 +136,7 @@
  }
  
  void ChatEdit::setShortcuts()
-@@ -119,6 +127,13 @@ void ChatEdit::setFont(const QFont &f)
+@@ -121,6 +129,13 @@ void ChatEdit::setFont(const QFont &f)
  	controller_->setFont(f);
  }
  
@@ -151,7 +150,7 @@
  bool ChatEdit::checkSpellingGloballyEnabled()
  {
  	return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
-@@ -223,8 +238,10 @@ void ChatEdit::contextMenuEvent(QContextMenuEvent *e)
+@@ -225,8 +240,10 @@ void ChatEdit::contextMenuEvent(QContext
  		}
  	}
  
@@ -164,7 +163,7 @@
  	e->accept();
  }
  
-@@ -299,6 +316,18 @@ void ChatEdit::showHistoryMessageNext()
+@@ -303,6 +320,18 @@ void ChatEdit::showHistoryMessageNext()
  	}
  }
  
@@ -182,8 +181,8 @@
 +
  void ChatEdit::showHistoryMessagePrev()
  {
- 	if (!typedMsgsHistory.isEmpty() && typedMsgsIndex > 0) {
-@@ -408,6 +437,24 @@ void ChatEdit::setCssString(const QString &css) {
+ 	if (!typedMsgsHistory.isEmpty() && (typedMsgsIndex > 0 || correction)) {
+@@ -426,6 +455,24 @@ void ChatEdit::setCssString(const QStrin
  	controller_->setCssString(css);
  }
  
@@ -208,9 +207,9 @@
  //----------------------------------------------------------------------------
  // LineEdit
  //----------------------------------------------------------------------------
---- a/src/msgmle.h
-+++ b/src/msgmle.h
-@@ -49,6 +49,7 @@ public:
+--- git.orig/src/msgmle.h
++++ git/src/msgmle.h
+@@ -51,6 +51,7 @@ public:
  	// reimplemented
  	QSize sizeHint() const;
  	void setFont(const QFont &);
@@ -218,7 +217,7 @@
  
  	static bool checkSpellingGloballyEnabled();
  	void setCheckSpelling(bool);
-@@ -59,6 +60,7 @@ public slots:
+@@ -65,6 +66,7 @@ public slots:
  	void clearMessageHistory();
  	void doHTMLTextMenu();
  	void setCssString(const QString& css);
@@ -226,7 +225,7 @@
  
  protected slots:
   	void applySuggestion();
-@@ -68,6 +70,8 @@ protected slots:
+@@ -74,6 +76,8 @@ protected slots:
  	void showHistoryMessagePrev();
  	void showHistoryMessageFirst();
  	void showHistoryMessageLast();
@@ -235,7 +234,7 @@
  
  protected:
  	// override the tab/esc behavior
-@@ -92,6 +96,8 @@ private:
+@@ -98,6 +102,8 @@ private:
  	QAction* act_showMessageNext;
  	QAction* act_showMessageFirst;
  	QAction* act_showMessageLast;
@@ -243,9 +242,9 @@
 +
  	QString currentText;
  	HTMLTextController *controller_;
- };
---- a/src/psichatdlg.cpp
-+++ b/src/psichatdlg.cpp
+ 	bool correction;
+--- git.orig/src/psichatdlg.cpp
++++ git/src/psichatdlg.cpp
 @@ -270,6 +270,7 @@ void PsiChatDlg::initUi()
  		ui_.vboxLayout1->insertWidget(0, winHeader_);
  	}
@@ -254,9 +253,9 @@
  
  	ui_.log->realTextWidget()->installEventFilter(this);
  	ui_.mini_prompt->hide();
---- a/src/webview.cpp
-+++ b/src/webview.cpp
-@@ -45,6 +45,11 @@ WebView::WebView(QWidget* parent) : QWebView(parent), possibleDragging(false), i
+--- git.orig/src/webview.cpp
++++ git/src/webview.cpp
+@@ -50,6 +50,11 @@ WebView::WebView(QWidget* parent) : QWeb
  	connect(page()->action(QWebPage::Cut), SIGNAL(triggered()), SLOT(textCopiedEvent()));
  	connect(page(), SIGNAL(loadStarted()), this, SLOT(loadStartedEvent()));
  	connect(page(), SIGNAL(loadFinished(bool)), this, SLOT(loadFinishedEvent(bool)));
@@ -268,7 +267,7 @@
  }
  
  void WebView::linkClickedEvent(const QUrl& url)
-@@ -68,6 +73,11 @@ void WebView::loadFinishedEvent(bool success)
+@@ -73,6 +78,11 @@ void WebView::loadFinishedEvent(bool suc
  	isLoading_ = false;
  }
  
@@ -280,7 +279,7 @@
  void WebView::contextMenuEvent(QContextMenuEvent* event)
  {
  	if (isLoading_) return;
-@@ -85,6 +95,7 @@ void WebView::contextMenuEvent(QContextMenuEvent* event)
+@@ -90,6 +100,7 @@ void WebView::contextMenuEvent(QContextM
  		menu = new QMenu(this);
  		if (!page()->selectedText().isEmpty()) {
  			menu->addAction(pageAction(QWebPage::Copy));
@@ -288,8 +287,8 @@
  		} else {
  			if (!menu->isEmpty()) {
  				menu->addSeparator();
---- a/src/webview.h
-+++ b/src/webview.h
+--- git.orig/src/webview.h
++++ git/src/webview.h
 @@ -100,13 +100,17 @@ private:
  	bool isLoading_;
  	QStringList jsBuffer_;
@@ -308,8 +307,8 @@
  };
  
  
---- a/src/widgets/psitextview.cpp
-+++ b/src/widgets/psitextview.cpp
+--- git.orig/src/widgets/psitextview.cpp
++++ git/src/widgets/psitextview.cpp
 @@ -25,6 +25,7 @@
  #include <QAbstractTextDocumentLayout>
  #include <QTextDocumentFragment>
@@ -318,7 +317,7 @@
  #include <QMimeData>
  
  #include "urlobject.h"
-@@ -79,6 +80,54 @@ PsiTextView::PsiTextView(QWidget *parent)
+@@ -79,6 +80,54 @@ PsiTextView::PsiTextView(QWidget *parent
  	viewport()->setMouseTracking(true); // we want to get all mouseMoveEvents
  }
  
@@ -373,7 +372,7 @@
  /**
   * This function returns true if vertical scroll bar is
   * at its maximum position.
-@@ -175,11 +224,7 @@ QString PsiTextView::getPlainText() const
+@@ -175,11 +224,7 @@ QString PsiTextView::getPlainText() cons
  
  void PsiTextView::contextMenuEvent(QContextMenuEvent *e)
  {
@@ -386,8 +385,8 @@
  	menu->exec(e->globalPos());
  	e->accept();
  	delete menu;
---- a/src/widgets/psitextview.h
-+++ b/src/widgets/psitextview.h
+--- git.orig/src/widgets/psitextview.h
++++ git/src/widgets/psitextview.h
 @@ -32,6 +32,9 @@ class PsiTextView : public QTextEdit
  public:
  	PsiTextView(QWidget *parent = 0);
