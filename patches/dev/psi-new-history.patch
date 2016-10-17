@@ -401,7 +401,7 @@
  												dispNick_, status_,
  												statusString_, priority_));
  			}
-@@ -784,6 +827,7 @@ void ChatDlg::doSend()
+@@ -780,6 +823,7 @@ void ChatDlg::doSend()
  
  void ChatDlg::doneSend()
  {
@@ -409,7 +409,7 @@
  	appendMessage(m_, true);
  	disconnect(chatEdit(), SIGNAL(textChanged()), this, SLOT(setComposing()));
  	chatEdit()->clear();
-@@ -812,6 +856,7 @@ void ChatDlg::encryptedMessageSent(int x
+@@ -808,6 +852,7 @@ void ChatDlg::encryptedMessageSent(int x
  
  void ChatDlg::incomingMessage(const Message &m)
  {
@@ -417,7 +417,7 @@
  	if (m.body().isEmpty() && m.subject().isEmpty() && m.urlList().isEmpty()) {
  		// Event message
  		if (m.containsEvent(CancelEvent)) {
-@@ -872,14 +917,16 @@ void ChatDlg::appendMessage(const Messag
+@@ -868,14 +913,16 @@ void ChatDlg::appendMessage(const Messag
  	// figure out the encryption state
  	bool encChanged = false;
  	bool encEnabled = false;
@@ -439,7 +439,7 @@
  				encEnabled? QString("<icon name=\"psi/cryptoYes\"> ") + tr("Encryption Enabled"):
  							QString("<icon name=\"psi/cryptoNo\"> ") + tr("Encryption Disabled"),
  				MessageView::System
-@@ -895,7 +942,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -891,7 +938,9 @@ void ChatDlg::appendMessage(const Messag
  	}
  
  	if (!m.subject().isEmpty()) {
@@ -450,21 +450,20 @@
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -925,10 +974,11 @@ void ChatDlg::appendMessage(const Messag
+@@ -921,9 +970,10 @@ void ChatDlg::appendMessage(const Messag
  	mv.setNick(whoNick(local));
- 	mv.setUserId(local?account()->jid().full():jid().full()); // theoretically, this can be inferred from the chat dialog properties
+ 	mv.setUserId(local?account()->jid().bare():jid().bare());
  	mv.setDateTime(m.timeStamp());
 -	mv.setSpooled(m.spooled());
 +	mv.setSpooled(historyState);
  	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
- 	mv.setReplaceId(m.replaceId());
 -	chatView()->dispatchMessage(mv);
 +	mv.setCarbonDirection(m.carbonDirection());
 +	dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
  		UrlList urls = m.urlList();
-@@ -936,11 +986,49 @@ void ChatDlg::appendMessage(const Messag
+@@ -931,11 +981,49 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
@@ -516,7 +515,7 @@
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
-@@ -962,7 +1050,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -957,7 +1045,7 @@ void ChatDlg::appendMessage(const Messag
  	//	messagesRead(jid());
  	//}
  
@@ -527,7 +526,7 @@
  	}
 --- git.orig/src/chatdlg.h
 +++ git/src/chatdlg.h
-@@ -33,6 +33,7 @@
+@@ -32,6 +32,7 @@
  #include "advwidget.h"
  
  #include "tabbablewidget.h"
@@ -535,7 +534,7 @@
  
  
  namespace XMPP
-@@ -88,6 +89,7 @@ public:
+@@ -87,6 +88,7 @@ public:
  	Jid realJid() const;
  	bool autoSelectContact() const {return autoSelectContact_;};
  	static UserStatus userStatusFor(const Jid& jid, QList<UserListItem*> ul, bool forceEmptyResource);
@@ -543,7 +542,7 @@
  
  signals:
  	void aInfo(const Jid &);
-@@ -148,6 +150,7 @@ private slots:
+@@ -146,6 +148,7 @@ private slots:
  	void addEmoticon(QString text);
  	void initComposing();
  	void setComposing();
@@ -551,18 +550,17 @@
  
  protected slots:
  	void checkComposing();
-@@ -167,7 +170,9 @@ protected:
- 	virtual void capsChanged();
- 	virtual void updateJidWidget(const QList<UserListItem*> &ul, int status, bool fromPresence);
+@@ -167,6 +170,9 @@ protected:
  	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
--
+ 
+ 	void appendMessage(const Message &, bool local = false);
 +	void holdMessages(bool hold);
 +	void dispatchMessage(const MessageView &mv);
 +	void displayMessage(const MessageView &mv);
  	virtual bool isEncryptionEnabled() const;
  
  public:
-@@ -214,9 +219,11 @@ private:
+@@ -212,9 +218,11 @@ private:
  	QTimer* composingTimer_;
  	bool isComposing_;
  	bool sendComposingEvents_;
@@ -576,31 +574,31 @@
  #endif
 --- git.orig/src/chatview_te.cpp
 +++ git/src/chatview_te.cpp
-@@ -86,6 +86,7 @@ ChatView::ChatView(QWidget *parent)
+@@ -80,6 +80,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconDeliveredPgp = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok_pgp").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
 +			logIconHistory = IconsetFactory::iconPixmap("psi/history").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
- 			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  		} else {
  			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive");
-@@ -96,6 +97,7 @@ ChatView::ChatView(QWidget *parent)
+ 			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send");
+@@ -89,6 +90,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconDeliveredPgp = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok_pgp");
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
 +			logIconHistory = IconsetFactory::iconPixmap("psi/history");
- 			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit");
  		}
  		addLogIconsResources();
-@@ -176,6 +178,7 @@ void ChatView::addLogIconsResources()
+ 	}
+@@ -167,6 +169,7 @@ void ChatView::addLogIconsResources()
+ 	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_info"), logIconInfo);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered_pgp"), logIconDeliveredPgp);
- 	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_corrected"), logIconCorrected);
 +	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_history"), logIconHistory);
  }
  
  void ChatView::markReceived(QString id)
-@@ -448,26 +451,47 @@ void ChatView::renderMucMessage(const Me
+@@ -369,26 +372,47 @@ void ChatView::renderMucMessage(const Me
  void ChatView::renderMessage(const MessageView &mv)
  {
  	QString timestr = formatTimeStamp(mv.dateTime());
@@ -664,9 +662,9 @@
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
 +	QPixmap logIconHistory;
- 	QPixmap logIconCorrected;
  	QAction *actQuote_;
  };
+ 
 --- git.orig/src/eventdb.cpp
 +++ git/src/eventdb.cpp
 @@ -28,23 +28,32 @@
@@ -5054,17 +5052,17 @@
  	inline QMap<QString, QString> urls() const { return _urls; }
 +	inline void setCarbonDirection(XMPP::Message::CarbonDir c) {_carbon = c; }
 +	inline XMPP::Message::CarbonDir carbonDirection() const { return _carbon; }
- 	inline void setReplaceId(const QString &id) { _replaceId = id; }
- 	inline const QString &replaceId() const { return _replaceId; }
  
-@@ -110,6 +114,7 @@ private:
+ 	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
+ 
+@@ -108,6 +112,7 @@ private:
  	QString _userText; // rich
  	QDateTime _dateTime;
  	QMap<QString, QString> _urls;
 +	XMPP::Message::CarbonDir _carbon;
- 	QString _replaceId;
  };
  
+ #endif
 --- git.orig/src/psiaccount.cpp
 +++ git/src/psiaccount.cpp
 @@ -4722,11 +4722,12 @@ void PsiAccount::dj_sendMessage(const Me
