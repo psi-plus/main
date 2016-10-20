@@ -450,20 +450,21 @@
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -921,9 +970,10 @@ void ChatDlg::appendMessage(const Messag
+@@ -921,10 +970,11 @@ void ChatDlg::appendMessage(const Messag
  	mv.setNick(whoNick(local));
- 	mv.setUserId(local?account()->jid().bare():jid().bare());
+ 	mv.setUserId(local?account()->jid().full():jid().full()); // theoretically, this can be inferred from the chat dialog properties
  	mv.setDateTime(m.timeStamp());
 -	mv.setSpooled(m.spooled());
 +	mv.setSpooled(historyState);
  	mv.setAwaitingReceipt(local && m.messageReceipt() == ReceiptRequest);
+ 	mv.setReplaceId(m.replaceId());
 -	chatView()->dispatchMessage(mv);
 +	mv.setCarbonDirection(m.carbonDirection());
 +	dispatchMessage(mv);
  
  	if (!m.urlList().isEmpty()) {
  		UrlList urls = m.urlList();
-@@ -931,11 +981,49 @@ void ChatDlg::appendMessage(const Messag
+@@ -931,11 +981,50 @@ void ChatDlg::appendMessage(const Messag
  		foreach (const Url &u, urls) {
  			urlsMap.insert(u.url(), u.desc());
  		}
@@ -472,6 +473,7 @@
 +		umv.setSpooled(historyState);
 +		dispatchMessage(umv);
  	}
++	emit messageAppended(body, chatView()->textWidget());
 +}
 +
 +void ChatDlg::holdMessages(bool hold)
@@ -515,7 +517,7 @@
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
-@@ -957,7 +1045,7 @@ void ChatDlg::appendMessage(const Messag
+@@ -957,11 +1046,10 @@ void ChatDlg::appendMessage(const Messag
  	//	messagesRead(jid());
  	//}
  
@@ -524,6 +526,10 @@
  		keepOpen_ = true;
  		QTimer::singleShot(1000, this, SLOT(setKeepOpenFalse()));
  	}
+-	emit messageAppended(body, chatView()->textWidget());
+ }
+ 
+ void ChatDlg::updateIsComposing(bool b)
 --- git.orig/src/chatdlg.h
 +++ git/src/chatdlg.h
 @@ -32,6 +32,7 @@
@@ -550,16 +556,16 @@
  
  protected slots:
  	void checkComposing();
-@@ -167,6 +170,9 @@ protected:
- 	virtual void contactUpdated(UserListItem* u, int status, const QString& statusString);
- 
- 	void appendMessage(const Message &, bool local = false);
+@@ -159,6 +162,9 @@ protected:
+ 	void updateRealJid();
+ 	void resetComposing();
+ 	void doneSend();
 +	void holdMessages(bool hold);
 +	void dispatchMessage(const MessageView &mv);
 +	void displayMessage(const MessageView &mv);
- 	virtual bool isEncryptionEnabled() const;
- 
- public:
+ 	virtual void setLooks();
+ 	void setSelfDestruct(int);
+ 	virtual void chatEditCreated();
 @@ -212,9 +218,11 @@ private:
  	QTimer* composingTimer_;
  	bool isComposing_;
@@ -574,26 +580,26 @@
  #endif
 --- git.orig/src/chatview_te.cpp
 +++ git/src/chatview_te.cpp
-@@ -80,6 +80,7 @@ ChatView::ChatView(QWidget *parent)
- 			logIconDeliveredPgp = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok_pgp").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
+@@ -81,6 +81,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
+ 			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
 +			logIconHistory = IconsetFactory::iconPixmap("psi/history").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  		} else {
  			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive");
  			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send");
-@@ -89,6 +90,7 @@ ChatView::ChatView(QWidget *parent)
- 			logIconDeliveredPgp = IconsetFactory::iconPixmap("psi/notification_chat_delivery_ok_pgp");
+@@ -90,6 +91,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
+ 			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit");
 +			logIconHistory = IconsetFactory::iconPixmap("psi/history");
  		}
  		addLogIconsResources();
  	}
-@@ -167,6 +169,7 @@ void ChatView::addLogIconsResources()
- 	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_info"), logIconInfo);
+@@ -168,6 +170,7 @@ void ChatView::addLogIconsResources()
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered_pgp"), logIconDeliveredPgp);
+ 	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_corrected"), logIconCorrected);
 +	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_history"), logIconHistory);
  }
  
@@ -657,10 +663,10 @@
  		deferredScroll();
 --- git.orig/src/chatview_te.h
 +++ git/src/chatview_te.h
-@@ -113,6 +113,7 @@ private:
- 	QPixmap logIconDeliveredPgp;
+@@ -114,6 +114,7 @@ private:
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
+ 	QPixmap logIconCorrected;
 +	QPixmap logIconHistory;
  	QAction *actQuote_;
  };
@@ -5046,19 +5052,19 @@
  class MessageView
  {
  public:
-@@ -89,6 +91,8 @@ public:
- 	inline void setDateTime(const QDateTime &dt) { _dateTime = dt; }
- 	inline const QDateTime &dateTime() const { return _dateTime; }
+@@ -91,6 +93,8 @@ public:
  	inline QMap<QString, QString> urls() const { return _urls; }
+ 	inline void setReplaceId(const QString &id) { _replaceId = id; }
+ 	inline const QString &replaceId() const { return _replaceId; }
 +	inline void setCarbonDirection(XMPP::Message::CarbonDir c) {_carbon = c; }
 +	inline XMPP::Message::CarbonDir carbonDirection() const { return _carbon; }
  
  	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
  
-@@ -108,6 +112,7 @@ private:
- 	QString _userText; // rich
+@@ -109,6 +113,7 @@ private:
  	QDateTime _dateTime;
  	QMap<QString, QString> _urls;
+ 	QString _replaceId;
 +	XMPP::Message::CarbonDir _carbon;
  };
  
