@@ -1,0 +1,69 @@
+--- a/src/chatdlg.cpp
++++ b/src/chatdlg.cpp
+@@ -935,7 +935,7 @@ void ChatDlg::appendMessage(const Message &m, bool local)
+ 	}
+ 
+ 	// if we're not active, notify the user by changing the title
+-	if (!isActiveTab()) {
++	if (!isActiveTab() && m.carbonDirection() != Message::Sent) {
+ 		++pending_;
+ 		invalidateTab();
+ 		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
+diff --git a/src/psiaccount.cpp b/src/psiaccount.cpp
+index 88d7489..bb57754 100644
+--- a/src/psiaccount.cpp
++++ b/src/psiaccount.cpp
+@@ -3330,12 +3330,12 @@ ChatDlg* PsiAccount::findChatDialog(const Jid& jid, bool compareResource) const
+ 	return findDialog<ChatDlg*>(jid, compareResource);
+ }
+ 
+-ChatDlg* PsiAccount::findChatDialogEx(const Jid& jid) const
++ChatDlg* PsiAccount::findChatDialogEx(const Jid& jid, bool ignoreResource) const
+ {
+ 	ChatDlg* cm1 = NULL;
+ 	ChatDlg* cm2 = NULL;
+ 	foreach (ChatDlg *cl, findChatDialogs(jid, false)) {
+-		if (cl->autoSelectContact())
++		if (cl->autoSelectContact() || ignoreResource)
+ 			return cl;
+ 		if (!cm1 && jid.resource() == cl->jid().resource()) {
+ 				cm1 = cl;
+@@ -5163,8 +5163,8 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+ 				doPopup = false;
+ 			}
+ 
+-			ChatDlg *c = findChatDialogEx(chatJid);
+-			if (c)
++			ChatDlg *c = findChatDialogEx(chatJid, m.carbonDirection() == Message::Sent);
++			if (c && c->jid().resource().isEmpty())
+ 				c->setJid(chatJid);
+ 
+ 			//if the chat exists, and is either open in a tab,
+@@ -5234,6 +5234,11 @@ void PsiAccount::handleEvent(const PsiEvent::Ptr &e, ActivationType activationTy
+ 			soundType = eSystem;
+ 		}
+ 
++		if (m.carbonDirection() == Message::Sent) {
++			doPopup = false;
++			soundType = eNone;
++			putToQueue = false;
++		}
+ 		if(m.type() == "error") {
+ 			// FIXME: handle message errors
+ 			//msg.text = QString(tr("<big>[Error Message]</big><br>%1").arg(plain2rich(msg.text)));
+diff --git a/src/psiaccount.h b/src/psiaccount.h
+index 2df5e69..5df4b93 100644
+--- a/src/psiaccount.h
++++ b/src/psiaccount.h
+@@ -167,7 +167,7 @@ public:
+ 	void passwordReady(QString password);
+ 
+ 	ChatDlg* findChatDialog(const Jid& jid, bool compareResource = true) const;
+-	ChatDlg* findChatDialogEx(const Jid& jid) const;
++	ChatDlg* findChatDialogEx(const Jid& jid, bool ignoreResource = false) const;
+ 	QList<ChatDlg*> findChatDialogs(const Jid& jid, bool compareResource = true) const;
+ 
+ 	QList<PsiContact*> activeContacts() const;
+-- 
+2.9.3
+
