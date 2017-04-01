@@ -1331,7 +1331,7 @@
  PsiEvent::Ptr EDBFlatFile::File::lineToEvent(const QString &line)
  {
  	// -- read the line --
-@@ -966,3 +958,828 @@ QString EDBFlatFile::File::eventToLine(c
+@@ -966,3 +958,831 @@ QString EDBFlatFile::File::eventToLine(c
  
  	return "";
  }
@@ -1948,21 +1948,24 @@
 +		PreparedQuery *query = queryes.getPreparedQuery(QueryJidRowId, false, false);
 +		query->bindValue(":jid", jid.full());
 +		query->bindValue(":acc_id", accId);
-+		if (query->exec() && query->next()) {
-+			const qint64 id = query->record().value("id").toLongLong();
-+			QSqlQuery query2(QSqlDatabase::database("history"));
-+			query2.prepare("DELETE FROM `events` WHERE `contact_id` = :id;");
-+			query2.bindValue(":id", id);
-+			if (query2.exec()) {
-+				res = true;
-+				query2.prepare("DELETE FROM `contacts` WHERE `id` = :id AND `lifetime` = -1;");
++		if (query->exec()) {
++			if (query->next()) {
++				const qint64 id = query->record().value("id").toLongLong();
++				QSqlQuery query2(QSqlDatabase::database("history"));
++				query2.prepare("DELETE FROM `events` WHERE `contact_id` = :id;");
 +				query2.bindValue(":id", id);
 +				if (query2.exec()) {
-+					if (query2.numRowsAffected() > 0)
++					res = true;
++					query2.prepare("DELETE FROM `contacts` WHERE `id` = :id AND `lifetime` = -1;");
++					query2.bindValue(":id", id);
++					if (query2.exec()) {
++						if (query2.numRowsAffected() > 0)
 +							jidsCache.clear();
-+				} else
-+					res = false;
++					} else
++						res = false;
++				}
 +			}
++			query->freeResult();
 +		}
 +	}
 +	if (res)
