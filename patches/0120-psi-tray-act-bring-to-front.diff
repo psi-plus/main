@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -217,6 +217,7 @@ QLineEdit#le_status_text {
+@@ -221,6 +221,7 @@ QLineEdit#le_status_text {
  				<lockdown-roster type="bool">false</lockdown-roster>
  				<raise-on-new-event type="bool">false</raise-on-new-event>
  				<quit-on-close type="bool">false</quit-on-close>
@@ -32,7 +32,7 @@
  	void registerActions();
  	IconAction* getAction( QString name );
  	void updateMenu(QStringList actions, QMenu* menu);
-@@ -1482,7 +1490,23 @@ void MainWin::closeEvent(QCloseEvent* e)
+@@ -1479,7 +1487,23 @@ void MainWin::closeEvent(QCloseEvent* e)
  
  void MainWin::changeEvent(QEvent *event)
  {
@@ -57,7 +57,7 @@
  	    event->type() == QEvent::WindowStateChange)
  	{
  		if (d->mainTabs) {
-@@ -1610,18 +1634,42 @@ void MainWin::optionsUpdate()
+@@ -1607,18 +1631,42 @@ void MainWin::optionsUpdate()
  	updateTray();
  }
  
@@ -106,7 +106,7 @@
  	if (!d->tray) {
  		return;
  	}
-@@ -1639,32 +1687,21 @@ void MainWin::trayClicked(const QPoint &, int button)
+@@ -1636,32 +1684,21 @@ void MainWin::trayClicked(const QPoint &, int button)
  		return;
  	}
  
@@ -149,7 +149,7 @@
  void MainWin::trayShow()
 --- a/src/mainwin.h
 +++ b/src/mainwin.h
-@@ -180,7 +180,7 @@ public slots:
+@@ -182,7 +182,7 @@ public slots:
  	void optionsUpdate();
  	void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
  
@@ -160,19 +160,18 @@
  
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -359,6 +359,10 @@ SOURCES += \
- 	$$PWD/mcmdcompletion.cpp \
- 	$$PWD/captchadlg.cpp
+@@ -636,6 +636,10 @@ win32:!dbus {
+ 	LIBS += -lUser32
+ }
  
 +unix:!macx:!haiku {
 +	HEADERS += $$PWD/x11windowsystem.h
 +	SOURCES += $$PWD/x11windowsystem.cpp
 +}
  
- CONFIG += filetransfer
- filetransfer {
+ unix:!dbus {
+ 	SOURCES += $$PWD/activeprofiles_stub.cpp
 new file mode 100644
-index 0000000..ea1ae7d
 --- /dev/null
 +++ b/src/x11windowsystem.cpp
 @@ -0,0 +1,215 @@
