@@ -401,7 +401,7 @@
  												dispNick_, status_,
  												statusString_, priority_));
  			}
-@@ -784,6 +827,7 @@ void ChatDlg::doSend()
+@@ -788,6 +831,7 @@ void ChatDlg::doSend()
  
  void ChatDlg::doneSend()
  {
@@ -409,7 +409,7 @@
  	appendMessage(m_, true);
  	disconnect(chatEdit(), SIGNAL(textChanged()), this, SLOT(setComposing()));
  	chatEdit()->clear();
-@@ -812,6 +856,7 @@ void ChatDlg::encryptedMessageSent(int x
+@@ -816,6 +860,7 @@ void ChatDlg::encryptedMessageSent(int x
  
  void ChatDlg::incomingMessage(const Message &m)
  {
@@ -417,7 +417,7 @@
  	if (m.body().isEmpty() && m.subject().isEmpty() && m.urlList().isEmpty()) {
  		// Event message
  		if (m.containsEvent(CancelEvent)) {
-@@ -872,14 +917,16 @@ void ChatDlg::appendMessage(const Messag
+@@ -876,14 +921,16 @@ void ChatDlg::appendMessage(const Messag
  	// figure out the encryption state
  	bool encChanged = false;
  	bool encEnabled = false;
@@ -439,7 +439,7 @@
  				encEnabled? QString("<icon name=\"psi/cryptoYes\"> ") + tr("Encryption Enabled"):
  							QString("<icon name=\"psi/cryptoNo\"> ") + tr("Encryption Disabled"),
  				MessageView::System
-@@ -895,7 +942,9 @@ void ChatDlg::appendMessage(const Messag
+@@ -899,7 +946,9 @@ void ChatDlg::appendMessage(const Messag
  	}
  
  	if (!m.subject().isEmpty()) {
@@ -450,7 +450,7 @@
  	}
  
  	MessageView mv(MessageView::Message);
-@@ -925,10 +974,11 @@ void ChatDlg::appendMessage(const Messag
+@@ -929,10 +978,11 @@ void ChatDlg::appendMessage(const Messag
  	mv.setNick(whoNick(local));
  	mv.setUserId(local?account()->jid().full():jid().full()); // theoretically, this can be inferred from the chat dialog properties
  	mv.setDateTime(m.timeStamp());
@@ -464,7 +464,7 @@
  
  	if (!m.urlList().isEmpty()) {
  		UrlList urls = m.urlList();
-@@ -938,12 +988,52 @@ void ChatDlg::appendMessage(const Messag
+@@ -942,12 +992,52 @@ void ChatDlg::appendMessage(const Messag
  		}
  		// Some XMPP clients send links to HTTP uploaded files both in body and in jabber:x:oob.
  		// It's convenient to show only body if OOB data brings no additional information.
@@ -520,7 +520,7 @@
  		++pending_;
  		invalidateTab();
  		if (PsiOptions::instance()->getOption("options.ui.flash-windows").toBool()) {
-@@ -965,11 +1055,10 @@ void ChatDlg::appendMessage(const Messag
+@@ -969,11 +1059,10 @@ void ChatDlg::appendMessage(const Messag
  	//	messagesRead(jid());
  	//}
  
@@ -583,7 +583,7 @@
  #endif
 --- git.orig/src/chatview_te.cpp
 +++ git/src/chatview_te.cpp
-@@ -87,6 +87,7 @@ ChatView::ChatView(QWidget *parent)
+@@ -88,6 +88,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
  			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit").scaledToHeight(logIconsSize, Qt::SmoothTransformation);
@@ -591,7 +591,7 @@
  		} else {
  			logIconReceive = IconsetFactory::iconPixmap("psi/notification_chat_receive");
  			logIconSend = IconsetFactory::iconPixmap("psi/notification_chat_send");
-@@ -97,6 +98,7 @@ ChatView::ChatView(QWidget *parent)
+@@ -98,6 +99,7 @@ ChatView::ChatView(QWidget *parent)
  			logIconTime = IconsetFactory::iconPixmap("psi/notification_chat_time");
  			logIconInfo = IconsetFactory::iconPixmap("psi/notification_chat_info");
  			logIconCorrected = IconsetFactory::iconPixmap("psi/action_templates_edit");
@@ -599,7 +599,7 @@
  		}
  		addLogIconsResources();
  	}
-@@ -176,6 +178,7 @@ void ChatView::addLogIconsResources()
+@@ -177,6 +179,7 @@ void ChatView::addLogIconsResources()
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered"), logIconDelivered);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_delivered_pgp"), logIconDeliveredPgp);
  	document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_corrected"), logIconCorrected);
@@ -607,7 +607,7 @@
  }
  
  void ChatView::markReceived(QString id)
-@@ -448,26 +451,47 @@ void ChatView::renderMucMessage(const Me
+@@ -459,28 +462,49 @@ void ChatView::renderMucMessage(const Me
  void ChatView::renderMessage(const MessageView &mv)
  {
  	QString timestr = formatTimeStamp(mv.dateTime());
@@ -643,22 +643,24 @@
 +		icon = QString("<img src=\"%1\" />").arg(sRes);
 +	}
 +	QString str;
+ 
+ 	QString inner = mv.formattedText() + replaceMarker(mv);
  	if (mv.isEmote()) {
--		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>");
-+		str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + mv.formattedText() + "</span>";
+-		appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + inner + "</span>");
++		str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1]").arg(timestr) + QString(" *%1 ").arg(TextUtil::escape(mv.nick())) + inner + "</span>";
  	} else {
  		if (PsiOptions::instance()->getOption("options.ui.chat.use-chat-says-style").toBool()) {
--			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</span><br>" + mv.formattedText());
+-			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</span><br>" + inner);
 +			str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] ").arg(timestr) + tr("%1 says:").arg(TextUtil::escape(mv.nick())) + "</span><br>";
  		}
  		else {
--			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + mv.formattedText());
+-			appendText(icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ") + inner);
 +			str = icon + QString("<span style=\"color: %1\">").arg(color) + QString("[%1] &lt;").arg(timestr) + TextUtil::escape(mv.nick()) + QString("&gt;</span> ");
  		}
 +		if (mv.isSpooled())
-+			str.append(QString("<span style=\"color: %1\">%2</span>").arg(ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name()).arg(mv.formattedText()));
++			str.append(QString("<span style=\"color: %1\">%2</span>").arg(ColorOpt::instance()->color("options.ui.look.colors.messages.usertext").name()).arg(inner));
 +		else
-+			str.append(mv.formattedText());
++			str.append(inner);
  	}
 +	appendText(str);
  
@@ -666,7 +668,7 @@
  		deferredScroll();
 --- git.orig/src/chatview_te.h
 +++ git/src/chatview_te.h
-@@ -114,6 +114,7 @@ private:
+@@ -121,6 +121,7 @@ private:
  	QPixmap logIconTime;
  	QPixmap logIconInfo;
  	QPixmap logIconCorrected;
@@ -674,239 +676,14 @@
  	QAction *actQuote_;
  };
  
---- git.orig/src/eventdb.cpp
-+++ git/src/eventdb.cpp
-@@ -28,23 +28,32 @@
- #include <QTimer>
- #include <QTextStream>
- #include <QDateTime>
--
-+#include <QSqlError>
-+#include <QSqlDriver>
-+#ifndef HAVE_QT5
-+#include <qjson/parser.h>
-+#include "qjson/serializer.h"
-+#else
-+#include <QJsonArray>
-+#include <QJsonDocument>
-+#include <QJsonObject>
-+#endif
- #include "common.h"
- #include "applicationinfo.h"
- #include "psievent.h"
-+#include "psicontactlist.h"
- #include "jidutil.h"
-+#include "historyimp.h"
- 
- using namespace XMPP;
- 
- //----------------------------------------------------------------------------
- // EDBItem
- //----------------------------------------------------------------------------
--EDBItem::EDBItem(const PsiEvent::Ptr &event, const QString &id, const QString &prevId, const QString &nextId)
-+EDBItem::EDBItem(const PsiEvent::Ptr &event, const QString &id)
- {
- 	e = event;
- 	v_id = id;
--	v_prevId = prevId;
--	v_nextId = nextId;
- }
- 
- EDBItem::~EDBItem()
-@@ -61,17 +70,6 @@ const QString & EDBItem::id() const
- 	return v_id;
- }
- 
--const QString & EDBItem::nextId() const
--{
--	return v_nextId;
--}
--
--const QString & EDBItem::prevId() const
--{
--	return v_prevId;
--}
--
--
- //----------------------------------------------------------------------------
- // EDBHandle
- //----------------------------------------------------------------------------
-@@ -81,6 +79,7 @@ public:
- 	Private() {}
- 
- 	EDB *edb;
-+	int beginRow_;
- 	EDBResult r;
- 	bool busy;
- 	bool writeSuccess;
-@@ -93,6 +92,7 @@ EDBHandle::EDBHandle(EDB *edb)
- {
- 	d = new Private;
- 	d->edb = edb;
-+	d->beginRow_ = 0;
- 	d->busy = false;
- 	d->writeSuccess = false;
- 	d->listeningFor = -1;
-@@ -108,53 +108,32 @@ EDBHandle::~EDBHandle()
- 	delete d;
- }
- 
--void EDBHandle::getLatest(const Jid &j, int len)
--{
--	d->busy = true;
--	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_getLatest(j, len);
--}
--
--void EDBHandle::getOldest(const Jid &j, int len)
-+void EDBHandle::get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int begin, int len)
- {
- 	d->busy = true;
- 	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_getOldest(j, len);
-+	d->listeningFor = d->edb->op_get(accId, jid, date, direction, begin, len);
- }
- 
--void EDBHandle::get(const Jid &j, const QString &id, int direction, int len)
-+void EDBHandle::find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction)
- {
- 	d->busy = true;
- 	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_get(j, id, direction, len);
-+	d->listeningFor = d->edb->op_find(accId, str, jid, date, direction);
- }
- 
--void EDBHandle::getByDate(const Jid &j, QDateTime first, QDateTime last)
--{
--	d->busy = true;
--	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_getByDate(j, first, last);
--}
--
--void EDBHandle::find(const QString &str, const Jid &j, const QString &id, int direction)
--{
--	d->busy = true;
--	d->lastRequestType = Read;
--	d->listeningFor = d->edb->op_find(str, j, id, direction);
--}
--
--void EDBHandle::append(const Jid &j, const PsiEvent::Ptr &e)
-+void EDBHandle::append(const QString &accId, const Jid &j, const PsiEvent::Ptr &e, int type)
- {
- 	d->busy = true;
- 	d->lastRequestType = Write;
--	d->listeningFor = d->edb->op_append(j, e);
-+	d->listeningFor = d->edb->op_append(accId, j, e, type);
- }
- 
--void EDBHandle::erase(const Jid &j)
-+void EDBHandle::erase(const QString &accId, const Jid &j)
- {
- 	d->busy = true;
- 	d->lastRequestType = Erase;
--	d->listeningFor = d->edb->op_erase(j);
-+	d->listeningFor = d->edb->op_erase(accId, j);
- }
- 
- bool EDBHandle::busy() const
-@@ -198,6 +177,11 @@ int EDBHandle::lastRequestType() const
- 	return d->lastRequestType;
- }
- 
-+int EDBHandle::beginRow() const
-+{
-+	return d->beginRow_;
-+}
-+
- 
- //----------------------------------------------------------------------------
- // EDB
-@@ -209,12 +193,14 @@ public:
- 
- 	QList<EDBHandle*> list;
- 	int reqid_base;
-+	PsiCon *psi;
- };
- 
--EDB::EDB()
-+EDB::EDB(PsiCon *psi)
- {
- 	d = new Private;
- 	d->reqid_base = 0;
-+	d->psi = psi;
- }
- 
- EDB::~EDB()
-@@ -239,46 +225,32 @@ void EDB::unreg(EDBHandle *h)
- 	d->list.removeAll(h);
- }
- 
--int EDB::op_getLatest(const Jid &j, int len)
--{
--	return getLatest(j, len);
--}
--
--int EDB::op_getOldest(const Jid &j, int len)
--{
--	return getOldest(j, len);
--}
--
--int EDB::op_get(const Jid &jid, const QString &id, int direction, int len)
--{
--	return get(jid, id, direction, len);
--}
--
--int EDB::op_getByDate(const Jid &j, QDateTime first, QDateTime last)
-+int EDB::op_get(const QString &accId, const Jid &jid, const QDateTime date, int direction, int start, int len)
- {
--	return getByDate(j, first, last);
-+	return get(accId, jid, date, direction, start, len);
- }
- 
--int EDB::op_find(const QString &str, const Jid &j, const QString &id, int direction)
-+int EDB::op_find(const QString &accId, const QString &str, const Jid &j, const QDateTime date, int direction)
- {
--	return find(str, j, id, direction);
-+	return find(accId, str, j, date, direction);
- }
- 
--int EDB::op_append(const Jid &j, const PsiEvent::Ptr &e)
-+int EDB::op_append(const QString &accId, const Jid &j, const PsiEvent::Ptr &e, int type)
- {
--	return append(j, e);
-+	return append(accId, j, e, type);
- }
- 
--int EDB::op_erase(const Jid &j)
-+int EDB::op_erase(const QString &accId, const Jid &j)
- {
--	return erase(j);
-+	return erase(accId, j);
- }
- 
--void EDB::resultReady(int req, EDBResult r)
-+void EDB::resultReady(int req, EDBResult r, int begin_row)
- {
- 	// deliver
- 	foreach(EDBHandle* h, d->list) {
- 		if(h->listeningFor() == req) {
-+			h->d->beginRow_ = begin_row;
- 			h->edb_resultReady(r);
- 			return;
- 		}
-@@ -296,6 +268,11 @@ void EDB::writeFinished(int req, bool b)
- 	}
- }
- 
-+inline PsiCon *EDB::psi()
-+{
-+	return d->psi;
-+}
-+
- 
+--- git.orig/src/edbflatfile.cpp
++++ git/src/edbflatfile.cpp
+@@ -38,25 +38,23 @@ using namespace XMPP;
  //----------------------------------------------------------------------------
  // EDBFlatFile
-@@ -304,21 +281,18 @@ struct item_file_req
+ //----------------------------------------------------------------------------
++
+ struct item_file_req
  {
  	Jid j;
  	int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
@@ -930,7 +707,7 @@
  		Type_erase
  	};
  };
-@@ -332,8 +306,8 @@ public:
+@@ -70,8 +68,8 @@ public:
  	QList<item_file_req*> rlist;
  };
  
@@ -941,7 +718,7 @@
  {
  	d = new Private;
  }
-@@ -347,64 +321,23 @@ EDBFlatFile::~EDBFlatFile()
+@@ -85,64 +83,23 @@ EDBFlatFile::~EDBFlatFile()
  	delete d;
  }
  
@@ -1010,7 +787,7 @@
  {
  	item_file_req *r = new item_file_req;
  	r->j = j;
-@@ -412,7 +345,7 @@ int EDBFlatFile::find(const QString &str
+@@ -150,7 +107,7 @@ int EDBFlatFile::find(const QString &str
  	r->len = 1;
  	r->dir = direction;
  	r->findStr = str;
@@ -1019,7 +796,7 @@
  	r->id = genUniqueId();
  	d->rlist.append(r);
  
-@@ -420,8 +353,10 @@ int EDBFlatFile::find(const QString &str
+@@ -158,8 +115,10 @@ int EDBFlatFile::find(const QString &str
  	return r->id;
  }
  
@@ -1031,7 +808,7 @@
  	item_file_req *r = new item_file_req;
  	r->j = j;
  	r->type = item_file_req::Type_append;
-@@ -438,7 +373,7 @@ int EDBFlatFile::append(const Jid &j, co
+@@ -176,7 +135,7 @@ int EDBFlatFile::append(const Jid &j, co
  	return r->id;
  }
  
@@ -1040,7 +817,7 @@
  {
  	item_file_req *r = new item_file_req;
  	r->j = j;
-@@ -450,6 +385,22 @@ int EDBFlatFile::erase(const Jid &j)
+@@ -188,6 +147,22 @@ int EDBFlatFile::erase(const Jid &j)
  	return r->id;
  }
  
@@ -1063,14 +840,13 @@
  EDBFlatFile::File *EDBFlatFile::findFile(const Jid &j) const
  {
  	foreach(File* i, d->flist) {
-@@ -503,25 +454,10 @@ void EDBFlatFile::performRequests()
+@@ -241,26 +216,9 @@ void EDBFlatFile::performRequests()
  
  	File *f = ensureFile(r->j);
  	int type = r->type;
 -	if(type >= item_file_req::Type_getLatest && type <= item_file_req::Type_get) {
 -		int id, direction;
-+	if(type == item_file_req::Type_get) {
- 
+-
 -		if(type == item_file_req::Type_getLatest) {
 -			direction = Backward;
 -			id = f->total()-1;
@@ -1087,36 +863,51 @@
 -			qWarning("EDBFlatFile::performRequests(): Invalid type.");
 -			return;
 -		}
+-
++	if(type == item_file_req::Type_get) {
 +		int direction = r->dir;
 +		int id = f->getId(r->date, direction, r->start);
- 
  		int len;
  		if(direction == Forward) {
-@@ -538,15 +474,11 @@ void EDBFlatFile::performRequests()
+ 			if(id + r->len > f->total())
+@@ -276,90 +234,63 @@ void EDBFlatFile::performRequests()
  		}
  
  		EDBResult result;
-+		int startId = id;
- 		for(int n = 0; n < len; ++n) {
- 			PsiEvent::Ptr e(f->get(id));
- 			if(e) {
+-		for(int n = 0; n < len; ++n) {
+-			PsiEvent::Ptr e(f->get(id));
+-			if(e) {
 -				QString prevId, nextId;
 -				if(id > 0)
 -					prevId = QString::number(id-1);
 -				if(id < f->total()-1)
 -					nextId = QString::number(id+1);
 -				EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
-+				EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
- 				result.append(ei);
- 			}
+-				result.append(ei);
+-			}
++		int startId = 0;
++		if (id != -1) {
++			startId = id;
++			for(int n = 0; n < len; ++n) {
++				PsiEvent::Ptr e(f->get(id));
++				if(e) {
++					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
++					result.append(ei);
++				}
  
-@@ -555,30 +487,26 @@ void EDBFlatFile::performRequests()
- 			else
- 				--id;
+-			if(direction == Forward)
+-				++id;
+-			else
+-				--id;
++				if(direction == Forward)
++					++id;
++				else
++					--id;
++			}
++			if (direction == Backward)
++				startId = id + 1;
  		}
 -		resultReady(r->id, result);
-+		if (direction == Backward)
-+			startId = id + 1;
 +		resultReady(r->id, result, startId);
  	}
  	else if(type == item_file_req::Type_append) {
@@ -1126,10 +917,15 @@
 -		int id = r->eventId;
 +		int id = f->getId(r->date, r->dir, r->start);
  		EDBResult result;
- 		while(1) {
- 			PsiEvent::Ptr e(f->get(id));
- 			if(!e)
- 				break;
+-		while(1) {
+-			PsiEvent::Ptr e(f->get(id));
+-			if(!e)
+-				break;
++		if (id != -1) {
++			while(1) {
++				PsiEvent::Ptr e(f->get(id));
++				if(!e)
++					break;
  
 -			QString prevId, nextId;
 -			if(id > 0)
@@ -1137,25 +933,36 @@
 -			if(id < f->total()-1)
 -				nextId = QString::number(id+1);
 -
- 			if(e->type() == PsiEvent::Message) {
- 				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
- 				const Message &m = me->message();
- 				if(m.body().indexOf(r->findStr, 0, Qt::CaseInsensitive) != -1) {
+-			if(e->type() == PsiEvent::Message) {
+-				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
+-				const Message &m = me->message();
+-				if(m.body().indexOf(r->findStr, 0, Qt::CaseInsensitive) != -1) {
 -					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
-+					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
- 					result.append(ei);
- 					//commented line below to return ALL(instead of just first) messages that contain findStr
- 					//break;
-@@ -590,40 +518,17 @@ void EDBFlatFile::performRequests()
- 			else
- 				--id;
- 		}
+-					result.append(ei);
+-					//commented line below to return ALL(instead of just first) messages that contain findStr
+-					//break;
++				if(e->type() == PsiEvent::Message) {
++					MessageEvent::Ptr me = e.staticCast<MessageEvent>();
++					const Message &m = me->message();
++					if(m.body().indexOf(r->findStr, 0, Qt::CaseInsensitive) != -1) {
++						EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id)));
++						result.append(ei);
++						//commented line below to return ALL(instead of just first) messages that contain findStr
++						//break;
++					}
+ 				}
+-			}
+ 
+-			if(r->dir == Forward)
+-				++id;
+-			else
+-				--id;
+-		}
 -		resultReady(r->id, result);
 -	}
 -	else if(type == item_file_req::Type_getByDate ) {
--		int id = 0;
 -		EDBResult result;
--		for (int i=0; i < f->total(); ++i) {
+-		for (int id = f->findNearestDate(r->first); id < f->total(); ++id) {
 -			PsiEvent::Ptr e(f->get(id));
 -			if(!e)
 -				continue;
@@ -1169,30 +976,32 @@
 -			if(e->type() == PsiEvent::Message) {
 -				MessageEvent::Ptr me = e.staticCast<MessageEvent>();
 -				const Message &m = me->message();
--				if(m.timeStamp() > r->first && m.timeStamp() < r->last ) {
+-				if(m.timeStamp() > r->first) {
+-					if (m.timeStamp() >= r->last )
+-						break;
 -					EDBItemPtr ei = EDBItemPtr(new EDBItem(e, QString::number(id), prevId, nextId));
 -					result.append(ei);
 -				}
--			}
--
--			++id;
--		}
++				if(r->dir == Forward)
++					++id;
++				else
++					--id;
+ 			}
+ 		}
 -		resultReady(r->id, result);
 +		resultReady(r->id, result, 0);
  	}
- 
+-
  	else if(type == item_file_req::Type_erase) {
  		writeFinished(r->id, deleteFile(f->j));
  	}
- 
 +	else {
 +		qWarning("EDBFlatFile::performRequests(): Invalid type.");
 +	}
-+
+ 
  	delete r;
  }
- 
-@@ -676,7 +581,28 @@ EDBFlatFile::File::~File()
+@@ -413,7 +344,28 @@ EDBFlatFile::File::~File()
  
  QString EDBFlatFile::File::jidToFileName(const XMPP::Jid &j)
  {
@@ -1222,7 +1031,7 @@
  }
  
  void EDBFlatFile::File::ensureIndex()
-@@ -728,6 +654,59 @@ int EDBFlatFile::File::total() const
+@@ -465,6 +417,41 @@ int EDBFlatFile::File::total() const
  	return d->index.size();
  }
  
@@ -1236,105 +1045,127 @@
 +		return total() - offset - 1;
 +	}
 +	ensureIndex();
-+	int id = findIdByNearDate(date, 0, total()-1);
-+	if (id != -1) {
-+		QDateTime fDate = getLineDate(getLine(id));
-+		if (dir == EDBFlatFile::Forward) {
-+			if (fDate < date)
-+				++id;
-+			id += offset;
-+		} else {
-+			if (fDate > date)
-+				--id;
-+			id -= offset;
-+		}
-+		if (id >= total())
-+			id = total() - 1;
-+		else if (id < 0)
-+			id = 0;
++	int id = findNearestDate(date);
++	if (id != -1)
++		return -1;
++
++	QDateTime fDate = getDate(id);
++	if (!fDate.isValid())
++		return -1;
++
++	if (dir == EDBFlatFile::Forward) {
++		if (fDate < date)
++			++id;
++		id += offset;
 +	}
++	else {
++		if (fDate > date)
++			--id;
++		id -= offset;
++	}
++	if (id >= total())
++		id = total() - 1;
++	else if (id < 0)
++		id = 0;
 +	return id;
 +}
 +
-+int EDBFlatFile::File::findIdByNearDate(QDateTime &date, int start, int end)
-+{
-+	if (start == end)
-+		return start;
+ /*
+  * This method returns an index of a string with the event
+  * which has the nearest date to the specified one.
+--- git.orig/src/edbflatfile.h
++++ git/src/edbflatfile.h
+@@ -30,20 +30,22 @@
+ #include "xmpp_jid.h"
+ #include "psievent.h"
+ 
 +
-+	int middle = (end - start) / 2;
-+	const QDateTime mDate = getLineDate(getLine(start + middle));
-+	if (!mDate.isValid())
-+		return -1;
-+
-+	if (mDate == date)
-+		return start + middle;
-+	if (middle == 0) {
-+		const QDateTime mDate2 = getLineDate(getLine(end));
-+		if (!mDate2.isValid())
-+			return -1;
-+		return (abs(date.secsTo(mDate)) < abs(date.secsTo(mDate2))) ? start : end;
-+	}
-+	if (mDate > date)
-+		return findIdByNearDate(date, start, start + middle);
-+	return findIdByNearDate(date, start + middle, end);
-+}
-+
- void EDBFlatFile::File::touch()
+ class EDBFlatFile : public EDB
  {
- 	t->start(30000);
-@@ -738,24 +717,30 @@ void EDBFlatFile::File::timer_timeout()
- 	timeout();
- }
+ 	Q_OBJECT
+ public:
+-	EDBFlatFile();
++	EDBFlatFile(PsiCon *psi);
+ 	~EDBFlatFile();
  
--PsiEvent::Ptr EDBFlatFile::File::get(int id)
-+QString EDBFlatFile::File::getLine(int id)
- {
- 	touch();
+-	int getLatest(const XMPP::Jid &, int len);
+-	int getOldest(const XMPP::Jid &, int len);
+-	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
+-	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
+-	int find(const QString &, const XMPP::Jid &, const QString &id, int direction);
+-	int append(const XMPP::Jid &, const PsiEvent::Ptr&);
+-	int erase(const XMPP::Jid &);
++	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
++	int find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
++	int append(const QString &accId, const XMPP::Jid &, const PsiEvent::Ptr &, int);
++	int erase(const QString &accId, const XMPP::Jid &);
++	QList<ContactItem> contacts(const QString &accId, int type);
++	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
++	QString getStorageParam(const QString &) { return QString(); }
++	void setStorageParam(const QString &, const QString &) {}
  
- 	if(!valid)
--		return PsiEvent::Ptr();
-+		return QString();
+ 	class File;
  
- 	ensureIndex();
- 	if(id < 0 || id >= (int)d->index.size())
--		return PsiEvent::Ptr();
-+		return QString();
+@@ -68,12 +70,15 @@ public:
+ 	~File();
  
- 	f.seek(d->index[id]);
+ 	int total() const;
++	int getId(QDateTime &date, int dir, int offset);
+ 	void touch();
+ 	PsiEvent::Ptr get(int);
+ 	bool append(const PsiEvent::Ptr &);
+ 	int findNearestDate(const QDateTime &date);
  
- 	QTextStream t;
- 	t.setDevice(&f);
- 	t.setCodec("UTF-8");
--	QString line = t.readLine();
-+	return t.readLine();
-+}
+ 	static QString jidToFileName(const XMPP::Jid &);
++	static QString strToFileName(const QString &);
++	static QList<EDB::ContactItem> contacts(int type);
  
-+PsiEvent::Ptr EDBFlatFile::File::get(int id)
-+{
-+	QString line = getLine(id);
-+	if (line.isEmpty())
-+		return PsiEvent::Ptr();
- 	return lineToEvent(line);
- }
- 
-@@ -788,6 +773,13 @@ bool EDBFlatFile::File::append(const Psi
- 	return true;
- }
- 
-+QDateTime EDBFlatFile::File::getLineDate(const QString &line) const
-+{
-+	int x1 = line.indexOf('|') + 1;
-+	int x2 = line.indexOf('|', x1);
-+	return QDateTime::fromString(line.mid(x1, x2 - x1), Qt::ISODate);
-+}
+ signals:
+ 	void timeout();
+--- git.orig/src/edbsqlite.cpp
++++ git/src/edbsqlite.cpp
+@@ -0,0 +1,869 @@
++/*
++ * edbsqlite.cpp
++ * Copyright (C) 2011   Aleksey Andreev
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
 +
- PsiEvent::Ptr EDBFlatFile::File::lineToEvent(const QString &line)
- {
- 	// -- read the line --
-@@ -966,3 +958,831 @@ QString EDBFlatFile::File::eventToLine(c
- 
- 	return "";
- }
++#include <QSqlError>
++#include <QSqlDriver>
++#ifndef HAVE_QT5
++#include <qjson/parser.h>
++#include "qjson/serializer.h"
++#else
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
++#endif
++
++#include "edbsqlite.h"
++//#include "common.h"
++#include "applicationinfo.h"
++#include "psicontactlist.h"
++#include "jidutil.h"
++#include "historyimp.h"
++
++#define FAKEDELAY 0
++
++using namespace XMPP;
 +
 +//----------------------------------------------------------------------------
 +// EDBSqLite
@@ -1469,7 +1300,7 @@
 +	r->accId   = accId;
 +	r->j       = jid;
 +	r->jidType = type;
-+	r->type    = item_file_req::Type_append;
++	r->type    = item_query_req::Type_append;
 +	r->event   = e;
 +	if ( !r->event ) {
 +		qWarning("EDBSqLite::append(): Attempted to append incompatible type.");
@@ -1673,7 +1504,7 @@
 +		}
 +		resultReady(r->id, result, beginRow);
 +
-+	} else if(type == item_file_req::Type_find) {
++	} else if(type == item_query_req::Type_find) {
 +		commit();
 +		bool fContAll = r->j.isEmpty();
 +		bool fAccAll  = r->accId.isEmpty();
@@ -1700,7 +1531,7 @@
 +		}
 +		resultReady(r->id, result, 0);
 +
-+	} else if(type == item_file_req::Type_erase) {
++	} else if(type == item_query_req::Type_erase) {
 +		writeFinished(r->id, eraseHistory(r->accId, r->j));
 +	}
 +
@@ -2163,21 +1994,385 @@
 +	res |=  struc.allContacts;
 +	return res;
 +}
---- git.orig/src/eventdb.h
-+++ git/src/eventdb.h
-@@ -26,23 +26,27 @@
- #include <QFile>
- #include <QSharedPointer>
- #include <QDateTime>
+--- git.orig/src/edbsqlite.h
++++ git/src/edbsqlite.h
+@@ -0,0 +1,164 @@
++/*
++ * edbsqlite.h
++ * Copyright (C) 2011   Aleksey Andreev
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ *
++ */
++
++#ifndef EDBSQLITE_H
++#define EDBSQLITE_H
++
++#include <QObject>
++#include <QDateTime>
++#include <QTimer>
 +#include <QSqlDatabase>
 +#include <QSqlQuery>
 +#include <QSqlRecord>
 +#include <QHash>
 +#include <QVariant>
++
++#include "eventdb.h"
++#include "xmpp_jid.h"
++#include "psievent.h"
++#include "edbflatfile.h"
++
++enum QueryType {
++	QueryContactsList,
++	QueryLatest, QueryOldest,
++	QueryDateForward, QueryDateBackward,
++	QueryFindText,
++	QueryRowCount, QueryRowCountBefore,
++	QueryJidRowId,
++	QueryInsertEvent
++};
++
++struct QueryProperty
++{
++	QueryType type;
++	bool      allAccounts;
++	bool      allContacts;
++	QueryProperty(QueryType tp, bool allAcc, bool allCont) {
++		type        = tp;
++		allAccounts = allAcc;
++		allContacts = allCont;
++	}
++	bool operator==(const QueryProperty &other) const {
++		return (type == other.type && allAccounts == other.allAccounts && allContacts == other.allContacts);
++	}
++};
++uint qHash(const QueryProperty &struc);
++
++class EDBSqLite : public EDB
++{
++	Q_OBJECT
++
++	class QueryStorage;
++	class PreparedQuery : private QSqlQuery
++	{
++	public:
++		void bindValue(const QString &placeholder, const QVariant &val) { QSqlQuery::bindValue(placeholder, val); }
++		bool exec() { return QSqlQuery::exec(); }
++		bool first() { return QSqlQuery::first(); }
++		bool next() { return QSqlQuery::next(); }
++		QSqlRecord record() const { return QSqlQuery::record(); }
++		void freeResult() { QSqlQuery::finish(); }
++	private:
++		friend class QueryStorage;
++		PreparedQuery(QSqlDatabase db);
++		~PreparedQuery() {}
++	};
++	//--------
++	class QueryStorage
++	{
++	public:
++		QueryStorage();
++		~QueryStorage();
++		PreparedQuery *getPreparedQuery(QueryType type, bool allAccounts, bool allContacts);
++	private:
++		QString getQueryString(QueryType type, bool allAccounts, bool allContacts);
++	private:
++		QHash<QueryProperty, PreparedQuery *> queryList;
++	};
++	//--------
++
++public:
++	enum InsertMode { Normal, Import };
++
++	EDBSqLite(PsiCon *psi);
++	~EDBSqLite();
++	bool init();
++
++	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
++	int find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction);
++	int append(const QString &accId, const XMPP::Jid &jid, const PsiEvent::Ptr &e, int type);
++	int erase(const QString &accId, const XMPP::Jid &jid);
++	QList<ContactItem> contacts(const QString &accId, int type);
++	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
++	QString getStorageParam(const QString &key);
++	void setStorageParam(const QString &key, const QString &val);
++
++	void setInsertingMode(InsertMode mode);
++	void setMirror(EDBFlatFile *mirr);
++	EDBFlatFile *mirror() const;
++
++private:
++	enum { NotActive, NotCommited, Commited };
++	struct item_query_req
++	{
++		QString accId;
++		XMPP::Jid j;
++		int jidType;
++		int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
++		int start;
++		int len;
++		int dir;
++		int id;
++		QDateTime date;
++		QString findStr;
++		PsiEvent::Ptr event;
++
++		enum Type { Type_get, Type_append, Type_find, Type_erase };
++	};
++	int  status;
++	unsigned int transactionsCounter;
++	QDateTime lastCommitTime;
++	unsigned int maxUncommitedRecs;
++	int maxUncommitedSecs;
++	unsigned int commitByTimeoutSecs;
++	QTimer *commitTimer;
++	EDBFlatFile *mirror_;
++	QList<item_query_req*> rlist;
++	QHash<QString, qint64>jidsCache;
++	QueryStorage queryes;
++
++private:
++	bool appendEvent(const QString &accId, const XMPP::Jid &, const PsiEvent::Ptr &, int);
++	PsiEvent::Ptr getEvent(const QSqlRecord &record);
++	qint64 ensureJidRowId(const QString &accId, const XMPP::Jid &jid, int type);
++	int  rowCount(const QString &accId, const XMPP::Jid &jid, const QDateTime before);
++	bool eraseHistory(const QString &accId, const XMPP::Jid &);
++	bool transaction(bool now);
++	bool rollback();
++	void startAutocommitTimer();
++	void stopAutocommitTimer();
++	bool importExecute();
++
++private slots:
++	void performRequests();
++	bool commit();
++};
++
++#endif // EDBSQLITE_H
+--- git.orig/src/eventdb.cpp
++++ git/src/eventdb.cpp
+@@ -35,12 +35,10 @@ using namespace XMPP;
+ //----------------------------------------------------------------------------
+ // EDBItem
+ //----------------------------------------------------------------------------
+-EDBItem::EDBItem(const PsiEvent::Ptr &event, const QString &id, const QString &prevId, const QString &nextId)
++EDBItem::EDBItem(const PsiEvent::Ptr &event, const QString &id)
+ {
+ 	e = event;
+ 	v_id = id;
+-	v_prevId = prevId;
+-	v_nextId = nextId;
+ }
+ 
+ EDBItem::~EDBItem()
+@@ -57,16 +55,6 @@ const QString & EDBItem::id() const
+ 	return v_id;
+ }
+ 
+-const QString & EDBItem::nextId() const
+-{
+-	return v_nextId;
+-}
+-
+-const QString & EDBItem::prevId() const
+-{
+-	return v_prevId;
+-}
+-
+ 
+ //----------------------------------------------------------------------------
+ // EDBHandle
+@@ -77,6 +65,7 @@ public:
+ 	Private() {}
+ 
+ 	EDB *edb;
++	int beginRow_;
+ 	EDBResult r;
+ 	bool busy;
+ 	bool writeSuccess;
+@@ -89,6 +78,7 @@ EDBHandle::EDBHandle(EDB *edb)
+ {
+ 	d = new Private;
+ 	d->edb = edb;
++	d->beginRow_ = 0;
+ 	d->busy = false;
+ 	d->writeSuccess = false;
+ 	d->listeningFor = -1;
+@@ -104,53 +94,32 @@ EDBHandle::~EDBHandle()
+ 	delete d;
+ }
+ 
+-void EDBHandle::getLatest(const Jid &j, int len)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getLatest(j, len);
+-}
+-
+-void EDBHandle::getOldest(const Jid &j, int len)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getOldest(j, len);
+-}
+-
+-void EDBHandle::get(const Jid &j, const QString &id, int direction, int len)
+-{
+-	d->busy = true;
+-	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_get(j, id, direction, len);
+-}
+-
+-void EDBHandle::getByDate(const Jid &j, QDateTime first, QDateTime last)
++void EDBHandle::get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int begin, int len)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_getByDate(j, first, last);
++	d->listeningFor = d->edb->op_get(accId, jid, date, direction, begin, len);
+ }
+ 
+-void EDBHandle::find(const QString &str, const Jid &j, const QString &id, int direction)
++void EDBHandle::find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Read;
+-	d->listeningFor = d->edb->op_find(str, j, id, direction);
++	d->listeningFor = d->edb->op_find(accId, str, jid, date, direction);
+ }
+ 
+-void EDBHandle::append(const Jid &j, const PsiEvent::Ptr &e)
++void EDBHandle::append(const QString &accId, const Jid &j, const PsiEvent::Ptr &e, int type)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Write;
+-	d->listeningFor = d->edb->op_append(j, e);
++	d->listeningFor = d->edb->op_append(accId, j, e, type);
+ }
+ 
+-void EDBHandle::erase(const Jid &j)
++void EDBHandle::erase(const QString &accId, const Jid &j)
+ {
+ 	d->busy = true;
+ 	d->lastRequestType = Erase;
+-	d->listeningFor = d->edb->op_erase(j);
++	d->listeningFor = d->edb->op_erase(accId, j);
+ }
+ 
+ bool EDBHandle::busy() const
+@@ -194,6 +163,11 @@ int EDBHandle::lastRequestType() const
+ 	return d->lastRequestType;
+ }
+ 
++int EDBHandle::beginRow() const
++{
++	return d->beginRow_;
++}
++
+ 
+ //----------------------------------------------------------------------------
+ // EDB
+@@ -205,12 +179,14 @@ public:
+ 
+ 	QList<EDBHandle*> list;
+ 	int reqid_base;
++	PsiCon *psi;
+ };
+ 
+-EDB::EDB()
++EDB::EDB(PsiCon *psi)
+ {
+ 	d = new Private;
+ 	d->reqid_base = 0;
++	d->psi = psi;
+ }
+ 
+ EDB::~EDB()
+@@ -235,46 +211,32 @@ void EDB::unreg(EDBHandle *h)
+ 	d->list.removeAll(h);
+ }
+ 
+-int EDB::op_getLatest(const Jid &j, int len)
+-{
+-	return getLatest(j, len);
+-}
+-
+-int EDB::op_getOldest(const Jid &j, int len)
++int EDB::op_get(const QString &accId, const Jid &jid, const QDateTime date, int direction, int start, int len)
+ {
+-	return getOldest(j, len);
++	return get(accId, jid, date, direction, start, len);
+ }
+ 
+-int EDB::op_get(const Jid &jid, const QString &id, int direction, int len)
++int EDB::op_find(const QString &accId, const QString &str, const Jid &j, const QDateTime date, int direction)
+ {
+-	return get(jid, id, direction, len);
++	return find(accId, str, j, date, direction);
+ }
+ 
+-int EDB::op_getByDate(const Jid &j, QDateTime first, QDateTime last)
++int EDB::op_append(const QString &accId, const Jid &j, const PsiEvent::Ptr &e, int type)
+ {
+-	return getByDate(j, first, last);
++	return append(accId, j, e, type);
+ }
+ 
+-int EDB::op_find(const QString &str, const Jid &j, const QString &id, int direction)
++int EDB::op_erase(const QString &accId, const Jid &j)
+ {
+-	return find(str, j, id, direction);
++	return erase(accId, j);
+ }
+ 
+-int EDB::op_append(const Jid &j, const PsiEvent::Ptr &e)
+-{
+-	return append(j, e);
+-}
+-
+-int EDB::op_erase(const Jid &j)
+-{
+-	return erase(j);
+-}
+-
+-void EDB::resultReady(int req, EDBResult r)
++void EDB::resultReady(int req, EDBResult r, int begin_row)
+ {
+ 	// deliver
+ 	foreach(EDBHandle* h, d->list) {
+ 		if(h->listeningFor() == req) {
++			h->d->beginRow_ = begin_row;
+ 			h->edb_resultReady(r);
+ 			return;
+ 		}
+@@ -291,3 +253,8 @@ void EDB::writeFinished(int req, bool b)
+ 		}
+ 	}
+ }
++
++PsiCon *EDB::psi()
++{
++	return d->psi;
++}
+--- git.orig/src/eventdb.h
++++ git/src/eventdb.h
+@@ -29,20 +29,19 @@
  
  #include "xmpp_jid.h"
-+#include "psicon.h"
  #include "psievent.h"
++#include "psicon.h"
  
  class EDBItem
  {
@@ -2197,7 +2392,7 @@
  	PsiEvent::Ptr e;
  };
  
-@@ -59,18 +63,16 @@ public:
+@@ -59,18 +58,16 @@ public:
  	~EDBHandle();
  
  	// operations
@@ -2221,7 +2416,7 @@
  
  signals:
  	void finished();
-@@ -90,20 +92,30 @@ class EDB : public QObject
+@@ -90,20 +87,30 @@ class EDB : public QObject
  	Q_OBJECT
  public:
  	enum { Forward, Backward };
@@ -2257,11 +2452,11 @@
 +	virtual int erase(const QString &accId, const XMPP::Jid &)=0;
 +	void resultReady(int, EDBResult, int);
  	void writeFinished(int, bool);
-+	inline PsiCon *psi();
++	PsiCon *psi();
  
  private:
  	class Private;
-@@ -113,29 +125,27 @@ private:
+@@ -113,13 +120,10 @@ private:
  	void reg(EDBHandle *);
  	void unreg(EDBHandle *);
  
@@ -2276,192 +2471,6 @@
 +	int op_find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
 +	int op_append(const QString &accId, const XMPP::Jid &, const PsiEvent::Ptr &, int);
 +	int op_erase(const QString &accId, const XMPP::Jid &);
- };
- 
- class EDBFlatFile : public EDB
- {
- 	Q_OBJECT
- public:
--	EDBFlatFile();
-+	EDBFlatFile(PsiCon *psi);
- 	~EDBFlatFile();
- 
--	int getLatest(const XMPP::Jid &, int len);
--	int getOldest(const XMPP::Jid &, int len);
--	int get(const XMPP::Jid &jid, const QString &id, int direction, int len);
--	int getByDate(const XMPP::Jid &jid, QDateTime first, QDateTime last);
--	int find(const QString &, const XMPP::Jid &, const QString &id, int direction);
--	int append(const XMPP::Jid &, const PsiEvent::Ptr&);
--	int erase(const XMPP::Jid &);
-+	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
-+	int find(const QString &accId, const QString &, const XMPP::Jid &, const QDateTime date, int direction);
-+	int append(const QString &accId, const XMPP::Jid &, const PsiEvent::Ptr &, int);
-+	int erase(const QString &accId, const XMPP::Jid &);
-+	QList<ContactItem> contacts(const QString &accId, int type);
-+	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
-+	QString getStorageParam(const QString &) {return QString();}
-+	void setStorageParam(const QString &, const QString &) {}
- 
- 	class File;
- 
-@@ -160,11 +170,14 @@ public:
- 	~File();
- 
- 	int total() const;
-+	int getId(QDateTime &date, int dir, int offset);
- 	void touch();
- 	PsiEvent::Ptr get(int);
- 	bool append(const PsiEvent::Ptr &);
- 
- 	static QString jidToFileName(const XMPP::Jid &);
-+	static QString strToFileName(const QString &);
-+	static QList<EDB::ContactItem> contacts(int type);
- 
- signals:
- 	void timeout();
-@@ -186,6 +199,145 @@ private:
- 	PsiEvent::Ptr lineToEvent(const QString &);
- 	QString eventToLine(const PsiEvent::Ptr&);
- 	void ensureIndex();
-+	int findIdByNearDate(QDateTime &date, int start, int end);
-+	QString getLine(int);
-+	QDateTime getLineDate(const QString &line) const;
-+};
-+
-+enum QueryType {
-+	QueryContactsList,
-+	QueryLatest, QueryOldest,
-+	QueryDateForward, QueryDateBackward,
-+	QueryFindText,
-+	QueryRowCount, QueryRowCountBefore,
-+	QueryJidRowId,
-+	QueryInsertEvent
-+};
-+
-+struct QueryProperty
-+{
-+	QueryType type;
-+	bool      allAccounts;
-+	bool      allContacts;
-+	QueryProperty(QueryType tp, bool allAcc, bool allCont) {
-+		type        = tp;
-+		allAccounts = allAcc;
-+		allContacts = allCont;
-+	}
-+	bool operator==(const QueryProperty &other) const {
-+		return (type        == other.type &&
-+				allAccounts == other.allAccounts &&
-+				allContacts == other.allContacts);
-+	}
-+};
-+uint qHash(const QueryProperty &struc);
-+
-+class EDBSqLite : public EDB
-+{
-+	Q_OBJECT
-+
-+	class QueryStorage;
-+	//--------
-+	class PreparedQuery : private QSqlQuery
-+	{
-+	public:
-+		void bindValue(const QString &placeholder, const QVariant &val) {QSqlQuery::bindValue(placeholder, val);}
-+		bool exec() {return QSqlQuery::exec();}
-+		bool first() {return QSqlQuery::first();}
-+		bool next() {return QSqlQuery::next();}
-+		QSqlRecord record() const {return QSqlQuery::record();}
-+		void freeResult() {QSqlQuery::finish();}
-+	private:
-+		friend class QueryStorage;
-+		PreparedQuery(QSqlDatabase db);
-+		~PreparedQuery() {}
-+
-+	};
-+	//--------
-+	class QueryStorage
-+	{
-+	public:
-+		QueryStorage();
-+		~QueryStorage();
-+		PreparedQuery *getPreparedQuery(QueryType type, bool allAccounts, bool allContacts);
-+	private:
-+		QString getQueryString(QueryType type, bool allAccounts, bool allContacts);
-+	private:
-+		QHash<QueryProperty, PreparedQuery *> queryList;
-+	};
-+	//--------
-+
-+public:
-+	enum InsertMode {Normal, Import};
-+
-+	EDBSqLite(PsiCon *psi);
-+	~EDBSqLite();
-+	bool init();
-+
-+	int get(const QString &accId, const XMPP::Jid &jid, const QDateTime date, int direction, int start, int len);
-+	int find(const QString &accId, const QString &str, const XMPP::Jid &jid, const QDateTime date, int direction);
-+	int append(const QString &accId, const XMPP::Jid &jid, const PsiEvent::Ptr &e, int type);
-+	int erase(const QString &accId, const XMPP::Jid &jid);
-+	QList<ContactItem> contacts(const QString &accId, int type);
-+	quint64 eventsCount(const QString &accId, const XMPP::Jid &jid);
-+	QString getStorageParam(const QString &key);
-+	void setStorageParam(const QString &key, const QString &val);
-+
-+	void setInsertingMode(InsertMode mode);
-+	void setMirror(EDBFlatFile *mirr);
-+	EDBFlatFile *mirror() const;
-+
-+private:
-+	enum {NotActive, NotCommited, Commited};
-+	struct item_query_req
-+	{
-+		QString accId;
-+		XMPP::Jid j;
-+		int jidType;
-+		int type; // 0 = latest, 1 = oldest, 2 = random, 3 = write
-+		int start;
-+		int len;
-+		int dir;
-+		int id;
-+		QDateTime date;
-+		QString findStr;
-+		PsiEvent::Ptr event;
-+
-+		enum Type {
-+			Type_get,
-+			Type_append,
-+			Type_find,
-+			Type_erase
-+		};
-+	};
-+	int  status;
-+	unsigned int transactionsCounter;
-+	QDateTime lastCommitTime;
-+	unsigned int maxUncommitedRecs;
-+	int maxUncommitedSecs;
-+	unsigned int commitByTimeoutSecs;
-+	QTimer *commitTimer;
-+	EDBFlatFile *mirror_;
-+	QList<item_query_req*> rlist;
-+	QHash<QString, qint64>jidsCache;
-+	QueryStorage queryes;
-+
-+private:
-+	bool appendEvent(const QString &accId, const XMPP::Jid &, const PsiEvent::Ptr &, int);
-+	PsiEvent::Ptr getEvent(const QSqlRecord &record);
-+	qint64 ensureJidRowId(const QString &accId, const XMPP::Jid &jid, int type);
-+	int  rowCount(const QString &accId, const XMPP::Jid &jid, const QDateTime before);
-+	bool eraseHistory(const QString &accId, const XMPP::Jid &);
-+	bool transaction(bool now);
-+	bool rollback();
-+	void startAutocommitTimer();
-+	void stopAutocommitTimer();
-+	bool importExecute();
-+
-+private slots:
-+	void performRequests();
-+	bool commit();
-+
  };
  
  #endif
@@ -4466,7 +4475,7 @@
  #endif
 --- git.orig/src/historyimp.cpp
 +++ git/src/historyimp.cpp
-@@ -0,0 +1,302 @@
+@@ -0,0 +1,304 @@
 +/*
 + * historyimp.cpp
 + * Copyright (C) 2011   Aleksey Andreev
@@ -4493,6 +4502,8 @@
 +#include <QLayout>
 +
 +#include "historyimp.h"
++#include "edbsqlite.h"
++#include "edbflatfile.h"
 +#include "applicationinfo.h"
 +#include "psicontactlist.h"
 +#include "psiaccount.h"
@@ -5371,14 +5382,16 @@
   <connections/>
 --- git.orig/src/messageview.cpp
 +++ git/src/messageview.cpp
-@@ -37,6 +37,7 @@ MessageView::MessageView(Type t)
- 	, _status(0)
- 	, _statusPriority(0)
- 	, _dateTime(QDateTime::currentDateTime())
-+	, _carbon(XMPP::Message::NoCarbon)
+@@ -32,7 +32,8 @@ MessageView::MessageView(Type t) :
+     _flags(0),
+ 	_status(0),
+ 	_statusPriority(0),
+-	_dateTime(QDateTime::currentDateTime())
++	_dateTime(QDateTime::currentDateTime()),
++	_carbon(XMPP::Message::NoCarbon)
  {
- 
  }
+ 
 --- git.orig/src/messageview.h
 +++ git/src/messageview.h
 @@ -24,6 +24,8 @@
@@ -5390,7 +5403,7 @@
  class MessageView
  {
  public:
-@@ -91,6 +93,8 @@ public:
+@@ -133,6 +135,8 @@ public:
  	inline QMap<QString, QString> urls() const { return _urls; }
  	inline void setReplaceId(const QString &id) { _replaceId = id; }
  	inline const QString &replaceId() const { return _replaceId; }
@@ -5399,14 +5412,14 @@
  
  	QVariantMap toVariantMap(bool isMuc, bool formatted = false) const;
  
-@@ -111,6 +115,7 @@ private:
+@@ -149,6 +153,7 @@ private:
  	QDateTime _dateTime;
  	QMap<QString, QString> _urls;
  	QString _replaceId;
 +	XMPP::Message::CarbonDir _carbon;
  };
  
- #endif
+ Q_DECLARE_OPERATORS_FOR_FLAGS(MessageView::Flags)
 --- git.orig/src/psiaccount.cpp
 +++ git/src/psiaccount.cpp
 @@ -593,8 +593,8 @@ private slots:
@@ -5506,6 +5519,15 @@
  ChatView* PsiChatDlg::chatView() const
 --- git.orig/src/psicon.cpp
 +++ git/src/psicon.cpp
+@@ -62,7 +62,7 @@
+ #ifdef HAVE_PGPUTIL
+ #include "pgputil.h"
+ #endif
+-#include "edbflatfile.h"
++#include "edbsqlite.h"
+ #include "proxy.h"
+ #ifdef PSIMNG
+ #include "psimng.h"
 @@ -358,8 +358,7 @@ PsiCon::PsiCon()
  	d->ftwin = 0;
  #endif
@@ -5526,7 +5548,7 @@
  	delete d->defaultMenuBar;
  	delete d->tabManager;
  	delete d->popupManager;
-@@ -655,6 +655,12 @@ bool PsiCon::init()
+@@ -654,6 +654,12 @@ bool PsiCon::init()
  
  	checkAccountsEmpty();
  
@@ -5547,17 +5569,21 @@
  
  greaterThan(QT_MAJOR_VERSION, 4) {
    QT += widgets multimedia concurrent
-@@ -152,6 +152,7 @@ HEADERS += \
+@@ -155,7 +155,9 @@ HEADERS += \
  	$$PWD/translationmanager.h \
  	$$PWD/eventdb.h \
+ 	$$PWD/edbflatfile.h \
++	$$PWD/edbsqlite.h \
  	$$PWD/historydlg.h \
 +	$$PWD/historyimp.h \
  	$$PWD/tipdlg.h \
  	$$PWD/searchdlg.h \
  	$$PWD/registrationdlg.h \
-@@ -288,6 +289,7 @@ SOURCES += \
+@@ -292,7 +294,9 @@ SOURCES += \
  	$$PWD/translationmanager.cpp \
  	$$PWD/eventdb.cpp \
+ 	$$PWD/edbflatfile.cpp \
++	$$PWD/edbsqlite.cpp \
  	$$PWD/historydlg.cpp \
 +	$$PWD/historyimp.cpp \
  	$$PWD/searchdlg.cpp \
@@ -5565,57 +5591,33 @@
  	$$PWD/psitoolbar.cpp \
 --- git.orig/themes/chatview/psi/adapter.js
 +++ git/themes/chatview/psi/adapter.js
-@@ -189,7 +189,11 @@ window[chatServer.jsNamespace()].adapter
- 							}
- 							if (!template) {
- 								data.nextOfGroup = false; //can't group w/o template
--								template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
+@@ -244,7 +244,11 @@ function psiThemeAdapter(chat) {
+                             }
+                             if (!template) {
+                                 data.nextOfGroup = false; //can't group w/o template
+-                                template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
 +								if (data.spooled) {
 +									template = shared.templates.spooledMessage;
 +								} else {
 +									template = data.local?shared.templates.sentMessage:shared.templates.receivedMessage;
 +								}
- 							}
- 							break;
-                         case "status":
+                             }
+                             break;
+                         case "join":
 --- git.orig/themes/chatview/psi/classic/index.html
 +++ git/themes/chatview/psi/classic/index.html
-@@ -13,6 +13,7 @@ body > div img { vertical-align:bottom;
- body > div > img:first-child { vertical-align:text-bottom; }
- .sent {}
- .received {}
-+.spooledmsg {}
- .infmsg {}
- .usertext {}
- .alert {font-weight:bold;}
-@@ -32,6 +33,7 @@ window[chatServer.jsNamespace()].theme =
- 	var cssBody = chat.util.findStyleSheet(document.styleSheets[0], "body").style;
- 	var cssSentMsg = chat.util.findStyleSheet(document.styleSheets[0], ".sent").style;
- 	var cssReceivedMsg = chat.util.findStyleSheet(document.styleSheets[0], ".received").style;
-+	var cssSpooledMsg = chat.util.findStyleSheet(document.styleSheets[0], ".spooledmsg").style;
- 	var cssInfMsg = chat.util.findStyleSheet(document.styleSheets[0], ".infmsg").style;
- 	var cssUserText = chat.util.findStyleSheet(document.styleSheets[0], ".usertext").style;
- 	var cssChatSays = chat.util.findStyleSheet(document.styleSheets[0], ".msg>span:first").style;
-@@ -46,6 +48,7 @@ window[chatServer.jsNamespace()].theme =
- 		cssReceivedMsg.color = shared.colorOption("options.ui.look.colors.messages.received");
- 		cssInfMsg.color = shared.colorOption("options.ui.look.colors.messages.informational");
- 		cssUserText.color = shared.colorOption("options.ui.look.colors.messages.usertext");
-+		cssSpooledMsg.color = cssUserText.color;
- 		cssAlertMsg.color = shared.psiOption("options.ui.look.colors.messages.highlighting");
- 		useMessageIcons = shared.psiOption("options.ui.chat.use-message-icons");
- 		if (shared.psiOption("options.ui.chat.scaled-message-icons")) {
-@@ -73,7 +76,9 @@ window[chatServer.jsNamespace()].theme =
+@@ -82,7 +82,9 @@ function startPsiTheme(shared) {
  			receivedMessage: shared.isMuc?
  				"<div class='msg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %alertedmessage%</div>"
  				: null,
 -			spooledMessage: "<div class='infmsg'>%icon%[%time%] %sender% %message%</div>",
 +			spooledMessage: shared.isMuc?
-+				"<div class='spooledmsg'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %message%</div>"
-+				: "<div class='spooledmsg'>%icon%<span class='%sentrec%'>[%time%] %sender%</span> %message%</div>",
++				"<div class='usertext'>%icon%<span style='color:%nickcolor%'>[%time%] %sender%</span> %message%</div>"
++				: "<div class='usertext'>%icon%<span class='%sentrec%'>[%time%] %sender%</span> %message%</div>",
  			sys: "<div class='infmsg'>%icon%%message%</div>",
  			sysMessage: "<div class='infmsg'>%icon%[%time%] *** %message%</div>",
  			sysMessageUT: "<div class='infmsg'>%icon%[%time%] *** %message%: <span class='usertext'>%usertext%</span></div>",
-@@ -97,7 +102,7 @@ window[chatServer.jsNamespace()].theme =
+@@ -106,7 +108,7 @@ function startPsiTheme(shared) {
  			}
  			if (shared.cdata.mtype == "message") {
  				var template = shared.cdata.emote && shared.templates.messageNC ||
@@ -5624,7 +5626,7 @@
  				if (template) {
  					shared.appendHtml(template.toString(), shared.cdata.local?true:null);
  					return false;
-@@ -119,8 +124,7 @@ window[chatServer.jsNamespace()].theme =
+@@ -128,8 +130,7 @@ function startPsiTheme(shared) {
  				return shared.cdata.alert?"<span class='alert'>"+
  					shared.cdata.message+"</span>":shared.cdata.message;
  			},
@@ -5632,9 +5634,9 @@
 -				(shared.cdata.local?"sent":"received");},
 +			sentrec : function() {return shared.cdata.local?"sent":"received";},
  			nickcolor : function() {
- 				return shared.session.mucNickColor(shared.cdata.sender, shared.cdata.local);
+ 				return util.nickColor(shared.cdata.sender);
  			},
-@@ -129,6 +133,10 @@ window[chatServer.jsNamespace()].theme =
+@@ -138,6 +139,10 @@ function startPsiTheme(shared) {
  				if (useMessageIcons) {
  					switch (shared.cdata.mtype) {
  						case "message":
