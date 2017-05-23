@@ -3497,7 +3497,7 @@
  QFont HistoryDlg::fontForOption(const QString &option)
  {
  	QFont font;
-@@ -205,90 +1092,134 @@ QFont HistoryDlg::fontForOption(const QS
+@@ -205,90 +1092,135 @@ QFont HistoryDlg::fontForOption(const QS
  
  void HistoryDlg::changeAccount(const QString /*accountName*/)
  {
@@ -3508,7 +3508,8 @@
 -	d->pa = d->psi->contactList()->getAccountByJid(ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString());
 -	loadContacts();
 -	ui_.jidList->setCurrentRow(0);
-+	contactListModel()->reloadContacts(d->psi, d->pa->id());
++	QString paId = ui_.accountsBox->itemData(ui_.accountsBox->currentIndex()).toString();
++	contactListModel()->reloadContacts(d->psi, paId);
 +	selectDefaultContact();
  	openSelectedContact();
  }
@@ -3689,7 +3690,7 @@
  	QList<QTextEdit::ExtraSelection> extras;
  	QTextEdit::ExtraSelection highlight;
  	highlight.format.setBackground(Qt::yellow);
-@@ -303,42 +1234,49 @@ void HistoryDlg::highlightBlocks(const Q
+@@ -303,42 +1235,49 @@ void HistoryDlg::highlightBlocks(const Q
  	}
  
  	ui_.msgLog->setExtraSelections(extras);
@@ -3753,7 +3754,7 @@
  	QString fname = FileUtil::getSaveFileName(this,
  						  tr("Export message history"),
  						  s + ".txt",
-@@ -353,19 +1291,22 @@ void HistoryDlg::exportHistory()
+@@ -353,19 +1292,22 @@ void HistoryDlg::exportHistory()
  	}
  	QTextStream stream(&f);
  
@@ -3787,7 +3788,7 @@
  		while(h->busy()) {
  			qApp->processEvents();
  		}
-@@ -376,7 +1317,6 @@ void HistoryDlg::exportHistory()
+@@ -376,7 +1318,6 @@ void HistoryDlg::exportHistory()
  		// events are in forward order
  		for(int i = 0; i < cnt; ++i) {
  			EDBItemPtr item = r.value(i);
@@ -3795,7 +3796,7 @@
  			PsiEvent::Ptr e(item->event());
  			QString txt;
  
-@@ -384,10 +1324,16 @@ void HistoryDlg::exportHistory()
+@@ -384,10 +1325,16 @@ void HistoryDlg::exportHistory()
  
  			QString nick;
  			if(e->originLocal()) {
@@ -3814,7 +3815,7 @@
  			}
  
  			if(e->type() == PsiEvent::Message) {
-@@ -410,10 +1356,14 @@ void HistoryDlg::exportHistory()
+@@ -410,10 +1357,14 @@ void HistoryDlg::exportHistory()
  		}
  		delete h;
  
@@ -3831,7 +3832,7 @@
  	}
  	f.close();
  	stopRequest();
-@@ -421,102 +1371,44 @@ void HistoryDlg::exportHistory()
+@@ -421,102 +1372,44 @@ void HistoryDlg::exportHistory()
  
  void HistoryDlg::doMenu()
  {
@@ -3958,7 +3959,7 @@
  }
  
  void HistoryDlg::refresh()
-@@ -528,58 +1420,48 @@ void HistoryDlg::refresh()
+@@ -528,58 +1421,48 @@ void HistoryDlg::refresh()
  
  void HistoryDlg::getLatest()
  {
@@ -4036,7 +4037,7 @@
  }
  
  void HistoryDlg::optionUpdated(const QString &option)
-@@ -590,14 +1472,15 @@ void HistoryDlg::optionUpdated(const QSt
+@@ -590,14 +1473,15 @@ void HistoryDlg::optionUpdated(const QSt
  	} else
  #endif
  	if(option == "options.ui.look.colors.messages.sent")
@@ -4056,7 +4057,7 @@
  #ifndef HAVE_X11
  void HistoryDlg::autoCopy()
  {
-@@ -606,55 +1489,38 @@ void HistoryDlg::autoCopy()
+@@ -606,55 +1490,38 @@ void HistoryDlg::autoCopy()
  	}
  }
  #endif
@@ -4137,7 +4138,7 @@
  	return u;
  }
  
-@@ -663,7 +1529,9 @@ void HistoryDlg::startRequest()
+@@ -663,7 +1530,9 @@ void HistoryDlg::startRequest()
  	if(!ui_.busy->isActive()) {
  		ui_.busy->start();
  	}
@@ -4147,7 +4148,7 @@
  }
  
  void HistoryDlg::stopRequest()
-@@ -671,17 +1539,38 @@ void HistoryDlg::stopRequest()
+@@ -671,17 +1540,38 @@ void HistoryDlg::stopRequest()
  	if(ui_.busy->isActive()) {
  		ui_.busy->stop();
  	}
