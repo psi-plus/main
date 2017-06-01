@@ -10,7 +10,7 @@
  					<agent-contacts type="bool">true</agent-contacts>
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
-@@ -84,6 +84,10 @@
+@@ -79,6 +79,10 @@
  #include "rosteravatarframe.h"
  #include "avatars.h"
  
@@ -21,9 +21,9 @@
  using namespace XMPP;
  
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
-@@ -161,6 +165,10 @@ public:
+@@ -154,6 +158,10 @@ public:
+ 
  	PsiRosterWidget* rosterWidget_;
- #endif
  
 +#ifdef Q_OS_WIN
 +	DWORD deactivationTickCount;
@@ -32,7 +32,7 @@
  	void registerActions();
  	IconAction* getAction( QString name );
  	void updateMenu(QStringList actions, QMenu* menu);
-@@ -1479,7 +1487,23 @@ void MainWin::closeEvent(QCloseEvent* e)
+@@ -1417,7 +1425,23 @@ void MainWin::closeEvent(QCloseEvent* e)
  
  void MainWin::changeEvent(QEvent *event)
  {
@@ -57,7 +57,7 @@
  	    event->type() == QEvent::WindowStateChange)
  	{
  		if (d->mainTabs) {
-@@ -1607,18 +1631,42 @@ void MainWin::optionsUpdate()
+@@ -1537,14 +1561,37 @@ void MainWin::optionsUpdate()
  	updateTray();
  }
  
@@ -101,12 +101,7 @@
  }
  
  void MainWin::setTrayToolTip(const Status& status, bool, bool)
- {
-+	Q_UNUSED (status);
- 	if (!d->tray) {
- 		return;
- 	}
-@@ -1636,32 +1684,21 @@ void MainWin::trayClicked(const QPoint &, int button)
+@@ -1568,32 +1615,21 @@ void MainWin::trayClicked(const QPoint &, int button)
  		return;
  	}
  
@@ -149,7 +144,7 @@
  void MainWin::trayShow()
 --- a/src/mainwin.h
 +++ b/src/mainwin.h
-@@ -182,7 +182,7 @@ public slots:
+@@ -178,7 +178,7 @@ public slots:
  	void optionsUpdate();
  	void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
  
@@ -160,7 +155,7 @@
  
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -636,6 +636,10 @@ win32:!dbus {
+@@ -612,6 +612,10 @@ win32:!dbus {
  	LIBS += -lUser32
  }
  
@@ -172,6 +167,7 @@
  unix:!dbus {
  	SOURCES += $$PWD/activeprofiles_stub.cpp
 new file mode 100644
+index 0000000..ea1ae7d
 --- /dev/null
 +++ b/src/x11windowsystem.cpp
 @@ -0,0 +1,215 @@
