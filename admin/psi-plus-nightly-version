@@ -6,7 +6,7 @@
 ref_commit=871fac5f74f247df1d28297d5ea3982a8dcfaacc # 1.0 tag
 
 show_help() {
-  echo "Usage: $0 <psi_repo_path> [--webkit]"
+  echo "Usage: $0 <psi_repo_path> [--webkit|--webengine] [--sql]"
 }
 
 [ -d "${1}/.git" ] || { show_help; exit 1; }
@@ -14,18 +14,18 @@ psi_path="$(cd $1;pwd)"
 
 cd "$(dirname "$0")"
 
-# compute verion number
+# compute version number
 psi_num=$("${psi_path}/admin/git_revnumber.sh")
 plus_num=$(git rev-list --count ${ref_commit}..HEAD)
 sum_commit=$(expr ${psi_num} + ${plus_num})
 
 # compute version date
 rev_date_list="$(cd "${psi_path}"; git log -n1 --date=short --pretty=format:'%ad')
-               $(git log -n1 --date=short --pretty=format:'%ad')"
+$(git log -n1 --date=short --pretty=format:'%ad')"
 rev_date=$(echo "${rev_date_list}" | sort -r | head -n1)
 
 # features list
-features=$([ "${2}" = --webkit ] && echo ", webkit")$([ "${2}" = --webengine ] && echo ", webengine")$([ "${2}" = --sql ] && echo ", sql")
+features=$([ "${2}" = --webkit ] && echo ", webkit")$([ "${2}" = --webengine ] && echo ", webengine")$([ "${2}" = --sql ] && echo ", sql")$([ "${3}" = --sql ] && echo ", sql")
 
 # revs
 psi_rev="$(cd "$psi_path"; git rev-parse --short HEAD)"
