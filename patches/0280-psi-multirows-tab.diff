@@ -151,7 +151,7 @@
  	pm_settings_->addAction(actions_->action("chat_info"));
  	pm_settings_->addAction(actions_->action("chat_history"));
 +    auto dlg = getManagingTabDlg();
-+    if (dlg) {
++    if (dlg && PsiOptions::instance()->getOption("options.ui.tabs.multi-rows").toBool()) {
 +        pm_settings_->addAction(actions_->action(dlg->isTabPinned(this)?
 +                                                     "chat_unpin_tab":
 +                                                     "chat_pin_tab"));
@@ -604,7 +604,7 @@
  	QStackedLayout *stacked_;
 --- git.orig/src/widgets/tabbar.cpp
 +++ git/src/widgets/tabbar.cpp
-@@ -0,0 +1,1334 @@
+@@ -0,0 +1,1336 @@
 +/*
 + * tabbar.cpp
 + * Copyright (C) 2013-2016  Ivan Romanov <drizt@land.ru>
@@ -637,7 +637,7 @@
 +#include <QLine>
 +#include <QDrag>
 +#include <QMimeData>
-+#include <QDebug>
++//#include <QDebug>
 +
 +#define PINNED_CHARS 4
 +
@@ -1161,7 +1161,7 @@
 +	pinnedTabs = qMin(pinnedTabs, q->count());
 +
 +	if (tabsClosable && multiRow) {
-+		while (closeButtons.isEmpty() || closeButtons.size() < q->count()) {
++		while (closeButtons.size() < q->count()) {
 +			CloseButton *cb = new CloseButton(q);
 +			closeButtons << cb;
 +			cb->show();
@@ -1172,10 +1172,12 @@
 +			closeButtons.takeLast()->deleteLater();
 +		}
 +
-+		for (int i = 0; i < pinnedTabs && i < closeButtons.size(); ++i)
++		for (int i = 0; i < pinnedTabs && i < closeButtons.size(); ++i) {
 +			closeButtons.at(i)->hide();
-+		for (int i = pinnedTabs; i < closeButtons.size(); ++i)
++		}
++		for (int i = pinnedTabs; i < closeButtons.size(); ++i) {
 +			closeButtons.at(i)->show();
++		}
 +	}
 +	else {
 +		qDeleteAll(closeButtons);
