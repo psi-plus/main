@@ -1,0 +1,89 @@
+diff --git a/psi-plus-snapshots/src/mainwin.cpp b/psi-plus-snapshots/src/mainwin.cpp
+index ecd20cc..4d71e98 100644
+--- a/psi-plus-snapshots/src/mainwin.cpp
++++ b/psi-plus-snapshots/src/mainwin.cpp
+@@ -1631,7 +1631,9 @@ void MainWin::trayClicked(const QPoint &, int button)
+ 		if(d->nextAmount > 0) {
+ 			doRecvNextEvent();
+ 			return;
+ 		}
++	} else {
++		return;
+ 	}
+ 
+ 	toggleVisible(true);
+diff --git a/psi-plus-snapshots/src/psitrayicon.cpp b/psi-plus-snapshots/src/psitrayicon.cpp
+index c6b0dc6..cb42e35 100644
+--- a/psi-plus-snapshots/src/psitrayicon.cpp
++++ b/psi-plus-snapshots/src/psitrayicon.cpp
+@@ -1,9 +1,12 @@
+ #include <QPixmap>
+ #include <QPixmapCache>
+ #include <QApplication> // old
++#include <QTimer>
++#include <QDebug>
+ #include <QSystemTrayIcon>
+ #include <QHelpEvent>
+ 
++#include "psioptions.h"
+ #include "psitrayicon.h"
+ #include "iconset.h"
+ #include "alerticon.h"
+@@ -17,11 +20,14 @@ PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
+ 	, icon_(NULL)
+ 	, trayicon_(new QSystemTrayIcon())
+ 	, realIcon_(0)
++	, timer_(new QTimer())
+ {	
+ 	trayicon_->setContextMenu(popup);
+ 	setToolTip(tip);
+ 	connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
+ 	trayicon_->installEventFilter(this);
++	timer_->setSingleShot(true);
++	timer_->setInterval(qApp->doubleClickInterval());
+ }
+ 
+ PsiTrayIcon::~PsiTrayIcon()
+@@ -32,6 +38,7 @@ PsiTrayIcon::~PsiTrayIcon()
+ 		icon_->stop();
+ 		delete icon_;
+ 	}
++	delete timer_;
+ }
+ 
+ void PsiTrayIcon::setContextMenu(QMenu* menu)
+@@ -176,8 +183,20 @@ void PsiTrayIcon::trayicon_activated(QSystemTrayIcon::ActivationReason reason)
+ #ifdef Q_OS_MAC
+ 	Q_UNUSED(reason)
+ #else
+-	if (reason == QSystemTrayIcon::Trigger)
+-		emit clicked(QPoint(),Qt::LeftButton);
++	if (reason == QSystemTrayIcon::Trigger) {
++		if(PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool()) {
++			if (timer_->remainingTime() <= 0)
++			{ //timer is not active or finished (first click)
++				timer_->start();
++			} else
++			{ //timer is active (second click)
++				timer_->stop();
++				emit doubleClicked(QPoint());
++			}
++		} else {
++			emit clicked(QPoint(), Qt::LeftButton);
++		}
++	}
+ 	else if (reason == QSystemTrayIcon::MiddleClick || (isKde() && reason == QSystemTrayIcon::Context))
+ 		emit clicked(QPoint(),Qt::MidButton);
+ 	else if (reason == QSystemTrayIcon::DoubleClick)
+diff --git a/psi-plus-snapshots/src/psitrayicon.h b/psi-plus-snapshots/src/psitrayicon.h
+index bb67fc1..8f0cf66 100644
+--- a/psi-plus-snapshots/src/psitrayicon.h
++++ b/psi-plus-snapshots/src/psitrayicon.h
+@@ -48,6 +48,7 @@ private:
+ 	PsiIcon* icon_;
+ 	QSystemTrayIcon* trayicon_;
+ 	quintptr realIcon_;
++	QTimer* timer_;
+ };
+ 
+ 
