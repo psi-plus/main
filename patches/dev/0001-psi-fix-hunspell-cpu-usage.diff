@@ -1,6 +1,14 @@
 --- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.cpp
 +++ git/src/libpsi/tools/spellchecker/hunspellchecker.cpp
-@@ -55,9 +55,6 @@ HunspellChecker::HunspellChecker()
+@@ -33,6 +33,7 @@
+ #include <QTextCodec>
+ #include <QCoreApplication>
+ #include <QLocale>
++#include <QMutableListIterator>
+ //#include <QDebug>
+ #include <hunspell.hxx>
+ #ifdef Q_OS_WIN
+@@ -55,9 +56,6 @@ HunspellChecker::HunspellChecker()
  {
  	getDictPaths();
  	getSupportedLanguages();
@@ -10,7 +18,7 @@
  }
  
  HunspellChecker::~HunspellChecker()
-@@ -180,7 +177,6 @@ bool HunspellChecker::isCorrect(const QS
+@@ -180,7 +178,6 @@ bool HunspellChecker::isCorrect(const QS
  			return true;
  		}
  	}
@@ -18,19 +26,19 @@
  	return false;
  }
  bool HunspellChecker::add(const QString& word)
-@@ -208,3 +204,54 @@ bool HunspellChecker::writable() const
+@@ -208,3 +205,54 @@ bool HunspellChecker::writable() const
  {
  	return false;
  }
 +
 +void HunspellChecker::unloadLanguage(const QLocale &locale)
 +{
-+	for(int index=0; index < languages_.count(); ++index) {
-+		LangItem item = languages_.at(index);
-+		QLocale loc(item.info.language, item.info.country);
-+		if(loc == locale) {
-+			item.hunspell_.reset();
-+			languages_.removeAt(index);
++	QMutableListIterator<LangItem> it(languages_);
++	while(it.hasNext()) {
++		LangItem item = it.next();
++		QLocale locale_(item.info.language, item.info.country);
++		if(locale_ == locale) {
++			it.remove();
 +		}
 +	}
 +}
