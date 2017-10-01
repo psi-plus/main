@@ -1,0 +1,103 @@
+--- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.cpp
++++ git/src/libpsi/tools/spellchecker/hunspellchecker.cpp
+@@ -55,9 +55,6 @@ HunspellChecker::HunspellChecker()
+ {
+ 	getDictPaths();
+ 	getSupportedLanguages();
+-	foreach (const QLocale &locale, supportedLangs_) {
+-		addLanguage(locale);
+-	}
+ }
+ 
+ HunspellChecker::~HunspellChecker()
+@@ -180,7 +177,6 @@ bool HunspellChecker::isCorrect(const QS
+ 			return true;
+ 		}
+ 	}
+-
+ 	return false;
+ }
+ bool HunspellChecker::add(const QString& word)
+@@ -208,3 +204,54 @@ bool HunspellChecker::writable() const
+ {
+ 	return false;
+ }
++
++void HunspellChecker::unloadLanguage(const QLocale &locale)
++{
++	for(int index=0; index < languages_.count(); ++index) {
++		LangItem item = languages_.at(index);
++		QLocale loc(item.info.language, item.info.country);
++		if(loc == locale) {
++			item.hunspell_.reset();
++			languages_.removeAt(index);
++		}
++	}
++}
++
++QList<QString> HunspellChecker::getAllLanguages() const
++{
++	QList<QString> result;
++	foreach (const QLocale &locale, supportedLangs_) {
++		result << locale.name();
++	}
++	return result;
++}
++
++void HunspellChecker::setActiveLanguages(const QList<QString> &langs)
++{
++	if(langs.isEmpty()) {
++		return;
++	}
++	QSet<LangId> loadedLangs;
++	QSet<LangId> newLangs;
++	foreach (const LangItem &item, languages_) {
++		LangId id(item.info.language, item.info.country);
++		loadedLangs << id;
++	}
++	foreach (const QString &lang, langs) {
++		QLocale locale(lang);
++		LangId id(locale.language(), locale.country());
++		newLangs << id;
++	}
++	QSet<LangId> langsToUnload = loadedLangs - newLangs;
++	QSet<LangId> langsToLoad = newLangs - loadedLangs;
++	QSetIterator<LangId> it(langsToUnload);
++	while(it.hasNext()) {
++		LangId id = it.next();
++		unloadLanguage(QLocale(id.first,id.second));
++	}
++	it = langsToLoad;
++	while(it.hasNext()) {
++		LangId id = it.next();
++		addLanguage(QLocale(id.first,id.second));
++	}
++}
+--- git.orig/src/libpsi/tools/spellchecker/hunspellchecker.h
++++ git/src/libpsi/tools/spellchecker/hunspellchecker.h
+@@ -38,6 +38,7 @@ class Hunspell;
+ class QTextCodec;
+ 
+ typedef QSharedPointer<Hunspell> HunspellPtr;
++typedef QPair<QLocale::Language, QLocale::Country> LangId;
+ 
+ class HunspellChecker : public SpellChecker
+ {
+@@ -49,6 +50,8 @@ public:
+ 	virtual bool add(const QString &word);
+ 	virtual bool available() const;
+ 	virtual bool writable() const;
++	virtual void setActiveLanguages(const QList<QString> &langs);
++	virtual QList<QString> getAllLanguages() const;
+ private:
+ 	struct DictInfo
+ 	{
+@@ -65,7 +68,7 @@ private:
+ 	void addLanguage(const QLocale &locale);
+ 	void getDictPaths();
+ 	bool scanDictPaths(const QString &language, QFileInfo &aff , QFileInfo &dic);
+-
++	void unloadLanguage(const QLocale &locale);
+ private:
+ 	QList<LangItem> languages_;
+ 	QStringList dictPaths_;
