@@ -1,0 +1,1375 @@
+--- git.orig/src/options/CMakeLists.txt
++++ git/src/options/CMakeLists.txt
+@@ -25,11 +25,14 @@ list(APPEND HEADERS
+ 	opt_groupchat.h
+ 	opt_sound.h
+ 	opt_avcall.h
++	opt_messages.h
++	opt_messages_common.h
+ 	opt_chat.h
+ 	optionstab.h
+ 	opt_tree.h
+ 	opt_application.h
+ 	opt_plugins.h
++	opt_input.h
+ 	opt_statusgeneral.h
+ 	opt_theme.h
+ )
+@@ -51,10 +54,13 @@ list(APPEND PLAIN_SOURCES
+ 	opt_events.cpp
+ 	opt_groupchat.cpp
+ 	opt_iconset.cpp
++	opt_messages.cpp
++	opt_messages_common.cpp
+ 	opt_popups.cpp
+ 	opt_roster.cpp
+ 	opt_shortcuts.cpp
+ 	opt_sound.cpp
++	opt_input.cpp
+ 	opt_status.cpp
+ 	opt_statusauto.cpp
+ 	opt_statusgeneral.cpp
+@@ -80,7 +86,9 @@ list(APPEND FORMS
+ 	opt_iconset_mood.ui
+ 	opt_iconset_roster.ui
+ 	opt_iconset_system.ui
++	opt_input.ui
+ 	opt_lookfeel_toolbars.ui
++	opt_messages_common.ui
+ 	opt_plugins.ui
+ 	opt_popups.ui
+ 	opt_roster.ui
+--- git.orig/src/options/opt_advanced.cpp
++++ git/src/options/opt_advanced.cpp
+@@ -10,7 +10,6 @@
+ 
+ #include "ui_opt_advanced.h"
+ #include "psioptions.h"
+-#include "spellchecker/spellchecker.h"
+ 
+ class OptAdvancedUI : public QWidget, public Ui::OptAdvanced
+ {
+@@ -44,7 +43,6 @@ QWidget *OptionsTabAdvanced::widget()
+ 	d->ck_autocopy->hide();
+ #endif
+ 
+-	d->ck_spell->setEnabled(SpellChecker::instance()->available());
+ 
+ 	d->ck_messageevents->setWhatsThis(
+ 		tr("Enables the sending and requesting of message events such as "
+@@ -58,10 +56,6 @@ QWidget *OptionsTabAdvanced::widget()
+ 		tr("Send receipts to contacts by request."));
+ 	d->ck_rc->setWhatsThis(
+ 		tr("Enables remote controlling your client from other locations"));
+-	d->ck_spell->setWhatsThis(
+-		tr("Check this option if you want your spelling to be checked"));
+-	d->ck_contactsMessageFormatting->setWhatsThis(
+-		tr("If enabled, Psi will display incoming messages formatted in the style specified by the contact"));
+ 	d->ck_autocopy->setWhatsThis(
+ 		tr("Check this option if you want the selected text in incoming messages and chat log to be automatically copied to clipboard"));
+ 	d->ck_singleclick->setWhatsThis(
+@@ -83,8 +77,6 @@ QWidget *OptionsTabAdvanced::widget()
+ 	d->cb_incomingAs->setItemData(3, "current-open");
+ 	d->ck_showSubjects->setWhatsThis(
+ 		tr("Makes Psi show separate subject line in messages. Uncheck this if you want to save some screen space."));
+-	d->ck_showCounter->setWhatsThis(
+-		tr("Makes Psi show message length counter. Check this if you want to know how long is your message. Can be useful when you're using SMS transport."));
+ 	d->ck_autoVCardOnLogin->setWhatsThis(
+ 		tr("By default, Psi always checks your vCard on login. If you want to save some traffic, you can uncheck this option."));
+ 	d->ck_rosterAnim->setWhatsThis(
+@@ -116,16 +108,12 @@ void OptionsTabAdvanced::applyOptions()
+ 	PsiOptions::instance()->setOption("options.ui.notifications.send-receipts", d->ck_sendReceipts->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.dont-send-composing-events", d->ck_sendComposingEvents->isChecked());
+ 	PsiOptions::instance()->setOption("options.external-control.adhoc-remote-control.enable", d->ck_rc->isChecked());
+-	if ( SpellChecker::instance()->available() )
+-		PsiOptions::instance()->setOption("options.ui.spell-check.enabled",d->ck_spell->isChecked());
+-	PsiOptions::instance()->setOption("options.html.chat.render", d->ck_contactsMessageFormatting->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.automatically-copy-selected-text", d->ck_autocopy->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.use-single-click", d->ck_singleclick->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.message.use-jid-auto-completion", d->ck_jidComplete->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.message.auto-grab-urls-from-clipboard", d->ck_grabUrls->isChecked());
+ 	PsiOptions::instance()->setOption("options.messages.force-incoming-message-type", d->cb_incomingAs->itemData(d->cb_incomingAs->currentIndex()));
+ 	PsiOptions::instance()->setOption("options.ui.message.show-subjects", d->ck_showSubjects->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.message.show-character-count", d->ck_showCounter->isChecked());
+ 	PsiOptions::instance()->setOption("options.vcard.query-own-vcard-on-login", d->ck_autoVCardOnLogin->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.use-status-change-animation", d->ck_rosterAnim->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.contactlist.ensure-contact-visible-on-event", d->ck_scrollTo->isChecked());
+@@ -145,18 +133,12 @@ void OptionsTabAdvanced::restoreOptions(
+ 	d->ck_sendReceipts->setChecked( PsiOptions::instance()->getOption("options.ui.notifications.send-receipts").toBool() );
+ 	d->ck_sendComposingEvents->setChecked( PsiOptions::instance()->getOption("options.messages.dont-send-composing-events").toBool() );
+ 	d->ck_rc->setChecked( PsiOptions::instance()->getOption("options.external-control.adhoc-remote-control.enable").toBool() );
+-	if ( !SpellChecker::instance()->available() )
+-		d->ck_spell->setChecked(false);
+-	else
+-		d->ck_spell->setChecked(PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
+-	d->ck_contactsMessageFormatting->setChecked(PsiOptions::instance()->getOption("options.html.chat.render").toBool());
+ 	d->ck_autocopy->setChecked( PsiOptions::instance()->getOption("options.ui.automatically-copy-selected-text").toBool() );
+ 	d->ck_singleclick->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.use-single-click").toBool() );
+ 	d->ck_jidComplete->setChecked( PsiOptions::instance()->getOption("options.ui.message.use-jid-auto-completion").toBool() );
+ 	d->ck_grabUrls->setChecked( PsiOptions::instance()->getOption("options.ui.message.auto-grab-urls-from-clipboard").toBool() );
+ 	d->cb_incomingAs->setCurrentIndex(d->cb_incomingAs->findData( PsiOptions::instance()->getOption("options.messages.force-incoming-message-type").toString()));
+ 	d->ck_showSubjects->setChecked( PsiOptions::instance()->getOption("options.ui.message.show-subjects").toBool() );
+-	d->ck_showCounter->setChecked( PsiOptions::instance()->getOption("options.ui.message.show-character-count").toBool() );
+ 	d->ck_autoVCardOnLogin->setChecked( PsiOptions::instance()->getOption("options.vcard.query-own-vcard-on-login").toBool() );
+ 	d->ck_rosterAnim->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.use-status-change-animation").toBool() );
+ 	d->ck_scrollTo->setChecked( PsiOptions::instance()->getOption("options.ui.contactlist.ensure-contact-visible-on-event").toBool() );
+--- git.orig/src/options/opt_advanced.ui
++++ git/src/options/opt_advanced.ui
+@@ -1,48 +1,58 @@
+-<ui version="4.0" >
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
+  <class>OptAdvanced</class>
+- <widget class="QWidget" name="OptAdvanced" >
+-  <property name="geometry" >
++ <widget class="QWidget" name="OptAdvanced">
++  <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>509</width>
+-    <height>429</height>
++    <height>594</height>
+    </rect>
+   </property>
+-  <property name="windowTitle" >
++  <property name="windowTitle">
+    <string>OptAdvancedUI</string>
+   </property>
+-  <layout class="QVBoxLayout" >
+-   <property name="margin" >
++  <layout class="QVBoxLayout">
++   <property name="spacing">
++    <number>6</number>
++   </property>
++   <property name="leftMargin">
+     <number>9</number>
+    </property>
+-   <property name="spacing" >
+-    <number>6</number>
++   <property name="topMargin">
++    <number>9</number>
++   </property>
++   <property name="rightMargin">
++    <number>9</number>
++   </property>
++   <property name="bottomMargin">
++    <number>9</number>
+    </property>
+    <item>
+-    <widget class="QCheckBox" name="ck_messageevents" >
+-     <property name="text" >
+-      <string>Enable "Contact is typing ..." events</string>
++    <widget class="QCheckBox" name="ck_messageevents">
++     <property name="text">
++      <string>Enable &quot;Contact is typing ...&quot; events</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_inactiveevents" >
+-     <property name="text" >
+-      <string>Enable "Inactivity" events (end/suspend conversation)</string>
++    <widget class="QCheckBox" name="ck_inactiveevents">
++     <property name="text">
++      <string>Enable &quot;Inactivity&quot; events (end/suspend conversation)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_requestReceipts" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_requestReceipts">
++     <property name="text">
+       <string>Request receipts</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_sendReceipts" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_sendReceipts">
++     <property name="text">
+       <string>Send receipts</string>
+      </property>
+     </widget>
+@@ -58,130 +68,118 @@
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_rc" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_rc">
++     <property name="text">
+       <string>Enable remote controlling from other locations</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_spell" >
+-     <property name="text" >
+-      <string>Check spelling</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_contactsMessageFormatting" >
+-     <property name="text" >
+-      <string>Use contacts' message formatting</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_singleclick" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_singleclick">
++     <property name="text">
+       <string>Single-click triggers default action</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_autocopy" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_autocopy">
++     <property name="text">
+       <string>Automatically copy selected text to clipboard</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_grabUrls" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_grabUrls">
++     <property name="text">
+       <string>Grab URLs from clipboard</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_jidComplete" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_jidComplete">
++     <property name="text">
+       <string>XMPP address completion</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_showSubjects" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_showSubjects">
++     <property name="text">
+       <string>Show subject line in events</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_showCounter" >
+-     <property name="text" >
+-      <string>Show character counter</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_autoVCardOnLogin" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_autoVCardOnLogin">
++     <property name="text">
+       <string>Automatically get vCard when becoming online</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_rosterAnim" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_rosterAnim">
++     <property name="text">
+       <string>Animate the roster when a contact comes online</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_scrollTo" >
+-     <property name="text" >
++    <widget class="QCheckBox" name="ck_scrollTo">
++     <property name="text">
+       <string>Scroll roster to contact on event</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QCheckBox" name="ck_ignoreHeadline" >
+-     <property name="text" >
+-      <string>Ignore "Headline" events (e.g. MSN alerts)</string>
++    <widget class="QCheckBox" name="ck_ignoreHeadline">
++     <property name="text">
++      <string>Ignore &quot;Headline&quot; events (e.g. MSN alerts)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <layout class="QHBoxLayout" >
+-     <property name="margin" >
++    <layout class="QHBoxLayout">
++     <property name="spacing">
++      <number>6</number>
++     </property>
++     <property name="leftMargin">
+       <number>0</number>
+      </property>
+-     <property name="spacing" >
+-      <number>6</number>
++     <property name="topMargin">
++      <number>0</number>
++     </property>
++     <property name="rightMargin">
++      <number>0</number>
++     </property>
++     <property name="bottomMargin">
++      <number>0</number>
+      </property>
+      <item>
+-      <widget class="QLabel" name="TextLabel2" >
+-       <property name="text" >
++      <widget class="QLabel" name="TextLabel2">
++       <property name="text">
+         <string>Treat incoming messages and chats as:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+-      <widget class="QComboBox" name="cb_incomingAs" >
++      <widget class="QComboBox" name="cb_incomingAs">
+        <item>
+-        <property name="text" >
++        <property name="text">
+          <string>Determined by sender</string>
+         </property>
+        </item>
+        <item>
+-        <property name="text" >
++        <property name="text">
+          <string>Messages</string>
+         </property>
+        </item>
+        <item>
+-        <property name="text" >
++        <property name="text">
+          <string>Chats</string>
+         </property>
+        </item>
+        <item>
+-        <property name="text" >
++        <property name="text">
+          <string>Messages (Chats if Chatting)</string>
+         </property>
+        </item>
+@@ -191,7 +189,7 @@
+    </item>
+   </layout>
+  </widget>
+- <layoutdefault spacing="6" margin="11" />
++ <layoutdefault spacing="6" margin="11"/>
+  <resources/>
+  <connections/>
+ </ui>
+--- git.orig/src/options/opt_chat.cpp
++++ git/src/options/opt_chat.cpp
+@@ -57,7 +57,6 @@ QWidget *OptionsTabChat::widget()
+ 	bg_delChats->addButton( d->rb_delChatsDay);
+ 	bg_delChats->addButton( d->rb_delChatsNever);
+ 
+-	connect(d->ck_tabChats, SIGNAL(toggled(bool)), d->cb_tabGrouping, SLOT(setEnabled(bool)));
+ 
+ 	d->rb_defActMsg->setWhatsThis(
+ 		tr("Make the default action open a normal message window."));
+@@ -79,13 +78,8 @@ QWidget *OptionsTabChat::widget()
+ 		" It does not take the keyboard focus, so it will not interfere with your work."));
+ 	d->ck_smallChats->setWhatsThis(
+ 		tr("Makes Psi open chat windows in compact mode."));
+-	d->ck_tabChats->setWhatsThis(
+-		tr("Makes Psi open chats in a tabbed window."));
+ 	QString s = tr("<P>Controls how long the chat log will be kept in memory after the"
+ 		" chat window is closed.</P>");
+-	d->ck_showPreviews->setWhatsThis(
+-		tr("Show under links to some media content preview of the content."
+-		" It's also possible to play audio and video right in chat."));
+ 	d->rb_delChatsClose->setWhatsThis(s +
+ 		tr("<P>This option does not keep the chat log in memory.</P>"));
+ 	d->rb_delChatsHour->setWhatsThis(s +
+@@ -110,7 +104,6 @@ void OptionsTabChat::applyOptions()
+ 	PsiOptions::instance()->setOption("options.ui.chat.raise-chat-windows-on-new-messages", d->ck_raiseChatWindow->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.chat.switch-tab-on-new-messages", d->ck_switchTabOnMessage->isChecked());
+ 	PsiOptions::instance()->setOption("options.ui.chat.use-small-chats", d->ck_smallChats->isChecked());
+-	PsiOptions::instance()->setOption("options.ui.tabs.show-tab-buttons", d->ck_showTabButtons->isChecked());
+ 
+ 	QString delafter;
+ 	switch (bg_delChats->buttons().indexOf( bg_delChats->checkedButton() )) {
+@@ -128,39 +121,6 @@ void OptionsTabChat::applyOptions()
+ 			break;
+ 	}
+ 	PsiOptions::instance()->setOption("options.ui.chat.delete-contents-after", delafter);
+-	PsiOptions::instance()->setOption("options.ui.tabs.use-tabs", d->ck_tabChats->isChecked());
+-	QString tabGrouping;
+-	int idx = d->cb_tabGrouping->currentIndex();
+-	switch (idx) {
+-		case 0:
+-			tabGrouping = "C";
+-			break;
+-		case 1:
+-			tabGrouping = "M";
+-			break;
+-		case 2:
+-			tabGrouping = "C:M";
+-			break;
+-		case 3:
+-			tabGrouping = "CM";
+-			break;
+-		case 4:
+-			tabGrouping = "ACM";
+-			break;
+-	}
+-	if (!tabGrouping.isEmpty()) {
+-		PsiOptions::instance()->setOption("options.ui.tabs.grouping", tabGrouping);
+-	} else {
+-		if (d->cb_tabGrouping->count() == 6) {
+-			d->cb_tabGrouping->removeItem(5);
+-		}
+-	}
+-
+-	PsiOptions::instance()->setOption("options.ui.chat.use-expanding-line-edit", d->ck_autoResize->isChecked());
+-
+-	PsiOptions::instance()->setOption("options.ui.tabs.use-tab-shortcuts", d->ck_tabShortcuts->isChecked());
+-
+-	PsiOptions::instance()->setOption("options.ui.chat.show-previews", d->ck_showPreviews->isChecked());
+ 
+ 	// Soft return.
+ 	// Only update this if the value actually changed, or else custom presets
+@@ -190,35 +150,7 @@ void OptionsTabChat::restoreOptions()
+ 	d->ck_raiseChatWindow->setChecked( PsiOptions::instance()->getOption("options.ui.chat.raise-chat-windows-on-new-messages").toBool() );
+ 	d->ck_switchTabOnMessage->setChecked( PsiOptions::instance()->getOption("options.ui.chat.switch-tab-on-new-messages").toBool() );
+ 	d->ck_smallChats->setChecked( PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool() );
+-	d->ck_showTabButtons->setChecked( PsiOptions::instance()->getOption("options.ui.tabs.show-tab-buttons").toBool() );
+-	d->ck_tabChats->setChecked( PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool() );
+-	d->cb_tabGrouping->setEnabled(PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool());
+-	QString tabGrouping = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString();
+-	bool custom = false;
+-	if (tabGrouping == "C") {
+-		d->cb_tabGrouping->setCurrentIndex(0);
+-	} else if (tabGrouping == "M") {
+-		d->cb_tabGrouping->setCurrentIndex(1);
+-	} else if (tabGrouping == "C:M") {
+-		d->cb_tabGrouping->setCurrentIndex(2);
+-	} else if (tabGrouping == "CM") {
+-		d->cb_tabGrouping->setCurrentIndex(3);
+-	} else if (tabGrouping == "ACM") {
+-		d->cb_tabGrouping->setCurrentIndex(4);
+-	} else {
+-		if (d->cb_tabGrouping->count() == 6) {
+-			d->cb_tabGrouping->setCurrentIndex(5);
+-		} else {
+-			d->cb_tabGrouping->setCurrentIndex(-1);
+-		}
+-		custom = true;
+-	}
+-	if (!custom && d->cb_tabGrouping->count() == 6) {
+-		d->cb_tabGrouping->removeItem(5);
+-	}
+-	d->ck_autoResize->setChecked( PsiOptions::instance()->getOption("options.ui.chat.use-expanding-line-edit").toBool() );
+-	d->ck_tabShortcuts->setChecked( PsiOptions::instance()->getOption("options.ui.tabs.use-tab-shortcuts").toBool() );
+-	d->ck_showPreviews->setChecked( PsiOptions::instance()->getOption("options.ui.chat.show-previews").toBool() );
++
+ 	QString delafter = PsiOptions::instance()->getOption("options.ui.chat.delete-contents-after").toString();
+ 	if (delafter == "instant") {
+ 		d->rb_delChatsClose->setChecked(true);
+--- git.orig/src/options/opt_chat.ui
++++ git/src/options/opt_chat.ui
+@@ -7,7 +7,7 @@
+     <x>0</x>
+     <y>0</y>
+     <width>517</width>
+-    <height>531</height>
++    <height>576</height>
+    </rect>
+   </property>
+   <property name="windowTitle">
+@@ -64,113 +64,6 @@
+      </property>
+     </widget>
+    </item>
+-   <item>
+-    <layout class="QHBoxLayout">
+-     <property name="spacing">
+-      <number>6</number>
+-     </property>
+-     <property name="leftMargin">
+-      <number>0</number>
+-     </property>
+-     <property name="topMargin">
+-      <number>0</number>
+-     </property>
+-     <property name="rightMargin">
+-      <number>0</number>
+-     </property>
+-     <property name="bottomMargin">
+-      <number>0</number>
+-     </property>
+-     <item>
+-      <widget class="QCheckBox" name="ck_tabChats">
+-       <property name="sizePolicy">
+-        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+-         <horstretch>0</horstretch>
+-         <verstretch>0</verstretch>
+-        </sizepolicy>
+-       </property>
+-       <property name="text">
+-        <string>Use tabbed mode:</string>
+-       </property>
+-      </widget>
+-     </item>
+-     <item>
+-      <widget class="QComboBox" name="cb_tabGrouping">
+-       <item>
+-        <property name="text">
+-         <string>for chats only</string>
+-        </property>
+-       </item>
+-       <item>
+-        <property name="text">
+-         <string>for mucs only</string>
+-        </property>
+-       </item>
+-       <item>
+-        <property name="text">
+-         <string>for chats and mucs separately</string>
+-        </property>
+-       </item>
+-       <item>
+-        <property name="text">
+-         <string>for mucs and chats in one window</string>
+-        </property>
+-       </item>
+-       <item>
+-        <property name="text">
+-         <string>for mucs, chats and roster in one window</string>
+-        </property>
+-       </item>
+-       <item>
+-        <property name="text">
+-         <string>[customized]</string>
+-        </property>
+-       </item>
+-      </widget>
+-     </item>
+-     <item>
+-      <spacer>
+-       <property name="orientation">
+-        <enum>Qt::Horizontal</enum>
+-       </property>
+-       <property name="sizeHint" stdset="0">
+-        <size>
+-         <width>0</width>
+-         <height>0</height>
+-        </size>
+-       </property>
+-      </spacer>
+-     </item>
+-    </layout>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_showTabButtons" >
+-     <property name="text" >
+-      <string>Show tab buttons</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_autoResize">
+-     <property name="text">
+-      <string>Auto-resize text input field</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_tabShortcuts">
+-     <property name="text">
+-      <string>Enable Alt-[0-9] tab shortcuts</string>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QCheckBox" name="ck_showPreviews">
+-     <property name="text">
+-      <string>Show previews for links</string>
+-     </property>
+-    </widget>
+-   </item>
+    <item>
+     <widget class="QGroupBox" name="groupBox18">
+      <property name="title">
+--- git.orig/src/options/opt_input.cpp
++++ git/src/options/opt_input.cpp
+@@ -0,0 +1,199 @@
++#include "opt_input.h"
++
++#include <QWidget>
++#include <QTreeWidget>
++#include <QTreeWidgetItem>
++#include <QCheckBox>
++#include <QLocale>
++#include <QDebug>
++
++#include "psioptions.h"
++#include "spellchecker/spellchecker.h"
++
++
++#include "ui_opt_input.h"
++
++static const QString ENABLED_OPTION("options.ui.spell-check.enabled");
++static const QString DICTS_OPTION("options.ui.spell-check.langs");
++static const uint FullName = 0;
++
++
++class OptInputUI : public QWidget, public Ui::OptInput
++{
++public:
++	OptInputUI() : QWidget() { setupUi(this); }
++};
++
++OptionsTabInput::OptionsTabInput(QObject *parent)
++: OptionsTab(parent, "input", "", tr("Input"), tr("Input options")),
++  w_(0),
++  psi_(0)
++{
++	availableDicts_ = SpellChecker::instance()->getAllLanguages();
++}
++
++OptionsTabInput::~OptionsTabInput()
++{}
++
++QWidget *OptionsTabInput::widget()
++{
++	if (w_) {
++		return 0;
++	}
++
++	w_ = new OptInputUI();
++	OptInputUI *d = (OptInputUI *)w_;
++	d->isSpellCheck->setWhatsThis(tr("Check this option if you want your spelling to be checked"));
++
++	connect(d->isSpellCheck, &QCheckBox::toggled, this, &OptionsTabInput::itemToggled);
++	return w_;
++}
++
++void OptionsTabInput::applyOptions()
++{
++	if (!w_) {
++		return;
++	}
++
++	OptInputUI *d = (OptInputUI *)w_;
++	PsiOptions* o = PsiOptions::instance();
++
++	o->setOption(ENABLED_OPTION, (d->isSpellCheck->isChecked() && SpellChecker::instance()->available()));
++	o->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
++}
++
++void OptionsTabInput::restoreOptions()
++{
++	if (!w_) {
++		return;
++	}
++
++	OptInputUI *d = (OptInputUI *)w_;
++	PsiOptions* o = PsiOptions::instance();
++
++	bool isEnabled = o->getOption(ENABLED_OPTION).toBool();
++	isEnabled = (!SpellChecker::instance()->available()) ? false : isEnabled;
++	d->isSpellCheck->setChecked(isEnabled);
++	if (!availableDicts_.isEmpty()) {
++		d->infoLabel->setVisible(false);
++		if(isEnabled) {
++			QStringList newLoadedList = PsiOptions::instance()->getOption(DICTS_OPTION).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
++			newLoadedList = (newLoadedList.isEmpty()) ? obtainDefaultLang() : newLoadedList;
++			if(newLoadedList != loadedDicts_ || loadedDicts_.isEmpty()) {
++				loadedDicts_ = newLoadedList;
++			}
++			if(!isTreeViewEmpty()) {
++				setChecked();
++			}
++			else {
++				fillList();
++				setChecked();
++			}
++		}
++	}
++	else {
++		d->infoLabel->setVisible(true);
++		d->availDicts->setVisible(false);
++	}
++
++}
++
++void OptionsTabInput::setData(PsiCon *psi, QWidget *)
++{
++	psi_ = psi;
++}
++
++QStringList OptionsTabInput::obtainDefaultLang() const
++{
++	QStringList uiLangs = QLocale::system().uiLanguages();
++	QStringList locales;
++	if(!uiLangs.isEmpty()) {
++		foreach (QString loc, uiLangs) {
++			if(availableDicts_.contains(loc.replace("-", "_"), Qt::CaseInsensitive)) {
++				locales << loc;
++			}
++		}
++	}
++	return locales;
++}
++
++void OptionsTabInput::fillList()
++{
++	if(!w_) {
++		return;
++	}
++
++	OptInputUI *d = (OptInputUI *)w_;
++	d->availDicts->clear();
++	d->availDicts->disconnect();
++
++	if(!availableDicts_.isEmpty()) {
++		foreach (const QString &item, availableDicts_) {
++			QTreeWidgetItem *dic = new QTreeWidgetItem(d->availDicts, QTreeWidgetItem::Type);
++			QLocale loc(item);
++			dic->setText(FullName, QString("%1 - %2").arg(loc.nativeLanguageName()).arg(loc.nativeCountryName()));
++			dic->setData(FullName, Qt::UserRole, item);
++			if(!loadedDicts_.contains(item)) {
++				dic->setCheckState(FullName, Qt::Unchecked);
++			}
++			else {
++				dic->setCheckState(FullName, Qt::Checked);
++			}
++		}
++	}
++	connect(d->availDicts, &QTreeWidget::itemChanged, this, &OptionsTabInput::itemChanged);
++}
++
++void OptionsTabInput::setChecked()
++{
++	if(!w_) {
++		return;
++	}
++
++	OptInputUI *d = (OptInputUI *)w_;
++	QTreeWidgetItemIterator it(d->availDicts);
++	while(*it) {
++		QTreeWidgetItem *item = *it;
++		Qt::CheckState state = loadedDicts_.contains(item->data(FullName, Qt::UserRole).toString(), Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked;
++		if(state != item->checkState(FullName)) {
++			item->setCheckState(FullName, state);
++		}
++		++it;
++	}
++}
++
++void OptionsTabInput::itemToggled(bool toggled)
++{
++	if(!w_) {
++		return;
++	}
++
++	OptInputUI *d = (OptInputUI *)w_;
++
++	d->frame->setVisible(toggled);
++}
++
++void OptionsTabInput::itemChanged(QTreeWidgetItem *item, int column)
++{
++	if ( !w_ )
++		return;
++
++	bool enabled = bool(item->checkState(column) == Qt::Checked);
++	QString itemText = item->data(column, Qt::UserRole).toString();
++	if(loadedDicts_.contains(itemText, Qt::CaseInsensitive) && !enabled) {
++		loadedDicts_.removeOne(itemText);
++	}
++	else if (enabled){
++		loadedDicts_ << itemText;
++	}
++	PsiOptions::instance()->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
++}
++
++bool OptionsTabInput::isTreeViewEmpty()
++{
++	if ( !w_ )
++		return true;
++	OptInputUI *d = (OptInputUI *)w_;
++	QTreeWidgetItemIterator it(d->availDicts);
++	return !bool(*it);
++}
+--- git.orig/src/options/opt_input.h
++++ git/src/options/opt_input.h
+@@ -0,0 +1,39 @@
++#ifndef OPT_TABINPUT_H
++#define OPT_TABINPUT_H
++
++#include "optionstab.h"
++#include "psicon.h"
++
++class QWidget;
++class QTreeWidgetItem;
++
++class OptionsTabInput : public OptionsTab
++{
++	Q_OBJECT
++public:
++	OptionsTabInput(QObject *parent);
++	~OptionsTabInput();
++
++	QWidget *widget();
++	void applyOptions();
++	void restoreOptions();
++	void setData(PsiCon *psi, QWidget *);
++
++private:
++	QStringList obtainDefaultLang() const;
++	void fillList();
++	void setChecked();
++	bool isTreeViewEmpty();
++
++private slots:
++	void itemToggled(bool toggled);
++	void itemChanged(QTreeWidgetItem *item, int column);
++
++private:
++	QWidget *w_;
++	PsiCon *psi_;
++	QStringList availableDicts_;
++	QStringList loadedDicts_;
++};
++
++#endif // OPT_TABINPUT_H
+--- git.orig/src/options/opt_input.ui
++++ git/src/options/opt_input.ui
+@@ -0,0 +1,77 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>OptInput</class>
++ <widget class="QWidget" name="OptInput">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>400</width>
++    <height>300</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>Form</string>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <widget class="QCheckBox" name="isSpellCheck">
++     <property name="text">
++      <string>Enable Spell Checking</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QFrame" name="frame">
++     <property name="frameShape">
++      <enum>QFrame::StyledPanel</enum>
++     </property>
++     <property name="frameShadow">
++      <enum>QFrame::Raised</enum>
++     </property>
++     <layout class="QVBoxLayout" name="verticalLayout_2">
++      <item>
++       <widget class="QTreeWidget" name="availDicts">
++        <property name="toolTip">
++         <string extracomment="Available dictionaries"/>
++        </property>
++        <property name="frameShape">
++         <enum>QFrame::StyledPanel</enum>
++        </property>
++        <property name="midLineWidth">
++         <number>0</number>
++        </property>
++        <property name="editTriggers">
++         <set>QAbstractItemView::NoEditTriggers</set>
++        </property>
++        <property name="rootIsDecorated">
++         <bool>true</bool>
++        </property>
++        <column>
++         <property name="text">
++          <string>Available spellcheck dictionaries</string>
++         </property>
++        </column>
++       </widget>
++      </item>
++      <item>
++       <widget class="QLabel" name="infoLabel">
++        <property name="frameShape">
++         <enum>QFrame::Box</enum>
++        </property>
++        <property name="frameShadow">
++         <enum>QFrame::Raised</enum>
++        </property>
++        <property name="text">
++         <string>No dictionaries found</string>
++        </property>
++       </widget>
++      </item>
++     </layout>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>
+--- git.orig/src/options/optionsdlg.cpp
++++ git/src/options/optionsdlg.cpp
+@@ -8,12 +8,12 @@
+ #include "opt_application.h"
+ #include "opt_roster.h"
+ #include "opt_appearance.h"
+-#include "opt_chat.h"
++#include "opt_messages.h"
+ #include "opt_events.h"
+ #include "opt_popups.h"
+ #include "opt_status.h"
+ #include "opt_iconset.h"
+-#include "opt_groupchat.h"
++//#include "opt_groupchat.h"
+ #include "opt_sound.h"
+ #include "opt_avcall.h"
+ #include "opt_advanced.h"
+@@ -50,7 +50,7 @@ OptionsDlg::OptionsDlg(PsiCon *psi, QWid
+ 	applicationTab->setHaveAutoUpdater(psi->haveAutoUpdater());
+ 	tabs.append( applicationTab );
+ 	tabs.append( new OptionsTabRoster(this) );
+-	tabs.append( new OptionsTabChat(this) );
++	tabs.append( new OptionsTabMessages(this) );
+ 	tabs.append( new OptionsTabEvents(this) );
+ 	tabs.append( new OptionsTabPopups(this) );
+ 	tabs.append( new OptionsTabStatus(this) );
+@@ -58,7 +58,7 @@ OptionsDlg::OptionsDlg(PsiCon *psi, QWid
+ 	//tabs.append( new OptionsTabIconsetSystem(this) );
+ 	//tabs.append( new OptionsTabIconsetRoster(this) );
+ 	//tabs.append( new OptionsTabIconsetEmoticons(this) );
+-	tabs.append( new OptionsTabGroupchat(this) );
++	//tabs.append( new OptionsTabGroupchat(this) );
+ 	tabs.append( new OptionsTabSound(this) );
+ 	if(AvCallManager::isSupported())
+ 		tabs.append( new OptionsTabAvCall(this) );
+--- git.orig/src/options/opt_messages_common.cpp
++++ git/src/options/opt_messages_common.cpp
+@@ -0,0 +1,149 @@
++#include "opt_messages_common.h"
++
++#include <QWidget>
++#include <QDebug>
++
++#include "psioptions.h"
++
++
++#include "ui_opt_messages_common.h"
++
++
++class OptMsgCommonUI : public QWidget, public Ui::OptMsgCommon
++{
++public:
++	OptMsgCommonUI() : QWidget() { setupUi(this); }
++};
++
++OptionsTabMsgCommon::OptionsTabMsgCommon(QObject *parent)
++: OptionsTab(parent, "common", "", tr("Common"), tr("Сommon options for messages section")),
++  w_(0),
++  psi_(0)
++{
++}
++
++OptionsTabMsgCommon::~OptionsTabMsgCommon()
++{}
++
++QWidget *OptionsTabMsgCommon::widget()
++{
++	if (w_) {
++		return 0;
++	}
++
++	w_ = new OptMsgCommonUI();
++
++	OptMsgCommonUI *d = (OptMsgCommonUI *)w_;
++
++	connect(d->ck_tabChats, SIGNAL(toggled(bool)), d->cb_tabGrouping, SLOT(setEnabled(bool)));
++
++	d->ck_tabChats->setWhatsThis(
++		tr("Makes Psi open chats in a tabbed window."));
++	d->ck_showPreviews->setWhatsThis(
++		tr("Show under links to some media content preview of the content."
++		   " It's also possible to play audio and video right in chat."));
++	d->ck_showCounter->setWhatsThis(
++		tr("Makes Psi show message length counter."
++		   " Check this if you want to know how long is your message."
++		   " Can be useful when you're using SMS transport."));
++	d->ck_contactsMessageFormatting->setWhatsThis(
++		tr("If enabled, Psi will display incoming messages formatted in the style specified by the contact"));
++
++	d->ck_autoCapitalize->setWhatsThis(
++		tr("Enables automatical substitution of the first lettter in a sentence to the same capital letter"));
++
++	return w_;
++}
++
++void OptionsTabMsgCommon::applyOptions()
++{
++	if (!w_) {
++		return;
++	}
++
++	OptMsgCommonUI *d = (OptMsgCommonUI *)w_;
++	PsiOptions* o = PsiOptions::instance();
++	o->setOption("options.ui.message.show-character-count", d->ck_showCounter->isChecked());
++	o->setOption("options.html.chat.render", d->ck_contactsMessageFormatting->isChecked());
++	o->setOption("options.ui.tabs.show-tab-buttons", d->ck_showTabButtons->isChecked());
++
++	o->setOption("options.ui.tabs.use-tabs", d->ck_tabChats->isChecked());
++	QString tabGrouping;
++	int idx = d->cb_tabGrouping->currentIndex();
++	switch (idx) {
++		case 0:
++			tabGrouping = "C";
++			break;
++		case 1:
++			tabGrouping = "M";
++			break;
++		case 2:
++			tabGrouping = "C:M";
++			break;
++		case 3:
++			tabGrouping = "CM";
++			break;
++		case 4:
++			tabGrouping = "ACM";
++			break;
++	}
++	if (!tabGrouping.isEmpty()) {
++		o->setOption("options.ui.tabs.grouping", tabGrouping);
++	} else {
++		if (d->cb_tabGrouping->count() == 6) {
++			d->cb_tabGrouping->removeItem(5);
++		}
++	}
++
++	o->setOption("options.ui.chat.use-expanding-line-edit", d->ck_autoResize->isChecked());
++	o->setOption("options.ui.tabs.use-tab-shortcuts", d->ck_tabShortcuts->isChecked());
++	o->setOption("options.ui.chat.show-previews", d->ck_showPreviews->isChecked());
++	o->setOption("options.ui.chat.auto-capitalize", d->ck_autoCapitalize->isChecked());
++}
++
++void OptionsTabMsgCommon::restoreOptions()
++{
++	if (!w_) {
++		return;
++	}
++
++	OptMsgCommonUI *d = (OptMsgCommonUI *)w_;
++	PsiOptions* o = PsiOptions::instance();
++	d->ck_showCounter->setChecked( o->getOption("options.ui.message.show-character-count").toBool() );
++	d->ck_contactsMessageFormatting->setChecked(o->getOption("options.html.chat.render").toBool());
++	d->ck_showTabButtons->setChecked( o->getOption("options.ui.tabs.show-tab-buttons").toBool() );
++	d->ck_tabChats->setChecked( o->getOption("options.ui.tabs.use-tabs").toBool() );
++	d->cb_tabGrouping->setEnabled(o->getOption("options.ui.tabs.use-tabs").toBool());
++	QString tabGrouping = o->getOption("options.ui.tabs.grouping").toString();
++	bool custom = false;
++	if (tabGrouping == "C") {
++		d->cb_tabGrouping->setCurrentIndex(0);
++	} else if (tabGrouping == "M") {
++		d->cb_tabGrouping->setCurrentIndex(1);
++	} else if (tabGrouping == "C:M") {
++		d->cb_tabGrouping->setCurrentIndex(2);
++	} else if (tabGrouping == "CM") {
++		d->cb_tabGrouping->setCurrentIndex(3);
++	} else if (tabGrouping == "ACM") {
++		d->cb_tabGrouping->setCurrentIndex(4);
++	} else {
++		if (d->cb_tabGrouping->count() == 6) {
++			d->cb_tabGrouping->setCurrentIndex(5);
++		} else {
++			d->cb_tabGrouping->setCurrentIndex(-1);
++		}
++		custom = true;
++	}
++	if (!custom && d->cb_tabGrouping->count() == 6) {
++		d->cb_tabGrouping->removeItem(5);
++	}
++	d->ck_autoResize->setChecked( o->getOption("options.ui.chat.use-expanding-line-edit").toBool() );
++	d->ck_tabShortcuts->setChecked( o->getOption("options.ui.tabs.use-tab-shortcuts").toBool() );
++	d->ck_showPreviews->setChecked( o->getOption("options.ui.chat.show-previews").toBool() );
++	d->ck_autoCapitalize->setChecked(o->getOption("options.ui.chat.auto-capitalize").toBool());
++}
++
++void OptionsTabMsgCommon::setData(PsiCon *psi, QWidget *)
++{
++	psi_ = psi;
++}
+--- git.orig/src/options/opt_messages_common.h
++++ git/src/options/opt_messages_common.h
+@@ -0,0 +1,26 @@
++#ifndef OPT_MSGCOMMON_H
++#define OPT_MSGCOMMON_H
++
++#include "optionstab.h"
++#include "psicon.h"
++
++class QWidget;
++
++class OptionsTabMsgCommon : public OptionsTab
++{
++	Q_OBJECT
++public:
++	OptionsTabMsgCommon(QObject *parent);
++	~OptionsTabMsgCommon();
++
++	QWidget *widget();
++	void applyOptions();
++	void restoreOptions();
++	void setData(PsiCon *psi, QWidget *);
++
++private:
++	QWidget *w_;
++	PsiCon *psi_;
++};
++
++#endif // OPT_MSGCOMMON_H
+--- git.orig/src/options/opt_messages_common.ui
++++ git/src/options/opt_messages_common.ui
+@@ -0,0 +1,163 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>OptMsgCommon</class>
++ <widget class="QWidget" name="OptMsgCommon">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>476</width>
++    <height>300</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>Form</string>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <layout class="QHBoxLayout" name="horizontalLayout">
++     <property name="topMargin">
++      <number>10</number>
++     </property>
++     <item>
++      <widget class="QCheckBox" name="ck_tabChats">
++       <property name="sizePolicy">
++        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
++         <horstretch>0</horstretch>
++         <verstretch>0</verstretch>
++        </sizepolicy>
++       </property>
++       <property name="text">
++        <string>Use tabbed mode:</string>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <widget class="QComboBox" name="cb_tabGrouping">
++       <item>
++        <property name="text">
++         <string>for chats only</string>
++        </property>
++       </item>
++       <item>
++        <property name="text">
++         <string>for mucs only</string>
++        </property>
++       </item>
++       <item>
++        <property name="text">
++         <string>for chats and mucs separately</string>
++        </property>
++       </item>
++       <item>
++        <property name="text">
++         <string>for mucs and chats in one window</string>
++        </property>
++       </item>
++       <item>
++        <property name="text">
++         <string>for mucs, chats and roster in one window</string>
++        </property>
++       </item>
++       <item>
++        <property name="text">
++         <string>[customized]</string>
++        </property>
++       </item>
++      </widget>
++     </item>
++     <item>
++      <spacer name="horizontalSpacer">
++       <property name="orientation">
++        <enum>Qt::Horizontal</enum>
++       </property>
++       <property name="sizeHint" stdset="0">
++        <size>
++         <width>40</width>
++         <height>20</height>
++        </size>
++       </property>
++      </spacer>
++     </item>
++    </layout>
++   </item>
++   <item>
++    <spacer>
++     <property name="orientation">
++      <enum>Qt::Horizontal</enum>
++     </property>
++     <property name="sizeHint" stdset="0">
++      <size>
++       <width>0</width>
++       <height>0</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_showTabButtons">
++     <property name="text">
++      <string>Show tab buttons</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_autoResize">
++     <property name="text">
++      <string>Auto-resize text input field</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_tabShortcuts">
++     <property name="text">
++      <string>Enable Alt-[0-9] tab shortcuts</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_showPreviews">
++     <property name="text">
++      <string>Show previews for links</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_contactsMessageFormatting">
++     <property name="text">
++      <string>Use contacts' message formatting</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_showCounter">
++     <property name="text">
++      <string>Show character counter</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QCheckBox" name="ck_autoCapitalize">
++     <property name="text">
++      <string>Automatically capitalize the first letter in a sentence</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <spacer name="verticalSpacer">
++     <property name="orientation">
++      <enum>Qt::Vertical</enum>
++     </property>
++     <property name="sizeHint" stdset="0">
++      <size>
++       <width>20</width>
++       <height>40</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>
+--- git.orig/src/options/opt_messages.cpp
++++ git/src/options/opt_messages.cpp
+@@ -0,0 +1,15 @@
++#include "opt_messages.h"
++
++#include "opt_messages_common.h"
++#include "opt_chat.h"
++#include "opt_groupchat.h"
++#include "opt_input.h"
++
++OptionsTabMessages::OptionsTabMessages(QObject *parent)
++: MetaOptionsTab(parent, "chat", "", tr("Messages"), tr("Messages options"), "psi/start-chat")
++{
++	addTab(new OptionsTabMsgCommon(this));
++	addTab(new OptionsTabChat(this));
++	addTab(new OptionsTabGroupchat(this));
++	addTab(new OptionsTabInput(this));
++}
+--- git.orig/src/options/opt_messages.h
++++ git/src/options/opt_messages.h
+@@ -0,0 +1,13 @@
++#ifndef OPT_TABMESSAGES_H
++#define OPT_TABMESSAGES_H
++
++#include "optionstab.h"
++
++class OptionsTabMessages: public MetaOptionsTab
++{
++	Q_OBJECT
++public:
++	OptionsTabMessages(QObject *parent);
++};
++
++#endif // OPT_TABTABMESSAGES_H
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
+@@ -1416,11 +1416,17 @@ void PsiCon::optionChanged(const QString
+ 		QStringList langs = PsiOptions::instance()->getOption(option).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
+ 		if(langs.isEmpty()) {
+ 			langs = SpellChecker::instance()->getAllLanguages();
+-			QString lang_env = getenv("LANG");
+-			if(!lang_env.isEmpty()) {
+-				lang_env = lang_env.split("_").first();
+-				if(langs.contains(lang_env, Qt::CaseInsensitive))
+-					langs = QStringList(lang_env);
++			QStringList uiLangs = QLocale::system().uiLanguages();
++			if(!uiLangs.isEmpty()) {
++				QStringList locales;
++				foreach (QString loc, uiLangs) {
++					if (langs.contains(loc.replace("-","_"), Qt::CaseInsensitive)) {
++						locales << loc;
++					}
++				}
++				if(!locales.isEmpty()) {
++					langs = locales;
++				}
+ 			}
+ 		}
+ 		SpellChecker::instance()->setActiveLanguages(langs);

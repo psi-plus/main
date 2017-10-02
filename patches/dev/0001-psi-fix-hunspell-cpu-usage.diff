@@ -36,8 +36,8 @@
 +	QMutableListIterator<LangItem> it(languages_);
 +	while(it.hasNext()) {
 +		LangItem item = it.next();
-+		QLocale locale_(item.info.language, item.info.country);
-+		if(locale_ == locale) {
++		if(item.info.language == locale.language()
++		   && item.info.country == locale.country()) {
 +			it.remove();
 +		}
 +	}
@@ -109,28 +109,3 @@
  private:
  	QList<LangItem> languages_;
  	QStringList dictPaths_;
---- git.orig/src/psicon.cpp
-+++ git/src/psicon.cpp
-@@ -1416,11 +1416,17 @@ void PsiCon::optionChanged(const QString
- 		QStringList langs = PsiOptions::instance()->getOption(option).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
- 		if(langs.isEmpty()) {
- 			langs = SpellChecker::instance()->getAllLanguages();
--			QString lang_env = getenv("LANG");
--			if(!lang_env.isEmpty()) {
--				lang_env = lang_env.split("_").first();
--				if(langs.contains(lang_env, Qt::CaseInsensitive))
--					langs = QStringList(lang_env);
-+			QStringList uiLangs = QLocale::system().uiLanguages();
-+			if(!uiLangs.isEmpty()) {
-+				QStringList locales;
-+				foreach (QString loc, uiLangs) {
-+					if (langs.contains(loc.replace("-","_"), Qt::CaseInsensitive)) {
-+						locales << loc;
-+					}
-+				}
-+				if(!locales.isEmpty()) {
-+					langs = locales;
-+				}
- 			}
- 		}
- 		SpellChecker::instance()->setActiveLanguages(langs);
