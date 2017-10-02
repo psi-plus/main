@@ -610,7 +610,7 @@
       <property name="title">
 --- git.orig/src/options/opt_input.cpp
 +++ git/src/options/opt_input.cpp
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,227 @@
 +#include "opt_input.h"
 +
 +#include <QWidget>
@@ -618,7 +618,7 @@
 +#include <QTreeWidgetItem>
 +#include <QCheckBox>
 +#include <QLocale>
-+#include <QDebug>
++//#include <QDebug>
 +
 +#include "psioptions.h"
 +#include "spellchecker/spellchecker.h"
@@ -643,7 +643,6 @@
 +  w_(0),
 +  psi_(0)
 +{
-+	availableDicts_ = SpellChecker::instance()->getAllLanguages();
 +}
 +
 +OptionsTabInput::~OptionsTabInput()
@@ -657,9 +656,21 @@
 +
 +	w_ = new OptInputUI();
 +	OptInputUI *d = (OptInputUI *)w_;
++
++	availableDicts_ = SpellChecker::instance()->getAllLanguages();
++	QStringList uiLangs = QLocale::system().uiLanguages();
++	if(!uiLangs.isEmpty()) {
++		foreach (QString loc, uiLangs) {
++			if(availableDicts_.contains(loc.replace("-", "_"), Qt::CaseInsensitive)) {
++				defaultLangs_ << loc;
++			}
++		}
++	}
++
 +	d->isSpellCheck->setWhatsThis(tr("Check this option if you want your spelling to be checked"));
 +
 +	connect(d->isSpellCheck, &QCheckBox::toggled, this, &OptionsTabInput::itemToggled);
++
 +	return w_;
 +}
 +
@@ -671,10 +682,20 @@
 +
 +	OptInputUI *d = (OptInputUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
++	SpellChecker *s = SpellChecker::instance();
 +
++	bool isEnabled = d->isSpellCheck->isChecked();
++	o->setOption(ENABLED_OPTION, isEnabled);
 +	o->setOption(AUTORESIZE_OPTION, d->isAutoResize->isChecked());
-+	o->setOption(ENABLED_OPTION, (d->isSpellCheck->isChecked() && SpellChecker::instance()->available()));
-+	o->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
++	if(!isEnabled) {
++		loadedDicts_.clear();
++		s->setActiveLanguages(loadedDicts_);
++	}
++	else {
++		setListVisibility(isEnabled);
++		s->setActiveLanguages(loadedDicts_);
++		o->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
++	}
 +}
 +
 +void OptionsTabInput::restoreOptions()
@@ -686,30 +707,24 @@
 +	OptInputUI *d = (OptInputUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
 +
++	updateDictLists();
++
 +	d->isAutoResize->setChecked( o->getOption(AUTORESIZE_OPTION).toBool() );
 +	bool isEnabled = o->getOption(ENABLED_OPTION).toBool();
 +	isEnabled = (!SpellChecker::instance()->available()) ? false : isEnabled;
++	setListVisibility(isEnabled);
 +	d->isSpellCheck->setChecked(isEnabled);
 +	if (!availableDicts_.isEmpty()) {
 +		d->infoLabel->setVisible(false);
-+		if(isEnabled) {
-+			QStringList newLoadedList = PsiOptions::instance()->getOption(DICTS_OPTION).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
-+			newLoadedList = (newLoadedList.isEmpty()) ? obtainDefaultLang() : newLoadedList;
-+			if(newLoadedList != loadedDicts_ || loadedDicts_.isEmpty()) {
-+				loadedDicts_ = newLoadedList;
-+			}
-+			if(!isTreeViewEmpty()) {
-+				setChecked();
-+			}
-+			else {
-+				fillList();
-+				setChecked();
-+			}
++		if(isEnabled && isTreeViewEmpty()) {
++			fillList();
++		}
++		if (isEnabled) {
++			setChecked();
 +		}
 +	}
 +	else {
 +		d->infoLabel->setVisible(true);
-+		d->availDicts->setVisible(false);
 +	}
 +
 +}
@@ -719,18 +734,14 @@
 +	psi_ = psi;
 +}
 +
-+QStringList OptionsTabInput::obtainDefaultLang() const
++void OptionsTabInput::updateDictLists()
 +{
-+	QStringList uiLangs = QLocale::system().uiLanguages();
-+	QStringList locales;
-+	if(!uiLangs.isEmpty()) {
-+		foreach (QString loc, uiLangs) {
-+			if(availableDicts_.contains(loc.replace("-", "_"), Qt::CaseInsensitive)) {
-+				locales << loc;
-+			}
-+		}
++	PsiOptions* o = PsiOptions::instance();
++	QStringList newLoadedList = o->getOption(DICTS_OPTION).toString().split(QRegExp("\\s+"), QString::SkipEmptyParts);
++	newLoadedList = (newLoadedList.isEmpty()) ? defaultLangs_ : newLoadedList;
++	if(newLoadedList != loadedDicts_ || loadedDicts_.isEmpty()) {
++		loadedDicts_ = newLoadedList;
 +	}
-+	return locales;
 +}
 +
 +void OptionsTabInput::fillList()
@@ -740,10 +751,10 @@
 +	}
 +
 +	OptInputUI *d = (OptInputUI *)w_;
-+	d->availDicts->clear();
-+	d->availDicts->disconnect();
 +
 +	if(!availableDicts_.isEmpty()) {
++		d->availDicts->disconnect();
++		d->availDicts->clear();
 +		foreach (const QString &item, availableDicts_) {
 +			QTreeWidgetItem *dic = new QTreeWidgetItem(d->availDicts, QTreeWidgetItem::Type);
 +			QLocale loc(item);
@@ -751,13 +762,15 @@
 +			dic->setData(FullName, Qt::UserRole, item);
 +			if(!loadedDicts_.contains(item)) {
 +				dic->setCheckState(FullName, Qt::Unchecked);
++				//qDebug() << "item" << item << "unchecked";
 +			}
 +			else {
 +				dic->setCheckState(FullName, Qt::Checked);
++				//qDebug() << "item" << item << "checked";
 +			}
 +		}
++		connect(d->availDicts, &QTreeWidget::itemChanged, this, &OptionsTabInput::itemChanged);
 +	}
-+	connect(d->availDicts, &QTreeWidget::itemChanged, this, &OptionsTabInput::itemChanged);
 +}
 +
 +void OptionsTabInput::setChecked()
@@ -770,7 +783,8 @@
 +	QTreeWidgetItemIterator it(d->availDicts);
 +	while(*it) {
 +		QTreeWidgetItem *item = *it;
-+		Qt::CheckState state = loadedDicts_.contains(item->data(FullName, Qt::UserRole).toString(), Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked;
++		QString itemText = item->data(FullName, Qt::UserRole).toString();
++		Qt::CheckState state = loadedDicts_.contains(itemText, Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked;
 +		if(state != item->checkState(FullName)) {
 +			item->setCheckState(FullName, state);
 +		}
@@ -784,9 +798,12 @@
 +		return;
 +	}
 +
-+	OptInputUI *d = (OptInputUI *)w_;
-+
-+	d->frame->setVisible(toggled);
++	if(toggled) {
++		updateDictLists();
++		fillList();
++		setChecked();
++	}
++	setListVisibility(toggled);
 +}
 +
 +void OptionsTabInput::itemChanged(QTreeWidgetItem *item, int column)
@@ -802,7 +819,7 @@
 +	else if (enabled){
 +		loadedDicts_ << itemText;
 +	}
-+	PsiOptions::instance()->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
++	dataChanged();
 +}
 +
 +bool OptionsTabInput::isTreeViewEmpty()
@@ -812,6 +829,14 @@
 +	OptInputUI *d = (OptInputUI *)w_;
 +	QTreeWidgetItemIterator it(d->availDicts);
 +	return !bool(*it);
++}
++
++void OptionsTabInput::setListVisibility(bool value)
++{
++	OptInputUI *d = (OptInputUI *)w_;
++
++	d->frame->setVisible(value);
++	d->availDicts->setVisible(value);
 +}
 --- git.orig/src/options/opt_input.h
 +++ git/src/options/opt_input.h
