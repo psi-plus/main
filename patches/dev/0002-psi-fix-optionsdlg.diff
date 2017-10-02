@@ -610,7 +610,7 @@
       <property name="title">
 --- git.orig/src/options/opt_input.cpp
 +++ git/src/options/opt_input.cpp
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,202 @@
 +#include "opt_input.h"
 +
 +#include <QWidget>
@@ -628,6 +628,7 @@
 +
 +static const QString ENABLED_OPTION("options.ui.spell-check.enabled");
 +static const QString DICTS_OPTION("options.ui.spell-check.langs");
++static const QString AUTORESIZE_OPTION("options.ui.chat.use-expanding-line-edit");
 +static const uint FullName = 0;
 +
 +
@@ -638,7 +639,7 @@
 +};
 +
 +OptionsTabInput::OptionsTabInput(QObject *parent)
-+: OptionsTab(parent, "input", "", tr("Input"), tr("Input options")),
++: OptionsTab(parent, "input", "", tr("Input"), tr("Input options"), "psi/action_templates"),
 +  w_(0),
 +  psi_(0)
 +{
@@ -671,6 +672,7 @@
 +	OptInputUI *d = (OptInputUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
 +
++	o->setOption(AUTORESIZE_OPTION, d->isAutoResize->isChecked());
 +	o->setOption(ENABLED_OPTION, (d->isSpellCheck->isChecked() && SpellChecker::instance()->available()));
 +	o->setOption(DICTS_OPTION, QVariant(loadedDicts_.join(" ")));
 +}
@@ -684,6 +686,7 @@
 +	OptInputUI *d = (OptInputUI *)w_;
 +	PsiOptions* o = PsiOptions::instance();
 +
++	d->isAutoResize->setChecked( o->getOption(AUTORESIZE_OPTION).toBool() );
 +	bool isEnabled = o->getOption(ENABLED_OPTION).toBool();
 +	isEnabled = (!SpellChecker::instance()->available()) ? false : isEnabled;
 +	d->isSpellCheck->setChecked(isEnabled);
@@ -854,7 +857,7 @@
 +#endif // OPT_TABINPUT_H
 --- git.orig/src/options/opt_input.ui
 +++ git/src/options/opt_input.ui
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,84 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
 + <class>OptInput</class>
@@ -871,6 +874,13 @@
 +   <string>Form</string>
 +  </property>
 +  <layout class="QVBoxLayout" name="verticalLayout">
++   <item>
++    <widget class="QCheckBox" name="isAutoResize">
++     <property name="text">
++      <string>Auto-resize text input field</string>
++     </property>
++    </widget>
++   </item>
 +   <item>
 +    <widget class="QCheckBox" name="isSpellCheck">
 +     <property name="text">
@@ -969,7 +979,7 @@
  		tabs.append( new OptionsTabAvCall(this) );
 --- git.orig/src/options/opt_messages_common.cpp
 +++ git/src/options/opt_messages_common.cpp
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,147 @@
 +#include "opt_messages_common.h"
 +
 +#include <QWidget>
@@ -988,7 +998,7 @@
 +};
 +
 +OptionsTabMsgCommon::OptionsTabMsgCommon(QObject *parent)
-+: OptionsTab(parent, "common", "", tr("Common"), tr("Сommon options for messages section")),
++: OptionsTab(parent, "common", "", tr("Common"), tr("Сommon options for messages section"), "psi/advanced"),
 +  w_(0),
 +  psi_(0)
 +{
@@ -1067,7 +1077,6 @@
 +		}
 +	}
 +
-+	o->setOption("options.ui.chat.use-expanding-line-edit", d->ck_autoResize->isChecked());
 +	o->setOption("options.ui.tabs.use-tab-shortcuts", d->ck_tabShortcuts->isChecked());
 +	o->setOption("options.ui.chat.show-previews", d->ck_showPreviews->isChecked());
 +	o->setOption("options.ui.chat.auto-capitalize", d->ck_autoCapitalize->isChecked());
@@ -1109,7 +1118,6 @@
 +	if (!custom && d->cb_tabGrouping->count() == 6) {
 +		d->cb_tabGrouping->removeItem(5);
 +	}
-+	d->ck_autoResize->setChecked( o->getOption("options.ui.chat.use-expanding-line-edit").toBool() );
 +	d->ck_tabShortcuts->setChecked( o->getOption("options.ui.tabs.use-tab-shortcuts").toBool() );
 +	d->ck_showPreviews->setChecked( o->getOption("options.ui.chat.show-previews").toBool() );
 +	d->ck_autoCapitalize->setChecked(o->getOption("options.ui.chat.auto-capitalize").toBool());
@@ -1150,7 +1158,7 @@
 +#endif // OPT_MSGCOMMON_H
 --- git.orig/src/options/opt_messages_common.ui
 +++ git/src/options/opt_messages_common.ui
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,156 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<ui version="4.0">
 + <class>OptMsgCommon</class>
@@ -1251,13 +1259,6 @@
 +    <widget class="QCheckBox" name="ck_showTabButtons">
 +     <property name="text">
 +      <string>Show tab buttons</string>
-+     </property>
-+    </widget>
-+   </item>
-+   <item>
-+    <widget class="QCheckBox" name="ck_autoResize">
-+     <property name="text">
-+      <string>Auto-resize text input field</string>
 +     </property>
 +    </widget>
 +   </item>
