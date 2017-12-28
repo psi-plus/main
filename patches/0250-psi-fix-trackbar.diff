@@ -3,41 +3,41 @@
 @@ -37,10 +37,14 @@
  
  TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabManager)
- 	: AdvancedWidget<QWidget>(0)
-+	, state_(Deactivated)
- 	, jid_(jid)
- 	, pa_(pa)
- 	, tabManager_(tabManager)
+     : AdvancedWidget<QWidget>(0)
++    , state_(Deactivated)
+     , jid_(jid)
+     , pa_(pa)
+     , tabManager_(tabManager)
  {
-+	stateCommitTimer_.setInterval(100);
-+	stateCommitTimer_.setSingleShot(true);
-+	connect(&stateCommitTimer_, SIGNAL(timeout()), SLOT(commitState()));
- 	//QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
++    stateCommitTimer_.setInterval(100);
++    stateCommitTimer_.setSingleShot(true);
++    connect(&stateCommitTimer_, SIGNAL(timeout()), SLOT(commitState()));
+     //QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
  }
  
 @@ -205,11 +209,22 @@ void TabbableWidget::changeEvent(QEvent*
- 	    event->type() == QEvent::WindowStateChange)
- 	{
- 		if (isActiveTab()) {
--			activated();
-+			state_ = Activated;
- 		}
- 		else {
--			deactivated();
-+			state_ = Deactivated;
- 		}
-+		stateCommitTimer_.start();
-+	}
+         event->type() == QEvent::WindowStateChange)
+     {
+         if (isActiveTab()) {
+-            activated();
++            state_ = Activated;
+         }
+         else {
+-            deactivated();
++            state_ = Deactivated;
+         }
++        stateCommitTimer_.start();
++    }
 +}
 +
 +void TabbableWidget::commitState()
 +{
-+	if(state_ == Activated) {
-+		activated();
-+	}
-+	else {
-+		deactivated();
- 	}
++    if(state_ == Activated) {
++        activated();
++    }
++    else {
++        deactivated();
+     }
  }
  
 --- psi.orig/src/tabs/tabbablewidget.h
@@ -51,57 +51,57 @@
  #include "im.h" // ChatState
  
 @@ -77,19 +78,26 @@ signals:
- 	void vSplitterMoved(int,int);
+     void vSplitterMoved(int,int);
  
  public slots:
--	virtual void deactivated();
--	virtual void activated();
- 	void bringToFront(bool raiseWindow = true);
- 	virtual void ensureTabbedCorrectly();
- 	void hideTab();
+-    virtual void deactivated();
+-    virtual void activated();
+     void bringToFront(bool raiseWindow = true);
+     virtual void ensureTabbedCorrectly();
+     void hideTab();
  
  protected:
- 	virtual void setJid(const Jid&);
-+	virtual void deactivated();
-+	virtual void activated();
+     virtual void setJid(const Jid&);
++    virtual void deactivated();
++    virtual void activated();
  
- 	// reimplemented
- 	void changeEvent(QEvent* e);
+     // reimplemented
+     void changeEvent(QEvent* e);
  
 +private slots:
-+	void commitState();
++    void commitState();
 +
  private:
-+	enum ActivationState { Activated, Deactivated };
-+	ActivationState state_;
-+	QTimer stateCommitTimer_;
++    enum ActivationState { Activated, Deactivated };
++    ActivationState state_;
++    QTimer stateCommitTimer_;
 +
- 	Jid jid_;
- 	PsiAccount *pa_;
- 	TabManager *tabManager_;
+     Jid jid_;
+     PsiAccount *pa_;
+     TabManager *tabManager_;
 --- psi.orig/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp
 @@ -397,12 +397,12 @@ void TabDlg::tabSelected(QWidget* _selec
- 	// _selected could be null when TabDlg is closing and deleting all its tabs
- 	TabbableWidget* selected = _selected ? qobject_cast<TabbableWidget*>(_selected) : 0;
- 	if (!selectedTab_.isNull()) {
--		selectedTab_->deactivated();
-+		QCoreApplication::postEvent(selectedTab_, new QEvent(QEvent::ActivationChange));
- 	}
+     // _selected could be null when TabDlg is closing and deleting all its tabs
+     TabbableWidget* selected = _selected ? qobject_cast<TabbableWidget*>(_selected) : 0;
+     if (!selectedTab_.isNull()) {
+-        selectedTab_->deactivated();
++        QCoreApplication::postEvent(selectedTab_, new QEvent(QEvent::ActivationChange));
+     }
  
- 	selectedTab_ = selected;
- 	if (selected) {
--		selected->activated();
-+		QCoreApplication::postEvent(selected, new QEvent(QEvent::ActivationChange));
- 	}
+     selectedTab_ = selected;
+     if (selected) {
+-        selected->activated();
++        QCoreApplication::postEvent(selected, new QEvent(QEvent::ActivationChange));
+     }
  
- 	updateCaption();
+     updateCaption();
 @@ -520,7 +520,7 @@ void TabDlg::closeTab(TabbableWidget* ch
- 	chat->hide();
- 	removeTabWithNoChecks(chat);
- 	chat->setParent(0);
--	chat->deactivated();
-+	QCoreApplication::postEvent(chat, new QEvent(QEvent::ActivationChange));
- 	if (tabWidget_->count() > 0) {
- 		updateCaption();
- 	}
+     chat->hide();
+     removeTabWithNoChecks(chat);
+     chat->setParent(0);
+-    chat->deactivated();
++    QCoreApplication::postEvent(chat, new QEvent(QEvent::ActivationChange));
+     if (tabWidget_->count() > 0) {
+         updateCaption();
+     }

@@ -1,17 +1,17 @@
 --- git.orig/src/mainwin.cpp
 +++ git/src/mainwin.cpp
 @@ -1323,9 +1323,10 @@ void MainWin::buildTrayMenu()
- 	else {
- 		d->trayMenu->addAction(tr("&Hide"), this, SLOT(trayHide()));
- 	}
+     else {
+         d->trayMenu->addAction(tr("&Hide"), this, SLOT(trayHide()));
+     }
 +#ifndef USE_KDE
- 	d->optionsButton->addTo(d->trayMenu);
- 	d->trayMenu->addMenu(d->statusMenu);
+     d->optionsButton->addTo(d->trayMenu);
+     d->trayMenu->addMenu(d->statusMenu);
 -
 +#endif
- 	d->trayMenu->addSeparator();
- 	// TODO!
- 	d->getAction("menu_quit")->addTo(d->trayMenu);
+     d->trayMenu->addSeparator();
+     // TODO!
+     d->getAction("menu_quit")->addTo(d->trayMenu);
 --- git.orig/src/psitrayicon.cpp
 +++ git/src/psitrayicon.cpp
 @@ -4,6 +4,16 @@
@@ -33,142 +33,142 @@
  #include "alerticon.h"
 @@ -14,18 +24,42 @@
  PsiTrayIcon::PsiTrayIcon(const QString &tip, QMenu *popup, QObject *parent)
- 	: QObject(parent)
- 	, icon_(NULL)
--	, trayicon_(new QSystemTrayIcon())
+     : QObject(parent)
+     , icon_(NULL)
+-    , trayicon_(new QSystemTrayIcon())
 +#ifdef USE_DBUS
-+	, newIcon_(KStatusNotifierItemPtr())
++    , newIcon_(KStatusNotifierItemPtr())
 +#endif
-+	, trayicon_(QSystemTrayIconPtr())
- 	, realIcon_(0)
- {	
--	trayicon_->setContextMenu(popup);
--	setToolTip(tip);
--	connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
--	trayicon_->installEventFilter(this);
-+	bool newInterface = false;
++    , trayicon_(QSystemTrayIconPtr())
+     , realIcon_(0)
+ {    
+-    trayicon_->setContextMenu(popup);
+-    setToolTip(tip);
+-    connect(trayicon_,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
+-    trayicon_->installEventFilter(this);
++    bool newInterface = false;
 +#ifdef USE_KDE
-+	QDBusInterface iface(KSNI_SERVICE, KSNI_PATH, KSNI_IFACE);
-+	if (iface.isValid()) {
-+		newInterface = true;
-+		newIcon_ = KStatusNotifierItemPtr(new KStatusNotifierItem("Psi+",parent));
-+		newIcon_->setStatus(KStatusNotifierItem::Active);
-+		newIcon_->setTitle("Psi+");
++    QDBusInterface iface(KSNI_SERVICE, KSNI_PATH, KSNI_IFACE);
++    if (iface.isValid()) {
++        newInterface = true;
++        newIcon_ = KStatusNotifierItemPtr(new KStatusNotifierItem("Psi+",parent));
++        newIcon_->setStatus(KStatusNotifierItem::Active);
++        newIcon_->setTitle("Psi+");
 +#ifndef USE_KDE5
-+		newIcon_->setContextMenu(static_cast<KMenu*>(popup));
++        newIcon_->setContextMenu(static_cast<KMenu*>(popup));
 +#else
-+		newIcon_->setContextMenu(popup);
++        newIcon_->setContextMenu(popup);
 +#endif
-+		connect(newIcon_.data(), SIGNAL(activateRequested(bool,QPoint)), SLOT(iconActivated(bool,QPoint)));
-+		connect(newIcon_.data(), SIGNAL(secondaryActivateRequested(QPoint)), SLOT(iconActivatedSecondary(QPoint)));
-+		setToolTip(tip);
-+	}
++        connect(newIcon_.data(), SIGNAL(activateRequested(bool,QPoint)), SLOT(iconActivated(bool,QPoint)));
++        connect(newIcon_.data(), SIGNAL(secondaryActivateRequested(QPoint)), SLOT(iconActivatedSecondary(QPoint)));
++        setToolTip(tip);
++    }
 +#endif
-+	if (!newInterface) {
-+		trayicon_ = QSystemTrayIconPtr(new QSystemTrayIcon());
-+		trayicon_->setContextMenu(popup);
-+		setToolTip(tip);
-+		connect(trayicon_.data(),SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
-+		trayicon_->installEventFilter(this);
-+	}
++    if (!newInterface) {
++        trayicon_ = QSystemTrayIconPtr(new QSystemTrayIcon());
++        trayicon_->setContextMenu(popup);
++        setToolTip(tip);
++        connect(trayicon_.data(),SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayicon_activated(QSystemTrayIcon::ActivationReason)));
++        trayicon_->installEventFilter(this);
++    }
  }
  
  PsiTrayIcon::~PsiTrayIcon()
  {
--	delete trayicon_;
-+	//delete trayicon_;
- 	if ( icon_ ) {
- 		icon_->disconnect();
- 		icon_->stop();
+-    delete trayicon_;
++    //delete trayicon_;
+     if ( icon_ ) {
+         icon_->disconnect();
+         icon_->stop();
 @@ -35,13 +69,29 @@ PsiTrayIcon::~PsiTrayIcon()
  
  void PsiTrayIcon::setContextMenu(QMenu* menu)
  {
--	trayicon_->setContextMenu(menu);
-+	if (trayicon_) {
-+		trayicon_->setContextMenu(menu);
-+	}
+-    trayicon_->setContextMenu(menu);
++    if (trayicon_) {
++        trayicon_->setContextMenu(menu);
++    }
 +/*#ifdef USE_KDE
-+	else {
++    else {
 +#ifndef USE_KDE5
-+		newIcon_->setContextMenu(static_cast<KMenu*>(menu));
++        newIcon_->setContextMenu(static_cast<KMenu*>(menu));
 +#else
-+		newIcon_->setContextMenu(menu);
++        newIcon_->setContextMenu(menu);
 +#endif
-+	}
++    }
 +#endif*/
  }
  
  void PsiTrayIcon::setToolTip(const QString &str)
  {
  #ifndef HAVE_X11
- 	trayicon_->setToolTip(str);
+     trayicon_->setToolTip(str);
 +#elif USE_KDE
-+	QIcon icon;
-+	if(icon_)
-+		icon = icon_->icon();
-+	newIcon_->setToolTip(icon, "Psi+", str);
++    QIcon icon;
++    if(icon_)
++        icon = icon_->icon();
++    newIcon_->setToolTip(icon, "Psi+", str);
  #else
- 	Q_UNUSED(str)
+     Q_UNUSED(str)
  #endif
 @@ -90,12 +140,22 @@ bool PsiTrayIcon::isWMDock()
  
  void PsiTrayIcon::show()
  {
--	trayicon_->show();
-+	if(trayicon_)
-+		trayicon_->show();
+-    trayicon_->show();
++    if(trayicon_)
++        trayicon_->show();
 +#ifdef USE_KDE
-+	if (newIcon_)
-+		newIcon_->setStatus(KStatusNotifierItem::Active);
++    if (newIcon_)
++        newIcon_->setStatus(KStatusNotifierItem::Active);
 +#endif
  }
  
  void PsiTrayIcon::hide()
  {
--	trayicon_->hide();
-+	if(trayicon_)
-+		trayicon_->hide();
+-    trayicon_->hide();
++    if(trayicon_)
++        trayicon_->hide();
 +#ifdef USE_KDE
-+	if (newIcon_)
-+		newIcon_->setStatus(KStatusNotifierItem::Passive);
++    if (newIcon_)
++        newIcon_->setStatus(KStatusNotifierItem::Passive);
 +#endif
  }
  
  
 @@ -197,7 +257,14 @@ void PsiTrayIcon::animate()
- 		p = makeIcon();
- 		QPixmapCache::insert( cachedName, p );
- 	}
--	trayicon_->setIcon(p);
-+	if (trayicon_) {
-+		trayicon_->setIcon(p);
-+	}
+         p = makeIcon();
+         QPixmapCache::insert( cachedName, p );
+     }
+-    trayicon_->setIcon(p);
++    if (trayicon_) {
++        trayicon_->setIcon(p);
++    }
 +#ifdef USE_KDE
-+	else {
-+		newIcon_->setIconByPixmap(p);
-+	}
++    else {
++        newIcon_->setIconByPixmap(p);
++    }
 +#endif
  }
  
  bool PsiTrayIcon::eventFilter(QObject *obj, QEvent *event)
 @@ -208,3 +275,18 @@ bool PsiTrayIcon::eventFilter(QObject *o
- 	}
- 	return QObject::eventFilter(obj, event);
+     }
+     return QObject::eventFilter(obj, event);
  }
 +
 +#ifdef USE_KDE
 +void PsiTrayIcon::iconActivated(bool isIt, QPoint point)
 +{
-+	Q_UNUSED(isIt);
-+	Q_UNUSED(point);
-+	trayicon_activated(QSystemTrayIcon::DoubleClick);
++    Q_UNUSED(isIt);
++    Q_UNUSED(point);
++    trayicon_activated(QSystemTrayIcon::DoubleClick);
 +}
 +
 +void PsiTrayIcon::iconActivatedSecondary(QPoint point) //Middle click
 +{
-+	Q_UNUSED(point);
-+	trayicon_activated(QSystemTrayIcon::MiddleClick);
++    Q_UNUSED(point);
++    trayicon_activated(QSystemTrayIcon::MiddleClick);
 +}
 +#endif
 --- git.orig/src/psitrayicon.h
@@ -197,49 +197,49 @@
 +
  class PsiTrayIcon : public QObject
  {
- 	Q_OBJECT
+     Q_OBJECT
 @@ -38,6 +51,10 @@ public slots:
  private slots:
- 	void animate();
- 	void trayicon_activated(QSystemTrayIcon::ActivationReason);
+     void animate();
+     void trayicon_activated(QSystemTrayIcon::ActivationReason);
 +#ifdef USE_KDE
-+	void iconActivated(bool isIt, QPoint point);
-+	void iconActivatedSecondary(QPoint point);
++    void iconActivated(bool isIt, QPoint point);
++    void iconActivatedSecondary(QPoint point);
 +#endif
  
  protected:
- 	QPixmap makeIcon();
+     QPixmap makeIcon();
 @@ -46,7 +63,10 @@ protected:
  
  private:
- 	PsiIcon* icon_;
--	QSystemTrayIcon* trayicon_;
+     PsiIcon* icon_;
+-    QSystemTrayIcon* trayicon_;
 +#ifdef USE_KDE
-+	KStatusNotifierItemPtr newIcon_;
++    KStatusNotifierItemPtr newIcon_;
 +#endif
-+	QSystemTrayIconPtr trayicon_;
- 	quintptr realIcon_;
++    QSystemTrayIconPtr trayicon_;
+     quintptr realIcon_;
  };
  
 --- git.orig/src/src.pri
 +++ git/src/src.pri
 @@ -628,6 +628,19 @@ dbus {
- 			$$PWD/psidbusnotifier.cpp
- 	DEFINES += USE_DBUS
- 	QT += dbus
-+	unix:!mac:CONFIG += kde
-+	kde {
-+		greaterThan(QT_MAJOR_VERSION, 4) {
-+			QT += KNotifications dbus
-+			DEFINES += USE_KDE5
-+		}
-+		else {
-+			INCLUDEPATH += /usr/include/KDE
-+			QT += gui
-+			LIBS += -lkdeui -lkdecore
-+		}
-+		DEFINES += USE_KDE
-+	}
+             $$PWD/psidbusnotifier.cpp
+     DEFINES += USE_DBUS
+     QT += dbus
++    unix:!mac:CONFIG += kde
++    kde {
++        greaterThan(QT_MAJOR_VERSION, 4) {
++            QT += KNotifications dbus
++            DEFINES += USE_KDE5
++        }
++        else {
++            INCLUDEPATH += /usr/include/KDE
++            QT += gui
++            LIBS += -lkdeui -lkdecore
++        }
++        DEFINES += USE_KDE
++    }
  }
  
  win32:!dbus {

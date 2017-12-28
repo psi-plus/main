@@ -1,13 +1,13 @@
 --- git.temp.orig/options/default.xml
 +++ git.temp/options/default.xml
 @@ -275,6 +275,7 @@ QLineEdit#le_status_text {
- 						<margin type="int">0</margin>
- 					</avatar>
- 				</roster-avatar-frame>
-+				<default-groups-delimiter comment="Default nested groups delimiter will be used if no delimiter on the server" type="QString">::</default-groups-delimiter>
- 			</contactlist>
- 			<menu comment="Options for the menu">
- 				<account comment="Options for the account-specific menu">
+                         <margin type="int">0</margin>
+                     </avatar>
+                 </roster-avatar-frame>
++                <default-groups-delimiter comment="Default nested groups delimiter will be used if no delimiter on the server" type="QString">::</default-groups-delimiter>
+             </contactlist>
+             <menu comment="Options for the menu">
+                 <account comment="Options for the account-specific menu">
 --- git.temp.orig/src/accountmodify.ui
 +++ git.temp/src/accountmodify.ui
 @@ -7,7 +7,7 @@
@@ -105,51 +105,51 @@
  AccountModifyDlg::AccountModifyDlg(PsiCon *_psi, QWidget *parent)
  :QDialog(parent)
 @@ -223,6 +224,12 @@ void AccountModifyDlg::init()
- 	pb_removeBlock->hide();
- 	pb_addBlock->hide();
+     pb_removeBlock->hide();
+     pb_addBlock->hide();
  
-+	// Misc
-+	connect(pb_groupsdelimiter, SIGNAL(clicked()), SLOT(miscChangeGroupsDelimiter()));
-+	connect(pb_disablegroupsdelimiter, SIGNAL(clicked()), SLOT(miscDisableGroupsDelimiter()));
-+	if (pa && pa->userList())
-+		le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
++    // Misc
++    connect(pb_groupsdelimiter, SIGNAL(clicked()), SLOT(miscChangeGroupsDelimiter()));
++    connect(pb_disablegroupsdelimiter, SIGNAL(clicked()), SLOT(miscDisableGroupsDelimiter()));
++    if (pa && pa->userList())
++        le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
 +
- 	// QWhatsThis helpers
- 	cb_plain->setWhatsThis(
- 		tr("Normally, Psi logs in using the <i>digest</i> authentication "
+     // QWhatsThis helpers
+     cb_plain->setWhatsThis(
+         tr("Normally, Psi logs in using the <i>digest</i> authentication "
 @@ -504,6 +511,22 @@ void AccountModifyDlg::removeStunHost()
- 	cb_stunHost->setCurrentIndex(0);
+     cb_stunHost->setCurrentIndex(0);
  }
  
 +void AccountModifyDlg::miscChangeGroupsDelimiter()
 +{
-+	if (pa) {
-+		pa->changeGroupsDelimiter();
-+		le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
-+	}
++    if (pa) {
++        pa->changeGroupsDelimiter();
++        le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
++    }
 +}
 +
 +void AccountModifyDlg::miscDisableGroupsDelimiter()
 +{
-+	if (pa) {
-+		pa->disableGroupsDelimiter();
-+		le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
-+	}
++    if (pa) {
++        pa->disableGroupsDelimiter();
++        le_groupsdelimiter->setText(pa->userList()->groupsDelimiter());
++    }
 +}
 +
  void AccountModifyDlg::save()
  {
- 	/*if(pa && le_name->text().isEmpty()) {
+     /*if(pa && le_name->text().isEmpty()) {
 --- git.temp.orig/src/accountmodifydlg.h
 +++ git.temp/src/accountmodifydlg.h
 @@ -57,6 +57,8 @@ private slots:
- 	void detailsChangePW();
+     void detailsChangePW();
  
- 	void removeStunHost();
-+	void miscChangeGroupsDelimiter();
-+	void miscDisableGroupsDelimiter();
+     void removeStunHost();
++    void miscChangeGroupsDelimiter();
++    void miscDisableGroupsDelimiter();
  
- 	void save();
+     void save();
  
 --- git.temp.orig/src/contactlistaccountgroup.cpp
 +++ git.temp/src/contactlistaccountgroup.cpp
@@ -157,80 +157,80 @@
  #include "contactlistgroupcache.h"
  
  ContactListAccountGroup::ContactListAccountGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount* account)
--	: ContactListNestedGroup(model, parent, QString())
-+	: ContactListNestedGroup(model, parent, account, QString())
- 	, isRoot_(!account)
--	, account_(account)
+-    : ContactListNestedGroup(model, parent, QString())
++    : ContactListNestedGroup(model, parent, account, QString())
+     , isRoot_(!account)
+-    , account_(account)
  {
--	if (account_) {
-+	if (account) {
- 		model->groupCache()->addGroup(this);
--		connect(account_, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
--		connect(account_, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
-+		connect(account, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
-+		connect(account, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
- 	}
+-    if (account_) {
++    if (account) {
+         model->groupCache()->addGroup(this);
+-        connect(account_, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
+-        connect(account_, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
++        connect(account, SIGNAL(destroyed(QObject*)), SLOT(accountUpdated()));
++        connect(account, SIGNAL(updatedAccount()), SLOT(accountUpdated()));
+     }
  }
  
 @@ -57,11 +56,6 @@ void ContactListAccountGroup::clearGroup
- 	ContactListNestedGroup::clearGroup();
+     ContactListNestedGroup::clearGroup();
  }
  
 -PsiAccount* ContactListAccountGroup::account() const
 -{
--	return account_;
+-    return account_;
 -}
 -
  ContactListModel::Type ContactListAccountGroup::type() const
  {
- 	return ContactListModel::AccountType;
+     return ContactListModel::AccountType;
 @@ -140,7 +134,7 @@ void ContactListAccountGroup::accountUpd
  
- 	model()->updatedItem(root->findGroup(this));
+     model()->updatedItem(root->findGroup(this));
  
--	if (account_.isNull() || !account_->enabled()) {
-+	if (!account() || !account()->enabled()) {
- 		clearGroup();
- 		root->removeAccount(this);
- 	}
+-    if (account_.isNull() || !account_->enabled()) {
++    if (!account() || !account()->enabled()) {
+         clearGroup();
+         root->removeAccount(this);
+     }
 @@ -148,8 +142,8 @@ void ContactListAccountGroup::accountUpd
  
  const QString& ContactListAccountGroup::displayName() const
  {
--	if (account_) {
--		return account_->name();
-+	if (account()) {
-+		return account()->name();
- 	}
+-    if (account_) {
+-        return account_->name();
++    if (account()) {
++        return account()->name();
+     }
  
- 	static QString emptyName;
+     static QString emptyName;
 @@ -163,8 +157,8 @@ QString ContactListAccountGroup::compari
  
  QString ContactListAccountGroup::internalGroupName() const
  {
--	if (account_) {
--		return account_->id();
-+	if (account()) {
-+		return account()->id();
- 	}
+-    if (account_) {
+-        return account_->id();
++    if (account()) {
++        return account()->id();
+     }
  
- 	return QString();
+     return QString();
 --- git.temp.orig/src/contactlistaccountgroup.h
 +++ git.temp/src/contactlistaccountgroup.h
 @@ -34,7 +34,6 @@ public:
- 	ContactListAccountGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount* account);
- 	~ContactListAccountGroup();
+     ContactListAccountGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount* account);
+     ~ContactListAccountGroup();
  
--	PsiAccount* account() const;
- 	ContactListAccountGroup* findAccount(PsiAccount* account) const;
+-    PsiAccount* account() const;
+     ContactListAccountGroup* findAccount(PsiAccount* account) const;
  
- 	// reimplemented
+     // reimplemented
 @@ -63,7 +62,6 @@ private slots:
  
  private:
- 	bool isRoot_;
--	QPointer<PsiAccount> account_;
- 	QList<ContactListAccountGroup*> accounts_;
+     bool isRoot_;
+-    QPointer<PsiAccount> account_;
+     QList<ContactListAccountGroup*> accounts_;
  };
  
 --- git.temp.orig/src/contactlistdragmodel.cpp
@@ -244,142 +244,142 @@
  #include "psiaccount.h"
  #include "contactlistgroup.h"
 @@ -296,7 +297,7 @@ bool ContactListDragModel::supportsMimeD
- 		if (group) {
- 			ContactListItemProxy* item2 = itemProxy(parent);
- 			ContactListGroup* group2 = item2 ? item2->parent() : 0;
--			if (group2 && group2->fullName().startsWith(group->fullName() + ContactListGroup::groupDelimiter())) {
-+			if (group2 && group2->fullName().startsWith(group->fullName() + group2->groupsDelimiter())) {
- 				return false;
- 			}
- 		}
+         if (group) {
+             ContactListItemProxy* item2 = itemProxy(parent);
+             ContactListGroup* group2 = item2 ? item2->parent() : 0;
+-            if (group2 && group2->fullName().startsWith(group->fullName() + ContactListGroup::groupDelimiter())) {
++            if (group2 && group2->fullName().startsWith(group->fullName() + group2->groupsDelimiter())) {
+                 return false;
+             }
+         }
 @@ -340,22 +341,18 @@ void ContactListDragModel::addOperations
- 		for (int i = 0; i < group->itemsCount(); ++i) {
- 			ContactListItemProxy* itemProxy = group->item(i);
- 			PsiContact* contact = 0;
+         for (int i = 0; i < group->itemsCount(); ++i) {
+             ContactListItemProxy* itemProxy = group->item(i);
+             PsiContact* contact = 0;
 -#ifdef CONTACTLIST_NESTED_GROUPS
- 			ContactListGroup* childGroup = 0;
+             ContactListGroup* childGroup = 0;
 -#endif
- 			if ((contact = dynamic_cast<PsiContact*>(itemProxy->item()))) {
- 				operations->addOperation(contact,
- 										 sourceOperationsForContactGroup(currentGroupName, contact),
- 										 destinationOperationsForContactGroup(newGroupName, contact));
- 			}
+             if ((contact = dynamic_cast<PsiContact*>(itemProxy->item()))) {
+                 operations->addOperation(contact,
+                                          sourceOperationsForContactGroup(currentGroupName, contact),
+                                          destinationOperationsForContactGroup(newGroupName, contact));
+             }
 -#ifdef CONTACTLIST_NESTED_GROUPS
 -#error needs testing
-+			// #error needs testing
- 			else if ((childGroup = dynamic_cast<ContactListGroup*>(itemProxy->item()))) {
--				QString theName = childGroup->fullName().split(ContactListGroup::groupDelimiter()).last();
--				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + ContactListGroup::groupDelimiter()) + theName;
-+				QString theName = childGroup->toNestedGroups(childGroup->fullName()).last();
-+				QString newName = (newGroupName.isEmpty() ? "" : newGroupName + childGroup->groupsDelimiter()) + theName;
- 				addOperationsForGroupRename(childGroup->fullName(), newName, operations);
- 			}
++            // #error needs testing
+             else if ((childGroup = dynamic_cast<ContactListGroup*>(itemProxy->item()))) {
+-                QString theName = childGroup->fullName().split(ContactListGroup::groupDelimiter()).last();
+-                QString newName = (newGroupName.isEmpty() ? "" : newGroupName + ContactListGroup::groupDelimiter()) + theName;
++                QString theName = childGroup->toNestedGroups(childGroup->fullName()).last();
++                QString newName = (newGroupName.isEmpty() ? "" : newGroupName + childGroup->groupsDelimiter()) + theName;
+                 addOperationsForGroupRename(childGroup->fullName(), newName, operations);
+             }
 -#endif
- 		}
- 	}
+         }
+     }
  }
 @@ -382,7 +379,9 @@ bool ContactListDragModel::dropMimeData(
  
- 	foreach(ContactListModelSelection::Group group, selection.groups()) {
- 		QString parentGroupName = getDropGroupName(parent);
--		if (parentGroupName.startsWith(group.fullName + ContactListGroup::groupDelimiter())) {
-+		bool hasDelimiter = account(parent)->userList()->hasGroupsDelimiter();
-+		QString delimiter = account(parent)->userList()->groupsDelimiter();
-+		if (parentGroupName.startsWith(group.fullName + delimiter)) {
- 			qWarning("Dropping group to its descendant is not supported ('%s' -> '%s')", qPrintable(group.fullName), qPrintable(parentGroupName));
- 			continue;
- 		}
+     foreach(ContactListModelSelection::Group group, selection.groups()) {
+         QString parentGroupName = getDropGroupName(parent);
+-        if (parentGroupName.startsWith(group.fullName + ContactListGroup::groupDelimiter())) {
++        bool hasDelimiter = account(parent)->userList()->hasGroupsDelimiter();
++        QString delimiter = account(parent)->userList()->groupsDelimiter();
++        if (parentGroupName.startsWith(group.fullName + delimiter)) {
+             qWarning("Dropping group to its descendant is not supported ('%s' -> '%s')", qPrintable(group.fullName), qPrintable(parentGroupName));
+             continue;
+         }
 @@ -391,8 +390,8 @@ bool ContactListDragModel::dropMimeData(
- 			continue;
+             continue;
  
- 		// TODO: unify these two lines with the ones in operationsForGroupRename
--		QString theName = group.fullName.split(ContactListGroup::groupDelimiter()).last();
--		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + ContactListGroup::groupDelimiter()) + theName;
-+		QString theName = group.fullName.split(hasDelimiter ? delimiter : "").last();
-+		QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + delimiter) + theName;
- 		if (newName == group.fullName)
- 			continue;
+         // TODO: unify these two lines with the ones in operationsForGroupRename
+-        QString theName = group.fullName.split(ContactListGroup::groupDelimiter()).last();
+-        QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + ContactListGroup::groupDelimiter()) + theName;
++        QString theName = group.fullName.split(hasDelimiter ? delimiter : "").last();
++        QString newName = (parentGroupName.isEmpty() ? "" : parentGroupName + delimiter) + theName;
+         if (newName == group.fullName)
+             continue;
  
 @@ -422,37 +421,17 @@ void ContactListDragModel::renameGroup(C
- 	Q_ASSERT(group);
- 	ContactListModelOperationList operations(ContactListModelOperationList::Move);
+     Q_ASSERT(group);
+     ContactListModelOperationList operations(ContactListModelOperationList::Move);
  
--	QStringList name = group->fullName().split(ContactListGroup::groupDelimiter());
-+	QStringList name = group->toNestedGroups(group->fullName());
- 	if (name.isEmpty())
- 		return;
- 	name.takeLast();
- 	if (!newName.isEmpty())
- 		name << newName;
--	addOperationsForGroupRename(group->fullName(), name.join(ContactListGroup::groupDelimiter()), &operations);
-+	addOperationsForGroupRename(group->fullName(), group->fromNestedGroups(name), &operations);
+-    QStringList name = group->fullName().split(ContactListGroup::groupDelimiter());
++    QStringList name = group->toNestedGroups(group->fullName());
+     if (name.isEmpty())
+         return;
+     name.takeLast();
+     if (!newName.isEmpty())
+         name << newName;
+-    addOperationsForGroupRename(group->fullName(), name.join(ContactListGroup::groupDelimiter()), &operations);
++    addOperationsForGroupRename(group->fullName(), group->fromNestedGroups(name), &operations);
  
- 	performContactOperations(operations, Operation_GroupRename);
+     performContactOperations(operations, Operation_GroupRename);
  }
  
 -QString ContactListDragModel::processContactSetGroupName(const QString& groupName) const
 -{
--	if (accountsEnabled()) {
--		QStringList split = groupName.split(ContactListGroup::groupDelimiter());
--		split.takeFirst();
--		return split.join(ContactListGroup::groupDelimiter());
--	}
+-    if (accountsEnabled()) {
+-        QStringList split = groupName.split(ContactListGroup::groupDelimiter());
+-        split.takeFirst();
+-        return split.join(ContactListGroup::groupDelimiter());
+-    }
 -
--	return groupName;
+-    return groupName;
 -}
 -
 -QStringList ContactListDragModel::processContactSetGroupNames(const QStringList& groups) const
 -{
--	QStringList result;
--	foreach(const QString& g, groups) {
--		result << processContactSetGroupName(g);
--	}
--	return result;
+-    QStringList result;
+-    foreach(const QString& g, groups) {
+-        result << processContactSetGroupName(g);
+-    }
+-    return result;
 -}
 -
  QStringList ContactListDragModel::processContactGetGroupNames(PsiContact* contact) const
  {
- 	QStringList groups;
+     QStringList groups;
 @@ -504,7 +483,7 @@ void ContactListDragModel::performContac
- 			}
- 		}
+             }
+         }
  
--		psiContact->setGroups(processContactSetGroupNames(groups));
-+		psiContact->setGroups(groups);
- 	}
+-        psiContact->setGroups(processContactSetGroupNames(groups));
++        psiContact->setGroups(groups);
+     }
  
- 	contactOperationsPerformed(operations, operationType, groupContactCount);
+     contactOperationsPerformed(operations, operationType, groupContactCount);
 @@ -532,7 +511,7 @@ QList<PsiContact*> ContactListDragModel:
- 		QStringList groups = psiContact->groups();
+         QStringList groups = psiContact->groups();
  
- 		foreach(ContactListModelOperationList::Operation op, contactOperation.operations) {
--			groups.removeAll(processContactSetGroupName(op.groupFrom));
-+			groups.removeAll(op.groupFrom);
- 		}
+         foreach(ContactListModelOperationList::Operation op, contactOperation.operations) {
+-            groups.removeAll(processContactSetGroupName(op.groupFrom));
++            groups.removeAll(op.groupFrom);
+         }
  
- 		if (!groupsEnabled()) {
+         if (!groupsEnabled()) {
 @@ -562,8 +541,9 @@ QList<PsiContact*> ContactListDragModel:
- 				continue;
+                 continue;
  
- 			QStringList groups = it.value();
+             QStringList groups = it.value();
 +
- 			if (!groups.isEmpty())
--				psiContact->setGroups(processContactSetGroupNames(groups));
-+				psiContact->setGroups(groups);
- 			else
- 				psiContact->remove();
- 		}
+             if (!groups.isEmpty())
+-                psiContact->setGroups(processContactSetGroupNames(groups));
++                psiContact->setGroups(groups);
+             else
+                 psiContact->remove();
+         }
 --- git.temp.orig/src/contactlistdragmodel.h
 +++ git.temp/src/contactlistdragmodel.h
 @@ -113,8 +113,6 @@ protected:
- 	virtual QString getDropGroupName(const QModelIndex& parent) const;
- 	virtual void contactOperationsPerformed(const ContactListModelOperationList& operations, OperationType operationType, const QHash<ContactListGroup*, int>& groupContactCount);
+     virtual QString getDropGroupName(const QModelIndex& parent) const;
+     virtual void contactOperationsPerformed(const ContactListModelOperationList& operations, OperationType operationType, const QHash<ContactListGroup*, int>& groupContactCount);
  
--	QString processContactSetGroupName(const QString& groupName) const;
--	QStringList processContactSetGroupNames(const QStringList& groups) const;
- 	QStringList processContactGetGroupNames(PsiContact* contact) const;
- 	QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
- 	QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
+-    QString processContactSetGroupName(const QString& groupName) const;
+-    QStringList processContactSetGroupNames(const QStringList& groups) const;
+     QStringList processContactGetGroupNames(PsiContact* contact) const;
+     QString sourceOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
+     QString destinationOperationsForContactGroup(const QString& groupName, PsiContact* contact) const;
 --- git.temp.orig/src/contactlistgroup.cpp
 +++ git.temp/src/contactlistgroup.cpp
 @@ -28,17 +28,17 @@
@@ -398,128 +398,128 @@
   * Flat group class.
   */
 -ContactListGroup::ContactListGroup(ContactListModel* model, ContactListGroup* parent)
--	: ContactListItem()
+-    : ContactListItem()
 +ContactListGroup::ContactListGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account)
-+	: ContactListItem(account)
- 	, model_(model)
- 	, parent_(parent)
- 	, updateOnlineContactsTimer_(0)
++    : ContactListItem(account)
+     , model_(model)
+     , parent_(parent)
+     , updateOnlineContactsTimer_(0)
 @@ -76,35 +76,61 @@ QString ContactListGroup::internalGroupN
  
  QString ContactListGroup::fullName() const
  {
--	QStringList name;
-+	QStringList nestedGroups;
- 	const ContactListGroup* group = this;
- 	while (group) {
--		if (!group->internalGroupName().isEmpty())
--			name.prepend(group->internalGroupName());
-+		if (!group->internalGroupName().isEmpty() && group->type() != ContactListModel::AccountType)
-+			nestedGroups.prepend(group->internalGroupName());
- 		group = group->parent();
- 	}
--	return name.join(groupDelimiter());
-+	return fromNestedGroups(nestedGroups);
+-    QStringList name;
++    QStringList nestedGroups;
+     const ContactListGroup* group = this;
+     while (group) {
+-        if (!group->internalGroupName().isEmpty())
+-            name.prepend(group->internalGroupName());
++        if (!group->internalGroupName().isEmpty() && group->type() != ContactListModel::AccountType)
++            nestedGroups.prepend(group->internalGroupName());
+         group = group->parent();
+     }
+-    return name.join(groupDelimiter());
++    return fromNestedGroups(nestedGroups);
 +}
 +
 +bool ContactListGroup::hasGroupsDelimiter() const
 +{
-+	return account() ? account()->userList()->hasGroupsDelimiter() : false;
++    return account() ? account()->userList()->hasGroupsDelimiter() : false;
 +}
 +
 +QString ContactListGroup::groupsDelimiter() const
 +{
-+	return account() ? account()->userList()->groupsDelimiter() : "";
++    return account() ? account()->userList()->groupsDelimiter() : "";
  }
  
 -const QString& ContactListGroup::groupDelimiter()
 +QStringList ContactListGroup::toNestedGroups(const QString &group) const
  {
--	return GROUP_DELIMITER;
-+	QStringList nestedGroups;
-+	if (hasGroupsDelimiter())
-+		nestedGroups = group.split(groupsDelimiter());
-+	else
-+		nestedGroups << group;
-+	return nestedGroups;
+-    return GROUP_DELIMITER;
++    QStringList nestedGroups;
++    if (hasGroupsDelimiter())
++        nestedGroups = group.split(groupsDelimiter());
++    else
++        nestedGroups << group;
++    return nestedGroups;
  }
  
 -void ContactListGroup::setGroupDelimiter(const QString& str)
 +QString ContactListGroup::fromNestedGroups(const QStringList &nestedGroups) const
  {
--	GROUP_DELIMITER = str;
-+	QString group;
-+	if (hasGroupsDelimiter()) {
-+		group = nestedGroups.join(groupsDelimiter());
-+	}
-+	else {
-+		group = nestedGroups.join("");
-+	}
-+	return group;
+-    GROUP_DELIMITER = str;
++    QString group;
++    if (hasGroupsDelimiter()) {
++        group = nestedGroups.join(groupsDelimiter());
++    }
++    else {
++        group = nestedGroups.join("");
++    }
++    return group;
  }
  
 -QString ContactListGroup::sanitizeGroupName(const QString& name) const
 +QString ContactListGroup::sanitizeGroupName(const QString &name) const
  {
--	return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
-+	if (!hasGroupsDelimiter()) {
-+		return name;
-+	}
+-    return name.split(groupDelimiter(), QString::SkipEmptyParts).join(groupDelimiter());
++    if (!hasGroupsDelimiter()) {
++        return name;
++    }
 +
-+	return name.split(groupsDelimiter(), QString::SkipEmptyParts).join(groupsDelimiter());
++    return name.split(groupsDelimiter(), QString::SkipEmptyParts).join(groupsDelimiter());
  }
  
  QStringList ContactListGroup::sanitizeGroupNames(const QStringList& names) const
  {
- 	QStringList sanitized;
--	foreach(QString name, names) {
-+	foreach(const QString &name, names) {
- 		sanitized.append(sanitizeGroupName(name));
- 	}
- 	return sanitized;
+     QStringList sanitized;
+-    foreach(QString name, names) {
++    foreach(const QString &name, names) {
+         sanitized.append(sanitizeGroupName(name));
+     }
+     return sanitized;
 @@ -420,6 +446,7 @@ void ContactListGroup::updateOnlineConta
- 		onlineContactsCount_ = onlineContactsCount;
- 		totalContactsCount_ = totalContactsCount;
- 		if (parent()) {
-+			parent()->updateOnlineContactsFlag();
- 			model()->updatedItem(parent()->findGroup(this));
- 		}
- 	}
+         onlineContactsCount_ = onlineContactsCount;
+         totalContactsCount_ = totalContactsCount;
+         if (parent()) {
++            parent()->updateOnlineContactsFlag();
+             model()->updatedItem(parent()->findGroup(this));
+         }
+     }
 @@ -477,7 +504,7 @@ void ContactListGroup::contactsHelper(QL
- 	foreach(ContactListItemProxy* item, items_) {
- 		ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
- 		if (group)
--			contactsHelper(contacts);
-+			group->contactsHelper(contacts);
- 	}
+     foreach(ContactListItemProxy* item, items_) {
+         ContactListGroup* group = dynamic_cast<ContactListGroup*>(item->item());
+         if (group)
+-            contactsHelper(contacts);
++            group->contactsHelper(contacts);
+     }
  }
  
 --- git.temp.orig/src/contactlistgroup.h
 +++ git.temp/src/contactlistgroup.h
 @@ -38,7 +38,7 @@ class ContactListGroup : public ContactL
  {
- 	Q_OBJECT
+     Q_OBJECT
  public:
--	ContactListGroup(ContactListModel* model, ContactListGroup* parent);
-+	ContactListGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account);
- 	~ContactListGroup();
+-    ContactListGroup(ContactListModel* model, ContactListGroup* parent);
++    ContactListGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account);
+     ~ContactListGroup();
  
- 	ContactListItemProxy* item(int index) const;
+     ContactListItemProxy* item(int index) const;
 @@ -80,8 +80,13 @@ public:
- 	virtual ContactListItemMenu* contextMenu(ContactListModel* model);
- 	virtual bool compare(const ContactListItem* other) const;
+     virtual ContactListItemMenu* contextMenu(ContactListModel* model);
+     virtual bool compare(const ContactListItem* other) const;
  
--	static const QString& groupDelimiter();
--	static void setGroupDelimiter(const QString&);
-+	bool hasGroupsDelimiter() const;
-+	QString groupsDelimiter() const;
+-    static const QString& groupDelimiter();
+-    static void setGroupDelimiter(const QString&);
++    bool hasGroupsDelimiter() const;
++    QString groupsDelimiter() const;
 +
-+	QStringList toNestedGroups(const QString &group) const;
-+	QString fromNestedGroups(const QStringList &nestedGroups) const;
++    QStringList toNestedGroups(const QString &group) const;
++    QString fromNestedGroups(const QStringList &nestedGroups) const;
 +
-+	// static void setGroupsDelimiter(const QString&);
- 	QString sanitizeGroupName(const QString&) const;
- 	QStringList sanitizeGroupNames(const QStringList& names) const;
++    // static void setGroupsDelimiter(const QString&);
+     QString sanitizeGroupName(const QString&) const;
+     QStringList sanitizeGroupNames(const QStringList& names) const;
  
 --- git.temp.orig/src/contactlistgroupstate.cpp
 +++ git.temp/src/contactlistgroupstate.cpp
@@ -541,25 +541,25 @@
  static const QString groupStateOptionPath = "options.main-window.contact-list.group-state.%1";
  
 @@ -147,8 +150,17 @@ QStringList ContactListGroupState::group
- 	}
+     }
  
- 	if (result.isEmpty()) {
--		for (int len = 1; len < parentName.count() + 1; ++len)
--			result += QStringList(parentName.mid(0, len)).join(ContactListGroup::groupDelimiter());
-+		ContactListItemProxy *itemProxy = model->modelIndexToItemProxy(parent);
-+		if (itemProxy) {
-+			ContactListGroup *groupItem = qobject_cast<ContactListGroup*>(itemProxy->item());
-+			QString groupsDelimiter;
-+			if (groupItem && groupItem->hasGroupsDelimiter()) {
-+				groupsDelimiter = groupItem->groupsDelimiter();
-+			}
+     if (result.isEmpty()) {
+-        for (int len = 1; len < parentName.count() + 1; ++len)
+-            result += QStringList(parentName.mid(0, len)).join(ContactListGroup::groupDelimiter());
++        ContactListItemProxy *itemProxy = model->modelIndexToItemProxy(parent);
++        if (itemProxy) {
++            ContactListGroup *groupItem = qobject_cast<ContactListGroup*>(itemProxy->item());
++            QString groupsDelimiter;
++            if (groupItem && groupItem->hasGroupsDelimiter()) {
++                groupsDelimiter = groupItem->groupsDelimiter();
++            }
 +
-+			for (int len = 1; len < parentName.count() + 1; ++len)
-+				result += QStringList(parentName.mid(0, len)).join(groupsDelimiter);
-+		}
- 	}
++            for (int len = 1; len < parentName.count() + 1; ++len)
++                result += QStringList(parentName.mid(0, len)).join(groupsDelimiter);
++        }
+     }
  
- 	return result;
+     return result;
 --- git.temp.orig/src/contactlistitem.cpp
 +++ git.temp/src/contactlistitem.cpp
 @@ -21,15 +21,32 @@
@@ -572,28 +572,28 @@
 +class ContactListItem::Private
 +{
 +public:
-+	Private();
-+	bool editing;
-+	PsiAccount *account;
++    Private();
++    bool editing;
++    PsiAccount *account;
 +};
 +
 +ContactListItem::Private::Private()
-+	: editing(false)
-+	, account(0)
++    : editing(false)
++    , account(0)
 +{
 +}
 +
 +ContactListItem::ContactListItem(PsiAccount *account, QObject* parent)
- 	: QObject(parent)
--	, editing_(false)
-+	, d(new ContactListItem::Private)
+     : QObject(parent)
+-    , editing_(false)
++    , d(new ContactListItem::Private)
  {
-+	d->account = account;
++    d->account = account;
  }
  
  ContactListItem::~ContactListItem()
  {
-+	delete d;
++    delete d;
  }
  
  bool ContactListItem::isEditable() const
@@ -601,24 +601,24 @@
  
  bool ContactListItem::editing() const
  {
--	return editing_;
-+	return d->editing;
+-    return editing_;
++    return d->editing;
  }
  
  void ContactListItem::setEditing(bool editing)
  {
--	editing_ = editing;
-+	d->editing = editing;
+-    editing_ = editing;
++    d->editing = editing;
  }
  
  const QString& ContactListItem::displayName() const
  {
- 	return name();
+     return name();
  }
 +
 +PsiAccount *ContactListItem::account() const
 +{
-+	return d->account;
++    return d->account;
 +}
 --- git.temp.orig/src/contactlistitem.h
 +++ git.temp/src/contactlistitem.h
@@ -631,21 +631,21 @@
  class ContactListItem : public QObject
  {
  public:
--	ContactListItem(QObject* parent = 0);
-+	ContactListItem(PsiAccount *account, QObject* parent = 0);
- 	virtual ~ContactListItem();
+-    ContactListItem(QObject* parent = 0);
++    ContactListItem(PsiAccount *account, QObject* parent = 0);
+     virtual ~ContactListItem();
  
- 	virtual ContactListModel::Type type() const = 0;
+     virtual ContactListModel::Type type() const = 0;
 @@ -58,8 +59,11 @@ public:
- 	virtual bool editing() const;
- 	virtual void setEditing(bool editing);
+     virtual bool editing() const;
+     virtual void setEditing(bool editing);
  
-+	PsiAccount *account() const;
++    PsiAccount *account() const;
 +
  private:
--	bool editing_;
-+	class Private;
-+	Private *d;
+-    bool editing_;
++    class Private;
++    Private *d;
  };
  
  #endif
@@ -664,37 +664,37 @@
 +class ContactListItemProxy::Private
 +{
 +public:
-+	QPointer<ContactListItem> item;
-+	QPointer<ContactListGroup> parent;
++    QPointer<ContactListItem> item;
++    QPointer<ContactListGroup> parent;
 +};
 +
  ContactListItemProxy::ContactListItemProxy(ContactListGroup* parent, ContactListItem* item)
--	: item_(item)
--	, parent_(parent)
-+	: d(new ContactListItemProxy::Private)
+-    : item_(item)
+-    , parent_(parent)
++    : d(new ContactListItemProxy::Private)
  {
- 	Q_ASSERT(item);
- 	Q_ASSERT(parent);
+     Q_ASSERT(item);
+     Q_ASSERT(parent);
 +
-+	d->item = item;
-+	d->parent = parent;
++    d->item = item;
++    d->parent = parent;
 +
- 	parent->model()->contactListItemProxyCreated(this);
+     parent->model()->contactListItemProxyCreated(this);
  }
  
  ContactListItemProxy::~ContactListItemProxy()
  {
-+	delete d;
++    delete d;
 +}
 +
 +ContactListItem *ContactListItemProxy::item() const
 +{
-+	return d->item;
++    return d->item;
 +}
 +
 +ContactListGroup *ContactListItemProxy::parent() const
 +{
-+	return d->parent;
++    return d->parent;
  }
 --- git.temp.orig/src/contactlistitemproxy.h
 +++ git.temp/src/contactlistitemproxy.h
@@ -707,78 +707,78 @@
  class ContactListItem;
  class ContactListGroup;
 @@ -33,12 +32,12 @@ public:
- 	ContactListItemProxy(ContactListGroup* parent, ContactListItem* item);
- 	~ContactListItemProxy();
+     ContactListItemProxy(ContactListGroup* parent, ContactListItem* item);
+     ~ContactListItemProxy();
  
--	ContactListItem* item() const { return item_; }
--	ContactListGroup* parent() const { return parent_; }
-+	ContactListItem *item() const;
-+	ContactListGroup *parent() const;
+-    ContactListItem* item() const { return item_; }
+-    ContactListGroup* parent() const { return parent_; }
++    ContactListItem *item() const;
++    ContactListGroup *parent() const;
  
  private:
--	QPointer<ContactListItem> item_;
--	QPointer<ContactListGroup> parent_;
-+	class Private;
-+	Private *d;
+-    QPointer<ContactListItem> item_;
+-    QPointer<ContactListGroup> parent_;
++    class Private;
++    Private *d;
  };
  
  #endif
 --- git.temp.orig/src/contactlistmodel.cpp
 +++ git.temp/src/contactlistmodel.cpp
 @@ -68,6 +68,7 @@ ContactListModel::ContactListModel(PsiCo
- 	connect(updater_, SIGNAL(contactGroupsChanged(PsiContact*)), SLOT(contactGroupsChanged(PsiContact*)));
- 	connect(updater_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
- 	connect(updater_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
-+	connect(updater_, SIGNAL(groupsDelimiterChanged()), SLOT(invalidateLayout()));
- 	connect(contactList_, SIGNAL(destroying()), SLOT(destroyingContactList()));
- 	connect(contactList_, SIGNAL(showOfflineChanged(bool)), SIGNAL(showOfflineChanged()));
- 	connect(contactList_, SIGNAL(showHiddenChanged(bool)), SIGNAL(showHiddenChanged()));
+     connect(updater_, SIGNAL(contactGroupsChanged(PsiContact*)), SLOT(contactGroupsChanged(PsiContact*)));
+     connect(updater_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
+     connect(updater_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
++    connect(updater_, SIGNAL(groupsDelimiterChanged()), SLOT(invalidateLayout()));
+     connect(contactList_, SIGNAL(destroying()), SLOT(destroyingContactList()));
+     connect(contactList_, SIGNAL(showOfflineChanged(bool)), SIGNAL(showOfflineChanged()));
+     connect(contactList_, SIGNAL(showHiddenChanged(bool)), SIGNAL(showHiddenChanged()));
 @@ -118,9 +119,9 @@ ContactListGroup* ContactListModel::crea
- 		return new ContactListAccountGroup(this, 0, 0);
+         return new ContactListAccountGroup(this, 0, 0);
  
- 	if (!groupsEnabled_)
--		return new ContactListGroup(this, 0);
-+		return new ContactListGroup(this, 0, 0);
+     if (!groupsEnabled_)
+-        return new ContactListGroup(this, 0);
++        return new ContactListGroup(this, 0, 0);
  
--	return new ContactListNestedGroup(this, 0, QString());
-+	return new ContactListNestedGroup(this, 0, 0, QString());
+-    return new ContactListNestedGroup(this, 0, QString());
++    return new ContactListNestedGroup(this, 0, 0, QString());
  }
  
  bool ContactListModel::groupsEnabled() const
 @@ -645,10 +646,24 @@ bool ContactListModel::setData(const QMo
- 			//}
- 		}
- 		else if ((group = dynamic_cast<ContactListGroup*>(item->item()))) {
-+			bool hasGroupsDelimiter = group->hasGroupsDelimiter();
-+			QString groupsDelimiter = group->groupsDelimiter();
- 			if (name.isEmpty()) {
- 				QMessageBox::information(0, tr("Error"), tr("You can't set a blank group name."));
- 				return false;
- 			}
-+			else if (hasGroupsDelimiter && name.startsWith(groupsDelimiter)) {
-+				QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the begin of group name."));
-+				return false;
-+			}
-+			else if (hasGroupsDelimiter && name.endsWith(groupsDelimiter)) {
-+				QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the end of group name."));
-+				return false;
-+			}
-+			else if (hasGroupsDelimiter && name.split(groupsDelimiter).contains("")) {
-+				QMessageBox::information(0, tr("Error"), tr("You can't use repeating delimiter in the group name."));
-+				return false;
-+			}
- 			// else {
- 				// // make sure we don't have it already
- 				// if (group->account()->groupList().contains(name)) {
+             //}
+         }
+         else if ((group = dynamic_cast<ContactListGroup*>(item->item()))) {
++            bool hasGroupsDelimiter = group->hasGroupsDelimiter();
++            QString groupsDelimiter = group->groupsDelimiter();
+             if (name.isEmpty()) {
+                 QMessageBox::information(0, tr("Error"), tr("You can't set a blank group name."));
+                 return false;
+             }
++            else if (hasGroupsDelimiter && name.startsWith(groupsDelimiter)) {
++                QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the begin of group name."));
++                return false;
++            }
++            else if (hasGroupsDelimiter && name.endsWith(groupsDelimiter)) {
++                QMessageBox::information(0, tr("Error"), tr("You can't use delimiter in the end of group name."));
++                return false;
++            }
++            else if (hasGroupsDelimiter && name.split(groupsDelimiter).contains("")) {
++                QMessageBox::information(0, tr("Error"), tr("You can't use repeating delimiter in the group name."));
++                return false;
++            }
+             // else {
+                 // // make sure we don't have it already
+                 // if (group->account()->groupList().contains(name)) {
 @@ -850,7 +865,7 @@ PsiAccount* ContactListModel::account(co
  {
- 	ContactListItemProxy* item = itemProxy(index);
- 	if (item) {
--		PsiContact* contact = dynamic_cast<PsiContact*>(item->item());
-+		ContactListItem *contact = item->item();
- 		if (contact)
- 			return contact->account();
- 	}
+     ContactListItemProxy* item = itemProxy(index);
+     if (item) {
+-        PsiContact* contact = dynamic_cast<PsiContact*>(item->item());
++        ContactListItem *contact = item->item();
+         if (contact)
+             return contact->account();
+     }
 --- git.temp.orig/src/contactlistmodel.h
 +++ git.temp/src/contactlistmodel.h
 @@ -27,13 +27,14 @@
@@ -799,40 +799,40 @@
  class ContactListModelUpdater;
 @@ -116,7 +117,6 @@ public:
  
- 	virtual PsiContactList* contactList() const;
+     virtual PsiContactList* contactList() const;
  
--	void invalidateLayout();
- 	ContactListItemProxy* modelIndexToItemProxy(const QModelIndex& index) const;
- 	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item) const;
- 	QModelIndex itemProxyToModelIndex(ContactListItemProxy* item, int index) const;
+-    void invalidateLayout();
+     ContactListItemProxy* modelIndexToItemProxy(const QModelIndex& index) const;
+     QModelIndex itemProxyToModelIndex(ContactListItemProxy* item) const;
+     QModelIndex itemProxyToModelIndex(ContactListItemProxy* item, int index) const;
 @@ -195,6 +195,7 @@ signals:
  public slots:
- 	void expanded(const QModelIndex&);
- 	void collapsed(const QModelIndex&);
-+	void invalidateLayout();
+     void expanded(const QModelIndex&);
+     void collapsed(const QModelIndex&);
++    void invalidateLayout();
  
  protected slots:
- 	void addContact(PsiContact*);
+     void addContact(PsiContact*);
 --- git.temp.orig/src/contactlistmodelupdater.cpp
 +++ git.temp/src/contactlistmodelupdater.cpp
 @@ -42,6 +42,7 @@ ContactListModelUpdater::ContactListMode
- 	connect(contactList_, SIGNAL(removedContact(PsiContact*)), SLOT(removeContact(PsiContact*)));
- 	connect(contactList_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
- 	connect(contactList_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
-+	connect(contactList_, SIGNAL(groupsDelimiterChanged()), SIGNAL(groupsDelimiterChanged()));
+     connect(contactList_, SIGNAL(removedContact(PsiContact*)), SLOT(removeContact(PsiContact*)));
+     connect(contactList_, SIGNAL(beginBulkContactUpdate()), SLOT(beginBulkUpdate()));
+     connect(contactList_, SIGNAL(endBulkContactUpdate()), SLOT(endBulkUpdate()));
++    connect(contactList_, SIGNAL(groupsDelimiterChanged()), SIGNAL(groupsDelimiterChanged()));
  }
  
  ContactListModelUpdater::~ContactListModelUpdater()
 --- git.temp.orig/src/contactlistmodelupdater.h
 +++ git.temp/src/contactlistmodelupdater.h
 @@ -51,6 +51,7 @@ signals:
- 	void contactAnim(PsiContact*);
- 	void contactUpdated(PsiContact*);
- 	void contactGroupsChanged(PsiContact*);
-+	void groupsDelimiterChanged();
+     void contactAnim(PsiContact*);
+     void contactUpdated(PsiContact*);
+     void contactGroupsChanged(PsiContact*);
++    void groupsDelimiterChanged();
  
- 	void beginBulkContactUpdate();
- 	void endBulkContactUpdate();
+     void beginBulkContactUpdate();
+     void endBulkContactUpdate();
 --- git.temp.orig/src/contactlistnestedgroup.cpp
 +++ git.temp/src/contactlistnestedgroup.cpp
 @@ -26,8 +26,8 @@
@@ -840,123 +840,123 @@
  #include "contactlistspecialgroup.h"
  
 -ContactListNestedGroup::ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, QString name)
--	: ContactListGroup(model, parent)
+-    : ContactListGroup(model, parent)
 +ContactListNestedGroup::ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account, QString name)
-+	: ContactListGroup(model, parent, account)
++    : ContactListGroup(model, parent, account)
  {
- 	quietSetName(name);
+     quietSetName(name);
  }
 @@ -82,12 +82,8 @@ void ContactListNestedGroup::addContact(
- 			ContactListGroup::addContact(contact, contactGroups);
- 		}
- 		else {
--			QStringList nestedGroups;
+             ContactListGroup::addContact(contact, contactGroups);
+         }
+         else {
+-            QStringList nestedGroups;
 -#ifdef CONTACTLIST_NESTED_GROUPS
--			nestedGroups = groupName.split(groupDelimiter());
+-            nestedGroups = groupName.split(groupDelimiter());
 -#else
--			nestedGroups += groupName;
+-            nestedGroups += groupName;
 -#endif
-+			QStringList nestedGroups = toNestedGroups(sanitizeGroupName(groupName));
++            QStringList nestedGroups = toNestedGroups(sanitizeGroupName(groupName));
 +
- 			if (!name().isEmpty()) {
- 				QString firstPart = nestedGroups.takeFirst();
- 				Q_ASSERT(firstPart == name());
+             if (!name().isEmpty()) {
+                 QString firstPart = nestedGroups.takeFirst();
+                 Q_ASSERT(firstPart == name());
 @@ -97,13 +93,13 @@ void ContactListNestedGroup::addContact(
  
- 			ContactListGroup* group = findGroup(nestedGroups.first());
- 			if (!group) {
--				group = new ContactListNestedGroup(model(), this, nestedGroups.first());
-+				group = new ContactListNestedGroup(model(), this, contact->account(), nestedGroups.first());
- 				addGroup(group);
+             ContactListGroup* group = findGroup(nestedGroups.first());
+             if (!group) {
+-                group = new ContactListNestedGroup(model(), this, nestedGroups.first());
++                group = new ContactListNestedGroup(model(), this, contact->account(), nestedGroups.first());
+                 addGroup(group);
  CL_DEBUG("ContactListNextedGroup(%x)::addContact: %s", this, qPrintable(group->fullName()));
- 			}
+             }
  
- 			QStringList moreGroups;
--			moreGroups << nestedGroups.join(groupDelimiter());
-+			moreGroups << fromNestedGroups(nestedGroups);
- 			group->addContact(contact, moreGroups);
- 		}
- 	}
+             QStringList moreGroups;
+-            moreGroups << nestedGroups.join(groupDelimiter());
++            moreGroups << fromNestedGroups(nestedGroups);
+             group->addContact(contact, moreGroups);
+         }
+     }
 @@ -172,11 +168,8 @@ void ContactListNestedGroup::contactGrou
- 		}
+         }
  
- 		QStringList split;
+         QStringList split;
 -#ifdef CONTACTLIST_NESTED_GROUPS
--		split = group.split(groupDelimiter());
+-        split = group.split(groupDelimiter());
 -#else
--		split += group;
+-        split += group;
 -#endif
-+		split = toNestedGroups(group);
++        split = toNestedGroups(group);
 +
- 		if (!name().isEmpty()) {
- 			QString firstPart = split.takeFirst();
- 			// hmm, probably should continue as the data should be invalid
+         if (!name().isEmpty()) {
+             QString firstPart = split.takeFirst();
+             // hmm, probably should continue as the data should be invalid
 @@ -202,14 +195,10 @@ void ContactListNestedGroup::contactGrou
- 		QStringList mergedGroupNames;
- 		foreach(QStringList i, splitGroupNames)
- 			if (!i.isEmpty() && i.first() == split.first())
--				mergedGroupNames += i.join(groupDelimiter());
-+				mergedGroupNames += fromNestedGroups(i);
+         QStringList mergedGroupNames;
+         foreach(QStringList i, splitGroupNames)
+             if (!i.isEmpty() && i.first() == split.first())
+-                mergedGroupNames += i.join(groupDelimiter());
++                mergedGroupNames += fromNestedGroups(i);
  
- 		foreach(QString i, mergedGroupNames) {
+         foreach(QString i, mergedGroupNames) {
 -#ifdef CONTACTLIST_NESTED_GROUPS
--			splitGroupNames.removeAll(i.split(groupDelimiter()));
+-            splitGroupNames.removeAll(i.split(groupDelimiter()));
 -#else
--			splitGroupNames.removeAll(QStringList() << i);
+-            splitGroupNames.removeAll(QStringList() << i);
 -#endif
-+			splitGroupNames.removeAll(toNestedGroups(i));
- 		}
++            splitGroupNames.removeAll(toNestedGroups(i));
+         }
  
- 		group->contactGroupsChanged(contact, mergedGroupNames);
+         group->contactGroupsChanged(contact, mergedGroupNames);
 @@ -249,7 +238,7 @@ CL_DEBUG("ContactListNextedGroup(%x)::co
- 			fullGroupName << name();
- 		fullGroupName += split;
- 		QStringList tmp;
--		tmp << fullGroupName.join(groupDelimiter());
-+		tmp << fromNestedGroups(fullGroupName);
- 		addContact(contact, tmp);
- 	}
+             fullGroupName << name();
+         fullGroupName += split;
+         QStringList tmp;
+-        tmp << fullGroupName.join(groupDelimiter());
++        tmp << fromNestedGroups(fullGroupName);
+         addContact(contact, tmp);
+     }
  
 @@ -269,14 +258,14 @@ CL_DEBUG("ContactListNextedGroup(%x)::co
  #else
- 	QStringList newNestedGroups = fullName().isEmpty()
- 	                              ? contactGroups
--	                              : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupDelimiter())));
-+	                              : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupsDelimiter())));
+     QStringList newNestedGroups = fullName().isEmpty()
+                                   ? contactGroups
+-                                  : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupDelimiter())));
++                                  : contactGroups.filter(QRegExp(QString("^%1($|%2)").arg(fullName(), groupsDelimiter())));
  
- 	QStringList directChildren;
- 	foreach(QString nnGroup, newNestedGroups) {
--		QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupDelimiter()).length());
-+		QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupsDelimiter()).length());
- 		if (!unqualifiedName.isEmpty()) {
- 			// direct children!
--			directChildren << QString(name().isEmpty() ? "" : name() + groupDelimiter()) + unqualifiedName;
-+			directChildren << QString(name().isEmpty() ? "" : name() + groupsDelimiter()) + unqualifiedName;
- 		}
- 	}
+     QStringList directChildren;
+     foreach(QString nnGroup, newNestedGroups) {
+-        QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupDelimiter()).length());
++        QString unqualifiedName = nnGroup.mid(QString(fullName().isEmpty() ? "" : fullName() + groupsDelimiter()).length());
+         if (!unqualifiedName.isEmpty()) {
+             // direct children!
+-            directChildren << QString(name().isEmpty() ? "" : name() + groupDelimiter()) + unqualifiedName;
++            directChildren << QString(name().isEmpty() ? "" : name() + groupsDelimiter()) + unqualifiedName;
+         }
+     }
  
 --- git.temp.orig/src/contactlistnestedgroup.h
 +++ git.temp/src/contactlistnestedgroup.h
 @@ -27,7 +27,7 @@ class ContactListNestedGroup : public Co
  {
- 	Q_OBJECT
+     Q_OBJECT
  public:
--	ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, QString name);
-+	ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account, QString name);
- 	~ContactListNestedGroup();
+-    ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, QString name);
++    ContactListNestedGroup(ContactListModel* model, ContactListGroup* parent, PsiAccount *account, QString name);
+     ~ContactListNestedGroup();
  
- 	virtual bool canContainSpecialGroups() const;
+     virtual bool canContainSpecialGroups() const;
 --- git.temp.orig/src/contactlistspecialgroup.cpp
 +++ git.temp/src/contactlistspecialgroup.cpp
 @@ -24,7 +24,7 @@
  #include <QStringList>
  
  ContactListSpecialGroup::ContactListSpecialGroup(ContactListModel* model, ContactListGroup* parent, ContactListGroup::SpecialType type)
--	: ContactListNestedGroup(model, parent, QString())
-+	: ContactListNestedGroup(model, parent, 0, QString())
- 	, specialType_(type)
+-    : ContactListNestedGroup(model, parent, QString())
++    : ContactListNestedGroup(model, parent, 0, QString())
+     , specialType_(type)
  {
- 	name_ = QString::fromUtf8("☣special_group_");
+     name_ = QString::fromUtf8("☣special_group_");
 --- /dev/null
 +++ git.temp/src/creategroup.ui
 @@ -0,0 +1,159 @@
@@ -1156,178 +1156,178 @@
 +class CreateGroupDlg::Private
 +{
 +public:
-+	CreateGroupDlg *q;
-+	Ui::CreateGroupDlg *ui;
-+	PsiContact *contact;
++    CreateGroupDlg *q;
++    Ui::CreateGroupDlg *ui;
++    PsiContact *contact;
 +
-+	QString fullGroupName()
-+	{
-+		QStringList groupNameList;
-+		groupNameList << ui->lneGroupName->text();
++    QString fullGroupName()
++    {
++        QStringList groupNameList;
++        groupNameList << ui->lneGroupName->text();
 +
-+		QTreeWidgetItem *item = ui->twGroups->currentItem();
-+		if (item != ui->twGroups->topLevelItem(0)) {
-+			while (item != 0) {
-+				groupNameList.prepend(item->text(0));
-+				item = item->parent();
-+			}
-+		}
++        QTreeWidgetItem *item = ui->twGroups->currentItem();
++        if (item != ui->twGroups->topLevelItem(0)) {
++            while (item != 0) {
++                groupNameList.prepend(item->text(0));
++                item = item->parent();
++            }
++        }
 +
-+		QString groupsDelimiter = contact->account()->userList()->groupsDelimiter();
++        QString groupsDelimiter = contact->account()->userList()->groupsDelimiter();
 +
-+		return groupNameList.join(groupsDelimiter);
-+	}
++        return groupNameList.join(groupsDelimiter);
++    }
 +};
 +
 +CreateGroupDlg::CreateGroupDlg(PsiContact *contact, QWidget *parent)
-+	: QDialog(parent)
-+	, d(new CreateGroupDlg::Private)
++    : QDialog(parent)
++    , d(new CreateGroupDlg::Private)
 +{
-+	d->q = this;
-+	d->ui = new Ui::CreateGroupDlg;
-+	d->ui->setupUi(this);
-+	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
-+	d->ui->btnAddGroup->setEnabled(false);
-+	d->contact = contact;
++    d->q = this;
++    d->ui = new Ui::CreateGroupDlg;
++    d->ui->setupUi(this);
++    d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
++    d->ui->btnAddGroup->setEnabled(false);
++    d->contact = contact;
 +
-+	// Fill groups tree
-+	bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
++    // Fill groups tree
++    bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
 +
-+	QList<QTreeWidgetItem *> items;
-+	items << new QTreeWidgetItem((QTreeWidget*)0, QStringList(tr("<None>")));
++    QList<QTreeWidgetItem *> items;
++    items << new QTreeWidgetItem((QTreeWidget*)0, QStringList(tr("<None>")));
 +
-+	// Show only <None> if no delimiter
-+	if (hasGroupsDelimiter) {
-+		QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
-+		QStringList groupList = d->contact->account()->groupList();
-+		groupList.removeAll("");
-+		groupList.removeAll(PsiContact::hiddenGroupName());
-+		foreach (const QString &groupName, groupList) {
-+			QStringList subGroupList = groupName.split(groupsDelimiter);
++    // Show only <None> if no delimiter
++    if (hasGroupsDelimiter) {
++        QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++        QStringList groupList = d->contact->account()->groupList();
++        groupList.removeAll("");
++        groupList.removeAll(PsiContact::hiddenGroupName());
++        foreach (const QString &groupName, groupList) {
++            QStringList subGroupList = groupName.split(groupsDelimiter);
 +
-+			QTreeWidgetItem *parentItem = 0;
-+			foreach (const QString &subGroupName, subGroupList) {
-+				QList<QTreeWidgetItem*> children;
-+				if (parentItem) {
-+					for (int i = 0; i < parentItem->childCount(); i++)
-+						children << parentItem->child(i);
-+				}
-+				else {
-+					children = items;
-+				}
++            QTreeWidgetItem *parentItem = 0;
++            foreach (const QString &subGroupName, subGroupList) {
++                QList<QTreeWidgetItem*> children;
++                if (parentItem) {
++                    for (int i = 0; i < parentItem->childCount(); i++)
++                        children << parentItem->child(i);
++                }
++                else {
++                    children = items;
++                }
 +
-+				bool needCreateItem = true;
++                bool needCreateItem = true;
 +
-+				for (int i = 0; i < children.length(); i++) {
-+					if (children.at(i)->text(0) == subGroupName) {
-+						parentItem = children.at(i);
-+						needCreateItem = false;
-+						break;
-+					}
-+				}
++                for (int i = 0; i < children.length(); i++) {
++                    if (children.at(i)->text(0) == subGroupName) {
++                        parentItem = children.at(i);
++                        needCreateItem = false;
++                        break;
++                    }
++                }
 +
-+				if (needCreateItem) {
-+					parentItem = new QTreeWidgetItem(parentItem, QStringList(subGroupName));
-+					items << parentItem;
-+				}
-+			}
-+		}
-+	}
-+	d->ui->twGroups->insertTopLevelItems(0, items);
-+	d->ui->twGroups->setCurrentItem(items.at(0));
-+	d->ui->lneGroupName->setFocus();
++                if (needCreateItem) {
++                    parentItem = new QTreeWidgetItem(parentItem, QStringList(subGroupName));
++                    items << parentItem;
++                }
++            }
++        }
++    }
++    d->ui->twGroups->insertTopLevelItems(0, items);
++    d->ui->twGroups->setCurrentItem(items.at(0));
++    d->ui->lneGroupName->setFocus();
 +}
 +
 +CreateGroupDlg::~CreateGroupDlg()
 +{
-+	delete d->ui;
-+	delete d;
++    delete d->ui;
++    delete d;
 +}
 +
 +void CreateGroupDlg::accept()
 +{
-+	QDialog::accept();
-+	d->contact->setGroups(QStringList() << d->fullGroupName());
++    QDialog::accept();
++    d->contact->setGroups(QStringList() << d->fullGroupName());
 +}
 +
 +void CreateGroupDlg::checkGroupName()
 +{
-+	bool ok;
-+	QString groupName = d->fullGroupName();
++    bool ok;
++    QString groupName = d->fullGroupName();
 +
-+	// Subgroup name can't be empty
-+	ok = !d->ui->lneGroupName->text().isEmpty();
++    // Subgroup name can't be empty
++    ok = !d->ui->lneGroupName->text().isEmpty();
 +
-+	QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
-+	bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
-+	QString subGroupName = d->ui->lneGroupName->text();
++    QString groupsDelimiter = d->contact->account()->userList()->groupsDelimiter();
++    bool hasGroupsDelimiter = d->contact->account()->userList()->hasGroupsDelimiter();
++    QString subGroupName = d->ui->lneGroupName->text();
 +
-+	// Subgroup name can't start or end with delimiter
-+	// or has repeated delimiters
-+	if (hasGroupsDelimiter &&
-+		(subGroupName.split(groupsDelimiter)).contains("")) {
++    // Subgroup name can't start or end with delimiter
++    // or has repeated delimiters
++    if (hasGroupsDelimiter &&
++        (subGroupName.split(groupsDelimiter)).contains("")) {
 +
-+		ok = false;
-+	}
++        ok = false;
++    }
 +
-+	// Contact is not added to this group
-+	if (ok) {
-+		ok = !d->contact->userListItem().groups().contains(groupName);
-+	}
++    // Contact is not added to this group
++    if (ok) {
++        ok = !d->contact->userListItem().groups().contains(groupName);
++    }
 +
-+	d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(ok);
++    d->ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(ok);
 +
-+	// Can't create subgroup if no delimiter
-+	if (ok) {
-+		ok = hasGroupsDelimiter;
-+	}
++    // Can't create subgroup if no delimiter
++    if (ok) {
++        ok = hasGroupsDelimiter;
++    }
 +
-+	// Can't create subgroup with delimiter
-+	if (ok) {
-+		ok = !subGroupName.contains(groupsDelimiter);
-+	}
++    // Can't create subgroup with delimiter
++    if (ok) {
++        ok = !subGroupName.contains(groupsDelimiter);
++    }
 +
-+	// No such subgroup
-+	if (ok) {
-+		QTreeWidgetItem *item = d->ui->twGroups->currentItem();
-+		QList<QTreeWidgetItem*> children;
++    // No such subgroup
++    if (ok) {
++        QTreeWidgetItem *item = d->ui->twGroups->currentItem();
++        QList<QTreeWidgetItem*> children;
 +
-+		if (item == d->ui->twGroups->topLevelItem(0)) {
-+			for (int i = 1; i < d->ui->twGroups->topLevelItemCount(); i++)
-+				children << d->ui->twGroups->topLevelItem(i);
-+		}
-+		else {
-+			for (int i = 0; i < item->childCount(); i++)
-+				children << item->child(i);
-+		}
++        if (item == d->ui->twGroups->topLevelItem(0)) {
++            for (int i = 1; i < d->ui->twGroups->topLevelItemCount(); i++)
++                children << d->ui->twGroups->topLevelItem(i);
++        }
++        else {
++            for (int i = 0; i < item->childCount(); i++)
++                children << item->child(i);
++        }
 +
-+		for (int i = 0; i < children.length(); i++) {
-+			if (children.at(i)->text(0) == subGroupName) {
-+				ok = false;
-+				break;
-+			}
-+		}
-+	}
-+	d->ui->btnAddGroup->setEnabled(ok);
++        for (int i = 0; i < children.length(); i++) {
++            if (children.at(i)->text(0) == subGroupName) {
++                ok = false;
++                break;
++            }
++        }
++    }
++    d->ui->btnAddGroup->setEnabled(ok);
 +}
 +
 +void CreateGroupDlg::addGroup()
 +{
-+	QTreeWidgetItem *item = d->ui->twGroups->currentItem();
-+	QString subGroupName = d->ui->lneGroupName->text();
++    QTreeWidgetItem *item = d->ui->twGroups->currentItem();
++    QString subGroupName = d->ui->lneGroupName->text();
 +
-+	if (item == d->ui->twGroups->topLevelItem(0)) {
-+		item = 0;
-+		item = new QTreeWidgetItem(item, QStringList(subGroupName));
-+		d->ui->twGroups->addTopLevelItem(item);
-+	}
-+	else {
-+		item = new QTreeWidgetItem(item, QStringList(subGroupName));
-+	}
-+	d->ui->twGroups->setCurrentItem(item);
++    if (item == d->ui->twGroups->topLevelItem(0)) {
++        item = 0;
++        item = new QTreeWidgetItem(item, QStringList(subGroupName));
++        d->ui->twGroups->addTopLevelItem(item);
++    }
++    else {
++        item = new QTreeWidgetItem(item, QStringList(subGroupName));
++    }
++    d->ui->twGroups->setCurrentItem(item);
 +
-+	d->ui->lneGroupName->setText("");
-+	d->ui->lneGroupName->setFocus();
++    d->ui->lneGroupName->setText("");
++    d->ui->lneGroupName->setFocus();
 +}
 --- /dev/null
 +++ git.temp/src/creategroupdlg.h
@@ -1361,43 +1361,43 @@
 +
 +class CreateGroupDlg : public QDialog
 +{
-+	Q_OBJECT
++    Q_OBJECT
 +
 +public:
-+	CreateGroupDlg(PsiContact *contact, QWidget *parent = 0);
-+	~CreateGroupDlg();
++    CreateGroupDlg(PsiContact *contact, QWidget *parent = 0);
++    ~CreateGroupDlg();
 +
 +public slots:
-+	void accept();
-+	void checkGroupName();
-+	void addGroup();
++    void accept();
++    void checkGroupName();
++    void addGroup();
 +
 +private:
-+	class Private;
-+	Private *d;
++    class Private;
++    Private *d;
 +};
 +
 +#endif // CREATEGROUPDLG_H
 --- git.temp.orig/src/psi_profiles.cpp
 +++ git.temp/src/psi_profiles.cpp
 @@ -302,6 +302,8 @@ void UserAccount::fromOptions(OptionsTre
- 		allow_plain = XMPP::ClientStream::NoAllowPlain;
- 	}
+         allow_plain = XMPP::ClientStream::NoAllowPlain;
+     }
  
-+	roster.setGroupsDelimiter(o->getOption(base + ".roster-cache-groups-delimiter").toString());
++    roster.setGroupsDelimiter(o->getOption(base + ".roster-cache-groups-delimiter").toString());
 +
- 	QStringList rosterCache = o->getChildOptionNames(base + ".roster-cache", true, true);
- 	foreach(QString rbase, rosterCache) {
- 		RosterItem ri;
+     QStringList rosterCache = o->getChildOptionNames(base + ".roster-cache", true, true);
+     foreach(QString rbase, rosterCache) {
+         RosterItem ri;
 @@ -439,6 +441,8 @@ void UserAccount::toOptions(OptionsTree
- 			qFatal("unknown allow_plain enum value in UserAccount::toOptions");
- 	}
+             qFatal("unknown allow_plain enum value in UserAccount::toOptions");
+     }
  
-+	o->setOption(base + ".roster-cache-groups-delimiter", roster.groupsDelimiter());
++    o->setOption(base + ".roster-cache-groups-delimiter", roster.groupsDelimiter());
 +
- 	int idx = 0;
- 	foreach(RosterItem ri, roster) {
- 		QString rbase = base + ".roster-cache.a" + QString::number(idx++);
+     int idx = 0;
+     foreach(RosterItem ri, roster) {
+         QString rbase = base + ".roster-cache.a" + QString::number(idx++);
 --- git.temp.orig/src/psiaccount.cpp
 +++ git.temp/src/psiaccount.cpp
 @@ -23,7 +23,6 @@
@@ -1409,199 +1409,199 @@
  #include <QSet>
  #include <QInputDialog>
 @@ -1100,6 +1099,8 @@ PsiAccount::PsiAccount(const UserAccount
- 	d->voiceCaller = 0;
- 	d->blockTransportPopupList = new BlockTransportPopupList();
+     d->voiceCaller = 0;
+     d->blockTransportPopupList = new BlockTransportPopupList();
  
-+	d->userList.setGroupsDelimiter(acc.roster.groupsDelimiter());
++    d->userList.setGroupsDelimiter(acc.roster.groupsDelimiter());
 +
- 	v_isActive = false;
- 	isDisconnecting = false;
- 	notifyOnlineOk = false;
+     v_isActive = false;
+     isDisconnecting = false;
+     notifyOnlineOk = false;
 @@ -1168,6 +1169,7 @@ PsiAccount::PsiAccount(const UserAccount
- 	//connect(d->client, SIGNAL(sslCertReady(const QSSLCert &)), SLOT(client_sslCertReady(const QSSLCert &)));
- 	//connect(d->client, SIGNAL(closeFinished()), SLOT(client_closeFinished()));
- 	//connect(d->client, SIGNAL(authFinished(bool, int, const QString &)), SLOT(client_authFinished(bool, int, const QString &)));
-+	connect(d->client, SIGNAL(rosterGroupsDelimiterRequestFinished(const QString &)), SLOT(client_rosterRequestGroupsDelimiterFinished(const QString &)));
- 	connect(d->client, SIGNAL(rosterRequestFinished(bool, int, const QString &)), SLOT(client_rosterRequestFinished(bool, int, const QString &)));
- 	connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemAdded(const RosterItem &)));
- 	connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemUpdated(const RosterItem &)));
+     //connect(d->client, SIGNAL(sslCertReady(const QSSLCert &)), SLOT(client_sslCertReady(const QSSLCert &)));
+     //connect(d->client, SIGNAL(closeFinished()), SLOT(client_closeFinished()));
+     //connect(d->client, SIGNAL(authFinished(bool, int, const QString &)), SLOT(client_authFinished(bool, int, const QString &)));
++    connect(d->client, SIGNAL(rosterGroupsDelimiterRequestFinished(const QString &)), SLOT(client_rosterRequestGroupsDelimiterFinished(const QString &)));
+     connect(d->client, SIGNAL(rosterRequestFinished(bool, int, const QString &)), SLOT(client_rosterRequestFinished(bool, int, const QString &)));
+     connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemAdded(const RosterItem &)));
+     connect(d->client, SIGNAL(rosterItemAdded(const RosterItem &)), SLOT(client_rosterItemUpdated(const RosterItem &)));
 @@ -1508,6 +1510,7 @@ const UserAccount & PsiAccount::userAcco
- 	// save the roster and pgp key bindings
- 	d->acc.roster.clear();
- 	d->acc.keybind.clear();
-+	d->acc.roster.setGroupsDelimiter(d->userList.groupsDelimiter());
- 	foreach(UserListItem* u, d->userList) {
- 		if(u->inList())
- 			d->acc.roster += *u;
+     // save the roster and pgp key bindings
+     d->acc.roster.clear();
+     d->acc.keybind.clear();
++    d->acc.roster.setGroupsDelimiter(d->userList.groupsDelimiter());
+     foreach(UserListItem* u, d->userList) {
+         if(u->inList())
+             d->acc.roster += *u;
 @@ -2321,6 +2324,24 @@ int PsiAccount::currentConnectionErrorCo
- 	return d->currentConnectionErrorCondition;
+     return d->currentConnectionErrorCondition;
  }
  
 +void PsiAccount::client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter)
 +{
-+	if (!groupsDelimiter.isEmpty()) {
-+		d->userList.setGroupsDelimiter(groupsDelimiter);
-+	}
-+	else {
-+		QString defaultGroupsDelimiter = PsiOptions::instance()->getOption("options.ui.contactlist.default-groups-delimiter").toString();
++    if (!groupsDelimiter.isEmpty()) {
++        d->userList.setGroupsDelimiter(groupsDelimiter);
++    }
++    else {
++        QString defaultGroupsDelimiter = PsiOptions::instance()->getOption("options.ui.contactlist.default-groups-delimiter").toString();
 +
-+		// Not empty delimiter can be set in options before login. Need to reset it in any case.
-+		d->userList.setGroupsDelimiter(defaultGroupsDelimiter);
++        // Not empty delimiter can be set in options before login. Need to reset it in any case.
++        d->userList.setGroupsDelimiter(defaultGroupsDelimiter);
 +
-+		// Prevent excessed iq
-+		if (!defaultGroupsDelimiter.isEmpty()) {
-+			actionSetGroupsDelimiter(defaultGroupsDelimiter);
-+		}
-+	}
++        // Prevent excessed iq
++        if (!defaultGroupsDelimiter.isEmpty()) {
++            actionSetGroupsDelimiter(defaultGroupsDelimiter);
++        }
++    }
 +}
 +
  void PsiAccount::client_rosterRequestFinished(bool success, int, const QString &)
  {
- 	if(success) {
+     if(success) {
 @@ -3474,6 +3495,35 @@ void PsiAccount::doDisco()
- 	actionDisco(d->jid.domain(), "");
+     actionDisco(d->jid.domain(), "");
  }
  
 +void PsiAccount::changeGroupsDelimiter()
 +{
-+	if (!checkConnected()) {
-+		return;
-+	}
++    if (!checkConnected()) {
++        return;
++    }
 +
-+	bool ok = false;
-+	QString delimiter = d->account->userList()->groupsDelimiter();
-+	delimiter = QInputDialog::getText(0,
-+									  tr("Nested Groups Delimiter"),
-+									  tr("Set a new delimiter of nested groups"),
-+									  QLineEdit::Normal,
-+									  delimiter,
-+									  &ok);
-+	if (!ok)
-+		return;
++    bool ok = false;
++    QString delimiter = d->account->userList()->groupsDelimiter();
++    delimiter = QInputDialog::getText(0,
++                                      tr("Nested Groups Delimiter"),
++                                      tr("Set a new delimiter of nested groups"),
++                                      QLineEdit::Normal,
++                                      delimiter,
++                                      &ok);
++    if (!ok)
++        return;
 +
-+	actionSetGroupsDelimiter(delimiter);
++    actionSetGroupsDelimiter(delimiter);
 +}
 +
 +void PsiAccount::disableGroupsDelimiter()
 +{
-+	if (!checkConnected()) {
-+		return;
-+	}
++    if (!checkConnected()) {
++        return;
++    }
 +
-+	actionSetGroupsDelimiter("e");
++    actionSetGroupsDelimiter("e");
 +}
 +
  void PsiAccount::actionDisco(const Jid &j, const QString &node)
  {
- 	DiscoDlg *w = new DiscoDlg(this, j, node);
+     DiscoDlg *w = new DiscoDlg(this, j, node);
 @@ -3512,6 +3562,18 @@ void PsiAccount::featureActivated(QStrin
- 	}
+     }
  }
  
 +void PsiAccount::actionSetGroupsDelimiter(const QString &groupsDelimiter)
 +{
-+	if (d->userList.groupsDelimiter() != groupsDelimiter) {
-+		d->userList.setGroupsDelimiter(groupsDelimiter);
-+		emit groupsDelimiterChanged();
-+	}
++    if (d->userList.groupsDelimiter() != groupsDelimiter) {
++        d->userList.setGroupsDelimiter(groupsDelimiter);
++        emit groupsDelimiterChanged();
++    }
 +
-+	JT_Roster *r = new JT_Roster(d->client->rootTask());
-+	r->setGroupsDelimiter(groupsDelimiter);
-+	r->go(true);
++    JT_Roster *r = new JT_Roster(d->client->rootTask());
++    r->setGroupsDelimiter(groupsDelimiter);
++    r->go(true);
 +}
 +
  void PsiAccount::actionManageBookmarks()
  {
- 	BookmarkManageDlg *dlg = findDialog<BookmarkManageDlg*>();
+     BookmarkManageDlg *dlg = findDialog<BookmarkManageDlg*>();
 --- git.temp.orig/src/psiaccount.h
 +++ git.temp/src/psiaccount.h
 @@ -207,6 +207,8 @@ public:
- 	void changePW();
- 	void changeStatus(int, bool forceDialog = false);
- 	void doDisco();
-+	void changeGroupsDelimiter();
-+	void disableGroupsDelimiter();
+     void changePW();
+     void changeStatus(int, bool forceDialog = false);
+     void doDisco();
++    void changeGroupsDelimiter();
++    void disableGroupsDelimiter();
  
- 	void showXmlConsole();
- 	void openAddUserDlg();
+     void showXmlConsole();
+     void openAddUserDlg();
 @@ -302,6 +304,7 @@ signals:
- 	void encryptedMessageSent(int, bool, int, const QString &);
- 	void enabledChanged();
- 	void startBounce();
-+	void groupsDelimiterChanged();
+     void encryptedMessageSent(int, bool, int, const QString &);
+     void enabledChanged();
+     void startBounce();
++    void groupsDelimiterChanged();
  
  public slots:
- 	void setStatus(const XMPP::Status &, bool withPriority = false, bool isManualStatus = false);
+     void setStatus(const XMPP::Status &, bool withPriority = false, bool isManualStatus = false);
 @@ -391,6 +394,7 @@ public slots:
- 	void actionUnsetAvatar();
- 	void actionQueryVersion(const Jid& j);
- 	void featureActivated(QString feature, Jid jid, QString node);
-+	void actionSetGroupsDelimiter(const QString &groupsDelimiter);
+     void actionUnsetAvatar();
+     void actionQueryVersion(const Jid& j);
+     void featureActivated(QString feature, Jid jid, QString node);
++    void actionSetGroupsDelimiter(const QString &groupsDelimiter);
  
- 	void actionAssignKey(const Jid &);
- 	void actionUnassignKey(const Jid &);
+     void actionAssignKey(const Jid &);
+     void actionUnassignKey(const Jid &);
 @@ -410,6 +414,7 @@ private slots:
- 	void cs_delayedCloseFinished();
- 	void cs_warning(int);
- 	void cs_error(int);
-+	void client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter);
- 	void client_rosterRequestFinished(bool, int, const QString &);
- 	void resolveContactName();
- 	void client_rosterItemAdded(const RosterItem &);
+     void cs_delayedCloseFinished();
+     void cs_warning(int);
+     void cs_error(int);
++    void client_rosterRequestGroupsDelimiterFinished(const QString &groupsDelimiter);
+     void client_rosterRequestFinished(bool, int, const QString &);
+     void resolveContactName();
+     void client_rosterItemAdded(const RosterItem &);
 --- git.temp.orig/src/psicontact.cpp
 +++ git.temp/src/psicontact.cpp
 @@ -63,8 +63,7 @@ class PsiContact::Private : public Alert
- 	Q_OBJECT
+     Q_OBJECT
  public:
- 	Private(PsiContact* contact)
--		: account_(0)
--		, statusTimer_(0)
-+		: statusTimer_(0)
- 		, isValid_(true)
- 		, isAnimated_(false)
- 		, isAlwaysVisible_(false)
+     Private(PsiContact* contact)
+-        : account_(0)
+-        , statusTimer_(0)
++        : statusTimer_(0)
+         , isValid_(true)
+         , isAnimated_(false)
+         , isAlwaysVisible_(false)
 @@ -100,7 +99,6 @@ public:
- 	{
- 	}
+     {
+     }
  
--	PsiAccount* account_;
- 	QTimer* statusTimer_;
- 	QTimer* animTimer_;
- 	UserListItem u_;
+-    PsiAccount* account_;
+     QTimer* statusTimer_;
+     QTimer* animTimer_;
+     UserListItem u_;
 @@ -140,7 +138,7 @@ public:
  #ifdef YAPSI
- 		reconnecting_ = false;
+         reconnecting_ = false;
  #endif
--		if (account_ && !account_->notifyOnline())
-+		if (contact_->account() && !contact_->account()->notifyOnline())
- 			oldStatus_ = status_;
- 		else
- 			statusTimer_->start();
+-        if (account_ && !account_->notifyOnline())
++        if (contact_->account() && !contact_->account()->notifyOnline())
+             oldStatus_ = status_;
+         else
+             statusTimer_->start();
 @@ -164,12 +162,11 @@ private:
   * Creates new PsiContact.
   */
  PsiContact::PsiContact(const UserListItem& u, PsiAccount* account)
--	: ContactListItem(account)
-+	: ContactListItem(account, account)
+-    : ContactListItem(account)
++    : ContactListItem(account, account)
  {
- 	d = new Private(this);
--	d->account_ = account;
--	if (d->account_) {
--		connect(d->account_->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
-+	if (account) {
-+		connect(account->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
- 	}
- 	connect(VCardFactory::instance(), SIGNAL(vcardChanged(const Jid&)), SLOT(vcardChanged(const Jid&)));
- 	update(u);
+     d = new Private(this);
+-    d->account_ = account;
+-    if (d->account_) {
+-        connect(d->account_->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
++    if (account) {
++        connect(account->avatarFactory(), SIGNAL(avatarChanged(const Jid&)), SLOT(avatarChanged(const Jid&)));
+     }
+     connect(VCardFactory::instance(), SIGNAL(vcardChanged(const Jid&)), SLOT(vcardChanged(const Jid&)));
+     update(u);
 @@ -178,10 +175,9 @@ PsiContact::PsiContact(const UserListIte
  }
  
  PsiContact::PsiContact()
--	: ContactListItem(0)
-+	: ContactListItem(0, 0)
+-    : ContactListItem(0)
++    : ContactListItem(0, 0)
  {
- 	d = new Private(this);
--	d->account_ = 0;
+     d = new Private(this);
+-    d->account_ = 0;
  }
  
  /**
@@ -1613,7 +1613,7 @@
 - */
 -PsiAccount* PsiContact::account() const
 -{
--	return d->account_;
+-    return d->account_;
 -}
 -
 -/**
@@ -1623,33 +1623,33 @@
 --- git.temp.orig/src/psicontact.h
 +++ git.temp/src/psicontact.h
 @@ -45,7 +45,6 @@ public:
- 	PsiContact(const UserListItem& u, PsiAccount* account);
- 	~PsiContact();
+     PsiContact(const UserListItem& u, PsiAccount* account);
+     ~PsiContact();
  
--	PsiAccount* account() const;
- 	const UserListItem& userListItem() const;
- 	const UserResourceList& userResourceList() const;
- 	virtual void update(const UserListItem& u);
+-    PsiAccount* account() const;
+     const UserListItem& userListItem() const;
+     const UserResourceList& userResourceList() const;
+     virtual void update(const UserListItem& u);
 --- git.temp.orig/src/psicontactlist.cpp
 +++ git.temp/src/psicontactlist.cpp
 @@ -315,6 +315,7 @@ void PsiContactList::link(PsiAccount* ac
- 	connect(account, SIGNAL(beginBulkContactUpdate()), this, SIGNAL(beginBulkContactUpdate()));
- 	connect(account, SIGNAL(endBulkContactUpdate()), this, SIGNAL(endBulkContactUpdate()));
- 	connect(account, SIGNAL(rosterRequestFinished()), this, SIGNAL(rosterRequestFinished()));
-+	connect(account, SIGNAL(groupsDelimiterChanged()), this, SIGNAL(groupsDelimiterChanged()));
- 	accounts_.append(account);
- 	if (account->enabled())
- 		addEnabledAccount(account);
+     connect(account, SIGNAL(beginBulkContactUpdate()), this, SIGNAL(beginBulkContactUpdate()));
+     connect(account, SIGNAL(endBulkContactUpdate()), this, SIGNAL(endBulkContactUpdate()));
+     connect(account, SIGNAL(rosterRequestFinished()), this, SIGNAL(rosterRequestFinished()));
++    connect(account, SIGNAL(groupsDelimiterChanged()), this, SIGNAL(groupsDelimiterChanged()));
+     accounts_.append(account);
+     if (account->enabled())
+         addEnabledAccount(account);
 --- git.temp.orig/src/psicontactlist.h
 +++ git.temp/src/psicontactlist.h
 @@ -99,6 +99,7 @@ signals:
- 	void beginBulkContactUpdate();
- 	void endBulkContactUpdate();
- 	void rosterRequestFinished();
-+	void groupsDelimiterChanged();
+     void beginBulkContactUpdate();
+     void endBulkContactUpdate();
+     void rosterRequestFinished();
++    void groupsDelimiterChanged();
  
- 	/**
- 	 * This signal is emitted when account is loaded from disk or created
+     /**
+      * This signal is emitted when account is loaded from disk or created
 --- git.temp.orig/src/psicontactmenu.cpp
 +++ git.temp/src/psicontactmenu.cpp
 @@ -50,6 +50,7 @@
@@ -1662,106 +1662,106 @@
  // GroupMenu
 @@ -130,23 +131,8 @@ private slots:
  
- 	void createNewGroup()
- 	{
--		while (contact_) {
--			bool ok = false;
--			QString newgroup = QInputDialog::getText(0, tr("Create New Group"),
--			                   tr("Enter the new group name:"),
--			                   QLineEdit::Normal,
--			                   QString::null,
--			                   &ok, 0);
--			if (!ok)
--				break;
--			if (newgroup.isEmpty())
--				continue;
+     void createNewGroup()
+     {
+-        while (contact_) {
+-            bool ok = false;
+-            QString newgroup = QInputDialog::getText(0, tr("Create New Group"),
+-                               tr("Enter the new group name:"),
+-                               QLineEdit::Normal,
+-                               QString::null,
+-                               &ok, 0);
+-            if (!ok)
+-                break;
+-            if (newgroup.isEmpty())
+-                continue;
 -
--			if (!contact_->userListItem().groups().contains(newgroup)) {
--				emit groupActivated(newgroup);
--				break;
--			}
--		}
-+		CreateGroupDlg dlg(contact_);
-+		dlg.exec();
- 	}
+-            if (!contact_->userListItem().groups().contains(newgroup)) {
+-                emit groupActivated(newgroup);
+-                break;
+-            }
+-        }
++        CreateGroupDlg dlg(contact_);
++        dlg.exec();
+     }
  };
  
 --- git.temp.orig/src/src.pri
 +++ git.temp/src/src.pri
 @@ -214,7 +214,8 @@ HEADERS += \
- 	$$PWD/coloropt.h \
- 	$$PWD/geolocationdlg.h \
- 	$$PWD/rosteravatarframe.h \
--	$$PWD/sendbuttonmenu.h
-+	$$PWD/sendbuttonmenu.h \
-+	$$PWD/creategroupdlg.h
+     $$PWD/coloropt.h \
+     $$PWD/geolocationdlg.h \
+     $$PWD/rosteravatarframe.h \
+-    $$PWD/sendbuttonmenu.h
++    $$PWD/sendbuttonmenu.h \
++    $$PWD/creategroupdlg.h
  
  
  
 @@ -357,7 +358,8 @@ SOURCES += \
- 	$$PWD/coloropt.cpp \
- 	$$PWD/geolocationdlg.cpp \
- 	$$PWD/rosteravatarframe.cpp \
--	$$PWD/sendbuttonmenu.cpp
-+	$$PWD/sendbuttonmenu.cpp \
-+	$$PWD/creategroupdlg.cpp
+     $$PWD/coloropt.cpp \
+     $$PWD/geolocationdlg.cpp \
+     $$PWD/rosteravatarframe.cpp \
+-    $$PWD/sendbuttonmenu.cpp
++    $$PWD/sendbuttonmenu.cpp \
++    $$PWD/creategroupdlg.cpp
  
  unix:!macx:!haiku {
- 	HEADERS += $$PWD/x11windowsystem.h
+     HEADERS += $$PWD/x11windowsystem.h
 @@ -452,7 +454,6 @@ mac {
  CONFIG += newcontactlist
  newcontactlist {
- 	DEFINES += NEWCONTACTLIST
--	# DEFINES += CONTACTLIST_NESTED_GROUPS
- 	HEADERS += \
- 		$$PWD/contactlistview.h \
- 		$$PWD/contactlistdragview.h \
+     DEFINES += NEWCONTACTLIST
+-    # DEFINES += CONTACTLIST_NESTED_GROUPS
+     HEADERS += \
+         $$PWD/contactlistview.h \
+         $$PWD/contactlistdragview.h \
 @@ -600,7 +601,8 @@ FORMS += \
- 	$$PWD/ahcformdlg.ui \
- 	$$PWD/geolocation.ui \
- 	$$PWD/rosteravatarframe.ui \
--	$$PWD/sendbuttontemplateseditor.ui
-+	$$PWD/sendbuttontemplateseditor.ui \
-+	$$PWD/creategroup.ui
+     $$PWD/ahcformdlg.ui \
+     $$PWD/geolocation.ui \
+     $$PWD/rosteravatarframe.ui \
+-    $$PWD/sendbuttontemplateseditor.ui
++    $$PWD/sendbuttontemplateseditor.ui \
++    $$PWD/creategroup.ui
  
  # options dialog
  include($$PWD/options/options.pri)
 --- git.temp.orig/src/userlist.cpp
 +++ git.temp/src/userlist.cpp
 @@ -1178,3 +1178,17 @@ UserListItem *UserList::find(const XMPP:
- 	return 0;
+     return 0;
  }
  
 +void UserList::setGroupsDelimiter(const QString &groupsDelimiter)
 +{
-+	_groupsDelimiter = groupsDelimiter;
++    _groupsDelimiter = groupsDelimiter;
 +}
 +
 +QString UserList::groupsDelimiter() const
 +{
-+	return _groupsDelimiter;
++    return _groupsDelimiter;
 +}
 +
 +bool UserList::hasGroupsDelimiter() const
 +{
-+	return groupsDelimiter().indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1;
++    return groupsDelimiter().indexOf(QRegExp("^[0-9A-Za-z]?$")) == -1;
 +}
 --- git.temp.orig/src/userlist.h
 +++ git.temp/src/userlist.h
 @@ -187,6 +187,16 @@ public:
- 	~UserList();
+     ~UserList();
  
- 	UserListItem *find(const XMPP::Jid &);
+     UserListItem *find(const XMPP::Jid &);
 +
-+	void setGroupsDelimiter(const QString &groupsDelimiter);
-+	QString groupsDelimiter() const;
++    void setGroupsDelimiter(const QString &groupsDelimiter);
++    QString groupsDelimiter() const;
 +
-+	// If the delimiter is a single alphanumeric character (a-z, A-Z, 0-9) or empty
-+	// the situation treats as if nesting were disabled
-+	bool hasGroupsDelimiter() const;
++    // If the delimiter is a single alphanumeric character (a-z, A-Z, 0-9) or empty
++    // the situation treats as if nesting were disabled
++    bool hasGroupsDelimiter() const;
 +
 +private:
-+	QString _groupsDelimiter;
++    QString _groupsDelimiter;
  };
  
  #endif

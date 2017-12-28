@@ -1,23 +1,23 @@
 Index: src/tools/crash/crash.pri
 ===================================================================
---- orig/src/tools/crash/crash.pri	(revision 944)
-+++ work/src/tools/crash/crash.pri	(working copy)
+--- orig/src/tools/crash/crash.pri    (revision 944)
++++ work/src/tools/crash/crash.pri    (working copy)
 @@ -16,6 +16,12 @@
- 		SOURCES +=  $$PWD/crash.cpp 
- 	}
+         SOURCES +=  $$PWD/crash.cpp 
+     }
  }
 -else {
 +
 +win32 {
-+	SOURCES     += $$PWD/crash_win32.cpp $$PWD/stackwalker.cpp
-+	HEADERS     += $$PWD/crash_win32.h $$PWD/stackwalker.h
++    SOURCES     += $$PWD/crash_win32.cpp $$PWD/stackwalker.cpp
++    HEADERS     += $$PWD/crash_win32.h $$PWD/stackwalker.h
 +}
 +
 +macx {
- 	SOURCES += $$PWD/crash_dummy.cpp
+     SOURCES += $$PWD/crash_dummy.cpp
  }
---- orig/src/tools/crash/crash_win32.h	1970-01-01 03:00:00.000000000 +0300
-+++ work/src/tools/crash/crash_win32.h	2008-01-23 10:30:52.388649000 +0300
+--- orig/src/tools/crash/crash_win32.h    1970-01-01 03:00:00.000000000 +0300
++++ work/src/tools/crash/crash_win32.h    2008-01-23 10:30:52.388649000 +0300
 @@ -0,0 +1,123 @@
 +/*
 + * crash_win32 -- win32 crash handlers
@@ -52,98 +52,98 @@ Index: src/tools/crash/crash.pri
 +namespace Crash {
 +
 +/**
-+ *	Simple dialog to show crash log.
-+ *	Must be created in GUI thread.
++ *    Simple dialog to show crash log.
++ *    Must be created in GUI thread.
 + */
 +class CrashDialog : public QDialog
 +{
-+	Q_OBJECT
++    Q_OBJECT
 +
 +public:
-+	CrashDialog(QString text, QWidget *parent = 0)
-+		: QDialog(parent)
-+	{
-+		//	Create readonly text editor for logging
-+		editor_ = new QTextEdit(this);
-+		editor_->setText(text);
-+		editor_->setReadOnly(true);
-+		QGridLayout *mainLayout = new QGridLayout;
-+		mainLayout->setContentsMargins(3,3,3,3);
-+		setWindowTitle(tr("Crash handler log")); 
-+		mainLayout->addWidget(editor_, 0, 0);
-+		setLayout(mainLayout);
-+		setModal(true);
-+	}
++    CrashDialog(QString text, QWidget *parent = 0)
++        : QDialog(parent)
++    {
++        //    Create readonly text editor for logging
++        editor_ = new QTextEdit(this);
++        editor_->setText(text);
++        editor_->setReadOnly(true);
++        QGridLayout *mainLayout = new QGridLayout;
++        mainLayout->setContentsMargins(3,3,3,3);
++        setWindowTitle(tr("Crash handler log")); 
++        mainLayout->addWidget(editor_, 0, 0);
++        setLayout(mainLayout);
++        setModal(true);
++    }
 +
 +private:
-+	QTextEdit * editor_;
++    QTextEdit * editor_;
 +};
 +
 +
 +/**
-+ *	Simple implementation of stack walker with output accumulation.
-+ *	Output may be redirected to file (or crash dialog)
++ *    Simple implementation of stack walker with output accumulation.
++ *    Output may be redirected to file (or crash dialog)
 + */
 +class Win32StackWalker : public StackWalker
 +{
 +private:
-+	QString text_;
++    QString text_;
 +
 +public:
-+	Win32StackWalker() : StackWalker() {}
++    Win32StackWalker() : StackWalker() {}
 +
-+	BOOL ShowCallstack(
-+		HANDLE hThread = GetCurrentThread(),
-+		CONTEXT *context = NULL,
-+		PReadProcessMemoryRoutine readMemoryFunction = NULL,
-+		LPVOID pUserData = NULL
-+		)
-+	{
-+		BOOL res = StackWalker::ShowCallstack(hThread, context, readMemoryFunction, pUserData);
++    BOOL ShowCallstack(
++        HANDLE hThread = GetCurrentThread(),
++        CONTEXT *context = NULL,
++        PReadProcessMemoryRoutine readMemoryFunction = NULL,
++        LPVOID pUserData = NULL
++        )
++    {
++        BOOL res = StackWalker::ShowCallstack(hThread, context, readMemoryFunction, pUserData);
 +#if 1
-+		//	Write crash log to file.
-+		//	Log file will be created in working directory of Psi application
-+		//	or in the root of drive "C", if application directory path is undefined.
-+		QString path = qApp->applicationDirPath();
-+		if (path.isEmpty()) {
-+			path = "c:";
-+		}
-+		path += "/psi_crash.log";
-+		QFile crashLog(path);
-+		if (crashLog.open(QIODevice::WriteOnly | QIODevice::Append)) {
-+			QString log = "\n\n------------------------------------------------------------------------------------------------\n";
-+			log += "Log is created at ";
-+			log += QDateTime::currentDateTime().toString(Qt::SystemLocaleDate) + "\n";
-+			log += "\nCall stack:\n\n";
-+			//	Add callstack log
-+			log += text_;
-+			//	Make right end of line
-+			log.replace("\n", "\r\n");
-+			crashLog.write(log.toLatin1());
-+			crashLog.close();
-+		}
++        //    Write crash log to file.
++        //    Log file will be created in working directory of Psi application
++        //    or in the root of drive "C", if application directory path is undefined.
++        QString path = qApp->applicationDirPath();
++        if (path.isEmpty()) {
++            path = "c:";
++        }
++        path += "/psi_crash.log";
++        QFile crashLog(path);
++        if (crashLog.open(QIODevice::WriteOnly | QIODevice::Append)) {
++            QString log = "\n\n------------------------------------------------------------------------------------------------\n";
++            log += "Log is created at ";
++            log += QDateTime::currentDateTime().toString(Qt::SystemLocaleDate) + "\n";
++            log += "\nCall stack:\n\n";
++            //    Add callstack log
++            log += text_;
++            //    Make right end of line
++            log.replace("\n", "\r\n");
++            crashLog.write(log.toLatin1());
++            crashLog.close();
++        }
 +#else
-+		//	This code may cause an exception, because
-+		//	crash dialog must be created in GUI thread.
-+		//	That's why there is more preferable to use file log as written above.
-+		CrashDialog cd(text_);
-+		cd.resize(640, 512);
-+		cd.exec();
++        //    This code may cause an exception, because
++        //    crash dialog must be created in GUI thread.
++        //    That's why there is more preferable to use file log as written above.
++        CrashDialog cd(text_);
++        cd.resize(640, 512);
++        cd.exec();
 +#endif
-+		return res;
-+	}
++        return res;
++    }
 +
-+	//	Accumulate output in string
-+	virtual void OnOutput(LPCSTR szText) {
-+		text_ += szText;
-+	}
++    //    Accumulate output in string
++    virtual void OnOutput(LPCSTR szText) {
++        text_ += szText;
++    }
 +};
 +
 +}; // namespace Crash
 +
 +#endif
---- orig/src/tools/crash/crash_win32.cpp	1970-01-01 03:00:00.000000000 +0300
-+++ work/src/tools/crash/crash_win32.cpp	2008-01-23 09:47:01.029274000 +0300
+--- orig/src/tools/crash/crash_win32.cpp    1970-01-01 03:00:00.000000000 +0300
++++ work/src/tools/crash/crash_win32.cpp    2008-01-23 09:47:01.029274000 +0300
 @@ -0,0 +1,19 @@
 +#include "crash_win32.h"
 +
@@ -152,20 +152,20 @@ Index: src/tools/crash/crash.pri
 +// The exception filter function
 +LONG WINAPI ExpFilter(EXCEPTION_POINTERS* pExp)
 +{
-+	Win32StackWalker sw;
-+	sw.ShowCallstack(GetCurrentThread(), pExp->ContextRecord);
-+	return EXCEPTION_EXECUTE_HANDLER;
++    Win32StackWalker sw;
++    sw.ShowCallstack(GetCurrentThread(), pExp->ContextRecord);
++    return EXCEPTION_EXECUTE_HANDLER;
 +}
 +
 +void registerSigsegvHandler(QString progname)
 +{
-+	//	Enable an application to supersede the top-level exception handler
-+	SetUnhandledExceptionFilter(ExpFilter);
++    //    Enable an application to supersede the top-level exception handler
++    SetUnhandledExceptionFilter(ExpFilter);
 +}
 +
 +}; // namespace Crash
---- orig/src/tools/crash/stackwalker.h	1970-01-01 03:00:00.000000000 +0300
-+++ work/src/tools/crash/stackwalker.h	2005-11-07 07:07:48.000000000 +0300
+--- orig/src/tools/crash/stackwalker.h    1970-01-01 03:00:00.000000000 +0300
++++ work/src/tools/crash/stackwalker.h    2005-11-07 07:07:48.000000000 +0300
 @@ -0,0 +1,189 @@
 +/**********************************************************************
 + * 
@@ -263,7 +263,7 @@ Index: src/tools/crash/crash.pri
 +// in older compilers in order to use it... starting with VC7 we can declare it as "protected"
 +protected:
 +#endif
-+	enum { STACKWALK_MAX_NAMELEN = 1024 }; // max name length for found symbols
++    enum { STACKWALK_MAX_NAMELEN = 1024 }; // max name length for found symbols
 +
 +protected:
 +  // Entry for each Callstack-Entry
@@ -356,8 +356,8 @@ Index: src/tools/crash/crash.pri
 +    RtlCaptureContext(&c); \
 +} while(0);
 +#endif
---- orig/src/tools/crash/stackwalker.cpp	1970-01-01 03:00:00.000000000 +0300
-+++ work/src/tools/crash/stackwalker.cpp	2008-01-22 14:09:46.683009000 +0300
+--- orig/src/tools/crash/stackwalker.cpp    1970-01-01 03:00:00.000000000 +0300
++++ work/src/tools/crash/stackwalker.cpp    2008-01-22 14:09:46.683009000 +0300
 @@ -0,0 +1,1220 @@
 +/**********************************************************************
 + * 

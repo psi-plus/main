@@ -1,34 +1,34 @@
 --- psi.orig/mac/Info.plist.in
 +++ psi/mac/Info.plist.in
 @@ -7,23 +7,25 @@
- 	<key>CFBundleExecutable</key>
- 	<string>psi</string>
- 	<key>CFBundleGetInfoString</key>
--	<string>Psi @@VERSION@@ by the Psi team. This program is licensed under the GNU GPL.</string>
-+	<string>Psi+ @@VERSION@@ by the Psi+ team. This program is licensed under the GNU GPL.</string>
- 	<key>CFBundleIconFile</key>
- 	<string>application.icns</string>
- 	<key>CFBundleIdentifier</key>
--	<string>org.psi-im</string>
-+	<string>com.googlecode.psi-dev</string>
- 	<key>CFBundleInfoDictionaryVersion</key>
- 	<string>6.0</string>
- 	<key>CFBundleName</key>
--	<string>Psi</string>
-+	<string>Psi+</string>
- 	<key>CFBundlePackageType</key>
- 	<string>APPL</string>
- 	<key>CFBundleShortVersionString</key>
--	<string>Psi @@VERSION@@</string>
-+	<string>Psi+ @@VERSION@@</string>
- 	<key>CFBundleSignature</key>
- 	<string>psi</string>
- 	<key>CFBundleVersion</key>
- 	<string>@@VERSION@@</string>
-+	<key>SUPublicDSAKeyFile</key>
-+	<string>dsa_pub.pem</string>
- 	<key>CSResourcesFileMapped</key>
- 	<true/>
+     <key>CFBundleExecutable</key>
+     <string>psi</string>
+     <key>CFBundleGetInfoString</key>
+-    <string>Psi @@VERSION@@ by the Psi team. This program is licensed under the GNU GPL.</string>
++    <string>Psi+ @@VERSION@@ by the Psi+ team. This program is licensed under the GNU GPL.</string>
+     <key>CFBundleIconFile</key>
+     <string>application.icns</string>
+     <key>CFBundleIdentifier</key>
+-    <string>org.psi-im</string>
++    <string>com.googlecode.psi-dev</string>
+     <key>CFBundleInfoDictionaryVersion</key>
+     <string>6.0</string>
+     <key>CFBundleName</key>
+-    <string>Psi</string>
++    <string>Psi+</string>
+     <key>CFBundlePackageType</key>
+     <string>APPL</string>
+     <key>CFBundleShortVersionString</key>
+-    <string>Psi @@VERSION@@</string>
++    <string>Psi+ @@VERSION@@</string>
+     <key>CFBundleSignature</key>
+     <string>psi</string>
+     <key>CFBundleVersion</key>
+     <string>@@VERSION@@</string>
++    <key>SUPublicDSAKeyFile</key>
++    <string>dsa_pub.pem</string>
+     <key>CSResourcesFileMapped</key>
+     <true/>
  </dict>
 --- psi.orig/src/applicationinfo.cpp
 +++ psi/src/applicationinfo.cpp
@@ -56,79 +56,79 @@
 
  static const QString showStatusMessagesOptionPath = "options.ui.contactlist.status-messages.show";
 @@ -536,6 +541,9 @@ MainWin::MainWin(bool _onTop, bool _asTo
- 	d->getAction("help_online_home")->addTo (helpMenu);
- 	d->getAction("help_online_forum")->addTo (helpMenu);
- 	d->getAction("help_psi_muc")->addTo (helpMenu);
+     d->getAction("help_online_home")->addTo (helpMenu);
+     d->getAction("help_online_forum")->addTo (helpMenu);
+     d->getAction("help_psi_muc")->addTo (helpMenu);
 +#ifdef HAVE_SPARKLE
-+	d->getAction("help_update")->addTo (helpMenu);
++    d->getAction("help_update")->addTo (helpMenu);
 +#endif
- 	d->getAction("help_report_bug")->addTo (helpMenu);
- 	QMenu* diagMenu = new QMenu(tr("Diagnostics"), this);
- 	helpMenu->addMenu(diagMenu);
+     d->getAction("help_report_bug")->addTo (helpMenu);
+     QMenu* diagMenu = new QMenu(tr("Diagnostics"), this);
+     helpMenu->addMenu(diagMenu);
 @@ -718,6 +724,9 @@ void MainWin::registerAction( IconAction
- 		{ "help_online_home", activated, this, SLOT( actOnlineHomeActivated() ) },
- 		{ "help_online_forum", activated, this, SLOT( actOnlineForumActivated() ) },
- 		{ "help_psi_muc",     activated, this, SLOT( actJoinPsiMUCActivated() ) },
+         { "help_online_home", activated, this, SLOT( actOnlineHomeActivated() ) },
+         { "help_online_forum", activated, this, SLOT( actOnlineForumActivated() ) },
+         { "help_psi_muc",     activated, this, SLOT( actJoinPsiMUCActivated() ) },
 +#ifdef HAVE_SPARKLE
-+		{ "help_update",     activated, this, SLOT( actCheckUpdateActivated() ) },
++        { "help_update",     activated, this, SLOT( actCheckUpdateActivated() ) },
 +#endif
- 		{ "help_report_bug",  activated, this, SLOT( actBugReportActivated() ) },
- 		{ "help_about",       activated, this, SLOT( actAboutActivated() ) },
- 		{ "help_about_qt",    activated, this, SLOT( actAboutQtActivated() ) },
+         { "help_report_bug",  activated, this, SLOT( actBugReportActivated() ) },
+         { "help_about",       activated, this, SLOT( actAboutActivated() ) },
+         { "help_about_qt",    activated, this, SLOT( actAboutQtActivated() ) },
 @@ -972,6 +979,9 @@ void MainWin::buildOptionsMenu()
- 			<< "help_report_bug"
- 			<< "diagnostics"
- 			<< "separator"
+             << "help_report_bug"
+             << "diagnostics"
+             << "separator"
 +#ifdef HAVE_SPARKLE
-+			<< "help_update"
++            << "help_update"
 +#endif
- 			<< "help_about"
- 			<< "help_about_qt";
+             << "help_about"
+             << "help_about_qt";
 
 @@ -1097,6 +1105,16 @@ void MainWin::actAboutQtActivated ()
- 	QMessageBox::aboutQt(this);
+     QMessageBox::aboutQt(this);
  }
 
 +void MainWin::actCheckUpdateActivated()
 +{
 +#ifdef HAVE_SPARKLE
-+	AutoUpdater* autoUpdater;
-+	autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
-+	autoUpdater->checkForUpdates();
-+	delete autoUpdater;
++    AutoUpdater* autoUpdater;
++    autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
++    autoUpdater->checkForUpdates();
++    delete autoUpdater;
 +#endif
 +}
 +
  void MainWin::actAboutPsiMediaActivated ()
  {
- 	QString creditText = PsiMedia::creditText();
+     QString creditText = PsiMedia::creditText();
 --- psi.orig/src/mainwin.h
 +++ psi/src/mainwin.h
 @@ -133,6 +133,7 @@ private slots:
- 	void actOnlineHomeActivated ();
- 	void actOnlineForumActivated ();
- 	void actJoinPsiMUCActivated();
-+	void actCheckUpdateActivated();
- 	void actBugReportActivated ();
- 	void actAboutActivated ();
- 	void actAboutQtActivated ();
+     void actOnlineHomeActivated ();
+     void actOnlineForumActivated ();
+     void actJoinPsiMUCActivated();
++    void actCheckUpdateActivated();
+     void actBugReportActivated ();
+     void actAboutActivated ();
+     void actAboutQtActivated ();
 --- psi.orig/src/psiactionlist.cpp
 +++ psi/src/psiactionlist.cpp
 @@ -387,6 +387,9 @@ void PsiActionList::Private::createMainW
- 		IconAction *actPsiMUC = new IconAction (tr("Join Psi Discussion Room (Online)"), tr("&Join Psi Discussion Room (Online)"), 0, this);
- 		actOnlineHome->setWhatsThis (tr("Join Psi Discussion Room (Online)"));
+         IconAction *actPsiMUC = new IconAction (tr("Join Psi Discussion Room (Online)"), tr("&Join Psi Discussion Room (Online)"), 0, this);
+         actOnlineHome->setWhatsThis (tr("Join Psi Discussion Room (Online)"));
 
-+		IconAction *actCheckUpdate = new IconAction (tr("Check for Updates..."), tr("&Check for Updates..."), 0, this);
-+		actCheckUpdate->setWhatsThis (tr("Check for Updates..."));
++        IconAction *actCheckUpdate = new IconAction (tr("Check for Updates..."), tr("&Check for Updates..."), 0, this);
++        actCheckUpdate->setWhatsThis (tr("Check for Updates..."));
 +
- 		IconAction *actBugReport = new IconAction (tr("Report a Bug (Online)"), tr("Report a &Bug (Online)"), 0, this);
- 		actBugReport->setWhatsThis (tr("Report a Bug (Online)"));
+         IconAction *actBugReport = new IconAction (tr("Report a Bug (Online)"), tr("Report a &Bug (Online)"), 0, this);
+         actBugReport->setWhatsThis (tr("Report a Bug (Online)"));
 
 @@ -415,6 +418,7 @@ void PsiActionList::Private::createMainW
- 			{ "help_report_bug",       actBugReport       },
- 			{ "help_about",            actAbout           },
- 			{ "help_about_qt",         actAboutQt         },
-+			{ "help_update",           actCheckUpdate     },
- 			{ "help_about_psimedia",   actAboutPsiMedia   },
- 			{ "help_diag_qcaplugin",   actDiagQCAPlugin   },
- 			{ "help_diag_qcakeystore", actDiagQCAKeyStore },
+             { "help_report_bug",       actBugReport       },
+             { "help_about",            actAbout           },
+             { "help_about_qt",         actAboutQt         },
++            { "help_update",           actCheckUpdate     },
+             { "help_about_psimedia",   actAboutPsiMedia   },
+             { "help_diag_qcaplugin",   actDiagQCAPlugin   },
+             { "help_diag_qcakeystore", actDiagQCAKeyStore },

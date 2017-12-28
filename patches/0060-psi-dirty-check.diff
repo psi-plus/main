@@ -2,7 +2,7 @@
 +++ psi/src/AutoUpdater/AutoUpdater.pri
 @@ -16,3 +16,16 @@ Sparkle {
  
- 	LIBS += -framework Sparkle
+     LIBS += -framework Sparkle
  }
 +
 +QuickDirtyChecker {
@@ -120,79 +120,79 @@
 +const QString QDChecker::settingsKey_ = QLatin1String("options.auto-update.last-check-value");
 +
 +QDChecker::QDChecker()
-+	: manager_(new QNetworkAccessManager(this)), logForm_(0)
++    : manager_(new QNetworkAccessManager(this)), logForm_(0)
 +{
-+	ProxyItem it = ProxyManager::instance()->getItemForObject("Auto Updater");
-+	ProxySettings ps = it.settings;
-+	if(!ps.host.isEmpty()) {
-+		QNetworkProxy prx(QNetworkProxy::HttpCachingProxy, ps.host, ps.port, ps.user, ps.pass);
-+		if(it.type == "socks")
-+			prx.setType(QNetworkProxy::Socks5Proxy);
-+		manager_->setProxy(prx);
-+	}
++    ProxyItem it = ProxyManager::instance()->getItemForObject("Auto Updater");
++    ProxySettings ps = it.settings;
++    if(!ps.host.isEmpty()) {
++        QNetworkProxy prx(QNetworkProxy::HttpCachingProxy, ps.host, ps.port, ps.user, ps.pass);
++        if(it.type == "socks")
++            prx.setType(QNetworkProxy::Socks5Proxy);
++        manager_->setProxy(prx);
++    }
 +}
 +
 +QDChecker::~QDChecker()
 +{
-+	delete logForm_;
++    delete logForm_;
 +}
 +
 +void QDChecker::checkForUpdates()
 +{
-+	QNetworkRequest request(updateCheckUrl_);
-+	QNetworkReply* reply = manager_->get(request);
-+	connect(reply, SIGNAL(finished()), this, SLOT(onCheckFinished()));
++    QNetworkRequest request(updateCheckUrl_);
++    QNetworkReply* reply = manager_->get(request);
++    connect(reply, SIGNAL(finished()), this, SLOT(onCheckFinished()));
 +}
 +
 +void QDChecker::onCheckFinished()
 +{
-+	qDebug("onCheckFinished");
-+	QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-+	if(reply && reply->error() == QNetworkReply::NoError) {
-+		const QByteArray data = reply->readAll();
-+		const quint16 newValue = qChecksum(data.constData(), data.size());
-+		const quint16 oldValue = PsiOptions::instance()->getOption(settingsKey_).toUInt();
++    qDebug("onCheckFinished");
++    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
++    if(reply && reply->error() == QNetworkReply::NoError) {
++        const QByteArray data = reply->readAll();
++        const quint16 newValue = qChecksum(data.constData(), data.size());
++        const quint16 oldValue = PsiOptions::instance()->getOption(settingsKey_).toUInt();
 +
-+		if(newValue != oldValue) {
-+			QNetworkRequest request(changelogUrl_);
-+			QNetworkReply* reply = manager_->get(request);
-+			connect(reply, SIGNAL(finished()), this, SLOT(onDownloadLogFinished()));
-+			PsiOptions::instance()->setOption(settingsKey_, newValue);
-+		}
++        if(newValue != oldValue) {
++            QNetworkRequest request(changelogUrl_);
++            QNetworkReply* reply = manager_->get(request);
++            connect(reply, SIGNAL(finished()), this, SLOT(onDownloadLogFinished()));
++            PsiOptions::instance()->setOption(settingsKey_, newValue);
++        }
 +
-+		reply->deleteLater();
-+	} else {
-+		qCritical("WTF?! at %s %d", __FILE__, __LINE__);
-+	}
++        reply->deleteLater();
++    } else {
++        qCritical("WTF?! at %s %d", __FILE__, __LINE__);
++    }
 +}
 +
 +void QDChecker::onDownloadLogFinished()
 +{
-+	qDebug("onDownloadLogFinished");
-+	QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-+	if(reply && reply->error() == QNetworkReply::NoError) {
-+		if(logForm_) {
-+			logForm_->deleteLater();
-+		}
-+		Ui::ShowChangeLogForm ui;
-+		logForm_ = new QWidget;
-+		ui.setupUi(logForm_);
++    qDebug("onDownloadLogFinished");
++    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
++    if(reply && reply->error() == QNetworkReply::NoError) {
++        if(logForm_) {
++            logForm_->deleteLater();
++        }
++        Ui::ShowChangeLogForm ui;
++        logForm_ = new QWidget;
++        ui.setupUi(logForm_);
 +
-+		ui.logText->setText(QString::fromUtf8(reply->readAll()));
++        ui.logText->setText(QString::fromUtf8(reply->readAll()));
 +
-+		connect(ui.buttonBox, SIGNAL(accepted()), this, SLOT(onOpenDownloadPage()));
-+		connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), logForm_, SLOT(hide()));
-+		logForm_->show();
++        connect(ui.buttonBox, SIGNAL(accepted()), this, SLOT(onOpenDownloadPage()));
++        connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), logForm_, SLOT(hide()));
++        logForm_->show();
 +
-+		reply->deleteLater();
-+	} else {
-+		qCritical("WTF?! at %s %d", __FILE__, __LINE__);
-+	}
++        reply->deleteLater();
++    } else {
++        qCritical("WTF?! at %s %d", __FILE__, __LINE__);
++    }
 +}
 +
 +void QDChecker::onOpenDownloadPage()
 +{
-+	QDesktopServices::openUrl(downloadPageUrl_);
++    QDesktopServices::openUrl(downloadPageUrl_);
 +}
 --- /dev/null
 +++ psi/src/AutoUpdater/QDChecker.h
@@ -215,29 +215,29 @@
 +
 +class QDChecker : public QObject, public AutoUpdater
 +{
-+	Q_OBJECT
++    Q_OBJECT
 +
 +public:
-+	QDChecker();
-+	virtual ~QDChecker();
++    QDChecker();
++    virtual ~QDChecker();
 +
-+	// from AutoUpdater
-+	virtual void checkForUpdates();
++    // from AutoUpdater
++    virtual void checkForUpdates();
 +
 +private slots:
-+	void onCheckFinished();
-+	void onDownloadLogFinished();
-+	void onOpenDownloadPage();
++    void onCheckFinished();
++    void onDownloadLogFinished();
++    void onOpenDownloadPage();
 +
 +private:
-+	QNetworkAccessManager* manager_;
-+	QWidget* logForm_;
++    QNetworkAccessManager* manager_;
++    QWidget* logForm_;
 +
-+	static const QUrl updateCheckUrl_;
-+	static const QUrl changelogUrl_;
-+	static const QUrl downloadPageUrl_;
++    static const QUrl updateCheckUrl_;
++    static const QUrl changelogUrl_;
++    static const QUrl downloadPageUrl_;
 +
-+	static const QString settingsKey_;
++    static const QString settingsKey_;
 +};
 +
 +#endif // QDCHECKER_H
@@ -248,40 +248,40 @@
  #ifdef HAVE_SPARKLE
  #include "AutoUpdater/SparkleAutoUpdater.h"
 +#elif defined(USE_QDCHECKER)
-+#	include "AutoUpdater/QDChecker.h"
++#    include "AutoUpdater/QDChecker.h"
  #endif
  
  #ifdef Q_OS_MAC
 @@ -462,14 +464,6 @@ bool PsiCon::init()
- 	d->tuneManager = new TuneControllerManager();
+     d->tuneManager = new TuneControllerManager();
  #endif
  
--	// Auto updater initialization
+-    // Auto updater initialization
 -#ifdef HAVE_SPARKLE
--	d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
+-    d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
 -#endif
--	if (d->autoUpdater && options->getOption("options.auto-update.check-on-startup").toBool()) {
--		d->autoUpdater->checkForUpdates();
--	}
+-    if (d->autoUpdater && options->getOption("options.auto-update.check-on-startup").toBool()) {
+-        d->autoUpdater->checkForUpdates();
+-    }
 -
- 	// calculate the small font size
- 	const int minimumFontSize = 7;
- 	common_smallFontSize = qApp->font().pointSize();
+     // calculate the small font size
+     const int minimumFontSize = 7;
+     common_smallFontSize = qApp->font().pointSize();
 @@ -505,6 +499,15 @@ bool PsiCon::init()
- 	QDir profileDir( pathToProfile(activeProfile, ApplicationInfo::DataLocation) );
- 	profileDir.rmdir( "info" ); // remove unused dir
+     QDir profileDir( pathToProfile(activeProfile, ApplicationInfo::DataLocation) );
+     profileDir.rmdir( "info" ); // remove unused dir
  
-+	// Auto updater initialization
++    // Auto updater initialization
 +#ifdef HAVE_SPARKLE
-+	d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
++    d->autoUpdater = new SparkleAutoUpdater(ApplicationInfo::getAppCastURL());
 +#elif defined(USE_QDCHECKER)
-+	d->autoUpdater = new QDChecker();
++    d->autoUpdater = new QDChecker();
 +#endif
-+	if (PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool() && d->autoUpdater)
-+		d->autoUpdater->checkForUpdates();
++    if (PsiOptions::instance()->getOption("options.auto-update.check-on-startup").toBool() && d->autoUpdater)
++        d->autoUpdater->checkForUpdates();
 +
- 	d->iconSelect = new IconSelectPopup(0);
- 	connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
+     d->iconSelect = new IconSelectPopup(0);
+     connect(PsiIconset::instance(), SIGNAL(emoticonsChanged()), d, SLOT(updateIconSelect()));
  
 --- psi.orig/src/src.pri
 +++ psi/src/src.pri

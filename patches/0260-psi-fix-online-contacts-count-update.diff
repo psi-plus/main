@@ -1,45 +1,45 @@
 --- a/src/psiaccount.cpp
 +++ b/src/psiaccount.cpp
 @@ -452,6 +452,11 @@ public:
- 		reconnectTimeoutTimer_ = new QTimer(this);
- 		reconnectTimeoutTimer_->setSingleShot(true);
- 		connect(reconnectTimeoutTimer_, SIGNAL(timeout()), SLOT(reconnectTimerTimeout()));
+         reconnectTimeoutTimer_ = new QTimer(this);
+         reconnectTimeoutTimer_->setSingleShot(true);
+         connect(reconnectTimeoutTimer_, SIGNAL(timeout()), SLOT(reconnectTimerTimeout()));
 +
-+		updateOnlineContactsCountTimer_ = new QTimer(this);
-+		updateOnlineContactsCountTimer_->setInterval(500);
-+		updateOnlineContactsCountTimer_->setSingleShot(true);
-+		connect(updateOnlineContactsCountTimer_, SIGNAL(timeout()), SLOT(updateOnlineContactsCountTimeout()));
- 	}
++        updateOnlineContactsCountTimer_ = new QTimer(this);
++        updateOnlineContactsCountTimer_->setInterval(500);
++        updateOnlineContactsCountTimer_->setSingleShot(true);
++        connect(updateOnlineContactsCountTimer_, SIGNAL(timeout()), SLOT(updateOnlineContactsCountTimeout()));
+     }
  
- 	PsiContactList* contactList;
+     PsiContactList* contactList;
 @@ -479,6 +484,7 @@ public:
- 	RosterItemExchangeTask* rosterItemExchangeTask;
- 	QString currentConnectionError;
- 	int currentConnectionErrorCondition;
-+	QTimer *updateOnlineContactsCountTimer_;
+     RosterItemExchangeTask* rosterItemExchangeTask;
+     QString currentConnectionError;
+     int currentConnectionErrorCondition;
++    QTimer *updateOnlineContactsCountTimer_;
  
- 	// Tune
- 	Tune lastTune;
+     // Tune
+     Tune lastTune;
 @@ -648,7 +654,8 @@ public:
- 		return pathToProfile(activeProfile, ApplicationInfo::DataLocation) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
- 	}
+         return pathToProfile(activeProfile, ApplicationInfo::DataLocation) + "/events-" + JIDUtil::encode(acc.id).toLower() + ".xml";
+     }
  
--	void updateOnlineContactsCount()
+-    void updateOnlineContactsCount()
 +private slots:
-+	void updateOnlineContactsCountTimeout()
- 	{
- 		int newOnlineContactsCount = 0;
- 		foreach(const PsiContact* c, contacts) {
++    void updateOnlineContactsCountTimeout()
+     {
+         int newOnlineContactsCount = 0;
+         foreach(const PsiContact* c, contacts) {
 @@ -664,6 +671,12 @@ public:
- 		}
- 	}
+         }
+     }
  
 +public:
-+	void updateOnlineContactsCount()
-+	{
-+		updateOnlineContactsCountTimer_->start();
-+	}
++    void updateOnlineContactsCount()
++    {
++        updateOnlineContactsCountTimer_->start();
++    }
 +
- 	// FIXME: Rename updateEntry -> updateContact
- 	void updateEntry(const UserListItem& u)
- 	{
+     // FIXME: Rename updateEntry -> updateContact
+     void updateEntry(const UserListItem& u)
+     {
