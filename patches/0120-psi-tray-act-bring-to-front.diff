@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -221,6 +221,7 @@ QLineEdit#le_status_text {
+@@ -225,6 +225,7 @@ QLineEdit#le_status_text {
                  <lockdown-roster type="bool">false</lockdown-roster>
                  <raise-on-new-event type="bool">false</raise-on-new-event>
                  <quit-on-close type="bool">false</quit-on-close>
@@ -8,6 +8,146 @@
                  <show-avatar-frame type="bool">false</show-avatar-frame>
                  <show>
                      <agent-contacts type="bool">true</agent-contacts>
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -39,6 +39,8 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/wait.h>
++
++#include "x11windowsystem.h"
+ #endif
+ 
+ #ifdef Q_OS_WIN
+@@ -456,101 +458,6 @@ TabbableWidget* findActiveTab()
+     return tw;
+ }
+ 
+-#ifdef HAVE_X11
+-#include <X11/Xlib.h>
+-#include <X11/Xutil.h> // needed for WM_CLASS hinting
+-
+-void x11wmClass(Display *dsp, WId wid, QString resName)
+-{
+-    if (!QX11Info::isPlatformX11())
+-        return;
+-
+-    //Display *dsp = x11Display();                 // get the display
+-    //WId win = winId();                           // get the window
+-    XClassHint classhint;                          // class hints
+-    // Get old class hint. It is important to save old class name
+-    XGetClassHint(dsp, wid, &classhint);
+-    XFree(classhint.res_name);
+-
+-    const QByteArray latinResName = resName.toLatin1();
+-    classhint.res_name = (char *)latinResName.data(); // res_name
+-    XSetClassHint(dsp, wid, &classhint);           // set the class hints
+-
+-    XFree(classhint.res_class);
+-}
+-
+-//>>>-- Nathaniel Gray -- Caltech Computer Science ------>
+-//>>>-- Mojave Project -- http://mojave.cs.caltech.edu -->
+-// Copied from http://www.nedit.org/archives/discuss/2002-Aug/0386.html
+-
+-// Helper function
+-bool getCardinal32Prop(Display *display, Window win, char *propName, long *value)
+-{
+-    if (!QX11Info::isPlatformX11())
+-        return false;
+-
+-    Atom nameAtom, typeAtom, actual_type_return;
+-    int actual_format_return, result;
+-    unsigned long nitems_return, bytes_after_return;
+-    long *result_array=NULL;
+-
+-    nameAtom = XInternAtom(display, propName, False);
+-    typeAtom = XInternAtom(display, "CARDINAL", False);
+-    if (nameAtom == None || typeAtom == None) {
+-        //qDebug("Atoms not interned!");
+-        return false;
+-    }
+-
+-
+-    // Try to get the property
+-    result = XGetWindowProperty(display, win, nameAtom, 0, 1, False,
+-        typeAtom, &actual_type_return, &actual_format_return,
+-        &nitems_return, &bytes_after_return,
+-        (unsigned char **)&result_array);
+-
+-    if( result != Success ) {
+-        //qDebug("not Success");
+-        return false;
+-    }
+-    if( actual_type_return == None || actual_format_return == 0 ) {
+-        //qDebug("Prop not found");
+-        return false;
+-    }
+-    if( actual_type_return != typeAtom ) {
+-        //qDebug("Wrong type atom");
+-    }
+-    *value = result_array[0];
+-    XFree(result_array);
+-    return true;
+-}
+-
+-
+-// Get the desktop number that a window is on
+-bool desktopOfWindow(Window *window, long *desktop)
+-{
+-    Display *display = QX11Info::display();
+-    bool result = getCardinal32Prop(display, *window, (char *)"_NET_WM_DESKTOP", desktop);
+-    //if( result )
+-    //    qDebug("Desktop: " + QString::number(*desktop));
+-    return result;
+-}
+-
+-
+-// Get the current desktop the WM is displaying
+-bool currentDesktop(long *desktop)
+-{
+-    Window rootWin;
+-    Display *display = QX11Info::display();
+-    bool result;
+-
+-    rootWin = RootWindow(QX11Info::display(), XDefaultScreen(QX11Info::display()));
+-    result = getCardinal32Prop(display, rootWin, (char *)"_NET_CURRENT_DESKTOP", desktop);
+-    //if( result )
+-    //    qDebug("Current Desktop: " + QString::number(*desktop));
+-    return result;
+-}
+-#endif
+-
+ void clearMenu(QMenu *m)
+ {
+     m->clear();
+@@ -579,7 +486,7 @@ void bringToFront(QWidget *widget, bool)
+     // If we're not on the current desktop, do the hide/show trick
+     long dsk, curr_dsk;
+     Window win = w->winId();
+-    if(desktopOfWindow(&win, &dsk) && currentDesktop(&curr_dsk)) {
++    if(X11WindowSystem::instance()->desktopOfWindow(&win, &dsk) && X11WindowSystem::instance()->currentDesktop(&curr_dsk)) {
+         //qDebug() << "bringToFront current desktop=" << curr_dsk << " windowDesktop=" << dsk;
+         if((dsk != curr_dsk) && (dsk != -1)) {  // second condition for sticky windows
+             w->hide();
+--- a/src/common.h
++++ b/src/common.h
+@@ -151,12 +151,10 @@ void replaceWidget(QWidget *, QWidget *);
+ void closeDialogs(QWidget *);
+ TabbableWidget* findActiveTab();
+ #ifdef HAVE_X11
+-#include <QWidget>
+-#include <QX11Info>
+-void x11wmClass(Display *dsp, WId wid, QString resName);
+-#define X11WM_CLASS(x)    x11wmClass(QX11Info::display(), winId(), (x));
++# include "x11windowsystem.h"
++# define X11WM_CLASS(x)    X11WindowSystem::instance()->x11wmClass(QX11Info::display(), winId(), (x));
+ #else
+-#define X11WM_CLASS(x)    /* dummy */
++# define X11WM_CLASS(x)    /* dummy */
+ #endif
+ void reorderGridLayout(QGridLayout* layout, int maxCols);
+ int devicePixelRatio(QWidget *);
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -79,6 +79,10 @@
@@ -32,11 +172,10 @@
      void registerActions();
      IconAction* getAction( QString name );
      void updateMenu(QStringList actions, QMenu* menu);
-@@ -1417,7 +1425,23 @@ void MainWin::closeEvent(QCloseEvent* e)
+@@ -1416,6 +1424,22 @@ void MainWin::closeEvent(QCloseEvent* e)
  
  void MainWin::changeEvent(QEvent *event)
  {
--    if (event->type() == QEvent::ActivationChange ||
 +#ifdef Q_OS_WIN
 +    if (event->type() == QEvent::ActivationChange
 +        && PsiOptions::instance()->getOption("options.ui.systemtray.enable").toBool()
@@ -53,11 +192,10 @@
 +    }
 +#endif
 +
-+    if (event->type() == QEvent::ActivationChange ||
+     if (event->type() == QEvent::ActivationChange ||
          event->type() == QEvent::WindowStateChange)
      {
-         if (d->mainTabs) {
-@@ -1537,14 +1561,37 @@ void MainWin::optionsUpdate()
+@@ -1536,14 +1560,37 @@ void MainWin::optionsUpdate()
      updateTray();
  }
  
@@ -101,7 +239,7 @@
  }
  
  void MainWin::setTrayToolTip(const Status& status, bool, bool)
-@@ -1568,32 +1615,21 @@ void MainWin::trayClicked(const QPoint &, int button)
+@@ -1567,32 +1614,21 @@ void MainWin::trayClicked(const QPoint &, int button)
          return;
      }
  
@@ -155,7 +293,7 @@
  
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -612,6 +612,10 @@ win32:!dbus {
+@@ -613,6 +613,10 @@ win32:!dbus {
      LIBS += -lUser32
  }
  
@@ -166,18 +304,108 @@
  
  unix:!dbus {
      SOURCES += $$PWD/activeprofiles_stub.cpp
-new file mode 100644
-index 0000000..ea1ae7d
 --- /dev/null
 +++ b/src/x11windowsystem.cpp
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,314 @@
 +#include "x11windowsystem.h"
 +
 +#include <QX11Info>
 +#include <X11/Xlib.h>
++#include <X11/Xutil.h> // needed for WM_CLASS hinting
 +
 +const long MAX_PROP_SIZE = 100000;
 +X11WindowSystem* X11WindowSystem::_instance = 0;
++
++
++void X11WindowSystem::x11wmClass(Display *dsp, WId wid, QString resName)
++{
++    if (!QX11Info::isPlatformX11())
++        return;
++
++    //Display *dsp = x11Display();                 // get the display
++    //WId win = winId();                           // get the window
++    XClassHint classhint;                          // class hints
++    // Get old class hint. It is important to save old class name
++    XGetClassHint(dsp, wid, &classhint);
++    XFree(classhint.res_name);
++
++    const QByteArray latinResName = resName.toLatin1();
++    classhint.res_name = (char *)latinResName.data(); // res_name
++    XSetClassHint(dsp, wid, &classhint);           // set the class hints
++
++    XFree(classhint.res_class);
++}
++
++//>>>-- Nathaniel Gray -- Caltech Computer Science ------>
++//>>>-- Mojave Project -- http://mojave.cs.caltech.edu -->
++// Copied from http://www.nedit.org/archives/discuss/2002-Aug/0386.html
++
++// Helper function
++static bool getCardinal32Prop(Display *display, Window win, char *propName, long *value)
++{
++    if (!QX11Info::isPlatformX11())
++        return false;
++
++    Atom nameAtom, typeAtom, actual_type_return;
++    int actual_format_return, result;
++    unsigned long nitems_return, bytes_after_return;
++    long *result_array=NULL;
++
++    nameAtom = XInternAtom(display, propName, False);
++    typeAtom = XInternAtom(display, "CARDINAL", False);
++    if (nameAtom == None || typeAtom == None) {
++        //qDebug("Atoms not interned!");
++        return false;
++    }
++
++
++    // Try to get the property
++    result = XGetWindowProperty(display, win, nameAtom, 0, 1, False,
++        typeAtom, &actual_type_return, &actual_format_return,
++        &nitems_return, &bytes_after_return,
++        (unsigned char **)&result_array);
++
++    if( result != Success ) {
++        //qDebug("not Success");
++        return false;
++    }
++    if( actual_type_return == None || actual_format_return == 0 ) {
++        //qDebug("Prop not found");
++        return false;
++    }
++    if( actual_type_return != typeAtom ) {
++        //qDebug("Wrong type atom");
++    }
++    *value = result_array[0];
++    XFree(result_array);
++    return true;
++}
++
++
++// Get the desktop number that a window is on
++bool X11WindowSystem::desktopOfWindow(Window *window, long *desktop)
++{
++    Display *display = QX11Info::display();
++    bool result = getCardinal32Prop(display, *window, (char *)"_NET_WM_DESKTOP", desktop);
++    //if( result )
++    //    qDebug("Desktop: " + QString::number(*desktop));
++    return result;
++}
++
++
++// Get the current desktop the WM is displaying
++bool X11WindowSystem::currentDesktop(long *desktop)
++{
++    Window rootWin;
++    Display *display = QX11Info::display();
++    bool result;
++
++    rootWin = RootWindow(QX11Info::display(), XDefaultScreen(QX11Info::display()));
++    result = getCardinal32Prop(display, rootWin, (char *)"_NET_CURRENT_DESKTOP", desktop);
++    //if( result )
++    //    qDebug("Current Desktop: " + QString::number(*desktop));
++    return result;
++}
 +
 +X11WindowSystem::X11WindowSystem()
 +{
@@ -288,6 +516,8 @@ index 0000000..ea1ae7d
 +    Q_ASSERT(widget);
 +    QWidget* w = widget->window();
 +    Window win = w->winId();
++    long desktop;
++    desktopOfWindow(&win, &desktop);
 +
 +    const Atom XA_WINDOW= (Atom) 33;
 +    Atom type_ret;
@@ -308,6 +538,11 @@ index 0000000..ea1ae7d
 +                while (nitems_ret--)
 +                {
 +                    Window current = wins[nitems_ret];
++
++                    long winDesktop;
++                    desktopOfWindow(&current, &winDesktop);
++                    if (desktop != winDesktop)
++                        continue;
 +
 +                    //We are not interested in underlying windows
 +                    if (current == win)
@@ -386,10 +621,9 @@ index 0000000..ea1ae7d
 +    }
 +    return false;
 +}
-new file mode 100644
 --- /dev/null
 +++ b/src/x11windowsystem.h
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,48 @@
 +#ifndef X11WINDOWSYSTEM_H
 +#define X11WINDOWSYSTEM_H
 +
@@ -397,6 +631,7 @@ new file mode 100644
 +#include <QWidget>
 +#include <QRect>
 +#include <QSet>
++#include <QX11Info>
 +
 +//TODO: Find a way to include Xlib here and not redefine Atom and Window types
 +typedef unsigned long Atom;
@@ -431,6 +666,9 @@ new file mode 100644
 +    bool isWindowObscured(QWidget *widget, bool alwaysOnTop);
 +    bool windowHasOnlyTypes(Window win, const QSet<Atom> &allowedTypes);
 +    bool windowHasAnyOfStates(Window win, const QSet<Atom> &filteredStates);
++    bool currentDesktop(long *desktop);
++    bool desktopOfWindow(Window *window, long *desktop);
++    void x11wmClass(Display *dsp, WId wid, QString resName);
 +};
 +
 +#endif // X11WINDOWSYSTEM_H
