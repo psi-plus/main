@@ -1,5 +1,5 @@
---- a/options/default.xml
-+++ b/options/default.xml
+--- git.orig/options/default.xml
++++ git/options/default.xml
 @@ -225,6 +225,7 @@ QLineEdit#le_status_text {
                  <lockdown-roster type="bool">false</lockdown-roster>
                  <raise-on-new-event type="bool">false</raise-on-new-event>
@@ -8,8 +8,8 @@
                  <show-avatar-frame type="bool">false</show-avatar-frame>
                  <show>
                      <agent-contacts type="bool">true</agent-contacts>
---- a/src/common.cpp
-+++ b/src/common.cpp
+--- git.orig/src/common.cpp
++++ git/src/common.cpp
 @@ -39,6 +39,8 @@
  #include <sys/types.h>
  #include <sys/stat.h>
@@ -130,9 +130,9 @@
          //qDebug() << "bringToFront current desktop=" << curr_dsk << " windowDesktop=" << dsk;
          if((dsk != curr_dsk) && (dsk != -1)) {  // second condition for sticky windows
              w->hide();
---- a/src/common.h
-+++ b/src/common.h
-@@ -151,12 +151,10 @@ void replaceWidget(QWidget *, QWidget *);
+--- git.orig/src/common.h
++++ git/src/common.h
+@@ -151,12 +151,10 @@ void replaceWidget(QWidget *, QWidget *)
  void closeDialogs(QWidget *);
  TabbableWidget* findActiveTab();
  #ifdef HAVE_X11
@@ -148,8 +148,8 @@
  #endif
  void reorderGridLayout(QGridLayout* layout, int maxCols);
  int devicePixelRatio(QWidget *);
---- a/src/mainwin.cpp
-+++ b/src/mainwin.cpp
+--- git.orig/src/mainwin.cpp
++++ git/src/mainwin.cpp
 @@ -79,6 +79,10 @@
  #include "rosteravatarframe.h"
  #include "avatars.h"
@@ -239,10 +239,10 @@
  }
  
  void MainWin::setTrayToolTip(const Status& status, bool, bool)
-@@ -1567,32 +1614,21 @@ void MainWin::trayClicked(const QPoint &, int button)
-         return;
-     }
- 
+@@ -1571,32 +1618,20 @@ void MainWin::trayClicked(const QPoint &
+     // some interesting info about the problem
+     // http://www.qtcentre.org/threads/56573-Get-the-Window-Visible-State-when-it-is-partially-visible
+     // But currently now really good cross-platform solution.
 -    if(!isHidden()) {
 -        trayHide();
 -    }
@@ -257,31 +257,31 @@
 -    if(!PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool()) {
 -        return;
 -    }
-+    //Double click works like second single click now if "double-click" style is disabled
- 
+-
 -    if(d->nextAmount > 0) {
 -        doRecvNextEvent();
 -        return;
+-    }
+-
++     //Double click works like second single click now if "double-click" style is disabled
+ 
+-    if(!isHidden()) {
+-        trayHide();
+-    }
+-    else {
+-        trayShow();
 +    if(PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool()) {
 +        if(d->nextAmount > 0) {
 +            doRecvNextEvent();
 +            return;
 +        }
      }
- 
--
--    if(!isHidden()) {
--        trayHide();
--    }
--    else {
--        trayShow();
--    }
 +    toggleVisible(true);
  }
  
  void MainWin::trayShow()
---- a/src/mainwin.h
-+++ b/src/mainwin.h
+--- git.orig/src/mainwin.h
++++ git/src/mainwin.h
 @@ -178,7 +178,7 @@ public slots:
      void optionsUpdate();
      void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
@@ -291,8 +291,8 @@
  
      void avcallConfig();
  
---- a/src/src.pri
-+++ b/src/src.pri
+--- git.orig/src/src.pri
++++ git/src/src.pri
 @@ -613,6 +613,10 @@ win32:!dbus {
      LIBS += -lUser32
  }
@@ -304,8 +304,8 @@
  
  unix:!dbus {
      SOURCES += $$PWD/activeprofiles_stub.cpp
---- /dev/null
-+++ b/src/x11windowsystem.cpp
+--- git.orig/src/x11windowsystem.cpp
++++ git/src/x11windowsystem.cpp
 @@ -0,0 +1,314 @@
 +#include "x11windowsystem.h"
 +
@@ -621,8 +621,8 @@
 +    }
 +    return false;
 +}
---- /dev/null
-+++ b/src/x11windowsystem.h
+--- git.orig/src/x11windowsystem.h
++++ git/src/x11windowsystem.h
 @@ -0,0 +1,48 @@
 +#ifndef X11WINDOWSYSTEM_H
 +#define X11WINDOWSYSTEM_H
