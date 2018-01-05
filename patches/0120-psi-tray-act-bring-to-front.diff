@@ -1,16 +1,16 @@
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -225,6 +225,7 @@ QLineEdit#le_status_text {
                  <lockdown-roster type="bool">false</lockdown-roster>
                  <raise-on-new-event type="bool">false</raise-on-new-event>
                  <quit-on-close type="bool">false</quit-on-close>
 +                <raise-inactive type="bool">true</raise-inactive>
-                 <show-avatar-frame type="bool">false</show-avatar-frame>
+                 <show-avatar-frame type="bool">true</show-avatar-frame>
                  <show>
                      <agent-contacts type="bool">true</agent-contacts>
---- git.orig/src/common.cpp
-+++ git/src/common.cpp
-@@ -39,6 +39,8 @@
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -42,6 +42,8 @@
  #include <sys/types.h>
  #include <sys/stat.h>
  #include <sys/wait.h>
@@ -19,7 +19,7 @@
  #endif
  
  #ifdef Q_OS_WIN
-@@ -456,101 +458,6 @@ TabbableWidget* findActiveTab()
+@@ -475,101 +477,6 @@ TabbableWidget* findActiveTab()
      return tw;
  }
  
@@ -121,7 +121,7 @@
  void clearMenu(QMenu *m)
  {
      m->clear();
-@@ -579,7 +486,7 @@ void bringToFront(QWidget *widget, bool)
+@@ -598,7 +505,7 @@ void bringToFront(QWidget *widget, bool)
      // If we're not on the current desktop, do the hide/show trick
      long dsk, curr_dsk;
      Window win = w->winId();
@@ -130,9 +130,9 @@
          //qDebug() << "bringToFront current desktop=" << curr_dsk << " windowDesktop=" << dsk;
          if((dsk != curr_dsk) && (dsk != -1)) {  // second condition for sticky windows
              w->hide();
---- git.orig/src/common.h
-+++ git/src/common.h
-@@ -151,12 +151,10 @@ void replaceWidget(QWidget *, QWidget *)
+--- a/src/common.h
++++ b/src/common.h
+@@ -151,12 +151,10 @@ void replaceWidget(QWidget *, QWidget *);
  void closeDialogs(QWidget *);
  TabbableWidget* findActiveTab();
  #ifdef HAVE_X11
@@ -148,8 +148,8 @@
  #endif
  void reorderGridLayout(QGridLayout* layout, int maxCols);
  int devicePixelRatio(QWidget *);
---- git.orig/src/mainwin.cpp
-+++ git/src/mainwin.cpp
+--- a/src/mainwin.cpp
++++ b/src/mainwin.cpp
 @@ -79,6 +79,10 @@
  #include "rosteravatarframe.h"
  #include "avatars.h"
@@ -172,7 +172,7 @@
      void registerActions();
      IconAction* getAction( QString name );
      void updateMenu(QStringList actions, QMenu* menu);
-@@ -1416,6 +1424,22 @@ void MainWin::closeEvent(QCloseEvent* e)
+@@ -1413,6 +1421,22 @@ void MainWin::closeEvent(QCloseEvent* e)
  
  void MainWin::changeEvent(QEvent *event)
  {
@@ -195,7 +195,7 @@
      if (event->type() == QEvent::ActivationChange ||
          event->type() == QEvent::WindowStateChange)
      {
-@@ -1536,14 +1560,37 @@ void MainWin::optionsUpdate()
+@@ -1533,14 +1557,37 @@ void MainWin::optionsUpdate()
      updateTray();
  }
  
@@ -239,7 +239,7 @@
  }
  
  void MainWin::setTrayToolTip(const Status& status, bool, bool)
-@@ -1571,32 +1618,20 @@ void MainWin::trayClicked(const QPoint &
+@@ -1568,32 +1615,20 @@ void MainWin::trayClicked(const QPoint &, int button)
      // some interesting info about the problem
      // http://www.qtcentre.org/threads/56573-Get-the-Window-Visible-State-when-it-is-partially-visible
      // But currently now really good cross-platform solution.
@@ -257,14 +257,14 @@
 -    if(!PsiOptions::instance()->getOption("options.ui.systemtray.use-double-click").toBool()) {
 -        return;
 -    }
--
++     //Double click works like second single click now if "double-click" style is disabled
+ 
 -    if(d->nextAmount > 0) {
 -        doRecvNextEvent();
 -        return;
 -    }
 -
-+     //Double click works like second single click now if "double-click" style is disabled
- 
+-
 -    if(!isHidden()) {
 -        trayHide();
 -    }
@@ -280,8 +280,8 @@
  }
  
  void MainWin::trayShow()
---- git.orig/src/mainwin.h
-+++ git/src/mainwin.h
+--- a/src/mainwin.h
++++ b/src/mainwin.h
 @@ -178,7 +178,7 @@ public slots:
      void optionsUpdate();
      void setTrayToolTip(const XMPP::Status &, bool usePriority = false, bool isManualStatus = false);
@@ -291,9 +291,9 @@
  
      void avcallConfig();
  
---- git.orig/src/src.pri
-+++ git/src/src.pri
-@@ -613,6 +613,10 @@ win32:!dbus {
+--- a/src/src.pri
++++ b/src/src.pri
+@@ -616,6 +616,10 @@ win32:!dbus {
      LIBS += -lUser32
  }
  
@@ -304,8 +304,8 @@
  
  unix:!dbus {
      SOURCES += $$PWD/activeprofiles_stub.cpp
---- git.orig/src/x11windowsystem.cpp
-+++ git/src/x11windowsystem.cpp
+--- /dev/null
++++ b/src/x11windowsystem.cpp
 @@ -0,0 +1,314 @@
 +#include "x11windowsystem.h"
 +
@@ -621,8 +621,8 @@
 +    }
 +    return false;
 +}
---- git.orig/src/x11windowsystem.h
-+++ git/src/x11windowsystem.h
+--- /dev/null
++++ b/src/x11windowsystem.h
 @@ -0,0 +1,48 @@
 +#ifndef X11WINDOWSYSTEM_H
 +#define X11WINDOWSYSTEM_H
