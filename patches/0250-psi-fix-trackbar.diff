@@ -1,6 +1,6 @@
---- psi.orig/src/tabs/tabbablewidget.cpp
-+++ psi/src/tabs/tabbablewidget.cpp
-@@ -37,10 +37,14 @@
+--- a/src/tabs/tabbablewidget.cpp
++++ b/src/tabs/tabbablewidget.cpp
+@@ -37,6 +37,7 @@
  
  TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabManager)
      : AdvancedWidget<QWidget>(0)
@@ -8,14 +8,18 @@
      , jid_(jid)
      , pa_(pa)
      , tabManager_(tabManager)
- {
+@@ -47,6 +48,10 @@ TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabMa
+         TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
+     }
+     ++TabbableWidget::chatsCount;
++
 +    stateCommitTimer_.setInterval(100);
 +    stateCommitTimer_.setSingleShot(true);
 +    connect(&stateCommitTimer_, SIGNAL(timeout()), SLOT(commitState()));
      //QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
  }
  
-@@ -205,11 +209,22 @@ void TabbableWidget::changeEvent(QEvent*
+@@ -247,11 +252,22 @@ void TabbableWidget::changeEvent(QEvent* event)
          event->type() == QEvent::WindowStateChange)
      {
          if (isActiveTab()) {
@@ -40,8 +44,8 @@
      }
  }
  
---- psi.orig/src/tabs/tabbablewidget.h
-+++ psi/src/tabs/tabbablewidget.h
+--- a/src/tabs/tabbablewidget.h
++++ b/src/tabs/tabbablewidget.h
 @@ -22,6 +22,7 @@
  #define TABBABLE_H
  
@@ -49,8 +53,8 @@
 +#include <QTimer>
  #include "advwidget.h"
  #include "im.h" // ChatState
- 
-@@ -77,19 +78,26 @@ signals:
+ #include "sendbuttonmenu.h"
+@@ -83,19 +84,26 @@ signals:
      void vSplitterMoved(int,int);
  
  public slots:
@@ -79,9 +83,9 @@
      Jid jid_;
      PsiAccount *pa_;
      TabManager *tabManager_;
---- psi.orig/src/tabs/tabdlg.cpp
-+++ psi/src/tabs/tabdlg.cpp
-@@ -397,12 +397,12 @@ void TabDlg::tabSelected(QWidget* _selec
+--- a/src/tabs/tabdlg.cpp
++++ b/src/tabs/tabdlg.cpp
+@@ -397,12 +397,12 @@ void TabDlg::tabSelected(QWidget* _selected)
      // _selected could be null when TabDlg is closing and deleting all its tabs
      TabbableWidget* selected = _selected ? qobject_cast<TabbableWidget*>(_selected) : 0;
      if (!selectedTab_.isNull()) {
@@ -96,7 +100,7 @@
      }
  
      updateCaption();
-@@ -520,7 +520,7 @@ void TabDlg::closeTab(TabbableWidget* ch
+@@ -520,7 +520,7 @@ void TabDlg::closeTab(TabbableWidget* chat, bool doclose)
      chat->hide();
      removeTabWithNoChecks(chat);
      chat->setParent(0);

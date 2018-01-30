@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -603,6 +603,7 @@ QLineEdit#le_status_text {
+@@ -607,6 +607,7 @@ QLineEdit#le_status_text {
                  <show-messageNext type="QKeySequence" comment="Show next message" >Ctrl+Down</show-messageNext>
                  <show-messagePrev type="QKeySequence" comment="Show prev message" >Ctrl+Up</show-messagePrev>
                  <change-case type="QKeySequence" comment="Change case of letters in the chat edit" >Ctrl+Alt+x</change-case>
@@ -10,7 +10,7 @@
                  <assign-custom-avatar type="QKeySequence" comment="Assign a custom avatar to the selected contact"/>
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -230,6 +230,7 @@ public:
+@@ -231,6 +231,7 @@ public:
  //#endif
      QAction *act_send, *act_scrollup, *act_scrolldown, *act_close;
      QAction *act_mini_cmd, *act_nick, *act_hide, *act_copy_muc_jid;
@@ -18,9 +18,9 @@
  
      MCmdSimpleSite mCmdSite;
      MCmdManager mCmdManager;
-@@ -806,6 +807,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
-     connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateMucName()));
-     connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
+@@ -824,6 +825,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+     d->act_pastesend = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
+     connect(d->act_pastesend, SIGNAL(triggered()), SLOT(doPasteAndSend()));
  
 +    d->act_minimize = new QAction(this);
 +    connect(d->act_minimize, SIGNAL(triggered()), SLOT(doMinimize()));
@@ -29,7 +29,7 @@
      int s = PsiIconset::instance()->system().iconSize();
      ui_.toolbar->setIconSize(QSize(s,s));
  
-@@ -928,6 +933,11 @@ void GCMainDlg::horizSplitterMoved()
+@@ -954,6 +959,11 @@ void GCMainDlg::horizSplitterMoved()
      PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
@@ -41,7 +41,7 @@
  void GCMainDlg::ensureTabbedCorrectly()
  {
      TabbableWidget::ensureTabbedCorrectly();
-@@ -971,6 +981,7 @@ void GCMainDlg::setShortcuts()
+@@ -997,6 +1007,7 @@ void GCMainDlg::setShortcuts()
      d->act_scrollup->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-up"));
      d->act_scrolldown->setShortcuts(ShortcutManager::instance()->shortcuts("common.scroll-down"));
      d->act_mini_cmd->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
@@ -51,9 +51,9 @@
  void GCMainDlg::scrollUp()
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -150,6 +150,7 @@ private slots:
- #endif
-     void chatEditCreated();
+@@ -154,6 +154,7 @@ private slots:
+     void sendTemp(const QString &);
+     void psButtonEnabled();
      void horizSplitterMoved();
 +    void doMinimize();
      void avatarUpdated(const Jid& jid);
@@ -61,7 +61,7 @@
  public:
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -359,6 +359,11 @@ void PsiChatDlg::setShortcuts()
+@@ -375,6 +375,11 @@ void PsiChatDlg::setShortcuts()
  
      act_mini_cmd_->setShortcuts(ShortcutManager::instance()->shortcuts("chat.quick-command"));
  
@@ -73,8 +73,8 @@
  }
  
  void PsiChatDlg::updateIdentityVisibility()
-@@ -905,6 +910,10 @@ void PsiChatDlg::chatEditCreated()
-     tabCompletion.setTextEdit(chatEdit());
+@@ -1017,6 +1022,10 @@ bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
+     return ChatDlg::eventFilter( obj, ev );
  }
  
 +void PsiChatDlg::doMinimize()
@@ -82,8 +82,8 @@
 +    window()->showMinimized();
 +}
  
- void PsiChatDlg::doSend() {
-     tabCompletion.reset();
+ QString PsiChatDlg::makeContactName(const QString &name, const Jid &jid) const
+ {
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
 @@ -36,6 +36,7 @@ private slots:
@@ -94,7 +94,7 @@
      void addContact();
      void buildMenu();
      void updateCounter();
-@@ -85,6 +86,7 @@ private:
+@@ -90,6 +91,7 @@ private:
  
      ActionList* actions_;
      QAction *act_mini_cmd_;

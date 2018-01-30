@@ -21,7 +21,7 @@
  
      useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
      if (useMessageIcons_) {
-@@ -145,10 +152,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
+@@ -147,10 +154,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
          e->accept();
      }
      else {
@@ -43,10 +43,11 @@
  void ChatView::addLogIconsResources()
  {
      document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
-@@ -214,6 +231,24 @@ void ChatView::autoCopy()
+@@ -216,6 +233,24 @@ void ChatView::autoCopy()
+     }
  }
  
- /**
++/**
 + * Make quote from any selected text and paste it in chat window
 + */
 +
@@ -64,10 +65,9 @@
 +    actQuote_->setEnabled(textCursor().hasSelection());
 +}
 +
-+/**
+ /**
   * Handle KeyPress events that happen in ChatEdit widget. This is used
   * to 'fix' the copy shortcut.
-  * \param object object that should receive the event
 --- a/src/chatview_te.h
 +++ b/src/chatview_te.h
 @@ -51,6 +51,7 @@ public:
@@ -94,7 +94,7 @@
      void nickInsertClick(const QString &nick);
  
  private:
-@@ -117,6 +121,7 @@ private:
+@@ -118,6 +122,7 @@ private:
      QPixmap logIconInfo;
      QPixmap logIconCorrected;
      QPixmap logIconHistory;
@@ -104,7 +104,7 @@
  #endif
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -898,6 +898,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -927,6 +927,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      invalidateTab();
      setConnecting();
  
@@ -244,17 +244,17 @@
      CapitalLettersController *capitalizer_;
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -270,6 +270,7 @@ void PsiChatDlg::initUi()
+@@ -289,6 +289,7 @@ void PsiChatDlg::initUi()
          ui_.vboxLayout1->insertWidget(0, winHeader_);
      }
      setMargins();
 +    connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  
-     ui_.log->realTextWidget()->installEventFilter(this);
-     ui_.mini_prompt->hide();
+     act_pastesend_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
+     connect(act_pastesend_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 --- a/src/webview.cpp
 +++ b/src/webview.cpp
-@@ -77,6 +77,11 @@ WebView::WebView(QWidget* parent) :
+@@ -76,6 +76,11 @@ WebView::WebView(QWidget* parent) :
  #endif
      connect(page(), SIGNAL(loadStarted()), this, SLOT(loadStartedEvent()));
      connect(page(), SIGNAL(loadFinished(bool)), this, SLOT(loadFinishedEvent(bool)));
@@ -266,7 +266,7 @@
  }
  
  void WebView::linkClickedEvent(const QUrl& url)
-@@ -100,6 +105,11 @@ void WebView::loadFinishedEvent(bool success)
+@@ -99,6 +104,11 @@ void WebView::loadFinishedEvent(bool success)
      isLoading_ = false;
  }
  
@@ -278,7 +278,7 @@
  void WebView::contextMenuEvent(QContextMenuEvent* event)
  {
      if (isLoading_) return;
-@@ -140,6 +150,7 @@ void WebView::contextMenuEvent(QContextMenuEvent* event)
+@@ -139,6 +149,7 @@ void WebView::contextMenuEvent(QContextMenuEvent* event)
      menu->addAction(pageAction(QWebEnginePage::Reload));
  #else
              menu->addAction(pageAction(QWebPage::Copy));

@@ -1,18 +1,20 @@
-Заходим в «iris»
-Заходим в «src/libpsi»
+diff --git a/options/default.xml b/options/default.xml
+index 0985b69c..7413bfdf 100644
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -114,6 +114,7 @@
-                 <use-message-icons type="bool">true</use-message-icons>
-                 <scaled-message-icons type="bool">false</scaled-message-icons>
+@@ -124,6 +124,7 @@
+                 <show-status-changes type="bool">true</show-status-changes>
+                 <show-previews type="bool">true</show-previews>
                  <warn-before-clear type="bool">true</warn-before-clear>
 +                <only-paste-template type="bool">false</only-paste-template>
-             </chat>
-             <save>
-                 <toolbars-state type="QByteArray"/>
+                 <css type="QString" />
+                 <hide-when-closing type="bool">false</hide-when-closing>
+                 <status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
+diff --git a/src/chatdlg.ui b/src/chatdlg.ui
+index 7ff91a9f..dd71bf2b 100644
 --- a/src/chatdlg.ui
 +++ b/src/chatdlg.ui
-@@ -292,6 +292,9 @@
+@@ -323,6 +323,9 @@
             <property name="toolTip">
              <string>Send</string>
             </property>
@@ -22,18 +24,20 @@
            </widget>
           </item>
           <item>
+diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
+index 50caf271..61ee9039 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -207,7 +207,7 @@ public:
-     QString password;
-     QString topic;
+@@ -224,7 +224,7 @@ public:
+     QMap<LanguageManager::LangId, QString> subjectMap;
      bool nonAnonymous;         // got status code 100 ?
--    IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_bookmark;
-+    IconAction *act_find, *act_clear, *act_icon, *act_configure, *act_bookmark, *act_ps, *act_templates;
- #ifdef WHITEBOARDING
-     IconAction *act_whiteboard;
- #endif
-@@ -606,6 +606,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+     ActionList *actions;
+-    IconAction *act_bookmark;
++    IconAction *act_bookmark, *act_pastesend;
+     TypeAheadFindBar *typeahead;
+ //#ifdef WHITEBOARDING
+ //    IconAction *act_whiteboard;
+@@ -684,6 +684,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
      d->state = Private::Connected;
  
@@ -47,30 +51,55 @@
      setAcceptDrops(true);
  
  #ifndef Q_OS_MAC
-@@ -689,6 +696,11 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
-     connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateBookmarkIcon()));
+@@ -748,28 +755,31 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+         action->setParent(this);
+         d->actions->addAction(name, action);
+ 
+-        if (name == "gchat_clear") {
++        if (name == QLatin1String("gchat_clear")) {
+             connect(action, SIGNAL(triggered()), SLOT(doClearButton()));
+         }
+-        else if (name == "gchat_find") {
++        else if (name == QLatin1String("gchat_find")) {
+             // typeahead find
+             connect(action, SIGNAL(triggered()), d->typeahead, SLOT(toggleVisibility()));
+         // -- typeahead
+         }
+-        else if (name == "gchat_configure") {
++        else if (name == QLatin1String("gchat_configure")) {
+             connect(action, SIGNAL(triggered()), SLOT(configureRoom()));
+         }
+-        else if (name == "gchat_html_text") {
++        else if (name == QLatin1String("gchat_html_text")) {
+             connect(action, SIGNAL(triggered()), d->mle(), SLOT(doHTMLTextMenu()));
+         }
+-        else if (name == "gchat_icon") {
++        else if (name == QLatin1String("gchat_icon")) {
+             connect(account()->psi()->iconSelectPopup(), SIGNAL(textSelected(QString)), d, SLOT(addEmoticon(QString)));
+             action->setMenu(pa->psi()->iconSelectPopup());
+             ui_.tb_emoticons->setMenu(pa->psi()->iconSelectPopup());
+         }
+-        else if (name == "gchat_info") {
++        else if (name == QLatin1String("gchat_info")) {
+             connect(action, SIGNAL(triggered()), SLOT(doInfo()));
+         }
++        else if (name == QLatin1String("gchat_templates")) {
++            action->setMenu(getTemplateMenu());
++        }
+     }
+ 
+     actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
+@@ -811,6 +821,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+     connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateMucName()));
      connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
  
-+    d->act_ps = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
-+    connect(d->act_ps, SIGNAL(triggered()), SLOT(doPasteAndSend()));
++    d->act_pastesend = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
++    connect(d->act_pastesend, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 +
-+    d->act_templates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
-+    d->act_templates->setMenu(getTemplateMenu());
-     ui_.toolbar->setIconSize(QSize(16,16));
-     ui_.toolbar->addAction(d->act_clear);
-     ui_.toolbar->addAction(d->act_configure);
-@@ -697,6 +709,10 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
- #endif
-     ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
-     ui_.toolbar->addAction(d->act_icon);
-+    ((QToolButton *)ui_.toolbar->widgetForAction(d->act_icon))->setPopupMode(QToolButton::InstantPopup);
-+    ui_.toolbar->addAction(d->act_templates);
-+    ((QToolButton *)ui_.toolbar->widgetForAction(d->act_templates))->setPopupMode(QToolButton::InstantPopup);
-+    ui_.toolbar->addAction(d->act_ps);
-     ui_.toolbar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
+     int s = PsiIconset::instance()->system().iconSize();
+     ui_.toolbar->setIconSize(QSize(s,s));
  
-     // Common actions
-@@ -705,6 +721,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -826,6 +839,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      connect(d->act_send,SIGNAL(triggered()), SLOT(mle_returnPressed()));
       ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
      connect(ui_.pb_send, SIGNAL(clicked()), SLOT(mle_returnPressed()));
@@ -78,7 +107,7 @@
      d->act_close = new QAction(this);
      addAction(d->act_close);
      connect(d->act_close,SIGNAL(triggered()), SLOT(close()));
-@@ -763,6 +780,13 @@ GCMainDlg::~GCMainDlg()
+@@ -920,6 +934,13 @@ GCMainDlg::~GCMainDlg()
      account()->dialogUnregister(this);
      delete d->mucManager;
      delete d;
@@ -91,18 +120,18 @@
 +    }
  }
  
- void GCMainDlg::ensureTabbedCorrectly()
-@@ -1869,6 +1893,8 @@ void GCMainDlg::buildMenu()
+ void GCMainDlg::horizSplitterMoved()
+@@ -2273,6 +2294,8 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addSeparator();
  
-     d->pm_settings->addAction(d->act_icon);
-+    d->pm_settings->addAction(d->act_templates);
-+    d->pm_settings->addAction(d->act_ps);
+     d->pm_settings->addAction(d->actions->action("gchat_icon"));
++    d->pm_settings->addAction(d->actions->action("gchat_templates"));
++    d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
- }
-@@ -1901,6 +1927,50 @@ void GCMainDlg::setStatusTabIcon(int status)
-     setTabIcon(PsiIconset::instance()->statusPtr(jid(), status)->icon());
+ #ifdef PSI_PLUGINS
+@@ -2338,6 +2361,50 @@ void GCMainDlg::resizeEvent(QResizeEvent *e)
+     QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
  }
  
 +void GCMainDlg::sendButtonMenu()
@@ -128,14 +157,14 @@
 +    if(TabbableWidget::isActiveTab()) {
 +        d->mle()->paste();
 +        mle_returnPressed();
-+        d->act_ps->setEnabled(false);
++        d->act_pastesend->setEnabled(false);
 +        QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
 +    }
 +}
 +
 +void GCMainDlg::psButtonEnabled()
 +{
-+    d->act_ps->setEnabled(true);
++    d->act_pastesend->setEnabled(true);
 +}
 +
 +void GCMainDlg::sendTemp(const QString &templText)
@@ -152,9 +181,11 @@
  //----------------------------------------------------------------------------
  // GCFindDlg
  //----------------------------------------------------------------------------
+diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
+index c13e41fa..c9bf875a 100644
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -138,6 +138,11 @@ private slots:
+@@ -148,6 +148,11 @@ private slots:
      void openWhiteboard();
  #endif
      void chatEditCreated();
@@ -163,12 +194,14 @@
 +    void doPasteAndSend();
 +    void sendTemp(const QString &);
 +    void psButtonEnabled();
+     void horizSplitterMoved();
+     void avatarUpdated(const Jid& jid);
  
- public:
-     class Private;
+diff --git a/src/groupchatdlg.ui b/src/groupchatdlg.ui
+index db190c43..31944628 100644
 --- a/src/groupchatdlg.ui
 +++ b/src/groupchatdlg.ui
-@@ -289,6 +289,9 @@
+@@ -315,6 +315,9 @@
             <property name="toolTip">
              <string>Send</string>
             </property>
@@ -178,19 +211,77 @@
            </widget>
           </item>
          </layout>
+diff --git a/src/psi_profiles.cpp b/src/psi_profiles.cpp
+index b10eb07c..be914516 100644
+--- a/src/psi_profiles.cpp
++++ b/src/psi_profiles.cpp
+@@ -530,7 +530,7 @@ void OptionsMigration::lateMigration()
+         chatToolbar.keys += pluginsKeys;
+         chatToolbar.keys << "spacer" << "chat_icon" << "chat_file"
+                          << "chat_pgp" << "chat_info" << "chat_history" << "chat_voice"
+-                         << "chat_active_contacts";
++                         << "chat_active_contacts" << "chat_templates";
+ 
+         if (PsiOptions::instance()->getOption("options.ui.chat.disable-paste-send").toBool()) {
+             chatToolbar.keys.removeAt(chatToolbar.keys.indexOf("chat_ps"));
+@@ -540,7 +540,8 @@ void OptionsMigration::lateMigration()
+         groupchatToolbar.on = chatToolbar.on;
+ 
+         groupchatToolbar.name = "Groupchat";
+-        groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" << "gchat_configure";
++        groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" <<
++                                 "gchat_configure" << "gchat_templates";
+         groupchatToolbar.keys += pluginsKeys;
+         groupchatToolbar.keys << "spacer" << "gchat_icon" ;
+ 
+diff --git a/src/psiactionlist.cpp b/src/psiactionlist.cpp
+index 566e71a4..3bc53fad 100644
+--- a/src/psiactionlist.cpp
++++ b/src/psiactionlist.cpp
+@@ -447,6 +447,7 @@ void PsiActionList::Private::createChat()
+         IconAction *actHistory = new IconAction(tr("Message History"), "psi/history", tr("Message History"), 0, this);
+         IconAction *actCompact = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
+         IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
++        IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
+ 
+         ActionNames actions[] = {
+             { "chat_clear",  actClear  },
+@@ -461,6 +462,7 @@ void PsiActionList::Private::createChat()
+             { "chat_history", actHistory   },
+             { "chat_compact", actCompact   },
+             { "chat_active_contacts", actActiveContacts   },
++            { "chat_templates", actTemplates },
+             { "", 0 }
+         };
+ 
+@@ -478,13 +480,15 @@ void PsiActionList::Private::createGroupchat()
+         IconAction *actHtmlText = new IconAction(tr("Set Text Format"), "psi/text", tr("Set Text Format"), 0, this);
+         IconAction *actConfigure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("Configure Room"), 0, this);
+         IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
++        IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
+ 
+         ActionNames actions[] = {
+-            { "gchat_clear",  actClear  },
+-            { "gchat_find", actFind   },
+-            { "gchat_html_text", actHtmlText   },
+-            { "gchat_configure", actConfigure   },
+-            { "gchat_icon", actIcon   },
++            { "gchat_clear",     actClear     },
++            { "gchat_find",      actFind      },
++            { "gchat_html_text", actHtmlText  },
++            { "gchat_configure", actConfigure },
++            { "gchat_icon",      actIcon      },
++            { "gchat_templates", actTemplates },
+             { "", 0 }
+         };
+ 
+diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
+index 3fa74499..6a8b9ab8 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
-@@ -18,6 +18,7 @@
- #include <QDragEnterEvent>
- #include <QMessageBox>
- #include <QDebug>
-+#include <QTimer>
- 
- #include "psicon.h"
- #include "psiaccount.h"
-@@ -171,6 +172,22 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
- {
-     connect(account()->psi(), SIGNAL(accountCountChanged()), this, SLOT(updateIdentityVisibility()));
+@@ -182,10 +182,22 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, PsiAccount* pa, TabManager* tabManager)
+     connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
+     connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
      mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
 +    SendButtonTemplatesMenu* menu = getTemplateMenu();
 +    if (menu) {
@@ -198,20 +289,20 @@
 +        connect(menu, SIGNAL(doEditTemplates()), this, SLOT(editTemplates()));
 +        connect(menu, SIGNAL(doTemplateText(const QString &)), this, SLOT(sendTemp(const QString &)));
 +    }
-+}
-+
-+PsiChatDlg::~PsiChatDlg()
-+{
+ }
+ 
+ PsiChatDlg::~PsiChatDlg()
+ {
 +    SendButtonTemplatesMenu* menu = getTemplateMenu();
 +    if (menu) {
 +        disconnect(menu, SIGNAL(doPasteAndSend()), this, SLOT(doPasteAndSend()));
 +        disconnect(menu, SIGNAL(doEditTemplates()), this, SLOT(editTemplates()));
 +        disconnect(menu, SIGNAL(doTemplateText(const QString &)), this, SLOT(sendTemp(const QString &)));
 +    }
+     delete actions_;
  }
  
- void PsiChatDlg::initUi()
-@@ -221,6 +238,7 @@ void PsiChatDlg::initUi()
+@@ -263,12 +275,16 @@ void PsiChatDlg::initUi()
      smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
       ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
      connect(ui_.pb_send, SIGNAL(clicked()), this, SLOT(doSend()));
@@ -219,41 +310,45 @@
  
      act_mini_cmd_ = new QAction(this);
      act_mini_cmd_->setText(tr("Input command..."));
-@@ -348,6 +366,12 @@ void PsiChatDlg::initToolButtons()
+     connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
+     addAction(act_mini_cmd_);
  
-     act_compact_ = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
-     connect(act_compact_, SIGNAL(triggered()), SLOT(toggleSmallChat()));
++    act_pastesend_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
++    connect(act_pastesend_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
 +
-+    act_ps_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
-+    connect(act_ps_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
-+
-+    act_templates_ = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
-+    act_templates_->setMenu(getTemplateMenu());
- }
+     ui_.log->realTextWidget()->installEventFilter(this);
+     ui_.mini_prompt->hide();
  
- void PsiChatDlg::initToolBar()
-@@ -357,6 +381,10 @@ void PsiChatDlg::initToolBar()
-     ui_.toolbar->addAction(act_clear_);
-     ui_.toolbar->addWidget(new StretchWidget(ui_.toolbar));
-     ui_.toolbar->addAction(act_icon_);
-+    ((QToolButton *)ui_.toolbar->widgetForAction(act_icon_))->setPopupMode(QToolButton::InstantPopup);
-+    ui_.toolbar->addAction(act_templates_);
-+    ((QToolButton *)ui_.toolbar->widgetForAction(act_templates_))->setPopupMode(QToolButton::InstantPopup);
-+    ui_.toolbar->addAction(act_ps_);
-     ui_.toolbar->addAction(act_file_);
-     if (PsiOptions::instance()->getOption("options.pgp.enable").toBool()) {
-         ui_.toolbar->addAction(act_pgp_);
-@@ -548,6 +576,8 @@ void PsiChatDlg::buildMenu()
+@@ -423,7 +439,7 @@ void PsiChatDlg::updateToolbuttons()
+         IconAction *action = actions_->action(actionName);
+         if (action) {
+             action->addTo(ui_.toolbar);
+-            if (actionName == "chat_icon") {
++            if (actionName == QLatin1String("chat_icon") || actionName == QLatin1String("chat_templates")) {
+                 ((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
+             }
+         }
+@@ -500,6 +516,9 @@ void PsiChatDlg::initToolButtons()
+         else if (name == "chat_active_contacts") {
+             connect(action, SIGNAL(triggered()), SLOT(actActiveContacts()));
+         }
++        else if (name == "chat_templates") {
++            action->setMenu(getTemplateMenu());
++        }
+     }
+ 
+     list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
+@@ -851,6 +870,8 @@ void PsiChatDlg::buildMenu()
      pm_settings_->addSeparator();
  
-     pm_settings_->addAction(act_icon_);
-+    pm_settings_->addAction(act_templates_);
-+    pm_settings_->addAction(act_ps_);
-     pm_settings_->addAction(act_file_);
+     pm_settings_->addAction(actions_->action("chat_icon"));
++    pm_settings_->addAction(actions_->action("chat_templates"));
++    pm_settings_->addAction(act_pastesend_);
+     pm_settings_->addAction(actions_->action("chat_file"));
      if (AvCallManager::isSupported()) {
-         pm_settings_->addAction(act_voice_);
-@@ -646,5 +676,48 @@ bool PsiChatDlg::eventFilter( QObject *obj, QEvent *ev ) {
-     return ChatDlg::eventFilter( obj, ev );
+         pm_settings_->addAction(actions_->action("chat_voice"));
+@@ -905,6 +926,49 @@ void PsiChatDlg::chatEditCreated()
+     tabCompletion.setTextEdit(chatEdit());
  }
  
 +void PsiChatDlg::sendButtonMenu()
@@ -279,14 +374,14 @@
 +    if(ChatDlg::isActiveTab()) {
 +        chatEdit()->paste();
 +        doSend();
-+        act_ps_->setEnabled(false);
++        act_pastesend_->setEnabled(false);
 +        QTimer::singleShot(2000, this, SLOT(psButtonEnabled()));
 +    }
 +}
 +
 +void PsiChatDlg::psButtonEnabled()
 +{
-+    act_ps_->setEnabled(true);
++    act_pastesend_->setEnabled(true);
 +}
 +
 +void PsiChatDlg::sendTemp(const QString &templText)
@@ -300,41 +395,55 @@
 +    }
 +}
  
- #include "psichatdlg.moc"
+ void PsiChatDlg::doSend() {
+     tabCompletion.reset();
+diff --git a/src/psichatdlg.h b/src/psichatdlg.h
+index 630819ea..a1deee17 100644
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
-@@ -17,6 +17,7 @@ class PsiChatDlg : public ChatDlg
-     Q_OBJECT
- public:
-     PsiChatDlg(const Jid& jid, PsiAccount* account, TabManager* tabManager);
-+    ~PsiChatDlg();
- 
- protected:
-     // reimplemented
-@@ -39,6 +40,11 @@ private slots:
- 
-     // reimplemented
-     void chatEditCreated();
+@@ -50,6 +50,11 @@ private slots:
+     void copyUserJid();
+     void actActiveContacts();
+     void actPgpToggled(bool);
 +    void sendButtonMenu();
 +    void editTemplates();
 +    void doPasteAndSend();
 +    void sendTemp(const QString &);
 +    void psButtonEnabled();
  
- private:
-     void initToolBar();
-@@ -73,7 +79,8 @@ private:
-     IconAction* act_file_;
-     IconAction* act_compact_;
-     IconAction* act_voice_;
--
-+    IconAction* act_ps_;
-+    IconAction* act_templates_;
-     QAction *act_mini_cmd_;
+     // reimplemented
+     void chatEditCreated();
+@@ -90,6 +95,7 @@ private:
+     ActionLineEdit *le_autojid;
+     IconAction *act_autojid;
+     IconAction *act_active_contacts;
++    IconAction* act_pastesend_;
  
      MCmdManager mCmdManager_;
+     MCmdSimpleSite mCmdSite_;
+diff --git a/src/psioptions.cpp b/src/psioptions.cpp
+index 16d3f0bd..75ba406c 100644
+--- a/src/psioptions.cpp
++++ b/src/psioptions.cpp
+@@ -199,12 +199,13 @@ bool PsiOptions::newProfile()
+         chatToolbar.keys += pluginsKeys;
+         chatToolbar.keys << "spacer" << "chat_icon" << "chat_file"
+                          << "chat_pgp" << "chat_info" << "chat_history" << "chat_voice"
+-                         << "chat_active_contacts";
++                         << "chat_active_contacts" << "gchat_templates";
+ 
+         ToolbarPrefs groupchatToolbar;
+         groupchatToolbar.on = true;
+         groupchatToolbar.name = "Groupchat";
+-        groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" << "gchat_configure";
++        groupchatToolbar.keys << "gchat_clear"  << "gchat_find" << "gchat_html_text" <<
++                                 "gchat_configure" << "gchat_templates";
+         groupchatToolbar.keys += pluginsKeys;
+         groupchatToolbar.keys << "spacer" << "gchat_icon" ;
+ 
+diff --git a/src/sendbuttonmenu.cpp b/src/sendbuttonmenu.cpp
 new file mode 100644
-index 0000000..7ea870b
+index 00000000..0b2efc85
 --- /dev/null
 +++ b/src/sendbuttonmenu.cpp
 @@ -0,0 +1,495 @@
@@ -833,7 +942,9 @@ index 0000000..7ea870b
 +{
 +    return str.replace("\\/", "/").replace("\\\\", "\\");
 +}
+diff --git a/src/sendbuttonmenu.h b/src/sendbuttonmenu.h
 new file mode 100644
+index 00000000..a6bac5d9
 --- /dev/null
 +++ b/src/sendbuttonmenu.h
 @@ -0,0 +1,77 @@
@@ -914,7 +1025,9 @@ new file mode 100644
 +};
 +
 +#endif
+diff --git a/src/sendbuttontemplateseditor.ui b/src/sendbuttontemplateseditor.ui
 new file mode 100644
+index 00000000..ae454a26
 --- /dev/null
 +++ b/src/sendbuttontemplateseditor.ui
 @@ -0,0 +1,364 @@
@@ -1282,40 +1395,36 @@ new file mode 100644
 +  <slot>contextMenu(QPoint)</slot>
 + </slots>
 +</ui>
+diff --git a/src/src.pri b/src/src.pri
+index 0eec5f8c..d34838c6 100644
 --- a/src/src.pri
 +++ b/src/src.pri
-@@ -209,7 +209,9 @@ HEADERS += \
-     $$PWD/bookmarkmanagedlg.h \
+@@ -229,6 +229,7 @@ HEADERS += \
      $$PWD/vcardphotodlg.h \
      $$PWD/psicli.h \
--    $$PWD/coloropt.h
-+    $$PWD/coloropt.h \
-+    $$PWD/sendbuttonmenu.h
-+
- 
- 
- HEADERS += tabcompletion.h
-@@ -345,7 +347,9 @@ SOURCES += \
-     $$PWD/accountlabel.cpp \
+     $$PWD/coloropt.h \
++    $$PWD/sendbuttonmenu.h \
+     $$PWD/geolocationdlg.h \
+     $$PWD/rosteravatarframe.h \
+     $$PWD/psicapsregsitry.h \
+@@ -362,6 +363,7 @@ SOURCES += \
      $$PWD/bookmarkmanagedlg.cpp \
      $$PWD/vcardphotodlg.cpp \
--    $$PWD/coloropt.cpp
-+    $$PWD/coloropt.cpp \
-+    $$PWD/sendbuttonmenu.cpp
-+
- 
- CONFIG += filetransfer
- filetransfer {
-@@ -576,7 +580,8 @@ FORMS += \
-     $$PWD/chatdlg.ui \
+     $$PWD/coloropt.cpp \
++    $$PWD/sendbuttonmenu.cpp \
+     $$PWD/geolocationdlg.cpp \
+     $$PWD/rosteravatarframe.cpp \
+     $$PWD/tabcompletion.cpp \
+@@ -577,6 +579,7 @@ FORMS += \
      $$PWD/bookmarkmanage.ui \
      $$PWD/ahcommanddlg.ui \
--    $$PWD/ahcformdlg.ui
-+    $$PWD/ahcformdlg.ui \
-+    $$PWD/sendbuttontemplateseditor.ui
- 
- # options dialog
- include($$PWD/options/options.pri)
+     $$PWD/ahcformdlg.ui \
++    $$PWD/sendbuttontemplateseditor.ui \
+     $$PWD/geolocation.ui \
+     $$PWD/rosteravatarframe.ui \
+     $$PWD/captchadlg.ui \
+diff --git a/src/tabs/tabbablewidget.cpp b/src/tabs/tabbablewidget.cpp
+index d7d0d7b3..e62a0e78 100644
 --- a/src/tabs/tabbablewidget.cpp
 +++ b/src/tabs/tabbablewidget.cpp
 @@ -41,6 +41,12 @@ TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabMa
@@ -1328,10 +1437,10 @@ new file mode 100644
 +        TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
 +    }
 +    ++TabbableWidget::chatsCount;
-     QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
+     //QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
  }
  
-@@ -100,6 +106,42 @@ TabbableWidget::~TabbableWidget()
+@@ -103,6 +109,42 @@ TabbableWidget::~TabbableWidget()
      if (isTabbed()) {
          getManagingTabDlg()->removeTabWithNoChecks(this);
      }
@@ -1374,6 +1483,8 @@ new file mode 100644
  }
  
  /**
+diff --git a/src/tabs/tabbablewidget.h b/src/tabs/tabbablewidget.h
+index c6901926..e39d53aa 100644
 --- a/src/tabs/tabbablewidget.h
 +++ b/src/tabs/tabbablewidget.h
 @@ -24,6 +24,7 @@
@@ -1396,7 +1507,7 @@ new file mode 100644
  signals:
      void invalidateTabInfo();
      void updateFlashState();
-@@ -90,6 +96,11 @@ private:
+@@ -91,6 +97,11 @@ private:
      PsiAccount *pa_;
      TabManager *tabManager_;
      QIcon icon_;
