@@ -18,9 +18,38 @@
  #include "mcmdsimplesite.h"
  #include "tabcompletion.h"
  #include "vcardfactory.h"
-@@ -190,6 +191,25 @@ private:
- };
+@@ -254,9 +255,13 @@ public:
  
+     int logSize;
+     int rosterSize;
++
+ public:
+     bool trackBar;
+ 
++    bool tabmode;
++    PsiWindowHeader *winHeader_;
++
+ public:
+     ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
+     ChatView* te_log() const { return dlg->ui_.log; }
+@@ -842,6 +847,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+     setAcceptDrops(true);
+ 
+     ui_.setupUi(this);
++    d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
++    setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
++    if (!d->tabmode && !isBorder()) {
++        d->winHeader_ = new PsiWindowHeader(this);
++        ui_.vboxLayout1->insertWidget(0, d->winHeader_);
++    }
++    setMargins();
++
+     ui_.lb_ident->setAccount(account());
+     ui_.lb_ident->setShowJid(false);
+     ui_.log->setSessionData(true, jid(), jid().full()); //FIXME change conference name
+@@ -2256,6 +2269,25 @@ void GCMainDlg::setLooks()
+     ui_.lv_users->setLooks();
+ }
  
 +void GCMainDlg::setMargins()
 +{
@@ -41,38 +70,9 @@
 +    }
 +}
 +
- //----------------------------------------------------------------------------
- // GCMainDlg
- //----------------------------------------------------------------------------
-@@ -254,9 +274,13 @@ public:
- 
-     int logSize;
-     int rosterSize;
-+
- public:
-     bool trackBar;
- 
-+    bool tabmode;
-+    PsiWindowHeader *winHeader_;
-+
- public:
-     ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
-     ChatView* te_log() const { return dlg->ui_.log; }
-@@ -842,6 +866,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
-     setAcceptDrops(true);
- 
-     ui_.setupUi(this);
-+    d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
-+    setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
-+    if (!d->tabmode && !isBorder()) {
-+        d->winHeader_ = new PsiWindowHeader(this);
-+        ui_.vboxLayout1->insertWidget(0, d->winHeader_);
-+    }
-+    setMargins();
-+
-     ui_.lb_ident->setAccount(account());
-     ui_.lb_ident->setShowJid(false);
-     ui_.log->setSessionData(true, jid(), jid().full()); //FIXME change conference name
+ void GCMainDlg::setToolbuttons()
+ {
+     ui_.toolbar->clear();
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
 @@ -165,6 +165,8 @@ private:
