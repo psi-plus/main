@@ -32,15 +32,6 @@
                  <use-small-chats type="bool">false</use-small-chats>
                  <use-message-icons type="bool">true</use-message-icons>
                  <scaled-message-icons type="bool">false</scaled-message-icons>
-@@ -256,7 +256,7 @@ QLineEdit#le_status_text {
-                 <use-single-click type="bool">false</use-single-click>
-                 <use-status-change-animation type="bool">true</use-status-change-animation>
-                 <aio-left-roster type="bool">false</aio-left-roster>
--                <use-transport-icons type="bool">false</use-transport-icons>
-+                <use-transport-icons type="bool">true</use-transport-icons>
-                 <saved-window-geometry type="QRect" >
-                     <x>64</x>
-                     <y>64</y>
 @@ -300,7 +300,7 @@ QLineEdit#le_status_text {
                      <invisible comment="Enable invisibility" type="bool">false</invisible>
                  </status>
@@ -74,74 +65,6 @@
                  <automatically-get-items type="bool">false</automatically-get-items>
                  <recent-jids type="QStringList" />
              </service-discovery>
-@@ -495,7 +495,7 @@ QLineEdit#le_status_text {
-                 <can-close-inactive-tab type="bool">true</can-close-inactive-tab>
-                 <show-tab-close-buttons type="bool">true</show-tab-close-buttons>
-                 <put-tabs-at-bottom type="bool">false</put-tabs-at-bottom>
--                <use-tabs type="bool">false</use-tabs>
-+                <use-tabs type="bool">true</use-tabs>
-                 <mouse-middle-button type="QString">close</mouse-middle-button> <!-- hide|close|detach -->
-                 <mouse-doubleclick-action type="QString">detach</mouse-doubleclick-action>
-                 <size type="QString"></size> <!-- will be invalid when converted to QSize so we can detect first load -->
-@@ -599,7 +599,7 @@ QLineEdit#le_status_text {
-                     <item type="QKeySequence">Enter</item>
-                 </send>
-                 <clear type="QKeySequence" comment="Clear the text"/>
--                <quick-command type="QKeySequence" comment="Change to quick command mode">Ctrl+7</quick-command>
-+                <quick-command type="QKeySequence" comment="Change to quick command mode">Ctrl+Space</quick-command>
-                 <show-messageLast type="QKeySequence" comment="Show last message" >Alt+Home</show-messageLast>
-                 <show-messageFirst type="QKeySequence" comment="Show first message" >Alt+End</show-messageFirst>
-                 <show-messageNext type="QKeySequence" comment="Show next message" >Ctrl+Down</show-messageNext>
-@@ -609,7 +609,7 @@ QLineEdit#le_status_text {
-             <contactlist comment="Shortcuts in the contactlist">
-                 <assign-custom-avatar type="QKeySequence" comment="Assign a custom avatar to the selected contact"/>
-                 <clear-custom-avatar type="QKeySequence" comment="Remove custom avatar from the selected contact"/>
--                <delete type="QKeySequence" comment="Delete the selected contact">Del</delete>
-+                <delete type="QKeySequence" comment="Delete the selected contact">Shift+Del</delete>
-                 <chat type="QKeySequence" comment="Open a chat to the selected contact">Ctrl+C</chat>
-                 <message type="QKeySequence" comment="Send a message to the selected contact">Ctrl+M</message>
-                 <event type="QKeySequence" comment="Receive incoming event">Ctrl+R</event>
-@@ -660,7 +660,7 @@ QLineEdit#le_status_text {
-         </shortcuts>
-         <contactlist>
-             <hide-on-start type="bool">false</hide-on-start>
--            <resolve-nicks-on-contact-add type="bool">false</resolve-nicks-on-contact-add>
-+            <resolve-nicks-on-contact-add type="bool">true</resolve-nicks-on-contact-add>
-             <use-toolwindow type="bool">false</use-toolwindow>
-             <autohide-interval type="int">0</autohide-interval>
-         </contactlist>
---- a/options/macosx.xml
-+++ b/options/macosx.xml
-@@ -16,14 +16,25 @@
-         </ui>
-         <shortcuts comment="Shortcuts">
-             <contactlist comment="Shortcuts in the contactlist">
--                <delete type="QVariantList" comment="Delete the selected contact">
--                    <item type="QKeySequence">Backspace</item>
--                    <item type="QKeySequence">Del</item>
--                </delete>
-+                <delete type="QKeySequence" comment="Delete the selected contact">Shift+Del</delete>
-             </contactlist>
-             <common comment="Common actions" >
-                 <history type="QKeySequence" comment="Open the message history">Ctrl+Shift+H</history>
-             </common>
-+            <chat comment="Shortcuts in the chat dialog">
-+                <quick-command type="QKeySequence" comment="Change to quick command mode">Ctrl+7</quick-command>
-+            </chat>
-         </shortcuts>
-+        <ui comment="User interface options">
-+            <disable-send-button type="bool">true</disable-send-button>
-+            <look>
-+                <font>
-+                    <chat type="QString">Lucida Grande,11,-1,5,50,0,0,0,0,0</chat>
-+                    <contactlist type="QString">Lucida Grande,11,-1,5,50,0,0,0,0,0</contactlist>
-+                    <message type="QString">Lucida Grande,11,-1,5,50,0,0,0,0,0</message>
-+                    <passive-popup type="QString">Lucida Grande,9,-1,5,50,0,0,0,0,0</passive-popup>
-+                </font>
-+            </look>
-+        </ui>
-     </options>
- </psi>
 --- a/options/windows.xml
 +++ b/options/windows.xml
 @@ -6,6 +6,9 @@
@@ -156,7 +79,7 @@
  </psi>
 --- a/src/psi_profiles.cpp
 +++ b/src/psi_profiles.cpp
-@@ -88,18 +88,18 @@ void UserAccount::reset()
+@@ -88,7 +88,7 @@ void UserAccount::reset()
      port = 5222;
      opt_host = false;
      host = "";
@@ -165,20 +88,6 @@
      priority_dep_on_status = true;
      ignore_global_actions = false;
      resource = ApplicationInfo::name();
--    priority = 5;
-+    priority = 55;
-     ibbOnly = false;
-     opt_keepAlive = true;
-     opt_sm = true;
-     allow_plain = XMPP::ClientStream::AllowPlainOverTLS;
--    opt_compress = false;
-+    opt_compress = true;
-     opt_log = true;
--    opt_reconn = false;
-+    opt_reconn = true;
-     opt_connectAfterSleep = false;
-     opt_autoSameStatus = true;
-     lastStatusWithPriority = false;
 --- a/src/psioptions.cpp
 +++ b/src/psioptions.cpp
 @@ -217,8 +217,9 @@ bool PsiOptions::newProfile()

@@ -31,7 +31,7 @@
      TypeAheadFindBar *typeahead;
  //#ifdef WHITEBOARDING
  //    IconAction *act_whiteboard;
-@@ -834,6 +834,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -831,6 +831,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
  
      d->state = Private::Connected;
  
@@ -45,7 +45,7 @@
      setAcceptDrops(true);
  
      ui_.setupUi(this);
-@@ -888,28 +895,31 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -885,28 +892,31 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
          action->setParent(this);
          d->actions->addAction(name, action);
  
@@ -83,7 +83,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -951,6 +961,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -948,6 +958,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateMucName()));
      connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
  
@@ -93,7 +93,7 @@
      int s = PsiIconset::instance()->system().iconSize();
      ui_.toolbar->setIconSize(QSize(s,s));
  
-@@ -966,6 +979,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -963,6 +976,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      connect(d->act_send,SIGNAL(triggered()), SLOT(mle_returnPressed()));
       ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
      connect(ui_.pb_send, SIGNAL(clicked()), SLOT(mle_returnPressed()));
@@ -101,7 +101,7 @@
      d->act_close = new QAction(this);
      addAction(d->act_close);
      connect(d->act_close,SIGNAL(triggered()), SLOT(close()));
-@@ -1060,6 +1074,13 @@ GCMainDlg::~GCMainDlg()
+@@ -1057,6 +1071,13 @@ GCMainDlg::~GCMainDlg()
      account()->dialogUnregister(this);
      delete d->mucManager;
      delete d;
@@ -115,7 +115,7 @@
  }
  
  void GCMainDlg::horizSplitterMoved()
-@@ -2410,6 +2431,8 @@ void GCMainDlg::buildMenu()
+@@ -2396,6 +2417,8 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addSeparator();
  
      d->pm_settings->addAction(d->actions->action("gchat_icon"));
@@ -124,7 +124,7 @@
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
  #ifdef PSI_PLUGINS
-@@ -2475,6 +2498,50 @@ void GCMainDlg::resizeEvent(QResizeEvent *e)
+@@ -2461,4 +2484,48 @@ void GCMainDlg::resizeEvent(QResizeEvent *e)
      QTimer::singleShot(0, this, SLOT(horizSplitterMoved()));
  }
  
@@ -172,12 +172,10 @@
 +    }
 +}
 +
- //----------------------------------------------------------------------------
- // GCFindDlg
- //----------------------------------------------------------------------------
+ #include "groupchatdlg.moc"
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -147,6 +147,11 @@ private slots:
+@@ -133,6 +133,11 @@ private slots:
      void openWhiteboard();
  #endif
      void chatEditCreated();
@@ -1394,7 +1392,7 @@
      $$PWD/captchadlg.ui \
 --- a/src/tabs/tabbablewidget.cpp
 +++ b/src/tabs/tabbablewidget.cpp
-@@ -41,6 +41,12 @@ TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabMa
+@@ -42,6 +42,13 @@ TabbableWidget::TabbableWidget(const Jid &jid, PsiAccount *pa, TabManager *tabMa
      , pa_(pa)
      , tabManager_(tabManager)
  {
@@ -1404,10 +1402,11 @@
 +        TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
 +    }
 +    ++TabbableWidget::chatsCount;
-     //QTimer::singleShot(0, this, SLOT(ensureTabbedCorrectly()));
- }
- 
-@@ -103,6 +109,42 @@ TabbableWidget::~TabbableWidget()
++
+     stateCommitTimer_.setInterval(100);
+     stateCommitTimer_.setSingleShot(true);
+     connect(&stateCommitTimer_, &QTimer::timeout, this, [this](){
+@@ -116,6 +123,42 @@ TabbableWidget::~TabbableWidget()
      if (isTabbed()) {
          getManagingTabDlg()->removeTabWithNoChecks(this);
      }
@@ -1452,15 +1451,15 @@
  /**
 --- a/src/tabs/tabbablewidget.h
 +++ b/src/tabs/tabbablewidget.h
-@@ -24,6 +24,7 @@
- #include <QIcon>
+@@ -25,6 +25,7 @@
+ #include <QTimer>
  #include "advwidget.h"
  #include "im.h" // ChatState
 +#include "sendbuttonmenu.h"
  
  namespace XMPP {
      class Jid;
-@@ -68,6 +69,11 @@ public:
+@@ -69,6 +70,11 @@ public:
      virtual int unreadMessageCount() const = 0;
      virtual QString desiredCaption() const = 0;
  
@@ -1472,7 +1471,7 @@
  signals:
      void invalidateTabInfo();
      void updateFlashState();
-@@ -91,6 +97,11 @@ private:
+@@ -96,6 +102,11 @@ private:
      PsiAccount *pa_;
      TabManager *tabManager_;
      QIcon icon_;

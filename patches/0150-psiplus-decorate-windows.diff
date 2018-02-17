@@ -1,6 +1,6 @@
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -487,6 +487,7 @@ QLineEdit#le_status_text {
+@@ -491,6 +491,7 @@ QLineEdit#le_status_text {
                  </sounds>
                  <successful-subscription type="bool">true</successful-subscription>
              </notifications>
@@ -18,38 +18,9 @@
  #include "mcmdsimplesite.h"
  #include "tabcompletion.h"
  #include "vcardfactory.h"
-@@ -257,9 +258,13 @@ public:
+@@ -190,6 +191,25 @@ private:
+ };
  
-     int logSize;
-     int rosterSize;
-+
- public:
-     bool trackBar;
- 
-+    bool tabmode;
-+    PsiWindowHeader *winHeader_;
-+
- public:
-     ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
-     ChatView* te_log() const { return dlg->ui_.log; }
-@@ -845,6 +850,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
-     setAcceptDrops(true);
- 
-     ui_.setupUi(this);
-+    d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
-+    setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
-+    if (!d->tabmode && !isBorder()) {
-+        d->winHeader_ = new PsiWindowHeader(this);
-+        ui_.vboxLayout1->insertWidget(0, d->winHeader_);
-+    }
-+    setMargins();
-+
-     ui_.lb_ident->setAccount(account());
-     ui_.lb_ident->setShowJid(false);
-     ui_.log->setSessionData(true, jid(), jid().full()); //FIXME change conference name
-@@ -2553,6 +2566,25 @@ void GCMainDlg::sendTemp(const QString &templText)
-     }
- }
  
 +void GCMainDlg::setMargins()
 +{
@@ -71,11 +42,40 @@
 +}
 +
  //----------------------------------------------------------------------------
- // GCFindDlg
+ // GCMainDlg
  //----------------------------------------------------------------------------
+@@ -254,9 +274,13 @@ public:
+ 
+     int logSize;
+     int rosterSize;
++
+ public:
+     bool trackBar;
+ 
++    bool tabmode;
++    PsiWindowHeader *winHeader_;
++
+ public:
+     ChatEdit* mle() const { return dlg->ui_.mle->chatEdit(); }
+     ChatView* te_log() const { return dlg->ui_.log; }
+@@ -842,6 +866,14 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+     setAcceptDrops(true);
+ 
+     ui_.setupUi(this);
++    d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
++    setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
++    if (!d->tabmode && !isBorder()) {
++        d->winHeader_ = new PsiWindowHeader(this);
++        ui_.vboxLayout1->insertWidget(0, d->winHeader_);
++    }
++    setMargins();
++
+     ui_.lb_ident->setAccount(account());
+     ui_.lb_ident->setShowJid(false);
+     ui_.log->setSessionData(true, jid(), jid().full()); //FIXME change conference name
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -179,6 +179,8 @@ private:
+@@ -165,6 +165,8 @@ private:
  
      inline XMPP::Jid jidForNick(const QString &nick) const;
  
@@ -83,7 +83,7 @@
 +
  };
  
- class GCFindDlg : public QDialog
+ #endif
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -130,6 +130,7 @@ public:

@@ -58,7 +58,7 @@
      void updateLayout();
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -259,6 +259,9 @@ public:
+@@ -275,6 +275,9 @@ public:
      int logSize;
      int rosterSize;
  
@@ -68,7 +68,7 @@
  public:
      bool trackBar;
  
-@@ -1026,6 +1029,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -1039,6 +1042,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
      connect(ui_.hsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(horizSplitterMoved()));
@@ -76,7 +76,7 @@
  
      // resize the horizontal splitter
      d->logSize = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
-@@ -1043,10 +1047,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -1056,10 +1060,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
          ui_.hsplitter->insertWidget(0, ui_.lv_users);  // Swap widgets
  
      // resize the vertical splitter
@@ -90,7 +90,7 @@
  
      X11WM_CLASS("groupchat");
  
-@@ -1116,6 +1119,26 @@ void GCMainDlg::horizSplitterMoved()
+@@ -1129,6 +1132,26 @@ void GCMainDlg::horizSplitterMoved()
      PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
@@ -119,7 +119,7 @@
      window()->showMinimized();
 --- a/src/groupchatdlg.h
 +++ b/src/groupchatdlg.h
-@@ -87,6 +87,7 @@ public:
+@@ -73,6 +73,7 @@ public:
      virtual int unreadMessageCount() const;
      const QString & getDisplayName() const;
      virtual QString desiredCaption() const;
@@ -127,7 +127,7 @@
  
  protected:
      void setShortcuts();
-@@ -153,6 +154,7 @@ private slots:
+@@ -139,6 +140,7 @@ private slots:
      void sendTemp(const QString &);
      void psButtonEnabled();
      void horizSplitterMoved();
@@ -211,7 +211,7 @@
  #endif
 --- a/src/tabs/tabbablewidget.h
 +++ b/src/tabs/tabbablewidget.h
-@@ -68,6 +68,7 @@ public:
+@@ -69,6 +69,7 @@ public:
      virtual State state() const = 0;
      virtual int unreadMessageCount() const = 0;
      virtual QString desiredCaption() const = 0;
@@ -219,14 +219,14 @@
  
      // Templates
      SendButtonTemplatesMenu* getTemplateMenu();
-@@ -78,6 +79,7 @@ signals:
+@@ -79,6 +80,7 @@ signals:
      void invalidateTabInfo();
      void updateFlashState();
      void eventsRead(const Jid &);
 +    void vSplitterMoved(int,int);
  
  public slots:
-     virtual void deactivated();
+     void bringToFront(bool raiseWindow = true);
 --- a/src/tabs/tabdlg.cpp
 +++ b/src/tabs/tabdlg.cpp
 @@ -426,6 +426,7 @@ void TabDlg::addTab(TabbableWidget* tab)
