@@ -3,8 +3,6 @@
 # first argument - path to cloned Psi repo
 # second argument[optional] - --webkit
 
-ref_commit=db1a4053ef7aae72ae819eb00eba47bae9530320 # 1.2 tag
-
 show_help() {
   echo "Usage: $0 <psi_repo_path> [--webkit|--webengine] [--sql]"
 }
@@ -14,9 +12,14 @@ psi_path="$(cd $1;pwd)"
 
 cd "$(dirname "$0")"
 
+# revs
+psi_rev="$(cd "$psi_path"; git rev-parse --short HEAD)"
+plus_rev="$(git rev-parse --short HEAD)"
+plus_tag=$(git tag | sort -V | grep '^[0-9]\+.[0-9]\+$' | tail -n 1)
+
 # compute version number
-psi_num=$("${psi_path}/admin/git_revnumber.sh")
-plus_num=$(git rev-list --count ${ref_commit}..HEAD)
+psi_num=$("${psi_path}/admin/git_revnumber.sh" "${plus_tag}")
+plus_num=$(git describe --tags | cut -d - -f2)
 sum_commit=$(expr ${psi_num} + ${plus_num})
 
 # compute version date
@@ -26,10 +29,5 @@ rev_date=$(echo "${rev_date_list}" | sort -r | head -n1)
 
 # features list
 features=$([ "${2}" = --webkit ] && echo ", webkit")$([ "${2}" = --webengine ] && echo ", webengine")$([ "${2}" = --sql ] && echo ", sql")$([ "${3}" = --sql ] && echo ", sql")
-
-# revs
-psi_rev="$(cd "$psi_path"; git rev-parse --short HEAD)"
-plus_rev="$(git rev-parse --short HEAD)"
-plus_tag=$(git tag | sort -V | grep '^[0-9]\+.[0-9]\+$' | tail -n 1)
 
 echo "${plus_tag}.${sum_commit} (${rev_date}, Psi:${psi_rev}, Psi+:${plus_rev}${features})"
