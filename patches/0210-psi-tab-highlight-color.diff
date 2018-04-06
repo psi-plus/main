@@ -1,18 +1,25 @@
 --- psi.orig/src/chatdlg.cpp
 +++ psi/src/chatdlg.cpp
-@@ -1127,9 +1127,15 @@ void ChatDlg::chatEditCreated()
+@@ -1254,15 +1254,17 @@ void ChatDlg::chatEditCreated()
  
  TabbableWidget::State ChatDlg::state() const
  {
--    return contactChatState_ == XMPP::StateComposing ?
--           TabbableWidget::StateComposing :
--           TabbableWidget::StateNone;
+-    switch (contactChatState_) {
+-        case XMPP::StateComposing:
+-            return TabbableWidget::StateComposing;
+-        case XMPP::StateInactive:
+-        case XMPP::StateGone:
+-            return TabbableWidget::StateInactive;
+-        default:
+-            return TabbableWidget::StateNone;
 +    TabbableWidget::State state = TabbableWidget::StateNone;
 +    if(contactChatState_ == XMPP::StateComposing) {
 +        state = TabbableWidget::StateComposing;
-+    }
+     }
 +    else if(unreadMessageCount()) {
 +        state = TabbableWidget::StateHighlighted;
++    } else if (contactChatState_ == XMPP::StateInactive || contactChatState_ == XMPP::StateGone) {
++        state = TabbableWidget::StateInactive;
 +    }
 +
 +    return state;
@@ -21,7 +28,7 @@
  int ChatDlg::unreadMessageCount() const
 --- psi.orig/src/groupchatdlg.cpp
 +++ psi/src/groupchatdlg.cpp
-@@ -2182,7 +2182,7 @@ void GCMainDlg::chatEditCreated()
+@@ -2552,7 +2552,7 @@ void GCMainDlg::chatEditCreated()
  
  TabbableWidget::State GCMainDlg::state() const
  {
@@ -32,19 +39,19 @@
  int GCMainDlg::unreadMessageCount() const
 --- psi.orig/src/tabs/tabbablewidget.h
 +++ psi/src/tabs/tabbablewidget.h
-@@ -62,7 +62,8 @@ public:
- 
+@@ -65,7 +65,8 @@ public:
      enum State {
          StateNone = 0,
--        StateComposing
-+        StateComposing,
+         StateComposing,
+-        StateInactive
++        StateInactive,
 +        StateHighlighted
      };
      virtual State state() const = 0;
      virtual int unreadMessageCount() const = 0;
 --- psi.orig/src/tabs/tabdlg.cpp
 +++ psi/src/tabs/tabdlg.cpp
-@@ -654,17 +654,25 @@ void TabDlg::updateTab(TabbableWidget* c
+@@ -656,21 +656,27 @@ void TabDlg::updateTab(TabbableWidget* chat)
      tabWidget_->setTabText(chat, captionForTab(chat));
      //now set text colour based upon whether there are new messages/composing etc
  
@@ -58,13 +65,19 @@
 -        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
 -        tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/chat")->icon());
 -    }
+-    else if (chat->state() == TabbableWidget::StateInactive) {
+-        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
+-        tabWidget_->setTabIcon(chat, chat->icon());
+-    }
      else {
 -        tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
 -        tabWidget_->setTabIcon(chat, chat->icon());
 +        if (state == TabbableWidget::StateHighlighted) {
 +            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
 +        }
-+        else {
++        else if (state == TabbableWidget::StateInactive) {
++            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
++        } else {
 +            tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
 +        }
 +
