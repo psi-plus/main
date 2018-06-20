@@ -6,20 +6,20 @@
  {
 -    switch (contactChatState_) {
 -        case XMPP::StateComposing:
--            return TabbableWidget::StateComposing;
+-            return TabbableWidget::State::Composing;
 -        case XMPP::StateInactive:
 -        case XMPP::StateGone:
--            return TabbableWidget::StateInactive;
+-            return TabbableWidget::State::Inactive;
 -        default:
--            return TabbableWidget::StateNone;
-+    TabbableWidget::State state = TabbableWidget::StateNone;
+-            return TabbableWidget::State::None;
++    TabbableWidget::State state = TabbableWidget::State::None;
 +    if(contactChatState_ == XMPP::StateComposing) {
-+        state = TabbableWidget::StateComposing;
++        state = TabbableWidget::State::Composing;
      }
 +    else if(unreadMessageCount()) {
-+        state = TabbableWidget::StateHighlighted;
++        state = TabbableWidget::State::Highlighted;
 +    } else if (contactChatState_ == XMPP::StateInactive || contactChatState_ == XMPP::StateGone) {
-+        state = TabbableWidget::StateInactive;
++        state = TabbableWidget::State::Inactive;
 +    }
 +
 +    return state;
@@ -32,8 +32,8 @@
  
  TabbableWidget::State GCMainDlg::state() const
  {
--    return TabbableWidget::StateNone;
-+    return d->hPending ? TabbableWidget::StateHighlighted : TabbableWidget::StateNone;
+-    return TabbableWidget::State::None;
++    return d->hPending ? TabbableWidget::State::Highlighted : TabbableWidget::State::None;
  }
  
  int GCMainDlg::unreadMessageCount() const
@@ -41,11 +41,11 @@
 +++ psi/src/tabs/tabbablewidget.h
 @@ -65,7 +65,8 @@ public:
      enum State {
-         StateNone = 0,
-         StateComposing,
--        StateInactive
-+        StateInactive,
-+        StateHighlighted
+         None = 0,
+         Composing,
+-        Inactive
++        Inactive,
++        Highlighted
      };
      virtual State state() const = 0;
      virtual int unreadMessageCount() const = 0;
@@ -55,9 +55,9 @@
      tabWidget_->setTabText(chat, captionForTab(chat));
      //now set text colour based upon whether there are new messages/composing etc
  
--    if (chat->state() == TabbableWidget::StateComposing) {
+-    if (chat->state() == TabbableWidget::State::Composing) {
 +    TabbableWidget::State state = chat->state();
-+    if (state == TabbableWidget::StateComposing) {
++    if (state == TabbableWidget::State::Composing) {
          tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.composing-color").value<QColor>());
          tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/typing")->icon());
      }
@@ -65,17 +65,17 @@
 -        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
 -        tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/chat")->icon());
 -    }
--    else if (chat->state() == TabbableWidget::StateInactive) {
+-    else if (chat->state() == TabbableWidget::State::Inactive) {
 -        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
 -        tabWidget_->setTabIcon(chat, chat->icon());
 -    }
      else {
 -        tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
 -        tabWidget_->setTabIcon(chat, chat->icon());
-+        if (state == TabbableWidget::StateHighlighted) {
++        if (state == TabbableWidget::State::Highlighted) {
 +            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
 +        }
-+        else if (state == TabbableWidget::StateInactive) {
++        else if (state == TabbableWidget::State::Inactive) {
 +            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
 +        } else {
 +            tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
