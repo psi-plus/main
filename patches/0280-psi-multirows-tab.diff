@@ -10,7 +10,7 @@
          <file>iconsets/system/default/keys_64.png</file>
 --- a/iconsets/system/default/icondef.xml
 +++ b/iconsets/system/default/icondef.xml
-@@ -741,6 +741,11 @@
+@@ -746,6 +746,11 @@
  		<x xmlns='name'>psi/doubleBackArrow</x>
  		<object mime='image/png'>psiplus/doublebackarrow.png</object>
  	</icon>
@@ -24,7 +24,7 @@
  	<!-- Icons for screenshot-plugin -->
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -515,6 +515,9 @@ QLineEdit#le_status_text {
+@@ -516,6 +516,9 @@ QLineEdit#le_status_text {
                  <tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
                  <use-tab-shortcuts type="bool">true</use-tab-shortcuts>
                  <show-tab-buttons type="bool">true</show-tab-buttons>
@@ -34,7 +34,7 @@
              </tabs>
          </ui>
          <shortcuts comment="Shortcuts">
-@@ -582,8 +585,10 @@ QLineEdit#le_status_text {
+@@ -583,8 +586,10 @@ QLineEdit#le_status_text {
                  <chat_icon type="QKeySequence"></chat_icon>
                  <chat_info type="QKeySequence"></chat_info>
                  <chat_pgp type="QKeySequence"></chat_pgp>
@@ -45,7 +45,7 @@
                  <chat_voice type="QKeySequence"></chat_voice>
                  <gchat_clear type="QKeySequence"></gchat_clear>
                  <gchat_configure type="QKeySequence"></gchat_configure>
-@@ -592,6 +597,8 @@ QLineEdit#le_status_text {
+@@ -593,6 +598,8 @@ QLineEdit#le_status_text {
                  <gchat_icon type="QKeySequence"></gchat_icon>
                  <gchat_ps type="QKeySequence"></gchat_ps>
                  <gchat_templates type="QKeySequence"></gchat_templates>
@@ -74,7 +74,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2524,6 +2528,13 @@ void GCMainDlg::buildMenu()
+@@ -2532,6 +2536,13 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
@@ -172,7 +172,7 @@
 +}
 --- a/src/tabs/tabbablewidget.h
 +++ b/src/tabs/tabbablewidget.h
-@@ -87,6 +87,7 @@ public slots:
+@@ -88,6 +88,7 @@ public slots:
      void bringToFront(bool raiseWindow = true);
      virtual void ensureTabbedCorrectly();
      void hideTab();
@@ -182,7 +182,7 @@
      virtual void setJid(const Jid&);
 --- a/src/tabs/tabdlg.cpp
 +++ b/src/tabs/tabdlg.cpp
-@@ -291,6 +291,11 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
+@@ -285,6 +285,11 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
              tabMenu_->addMenu(sendTo);
          }
  
@@ -194,7 +194,7 @@
          QAction *act = tabMenu_->exec(pos);
          if (!act)
              return;
-@@ -303,6 +308,9 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
+@@ -297,6 +302,9 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
          else if(act == h) {
              hideTab(getTab(tab));
          }
@@ -204,7 +204,7 @@
          else {
              TabDlg* target = sentTos[act];
              if (target)
-@@ -448,6 +456,11 @@ void TabDlg::hideTab(TabbableWidget* tab)
+@@ -442,6 +450,11 @@ void TabDlg::hideTab(TabbableWidget* tab)
      closeTab(tab, false);
  }
  
@@ -216,7 +216,7 @@
  void TabDlg::hideAllTab()
  {
      foreach(TabbableWidget* tab, tabs_)
-@@ -924,6 +937,11 @@ void TabDlg::updateVSplitters(int log, int chat)
+@@ -922,6 +935,11 @@ void TabDlg::updateVSplitters(int log, int chat)
      }
  }
  
@@ -286,7 +286,7 @@
      closeButton_->setText("x");
      downButton_->setArrowType(Qt::DownArrow);
      downButton_->setPopupMode(QToolButton::InstantPopup);
-@@ -76,20 +82,23 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
+@@ -76,20 +82,22 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
      setTabPosition(QTabWidget::North);
      setLooks();
  
@@ -301,11 +301,10 @@
 -    connect(tabBar_, SIGNAL(mouseMiddleClickTab(int)), SLOT(mouseMiddleClickTab(int)));
 -    connect(tabBar_, SIGNAL( currentChanged(int)), SLOT(tab_currentChanged(int)));
 -    connect(tabBar_, SIGNAL( contextMenu(QContextMenuEvent*,int)), SLOT( tab_contextMenu(QContextMenuEvent*,int)));
-+#if QT_VERSION >= 0x040500
 +    if (!PsiOptions::instance()->getOption("options.ui.tabs.show-tab-close-buttons").toBool()){
 +        tabBar_->setTabsClosable(false);
 +    }
-+#endif
++
 +    connect( tabBar_, SIGNAL(mouseDoubleClickTab(int)), SLOT(mouseDoubleClickTab(int)));
 +    connect( tabBar_, SIGNAL(mouseMiddleClickTab(int)), SLOT(mouseMiddleClickTab(int)));
 +    // TabBar::tabRemove must be handled before tab_currentChanged
@@ -318,7 +317,7 @@
  }
  
  void PsiTabWidget::setCloseIcon(const QIcon& icon) {
-@@ -180,6 +189,7 @@ void PsiTabWidget::addTab(QWidget *widget, QString name, const QIcon &icon)
+@@ -180,6 +188,7 @@ void PsiTabWidget::addTab(QWidget *widget, QString name, const QIcon &icon)
          tabBar_->addTab(name);
      setLooks();
      showPage(currentPage());
@@ -326,7 +325,7 @@
  }
  
  void PsiTabWidget::setLooks()
-@@ -190,6 +200,14 @@ void PsiTabWidget::setLooks()
+@@ -190,6 +199,14 @@ void PsiTabWidget::setLooks()
      }
  }
  
@@ -341,7 +340,7 @@
  /**
   * Selects the page for the specified widget.
   */
-@@ -217,6 +235,28 @@ void PsiTabWidget::showPageDirectly(QWidget* widget) {
+@@ -217,6 +234,28 @@ void PsiTabWidget::showPageDirectly(QWidget* widget) {
      }
  }
  
@@ -370,28 +369,20 @@
  /**
   * Removes the page for the specified widget.
   */
-@@ -364,6 +404,11 @@ void PsiTabWidget::setDragsEnabled(bool enabled) {
-     ((PsiTabBar *)tabBar_)->setDragsEnabled(enabled);
- }
- 
+@@ -361,7 +400,12 @@ void PsiTabWidget::setTabButtonsShown(bool shown) {
+  * Enable/disable dragging of tabs
+  */
+ void PsiTabWidget::setDragsEnabled(bool enabled) {
+-    ((PsiTabBar *)tabBar_)->setDragsEnabled(enabled);
++    static_cast<PsiTabBar *>(tabBar_)->setDragsEnabled(enabled);
++}
++
 +void PsiTabWidget::setTabBarUpdateEnabled(bool b)
 +{
 +    tabBar_->setUpdateEnabled(b);
-+}
-+
+ }
+ 
  void PsiTabWidget::widgetMoved(int from, int to)
- {
-     if (from > to) {
-@@ -379,6 +424,9 @@ void PsiTabWidget::widgetMoved(int from, int to)
-         stacked_->insertWidget(to,widgets_[to]);
-     }
- 
-+#if QT_VERSION <= 0x040500
-+    setCurrentPage(to);
-+#endif
-     emit currentChanged(currentPage());
- 
- };
 --- a/src/widgets/psitabwidget.h
 +++ b/src/widgets/psitabwidget.h
 @@ -22,7 +22,6 @@
