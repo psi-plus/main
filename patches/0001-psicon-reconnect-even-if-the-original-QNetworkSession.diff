@@ -15,16 +15,10 @@ This is mostly a work-around, merely a hack. We need to implement
 roaming (or something alike) in the longterm.
 
 This fixes #736.
----
- src/psicon.cpp | 25 ++++++++++++++++++++++---
- src/psicon.h   |  2 ++
- 2 files changed, 24 insertions(+), 3 deletions(-)
 
-diff --git a/src/psicon.cpp b/src/psicon.cpp
-index 84a47b5a..79430e02 100644
---- a/src/psicon.cpp
-+++ b/src/psicon.cpp
-@@ -406,9 +406,7 @@ bool PsiCon::init()
+--- git.orig/src/psicon.cpp
++++ git/src/psicon.cpp
+@@ -385,9 +385,7 @@ bool PsiCon::init()
      PGPUtil::instance();
  #endif
  
@@ -35,7 +29,7 @@ index 84a47b5a..79430e02 100644
  
      d->contactList = new PsiContactList(this);
  
-@@ -1911,6 +1909,27 @@ void PsiCon::doWakeup()
+@@ -1889,6 +1887,28 @@ void PsiCon::doWakeup()
      d->wakeupPending = true; // and wait for signal till network session is opened (proved to work on gentoo+nm+xfce)
  }
  
@@ -48,7 +42,8 @@ index 84a47b5a..79430e02 100644
 +     * This is mostly a work-around, merely a hack. We need to implement
 +     * roaming (or something alike) in the longterm.
 +     */
-+    delete d->netSession;
++    disconnect(d->netSession);
++    d->netSession->deleteLater();
 +    initNetSession();
 +}
 +
@@ -63,10 +58,8 @@ index 84a47b5a..79430e02 100644
  void PsiCon::networkSessionOpened()
  {
      if (d->wakeupPending) {
-diff --git a/src/psicon.h b/src/psicon.h
-index d1e6a2b6..e98a34c7 100644
---- a/src/psicon.h
-+++ b/src/psicon.h
+--- git.orig/src/psicon.h
++++ git/src/psicon.h
 @@ -187,6 +187,7 @@ private slots:
      void secondsIdle(int);    
      void proceedWithSleep();
@@ -83,6 +76,3 @@ index d1e6a2b6..e98a34c7 100644
  };
  
  #endif
--- 
-2.18.0
-
