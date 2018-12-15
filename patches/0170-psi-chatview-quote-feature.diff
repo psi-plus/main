@@ -1,5 +1,5 @@
---- a/src/chatview_te.cpp
-+++ b/src/chatview_te.cpp
+--- git.orig/src/chatview_te.cpp
++++ git/src/chatview_te.cpp
 @@ -36,6 +36,7 @@
  #include <QTimer>
  #include <QKeyEvent>
@@ -21,7 +21,7 @@
  
      useMessageIcons_ = PsiOptions::instance()->getOption("options.ui.chat.use-message-icons").toBool();
      if (useMessageIcons_) {
-@@ -147,10 +154,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent *e)
+@@ -148,10 +155,20 @@ void ChatView::contextMenuEvent(QContext
          e->accept();
      }
      else {
@@ -43,11 +43,10 @@
  void ChatView::addLogIconsResources()
  {
      document()->addResource(QTextDocument::ImageResource, QUrl("icon:log_icon_receive"), logIconReceive);
-@@ -216,6 +233,24 @@ void ChatView::autoCopy()
-     }
+@@ -218,6 +235,24 @@ void ChatView::autoCopy()
  }
  
-+/**
+ /**
 + * Make quote from any selected text and paste it in chat window
 + */
 +
@@ -65,11 +64,12 @@
 +    actQuote_->setEnabled(textCursor().hasSelection());
 +}
 +
- /**
++/**
   * Handle KeyPress events that happen in ChatEdit widget. This is used
   * to 'fix' the copy shortcut.
---- a/src/chatview_te.h
-+++ b/src/chatview_te.h
+  * \param object object that should receive the event
+--- git.orig/src/chatview_te.h
++++ git/src/chatview_te.h
 @@ -51,6 +51,7 @@ public:
      QSize sizeHint() const;
      void clear();
@@ -78,7 +78,7 @@
  
      void init();
      void setDialog(QWidget* dialog);
-@@ -91,12 +92,15 @@ protected:
+@@ -92,12 +93,15 @@ protected:
  
  protected slots:
      void autoCopy();
@@ -94,7 +94,7 @@
      void nickInsertClick(const QString &nick);
  
  private:
-@@ -118,6 +122,7 @@ private:
+@@ -120,6 +124,7 @@ private:
      QPixmap logIconInfo;
      QPixmap logIconCorrected;
      QPixmap logIconHistory;
@@ -102,9 +102,9 @@
  };
  
  #endif
---- a/src/groupchatdlg.cpp
-+++ b/src/groupchatdlg.cpp
-@@ -927,6 +927,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
+@@ -1051,6 +1051,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      invalidateTab();
      setConnecting();
  
@@ -112,8 +112,8 @@
      connect(pa->avatarFactory(), SIGNAL(avatarChanged(Jid)), SLOT(avatarUpdated(Jid)));
  
  #ifdef PSI_PLUGINS
---- a/src/msgmle.cpp
-+++ b/src/msgmle.cpp
+--- git.orig/src/msgmle.cpp
++++ git/src/msgmle.cpp
 @@ -33,6 +33,7 @@
  #include <QTextDocument>
  #include <QTimer>
@@ -150,7 +150,7 @@
  bool ChatEdit::checkSpellingGloballyEnabled()
  {
      return (SpellChecker::instance()->available() && PsiOptions::instance()->getOption("options.ui.spell-check.enabled").toBool());
-@@ -356,8 +371,10 @@ void ChatEdit::contextMenuEvent(QContextMenuEvent *e)
+@@ -356,8 +371,10 @@ void ChatEdit::contextMenuEvent(QContext
          }
      }
  
@@ -182,7 +182,7 @@
  void ChatEdit::showHistoryMessagePrev()
  {
      if (!typedMsgsHistory.isEmpty() && (typedMsgsIndex > 0 || correction)) {
-@@ -558,6 +587,24 @@ void ChatEdit::setCssString(const QString &css) {
+@@ -558,6 +587,24 @@ void ChatEdit::setCssString(const QStrin
      controller_->setCssString(css);
  }
  
@@ -207,8 +207,8 @@
  //----------------------------------------------------------------------------
  // LineEdit
  //----------------------------------------------------------------------------
---- a/src/msgmle.h
-+++ b/src/msgmle.h
+--- git.orig/src/msgmle.h
++++ git/src/msgmle.h
 @@ -52,6 +52,7 @@ public:
      // reimplemented
      QSize sizeHint() const;
@@ -242,18 +242,19 @@
      QString currentText;
      HTMLTextController *controller_;
      CapitalLettersController *capitalizer_;
---- a/src/psichatdlg.cpp
-+++ b/src/psichatdlg.cpp
-@@ -289,6 +289,7 @@ void PsiChatDlg::initUi()
-         ui_.vboxLayout1->insertWidget(0, winHeader_);
-     }
-     setMargins();
-+    connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
+--- git.orig/src/psichatdlg.cpp
++++ git/src/psichatdlg.cpp
+@@ -282,6 +282,8 @@ void PsiChatDlg::initUi()
+     connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
+     addAction(act_mini_cmd_);
  
++    connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
++
      act_pastesend_ = new IconAction(tr("Paste and Send"), "psi/action_paste_and_send", tr("Paste and Send"), 0, this);
      connect(act_pastesend_, SIGNAL(triggered()), SLOT(doPasteAndSend()));
---- a/src/webview.cpp
-+++ b/src/webview.cpp
+ 
+--- git.orig/src/webview.cpp
++++ git/src/webview.cpp
 @@ -76,6 +76,11 @@ WebView::WebView(QWidget* parent) :
  #endif
      connect(page(), SIGNAL(loadStarted()), this, SLOT(loadStartedEvent()));
@@ -266,7 +267,7 @@
  }
  
  void WebView::linkClickedEvent(const QUrl& url)
-@@ -99,6 +104,11 @@ void WebView::loadFinishedEvent(bool success)
+@@ -99,6 +104,11 @@ void WebView::loadFinishedEvent(bool suc
      isLoading_ = false;
  }
  
@@ -278,7 +279,7 @@
  void WebView::contextMenuEvent(QContextMenuEvent* event)
  {
      if (isLoading_) return;
-@@ -139,6 +149,7 @@ void WebView::contextMenuEvent(QContextMenuEvent* event)
+@@ -139,6 +149,7 @@ void WebView::contextMenuEvent(QContextM
      menu->addAction(pageAction(QWebEnginePage::Reload));
  #else
              menu->addAction(pageAction(QWebPage::Copy));
@@ -286,9 +287,9 @@
          } else {
              if (!menu->isEmpty()) {
                  menu->addSeparator();
---- a/src/webview.h
-+++ b/src/webview.h
-@@ -87,13 +87,17 @@ private:
+--- git.orig/src/webview.h
++++ git/src/webview.h
+@@ -85,13 +85,17 @@ private:
      bool isLoading_;
      QStringList jsBuffer_;
      QPoint dragStartPosition;
@@ -306,8 +307,8 @@
  };
  
  
---- a/src/widgets/psitextview.cpp
-+++ b/src/widgets/psitextview.cpp
+--- git.orig/src/widgets/psitextview.cpp
++++ git/src/widgets/psitextview.cpp
 @@ -25,6 +25,7 @@
  #include <QAbstractTextDocumentLayout>
  #include <QTextDocumentFragment>
@@ -316,7 +317,7 @@
  #include <QMimeData>
  
  #include "urlobject.h"
-@@ -79,6 +80,54 @@ PsiTextView::PsiTextView(QWidget *parent)
+@@ -79,6 +80,54 @@ PsiTextView::PsiTextView(QWidget *parent
      viewport()->setMouseTracking(true); // we want to get all mouseMoveEvents
  }
  
@@ -371,7 +372,7 @@
  /**
   * This function returns true if vertical scroll bar is
   * at its maximum position.
-@@ -175,11 +224,7 @@ QString PsiTextView::getPlainText() const
+@@ -183,11 +232,7 @@ QString PsiTextView::getPlainText() cons
  
  void PsiTextView::contextMenuEvent(QContextMenuEvent *e)
  {
@@ -384,8 +385,8 @@
      menu->exec(e->globalPos());
      e->accept();
      delete menu;
---- a/src/widgets/psitextview.h
-+++ b/src/widgets/psitextview.h
+--- git.orig/src/widgets/psitextview.h
++++ git/src/widgets/psitextview.h
 @@ -32,6 +32,9 @@ class PsiTextView : public QTextEdit
  public:
      PsiTextView(QWidget *parent = 0);
@@ -396,7 +397,7 @@
      bool atBottom();
  
      virtual void appendText(const QString &text);
-@@ -68,6 +71,7 @@ protected:
+@@ -69,6 +72,7 @@ protected:
      class Private;
  private:
      Private *d;
