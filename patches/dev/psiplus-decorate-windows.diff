@@ -406,7 +406,7 @@
  #include <QWidget>
  
  class GAdvancedWidget : public QObject
-@@ -65,6 +66,196 @@ class AdvancedWidget : public BaseClass
+@@ -65,14 +66,205 @@ class AdvancedWidget : public BaseClass
  {
  private:
      GAdvancedWidget *gAdvWidget;
@@ -602,8 +602,11 @@
 +    }
  
  public:
-     AdvancedWidget(QWidget *parent = 0, Qt::WindowFlags f = 0)
-@@ -73,6 +264,7 @@ public:
+-    AdvancedWidget(QWidget *parent = 0, Qt::WindowFlags f = 0)
++    AdvancedWidget(QWidget *parent = nullptr, Qt::WindowFlags f = nullptr)
+         : BaseClass(parent)
+-        , gAdvWidget(0)
++        , gAdvWidget(nullptr)
      {
          if (f != 0)
              BaseClass::setWindowFlags(f);
@@ -611,7 +614,7 @@
          gAdvWidget = new GAdvancedWidget( this );
      }
  
-@@ -151,6 +343,48 @@ public:
+@@ -151,6 +343,49 @@ public:
          windowTitleChanged();
      }
  
@@ -650,7 +653,8 @@
 +        }
 +#endif
 +        border_ = isDecorated;
-+        enableMouseTracking(!isDecorated);
++        BaseClass::setMouseTracking(!isDecorated);
++        //enableMouseTracking(!isDecorated);
 +    }
 +    bool isBorder() const
 +    {
@@ -660,7 +664,7 @@
  protected:
      virtual void windowTitleChanged()
      {
-@@ -165,6 +399,63 @@ protected:
+@@ -165,6 +400,63 @@ protected:
          }
          BaseClass::changeEvent(event);
      }
@@ -677,6 +681,7 @@
 +            region_ = getMouseRegion(event->globalPos().x(), event->globalPos().y(), window->geometry());
 +            if (region_ != Qt::NoSection) {
 +                action_ = WinAction::Resizing;
++                updateCursor(region_, BaseClass::window());
 +            }
 +            else{
 +                movePath_ = event->globalPos() - window->pos();
@@ -710,14 +715,13 @@
 +    }
 +    void mouseReleaseEvent(QMouseEvent *event)
 +    {
++        QWidget *window = BaseClass::window();
 +        if (!border_ && (event->button() == Qt::LeftButton)
 +            && action_ == WinAction::Dragging && !isMaximized()) {
-+            QWidget *window = BaseClass::window();
-+
 +            movePath_ = QPoint(0,0);
 +            action_ = WinAction::None;
-+            window->setCursor(QCursor(Qt::ArrowCursor));
 +        }
++        window->setCursor(QCursor(Qt::ArrowCursor));
 +
 +        BaseClass::mouseReleaseEvent(event);
 +    }
@@ -726,7 +730,7 @@
  #endif
 --- git.orig/src/widgets/psiwindowheader.cpp
 +++ git/src/widgets/psiwindowheader.cpp
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,271 @@
 +/*
 + * psiwindowheader.cpp
 + * Copyright (C) 2010-2017  Evgeny Khryukin, Vitaly Tonkacheyev
@@ -823,6 +827,7 @@
 +        region_ = getMouseRegion(e->globalPos().x(), e->globalPos().y(), parent_->window()->geometry());
 +        if (region_ != Qt::NoSection) {
 +            action_ = WinAction::Resizing;
++            updateCursor(region_);
 +        }
 +        else{
 +            movePath_ = e->globalPos() - parent_->window()->pos();
@@ -948,7 +953,6 @@
 +        if (e->button() == Qt::LeftButton && action_ == WinAction::Dragging) {
 +            movePath_ = QPoint(0,0);
 +            action_ = WinAction::None;
-+            setCursor(QCursor(Qt::ArrowCursor));
 +        }
 +        int min_x = qMin(ui_.hideButton->geometry().left(), qMin(ui_.maximizeButton->geometry().left(), ui_.closeButton->geometry().left()));
 +        int max_x = qMax(ui_.hideButton->geometry().right(), qMax(ui_.maximizeButton->geometry().right(), ui_.closeButton->geometry().right()));
@@ -960,6 +964,7 @@
 +                hidePressed();
 +            }
 +        }
++        setCursor(QCursor(Qt::ArrowCursor));
 +    }
 +    e->accept();
 +}
@@ -992,9 +997,10 @@
 +void PsiWindowHeader::enableMouseTracking(bool enabled)
 +{
 +    //Dirty hack to enable mouse tracking for psichatdlg
-+    foreach (QWidget *w, qApp->allWidgets()) {
++    /*foreach (QWidget *w, qApp->allWidgets()) {
 +        w->setMouseTracking(enabled);
-+    }
++    }*/
++    this->setMouseTracking(enabled);
 +}
 --- git.orig/src/widgets/psiwindowheader.h
 +++ git/src/widgets/psiwindowheader.h
