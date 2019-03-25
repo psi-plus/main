@@ -24,7 +24,7 @@
          <file>iconsets/system/default/keys_64.png</file>
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -515,6 +515,9 @@ QLineEdit#le_status_text {
+@@ -509,6 +509,9 @@ QLineEdit#le_status_text {
                  <tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
                  <use-tab-shortcuts type="bool">true</use-tab-shortcuts>
                  <show-tab-buttons type="bool">true</show-tab-buttons>
@@ -34,7 +34,7 @@
              </tabs>
          </ui>
          <shortcuts comment="Shortcuts">
-@@ -582,8 +585,10 @@ QLineEdit#le_status_text {
+@@ -576,8 +579,10 @@ QLineEdit#le_status_text {
                  <chat_icon type="QKeySequence"></chat_icon>
                  <chat_info type="QKeySequence"></chat_info>
                  <chat_pgp type="QKeySequence"></chat_pgp>
@@ -45,7 +45,7 @@
                  <chat_voice type="QKeySequence"></chat_voice>
                  <gchat_clear type="QKeySequence"></gchat_clear>
                  <gchat_configure type="QKeySequence"></gchat_configure>
-@@ -592,6 +597,8 @@ QLineEdit#le_status_text {
+@@ -586,6 +591,8 @@ QLineEdit#le_status_text {
                  <gchat_icon type="QKeySequence"></gchat_icon>
                  <gchat_ps type="QKeySequence"></gchat_ps>
                  <gchat_templates type="QKeySequence"></gchat_templates>
@@ -56,7 +56,7 @@
                  <next-tab type="QVariantList" comment="Switch to the next tab">
 --- git.orig/src/groupchatdlg.cpp
 +++ git/src/groupchatdlg.cpp
-@@ -96,6 +96,7 @@
+@@ -95,6 +95,7 @@
  #include "vcardfactory.h"
  #include "languagemanager.h"
  #include "filesharedlg.h"
@@ -64,7 +64,7 @@
  
  #ifdef Q_OS_WIN
  #include <windows.h>
-@@ -260,6 +261,7 @@ public:
+@@ -259,6 +260,7 @@ public:
      int rosterSize;
  public:
      bool trackBar;
@@ -72,7 +72,7 @@
  
      int logHeight;
      int chateditHeight;
-@@ -849,6 +851,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -848,6 +850,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      setAcceptDrops(true);
  
      ui_.setupUi(this);
@@ -80,7 +80,7 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -922,6 +925,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -921,6 +924,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
          else if (name == QLatin1String("gchat_templates")) {
              action->setMenu(getTemplateMenu());
          }
@@ -90,7 +90,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2501,6 +2507,13 @@ void GCMainDlg::buildMenu()
+@@ -2489,6 +2495,13 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
@@ -106,7 +106,7 @@
          d->pm_settings->addSeparator();
 --- git.orig/src/psiactionlist.cpp
 +++ git/src/psiactionlist.cpp
-@@ -455,6 +455,8 @@ void PsiActionList::Private::createChat(
+@@ -454,6 +454,8 @@ void PsiActionList::Private::createChat(
          IconAction *actCompact = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
          IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
@@ -115,16 +115,16 @@
  
          ActionNames actions[] = {
              { "chat_clear",  actClear  },
-@@ -470,6 +472,8 @@ void PsiActionList::Private::createChat(
+@@ -469,6 +471,8 @@ void PsiActionList::Private::createChat(
              { "chat_compact", actCompact   },
              { "chat_active_contacts", actActiveContacts   },
              { "chat_templates", actTemplates },
 +            { "chat_pin_tab", actPinTab },
 +            { "chat_unpin_tab", actUnpinTab },
-             { "", 0 }
+             { "", nullptr }
          };
  
-@@ -488,6 +492,8 @@ void PsiActionList::Private::createGroup
+@@ -487,6 +491,8 @@ void PsiActionList::Private::createGroup
          IconAction *actConfigure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("Configure Room"), 0, this);
          IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
@@ -133,13 +133,13 @@
  
          ActionNames actions[] = {
              { "gchat_clear",     actClear     },
-@@ -496,6 +502,8 @@ void PsiActionList::Private::createGroup
+@@ -495,6 +501,8 @@ void PsiActionList::Private::createGroup
              { "gchat_configure", actConfigure },
              { "gchat_icon",      actIcon      },
              { "gchat_templates", actTemplates },
 +            { "gchat_pin_tab",   actPinTab    },
 +            { "gchat_unpin_tab", actUnpinTab  },
-             { "", 0 }
+             { "", nullptr }
          };
  
 --- git.orig/src/psichatdlg.cpp
@@ -177,7 +177,7 @@
          pm_settings_->addSeparator();
 --- git.orig/src/tabs/tabbablewidget.cpp
 +++ git/src/tabs/tabbablewidget.cpp
-@@ -294,3 +294,8 @@ void TabbableWidget::hideTab()
+@@ -293,3 +293,8 @@ void TabbableWidget::hideTab()
      else
          hide();
  }
@@ -188,7 +188,7 @@
 +}
 --- git.orig/src/tabs/tabbablewidget.h
 +++ git/src/tabs/tabbablewidget.h
-@@ -88,6 +88,7 @@ public slots:
+@@ -87,6 +87,7 @@ public slots:
      void bringToFront(bool raiseWindow = true);
      virtual void ensureTabbedCorrectly();
      void hideTab();
@@ -198,7 +198,7 @@
      virtual void setJid(const Jid&);
 --- git.orig/src/tabs/tabdlg.cpp
 +++ git/src/tabs/tabdlg.cpp
-@@ -274,6 +274,11 @@ void TabDlg::showTabMenu(int tab, QPoint
+@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint
              tabMenu_->addMenu(sendTo);
          }
  
@@ -210,7 +210,7 @@
          QAction *act = tabMenu_->exec(pos);
          if (!act)
              return;
-@@ -286,6 +291,9 @@ void TabDlg::showTabMenu(int tab, QPoint
+@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint
          else if(act == h) {
              hideTab(getTab(tab));
          }
@@ -220,7 +220,7 @@
          else {
              TabDlg* target = sentTos[act];
              if (target)
-@@ -431,6 +439,11 @@ void TabDlg::hideTab(TabbableWidget* tab
+@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab
      closeTab(tab, false);
  }
  
@@ -232,7 +232,7 @@
  void TabDlg::hideAllTab()
  {
      foreach(TabbableWidget* tab, tabs_)
-@@ -911,6 +924,11 @@ void TabDlg::updateVSplitters(int log, i
+@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, i
      }
  }
  
@@ -246,7 +246,7 @@
      return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
 --- git.orig/src/tabs/tabdlg.h
 +++ git/src/tabs/tabdlg.h
-@@ -89,6 +89,8 @@ public:
+@@ -88,6 +88,8 @@ public:
      void setTabIcon(QWidget *,const QIcon &);
      TabbableWidget* getCurrentTab() const;
  
@@ -255,7 +255,7 @@
  protected:
      void setShortcuts();
  
-@@ -124,6 +126,7 @@ public slots:
+@@ -123,6 +125,7 @@ public slots:
      void sendTabTo(TabbableWidget*, TabDlg *);
      void tabCloseRequested(int i);
      void hideTab(TabbableWidget*);
@@ -265,7 +265,7 @@
  
 --- git.orig/src/widgets/psitabwidget.cpp
 +++ git/src/widgets/psitabwidget.cpp
-@@ -38,7 +38,11 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+@@ -37,7 +37,11 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
          : QWidget(parent) {
      tabsPosition_ = QTabWidget::East; // impossible => uninitialised state
      tabBar_ = new PsiTabBar(this);
@@ -278,7 +278,7 @@
      layout_ = new QVBoxLayout(this);
      layout_->setMargin(0);
      layout_->setSpacing(0);
-@@ -55,19 +59,21 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+@@ -54,19 +58,21 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
      downButton_ = new QToolButton(this);
      downButton_->setMinimumSize(3,3);
      downButton_->setFixedWidth(buttonwidth);
@@ -302,7 +302,7 @@
      closeButton_->setText("x");
      downButton_->setArrowType(Qt::DownArrow);
      downButton_->setPopupMode(QToolButton::InstantPopup);
-@@ -76,20 +82,22 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+@@ -75,20 +81,22 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
      setTabPosition(QTabWidget::North);
      setLooks();
  
@@ -333,7 +333,7 @@
  }
  
  void PsiTabWidget::setCloseIcon(const QIcon& icon) {
-@@ -180,6 +188,7 @@ void PsiTabWidget::addTab(QWidget *widge
+@@ -179,6 +187,7 @@ void PsiTabWidget::addTab(QWidget *widge
          tabBar_->addTab(name);
      setLooks();
      showPage(currentPage());
@@ -341,7 +341,7 @@
  }
  
  void PsiTabWidget::setLooks()
-@@ -190,6 +199,14 @@ void PsiTabWidget::setLooks()
+@@ -189,6 +198,14 @@ void PsiTabWidget::setLooks()
      }
  }
  
@@ -356,7 +356,7 @@
  /**
   * Selects the page for the specified widget.
   */
-@@ -217,6 +234,27 @@ void PsiTabWidget::showPageDirectly(QWid
+@@ -216,6 +233,27 @@ void PsiTabWidget::showPageDirectly(QWid
      }
  }
  
@@ -384,7 +384,7 @@
  /**
   * Removes the page for the specified widget.
   */
-@@ -361,7 +399,12 @@ void PsiTabWidget::setTabButtonsShown(bo
+@@ -360,7 +398,12 @@ void PsiTabWidget::setTabButtonsShown(bo
   * Enable/disable dragging of tabs
   */
  void PsiTabWidget::setDragsEnabled(bool enabled) {
@@ -400,7 +400,7 @@
  void PsiTabWidget::widgetMoved(int from, int to)
 --- git.orig/src/widgets/psitabwidget.h
 +++ git/src/widgets/psitabwidget.h
-@@ -22,7 +22,6 @@
+@@ -21,7 +21,6 @@
  #define PSITABWIDGET_H
  
  #include <QTabWidget>
@@ -408,7 +408,7 @@
  #include <QDragEnterEvent>
  #include "psitabbar.h"
  
-@@ -52,6 +51,9 @@ public:
+@@ -51,6 +50,9 @@ public:
      void showPage(QWidget *);
      void showPageDirectly(QWidget *);
  
@@ -418,7 +418,7 @@
      void removePage(QWidget *);
      QWidget* page(int index);
      int getIndex(QWidget *);
-@@ -64,6 +66,8 @@ public:
+@@ -63,6 +65,8 @@ public:
      void setTabButtonsShown(bool shown); // default shown
      void setDragsEnabled(bool enabled);  // default enabled
  
@@ -427,7 +427,7 @@
  public slots:
      void setCurrentPage(int);
      void removeCurrentPage();
-@@ -80,6 +84,9 @@ signals:
+@@ -79,6 +83,9 @@ signals:
      // context menu on the blank space will have tab==-1
      void tabContextMenu(int tab, QPoint pos, QContextMenuEvent *event);
  
@@ -437,7 +437,7 @@
  private slots:
      void mouseDoubleClickTab(int tab);
      void mouseMiddleClickTab(int tab);
-@@ -91,7 +98,7 @@ private slots:
+@@ -90,7 +97,7 @@ private slots:
  
  private:
      QVector<QWidget*> widgets_;
