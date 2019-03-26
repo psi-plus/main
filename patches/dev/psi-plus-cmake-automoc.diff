@@ -1,0 +1,894 @@
+diff --git a/iris/CMakeLists.txt b/iris/CMakeLists.txt
+index 12d5fd28..a8a03e0c 100644
+--- a/iris/CMakeLists.txt
++++ b/iris/CMakeLists.txt
+@@ -35,7 +35,7 @@ set(CMAKE_CXX_STANDARD 14)
+ include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+ include_directories(include/iris)
+ 
+-set(CMAKE_AUTOMOC OFF)
++set(CMAKE_AUTOMOC ON)
+ 
+ find_package(Qt5 COMPONENTS Core Gui Xml Network REQUIRED)
+ if(USE_QJDNS)
+diff --git a/iris/src/irisnet/CMakeLists.txt b/iris/src/irisnet/CMakeLists.txt
+index a7b201f2..662c8541 100644
+--- a/iris/src/irisnet/CMakeLists.txt
++++ b/iris/src/irisnet/CMakeLists.txt
+@@ -14,7 +14,7 @@ set( CMAKE_MODULE_PATH
+     "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules"
+ )
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     corelib/irisnetglobal.cpp
+     corelib/irisnetplugin.cpp
+ 
+@@ -30,9 +30,7 @@ set(PLAIN_SOURCES
+ 
+     noncore/legacy/ndns.cpp
+     noncore/legacy/srvresolver.cpp
+-)
+ 
+-set(SOURCES
+     corelib/addressresolver.cpp
+     corelib/netavailability.cpp
+     corelib/netinterface.cpp
+@@ -64,7 +62,7 @@ else()
+     list(APPEND SOURCES corelib/netnames_jdns.cpp)
+ endif()
+ 
+-set(PLAIN_HEADERS
++set(HEADERS
+     corelib/irisnetexport.h
+     corelib/irisnetglobal.h
+     corelib/irisnetglobal_p.h
+@@ -72,9 +70,7 @@ set(PLAIN_HEADERS
+     noncore/stunmessage.h
+     noncore/stuntypes.h
+     noncore/stunutil.h
+-)
+ 
+-set(HEADERS
+     corelib/addressresolver.h
+     corelib/irisnetplugin.h
+     corelib/netavailability.h
+@@ -104,8 +100,7 @@ set(HEADERS
+     noncore/legacy/srvresolver.h
+ )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS} ${SOURCES})
+-add_library(irisnet STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES} ${PLAIN_HEADERS} )
++add_library(irisnet STATIC ${SOURCES} ${HEADERS} )
+ 
+ if(WIN32 AND (SEPARATE_QJDNS OR (NOT USE_QJDNS)))
+     set(EXTRA_LDFLAGS ws2_32)
+diff --git a/iris/src/xmpp/CMakeLists.txt b/iris/src/xmpp/CMakeLists.txt
+index 40da8378..593b5dc1 100644
+--- a/iris/src/xmpp/CMakeLists.txt
++++ b/iris/src/xmpp/CMakeLists.txt
+@@ -13,7 +13,7 @@ include_directories(
+     ${QCA_INCLUDES}
+     )
+ 
+-set(PLAIN_HEADERS
++set(HEADERS
+     xmpp-core/parser.h
+     xmpp-core/protocol.h
+     xmpp-core/sm.h
+@@ -68,9 +68,7 @@ set(PLAIN_HEADERS
+     blake2/blake2qt.h
+     blake2/blake2.h
+     blake2/blake2-impl.h
+-    )
+ 
+-set(HEADERS
+     xmpp-core/compressionhandler.h
+     xmpp-core/securestream.h
+     xmpp-core/xmpp.h
+@@ -97,7 +95,7 @@ set(HEADERS
+     zlib/zlibdecompressor.h
+     )
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     xmpp-core/compressionhandler.cpp
+     xmpp-core/connector.cpp
+     xmpp-core/parser.cpp
+@@ -146,9 +144,7 @@ set(PLAIN_SOURCES
+     sasl/scramsha1message.cpp
+     sasl/scramsha1response.cpp
+     sasl/scramsha1signature.cpp
+-    )
+ 
+-set(SOURCES
+     xmpp-core/securestream.cpp
+     xmpp-core/simplesasl.cpp
+ 
+@@ -157,14 +153,10 @@ set(SOURCES
+     xmpp-im/jingle.cpp
+     )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS} ${SOURCES})
+ add_library(iris
+     STATIC
+     ${HEADERS}
+     ${SOURCES}
+-    ${MOC_SOURCES}
+-    ${PLAIN_SOURCES}
+-    ${PLAIN_HEADERS}
+ )
+ 
+ if( SEPARATE_QJDNS AND WIN32)
+diff --git a/src/AutoUpdater/CMakeLists.txt b/src/AutoUpdater/CMakeLists.txt
+index cd9256c5..9af63a54 100644
+--- a/src/AutoUpdater/CMakeLists.txt
++++ b/src/AutoUpdater/CMakeLists.txt
+@@ -16,11 +16,11 @@ include_directories(
+     ../
+ )
+ 
+-list(APPEND PLAIN_HEADERS
++list(APPEND HEADERS
+     AutoUpdater.h
+ )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     AutoUpdater.cpp
+ )
+ 
+@@ -41,7 +41,7 @@ if(USE_QDCHECKER)
+     list(APPEND HEADERS
+         QDChecker.h
+     )
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         QDChecker.cpp
+     )
+     list(APPEND FORMS
+@@ -58,8 +58,7 @@ if(USE_QDCHECKER)
+ endif()
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(AutoUpdater STATIC ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(AutoUpdater STATIC ${HEADERS} ${SOURCES} ${UI_FORMS})
+ if(USE_QDCHECKER)
+     add_dependencies(AutoUpdater build_ui_files tools widgets)
+ endif()
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 151e6d00..26450af6 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -4,7 +4,7 @@ set( CMAKE_MODULE_PATH
+     "${CMAKE_MODULE_PATH}"
+     "${CMAKE_CURRENT_SOURCE_DIR}"
+     "${PROJECT_SOURCE_DIR}/cmake/modules" )
+-set(CMAKE_AUTOMOC OFF)
++set(CMAKE_AUTOMOC ON)
+ 
+ if(LINUX)
+     set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
+@@ -263,9 +263,9 @@ set(RESOURCES
+ qt5_add_resources(QRC_SOURCES ${RESOURCES})
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-add_custom_target(build_ui_files DEPENDS "${UI_FORMS}" SOURCES "${FORMS}")
++add_custom_target(build_ui_files DEPENDS "${UI_FORMS}")# SOURCES "${FORMS}")
+ 
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
++#qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+ 
+ if(WIN32)
+     if(IS_PSIPLUS)
+@@ -325,10 +325,7 @@ add_executable(${PROJECT_NAME}
+     MACOSX_BUNDLE
+     ${SOURCES}
+     ${HEADERS}
+-    ${MOC_SOURCES}
+     ${UI_FORMS}
+-    ${PLAIN_SOURCES}
+-    ${PLAIN_HEADERS}
+     ${QRC_SOURCES}
+     ${QM}
+     ${RC_FILE}
+diff --git a/src/Certificates/CMakeLists.txt b/src/Certificates/CMakeLists.txt
+index ad315659..d865b89e 100644
+--- a/src/Certificates/CMakeLists.txt
++++ b/src/Certificates/CMakeLists.txt
+@@ -18,20 +18,17 @@ list(APPEND FORMS
+ list(APPEND HEADERS
+     CertificateDisplayDialog.h
+     CertificateErrorDialog.h
+-)
+ 
+-list(APPEND PLAIN_HEADERS
+     CertificateHelpers.h
+ )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     CertificateDisplayDialog.cpp
+     CertificateErrorDialog.cpp
+     CertificateHelpers.cpp
+ )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(Certificates STATIC ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(Certificates STATIC ${HEADERS} ${SOURCES} ${UI_FORMS})
+ target_link_libraries(Certificates ${QT_LIBRARIES} ${iris_LIB})
+ target_include_directories(Certificates PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/avcall/CMakeLists.txt b/src/avcall/CMakeLists.txt
+index 99a24751..1511c7e7 100644
+--- a/src/avcall/CMakeLists.txt
++++ b/src/avcall/CMakeLists.txt
+@@ -25,9 +25,7 @@ set(SOURCES
+     jinglertp.cpp
+     avcall.cpp
+     calldlg.cpp
+-)
+ 
+-set(PLAIN_SOURCES
+     jinglertptasks.cpp
+     mediadevicewatcher.cpp
+ )
+@@ -37,8 +35,7 @@ set(FORMS
+ )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(avcall STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(avcall STATIC ${SOURCES} ${HEADERS} ${UI_FORMS})
+ add_dependencies(avcall build_ui_files)
+ target_link_libraries(avcall ${QT_LIBRARIES} ${iris_LIB} libpsi_tools widgets)
+ target_include_directories(avcall PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/contactmanager/CMakeLists.txt b/src/contactmanager/CMakeLists.txt
+index 041740b3..e39d3087 100644
+--- a/src/contactmanager/CMakeLists.txt
++++ b/src/contactmanager/CMakeLists.txt
+@@ -15,7 +15,7 @@ list(APPEND HEADERS
+     contactmanagerview.h
+ )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     contactmanagerdlg.cpp
+     contactmanagermodel.cpp
+     contactmanagerview.cpp
+@@ -26,7 +26,6 @@ list(APPEND FORMS
+ )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(contactmanager STATIC ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(contactmanager STATIC ${HEADERS} ${SOURCES} ${UI_FORMS})
+ target_link_libraries(contactmanager ${QT_LIBRARIES} widgets)
+ target_include_directories(contactmanager PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/irisprotocol/irisprotocol.cmake b/src/irisprotocol/irisprotocol.cmake
+index 1e3468b5..4dec341b 100644
+--- a/src/irisprotocol/irisprotocol.cmake
++++ b/src/irisprotocol/irisprotocol.cmake
+@@ -2,6 +2,6 @@ list(APPEND HEADERS
+     irisprotocol/iris_discoinfoquerier.h
+ )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     irisprotocol/iris_discoinfoquerier.cpp
+ )
+diff --git a/src/libpsi/dialogs/CMakeLists.txt b/src/libpsi/dialogs/CMakeLists.txt
+index 701fee75..ff07b702 100644
+--- a/src/libpsi/dialogs/CMakeLists.txt
++++ b/src/libpsi/dialogs/CMakeLists.txt
+@@ -13,7 +13,7 @@ list(APPEND HEADERS
+     grepshortcutkeydialog.h
+     )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     grepshortcutkeydialog.cpp
+     )
+ 
+@@ -22,7 +22,6 @@ list(APPEND FORMS
+     )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(libpsi_dialogs STATIC ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(libpsi_dialogs STATIC ${HEADERS} ${SOURCES} ${UI_FORMS})
+ target_link_libraries(libpsi_dialogs ${QT_LIBRARIES})
+ target_include_directories(libpsi_dialogs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/libpsi/tools/CMakeLists.txt b/src/libpsi/tools/CMakeLists.txt
+index ed489bb5..80b1d600 100644
+--- a/src/libpsi/tools/CMakeLists.txt
++++ b/src/libpsi/tools/CMakeLists.txt
+@@ -33,9 +33,7 @@ list(APPEND HEADERS
+ 
+     # globalshortcut
+     globalshortcut/globalshortcuttrigger.h
+-    )
+ 
+-list(APPEND PLAIN_HEADERS
+     # tools
+     maybe.h
+     iodeviceopener.h
+@@ -55,7 +53,7 @@ list(APPEND PLAIN_HEADERS
+     spellchecker/spellhighlighter.h
+     )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     # tools
+     priorityvalidator.cpp
+     languagemanager.cpp
+@@ -84,12 +82,12 @@ list(APPEND PLAIN_SOURCES
+     )
+ 
+ if(APPLE)
+-    list(APPEND PLAIN_HEADERS
++    list(APPEND HEADERS
+         mac_dock/mac_dock.h
+         mac_dock/privateqt_mac.h
+         )
+ 
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         # globalshortcut
+         globalshortcut/globalshortcutmanager_mac.mm
+         globalshortcut/NDKeyboardLayout.m
+@@ -114,12 +112,12 @@ if(APPLE)
+         systemwatch/systemwatch_mac.cpp
+         )
+ elseif(WIN32)
+-    list(APPEND PLAIN_HEADERS
++    list(APPEND HEADERS
+         # spellchecker
+         spellchecker/hunspellchecker.h
+         )
+ 
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         #idle
+         idle/idle_win.cpp
+ 
+@@ -138,7 +136,7 @@ elseif(HAIKU)
+         systemwatch/systemwatch_unix.h
+         )
+ 
+-        list(APPEND PLAIN_SOURCES
++        list(APPEND SOURCES
+         #idle
+         idle/idle_x11.cpp
+ 
+@@ -154,7 +152,7 @@ else()
+         systemwatch/systemwatch_unix.h
+         )
+ 
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         #idle
+         idle/idle_x11.cpp
+ 
+@@ -188,11 +186,11 @@ if(USE_ENCHANT)
+         ${Enchant_LIBRARY}
+         )
+ 
+-    list(APPEND PLAIN_HEADERS
++    list(APPEND HEADERS
+         spellchecker/enchantchecker.h
+         )
+ 
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         spellchecker/enchantchecker.cpp
+         )
+ elseif(USE_HUNSPELL)
+@@ -210,15 +208,15 @@ elseif(USE_HUNSPELL)
+         ${HUNSPELL_LIBRARY}
+         )
+ 
+-    list(APPEND PLAIN_HEADERS
++    list(APPEND HEADERS
+         spellchecker/hunspellchecker.h
+         )
+ 
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         spellchecker/hunspellchecker.cpp
+         )
+ elseif(APPLE)
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         spellchecker/macspellchecker.mm
+         )
+ 
+@@ -228,8 +226,7 @@ elseif(APPLE)
+ endif()
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(libpsi_tools STATIC  ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(libpsi_tools STATIC  ${SOURCES} ${HEADERS} ${UI_FORMS})
+ target_link_libraries(libpsi_tools ${QT_LIBRARIES} tools ${EXTRA_LDFLAGS})
+ target_include_directories(libpsi_tools PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+ 
+diff --git a/src/options/CMakeLists.txt b/src/options/CMakeLists.txt
+index 6cdc916f..4f24895d 100644
+--- a/src/options/CMakeLists.txt
++++ b/src/options/CMakeLists.txt
+@@ -44,9 +44,7 @@ list(APPEND SOURCES
+     optionsdlgbase.cpp
+     optionstab.cpp
+     opt_plugins.cpp
+-)
+ 
+-list(APPEND PLAIN_SOURCES
+     optionsdlg.cpp
+     opt_advanced.cpp
+     opt_appearance.cpp
+@@ -109,7 +107,6 @@ list(APPEND FORMS
+ )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(options STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(options STATIC ${SOURCES} ${HEADERS} ${UI_FORMS})
+ target_link_libraries(options ${QT_LIBRARIES} tools widgets tabs libpsi_dialogs)
+ target_include_directories(options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/plugins/plugins.cmake b/src/plugins/plugins.cmake
+index 2291246a..a038140f 100644
+--- a/src/plugins/plugins.cmake
++++ b/src/plugins/plugins.cmake
+@@ -47,6 +47,6 @@ list(APPEND PLUGINS_INCLUDES
+     plugins/include/webkitaccessor.h
+     plugins/include/webkitaccessinghost.h
+ )
+-list(APPEND PLAIN_HEADERS
++list(APPEND HEADERS
+     ${PLUGINS_INCLUDES}
+ )
+diff --git a/src/privacy/CMakeLists.txt b/src/privacy/CMakeLists.txt
+index e975d67c..e305d153 100644
+--- a/src/privacy/CMakeLists.txt
++++ b/src/privacy/CMakeLists.txt
+@@ -11,9 +11,7 @@ list(APPEND HEADERS
+     privacymanager.h
+     privacyruledlg.h
+     psiprivacymanager.h
+-)
+ 
+-list(APPEND PLAIN_HEADERS
+     privacylist.h
+     privacylistblockedmodel.h
+     privacylistitem.h
+@@ -22,9 +20,7 @@ list(APPEND PLAIN_HEADERS
+ 
+ list(APPEND SOURCES
+     psiprivacymanager.cpp
+-)
+ 
+-list(APPEND PLAIN_SOURCES
+     privacydlg.cpp
+     privacylist.cpp
+     privacylistblockedmodel.cpp
+@@ -39,7 +35,6 @@ list(APPEND FORMS
+ )
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(privacy STATIC ${SOURCES} ${HEADERS} ${SOURCES} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(privacy STATIC ${SOURCES} ${HEADERS} ${UI_FORMS})
+ target_link_libraries(privacy ${QT_LIBRARIES} ${iris_LIB} libpsi_tools widgets tabs)
+ target_include_directories(privacy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/psidbusnotifier.cpp b/src/psidbusnotifier.cpp
+index 6a3dd00c..b0975f79 100644
+--- a/src/psidbusnotifier.cpp
++++ b/src/psidbusnotifier.cpp
+@@ -22,6 +22,7 @@
+  *
+  */
+ 
++#include "moc_psidbusnotifier.cpp"
+ 
+ #include <QDBusConnection>
+ #include <QDBusMessage>
+diff --git a/src/psimedia/CMakeLists.txt b/src/psimedia/CMakeLists.txt
+index 3c8b2e12..b3d27301 100644
+--- a/src/psimedia/CMakeLists.txt
++++ b/src/psimedia/CMakeLists.txt
+@@ -9,19 +9,16 @@ unset(UI_FORMS)
+ list(APPEND HEADERS
+     psimedia.h
+     psimedia_p.h
+-)
+ 
+-list(APPEND PLAIN_HEADERS
+     psimediaprovider.h
+ )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     psimedia.cpp
+ )
+ 
+ add_definitions( -DQT_GUI_LIB )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(psimedia STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES})
++add_library(psimedia STATIC ${SOURCES} ${HEADERS} ${UI_FORMS})
+ target_link_libraries(psimedia ${QT_LIBRARIES})
+ target_include_directories(psimedia PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/src.cmake b/src/src.cmake
+index 61ec0f54..f3d4e7f1 100644
+--- a/src/src.cmake
++++ b/src/src.cmake
+@@ -208,6 +208,40 @@ list(APPEND HEADERS
+     xmlconsole.h
+     )
+ 
++if(UNIX AND NOT APPLE AND NOT HAIKU)
++    list(APPEND SOURCES
++        dbus.cpp
++        activeprofiles_dbus.cpp
++        psidbusnotifier.cpp
++        x11windowsystem.cpp
++        )
++
++    list(APPEND HEADERS
++        psidbusnotifier.h
++        dbus.h
++        x11windowsystem.h
++        )
++elseif(APPLE)
++    list(APPEND SOURCES
++        activeprofiles_stub.cpp
++        )
++#    list(APPEND SOURCES
++#        psigrowlnotifier.cpp
++#        )
++#
++#    list(APPEND HEADERS
++#        psigrowlnotifier.h
++#        )
++elseif(HAIKU)
++    list(APPEND SOURCES
++        activeprofiles_stub.cpp
++        )
++elseif(WIN32)
++    list(APPEND SOURCES
++        activeprofiles_win.cpp
++        )
++endif()
++
+ # Source files
+ list(APPEND SOURCES
+     accountmanagedlg.cpp
+@@ -242,51 +276,7 @@ list(APPEND SOURCES
+     xdata_widget.cpp
+     )
+ 
+-if(UNIX AND NOT APPLE AND NOT HAIKU)
+-    list(APPEND SOURCES
+-        dbus.cpp
+-        )
+-
+-    list(APPEND PLAIN_SOURCES
+-        activeprofiles_dbus.cpp
+-        psidbusnotifier.cpp
+-        )
+-
+-    list(APPEND HEADERS
+-        psidbusnotifier.h
+-        )
+-
+-    list(APPEND PLAIN_HEADERS
+-        dbus.h
+-        )
+-    list(APPEND PLAIN_SOURCES
+-        x11windowsystem.cpp
+-        )
+-    list(APPEND PLAIN_HEADERS
+-        x11windowsystem.h
+-        )
+-elseif(APPLE)
+-    list(APPEND PLAIN_SOURCES
+-        activeprofiles_stub.cpp
+-        )
+-#    list(APPEND SOURCES
+-#        psigrowlnotifier.cpp
+-#        )
+-#
+-#    list(APPEND HEADERS
+-#        psigrowlnotifier.h
+-#        )
+-elseif(HAIKU)
+-    list(APPEND PLAIN_SOURCES
+-        activeprofiles_stub.cpp
+-        )
+-elseif(WIN32)
+-    list(APPEND PLAIN_SOURCES
+-        activeprofiles_win.cpp
+-        )
+-endif()
+-
+-list(APPEND PLAIN_HEADERS
++list(APPEND HEADERS
+     abstracttreeitem.h
+     activity.h
+     activitycatalog.h
+@@ -333,7 +323,7 @@ list(APPEND PLAIN_HEADERS
+     varlist.h
+     )
+ 
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     aboutdlg.cpp
+     abstracttreeitem.cpp
+     abstracttreemodel.cpp
+@@ -482,7 +472,7 @@ list(APPEND PLAIN_SOURCES
+ 
+ if(ENABLE_WEBKIT)
+     if(USE_WEBENGINE)
+-        list(APPEND PLAIN_SOURCES
++        list(APPEND SOURCES
+             themeserver.cpp
+         )
+         list(APPEND HEADERS
+@@ -496,14 +486,10 @@ if(ENABLE_WEBKIT)
+         chatviewtheme_p.h
+         chatviewthemeprovider.h
+         chatviewthemeprovider_priv.h
+-        )
+-    list(APPEND PLAIN_HEADERS
+         jsutil.h
+         )
+     list(APPEND SOURCES
+         chatview_webkit.cpp
+-        )
+-    list(APPEND PLAIN_SOURCES
+         webview.cpp
+         jsutil.cpp
+         chatviewtheme.cpp
+@@ -513,8 +499,6 @@ if(ENABLE_WEBKIT)
+ else()
+     list(APPEND HEADERS
+         chatview_te.h
+-        )
+-    list(APPEND SOURCES
+         chatview_te.cpp
+         )
+ endif()
+@@ -523,7 +507,7 @@ list(APPEND HEADERS
+     edbsqlite.h
+     historyimp.h
+     )
+-list(APPEND PLAIN_SOURCES
++list(APPEND SOURCES
+     edbsqlite.cpp
+     historyimp.cpp
+     )
+@@ -535,7 +519,7 @@ if(IS_PSIPLUS)
+     list(APPEND HEADERS
+         sendbuttonmenu.h
+     )
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         sendbuttonmenu.cpp
+     )
+ endif()
+diff --git a/src/sxe/CMakeLists.txt b/src/sxe/CMakeLists.txt
+index 11f7958d..85076877 100644
+--- a/src/sxe/CMakeLists.txt
++++ b/src/sxe/CMakeLists.txt
+@@ -9,7 +9,7 @@ unset(EXTRA_LDFLAGS)
+ 
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     sxeedit.cpp
+     sxemanager.cpp
+     sxenewedit.cpp
+@@ -23,15 +23,12 @@ set(HEADERS
+     sxemanager.h
+     sxerecord.h
+     sxesession.h
+-)
+ 
+-set(PLAIN_HEADERS
+     sxeedit.h
+     sxenewedit.h
+     sxerecordedit.h
+     sxeremoveedit.h
+ )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(sxe STATIC ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(sxe STATIC ${HEADERS} ${SOURCES})
+ target_link_libraries(sxe ${QT_LIBRARIES} ${iris_LIB} libpsi_tools widgets)
+diff --git a/src/tabs/CMakeLists.txt b/src/tabs/CMakeLists.txt
+index 5fbe021a..c8426fa7 100644
+--- a/src/tabs/CMakeLists.txt
++++ b/src/tabs/CMakeLists.txt
+@@ -12,13 +12,12 @@ set(HEADERS
+     tabbablewidget.h
+ )
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     tabdlg.cpp
+     tabmanager.cpp
+     tabbablewidget.cpp
+ )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(tabs STATIC  ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES})
++add_library(tabs STATIC  ${HEADERS} ${SOURCES})
+ target_link_libraries(tabs ${QT_LIBRARIES} ${iris_LIB} tools widgets)
+ target_include_directories(tabs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/src/tools/CMakeLists.txt b/src/tools/CMakeLists.txt
+index 925105f6..49890e79 100644
+--- a/src/tools/CMakeLists.txt
++++ b/src/tools/CMakeLists.txt
+@@ -14,9 +14,7 @@ list(APPEND SOURCES
+ 
+     # advwidget
+     advwidget/advwidget.cpp
+-)
+ 
+-list(APPEND PLAIN_SOURCES
+     # optionstree
+     optionstree/optionstree.cpp
+     optionstree/optionstreemodel.cpp
+@@ -51,9 +49,7 @@ list(APPEND HEADERS
+     # psifile
+     tunecontroller/tunecontrollermanager.h
+     tunecontroller/plugins/psifile/psifileplugin.h
+-)
+ 
+-list(APPEND PLAIN_HEADERS
+     # iconset
+     iconset/anim.h
+ 
+@@ -68,21 +64,21 @@ list(APPEND PLAIN_HEADERS
+ )
+ 
+ if(USE_CRASH)
+-    list(APPEND PLAIN_HEADERS
++    list(APPEND HEADERS
+         crash/crash.h
+     )
+ 
+     if(LINUX)
+-        list(APPEND PLAIN_SOURCES
++        list(APPEND SOURCES
+             crash/crash_sigsegv.cpp
+             crash/crash.cpp
+         )
+-        list(APPEND PLAIN_HEADERS
++        list(APPEND HEADERS
+             crash/crash_sigsegv.h
+         )
+     endif()
+     if(WIN32)
+-        list(APPEND PLAIN_SOURCES
++        list(APPEND SOURCES
+             crash/crash_dummy.cpp
+         )
+     endif()
+@@ -116,9 +112,7 @@ elseif(WIN32)
+     add_definitions(-DTC_WINAMP -DTC_AIMP)
+     list(APPEND SOURCES
+         tunecontroller/plugins/aimp/aimpplugin.cpp
+-    )
+ 
+-    list(APPEND PLAIN_SOURCES
+         tunecontroller/aimptunecontroller.cpp
+         tunecontroller/winamptunecontroller.cpp
+         tunecontroller/plugins/winamp/winampplugin.cpp
+@@ -134,9 +128,7 @@ elseif(LINUX)
+     add_definitions(-DTC_MPRIS)
+     list(APPEND SOURCES
+         tunecontroller/plugins/mpris/mprisplugin.cpp
+-    )
+ 
+-    list(APPEND PLAIN_SOURCES
+         tunecontroller/mpristunecontroller.cpp
+         tunecontroller/plugins/mpris/mprisplugin.cpp
+     )
+@@ -146,8 +138,7 @@ elseif(LINUX)
+     )
+ endif()
+ 
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(tools STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(tools STATIC ${SOURCES} ${HEADERS})
+ target_link_libraries(tools ${QT_LIBRARIES} ${iris_LIB} zip ${EXTRA_LDFLAGS})
+ target_include_directories(tools PUBLIC
+     ${CMAKE_CURRENT_SOURCE_DIR}
+diff --git a/src/tools/tunecontroller/plugins/winamp/winampplugin.cpp b/src/tools/tunecontroller/plugins/winamp/winampplugin.cpp
+index 150c3c2d..dd7d37b4 100644
+--- a/src/tools/tunecontroller/plugins/winamp/winampplugin.cpp
++++ b/src/tools/tunecontroller/plugins/winamp/winampplugin.cpp
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include "winampplugin.h"
++#include "moc_winampplugin.cpp"
+ 
+ 
+ QString WinAmpPlugin::name()
+diff --git a/src/whiteboarding/CMakeLists.txt b/src/whiteboarding/CMakeLists.txt
+index 70b33f2f..0224f173 100644
+--- a/src/whiteboarding/CMakeLists.txt
++++ b/src/whiteboarding/CMakeLists.txt
+@@ -9,7 +9,7 @@ unset(EXTRA_LDFLAGS)
+ 
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     wbdlg.cpp
+     wbitem.cpp
+     wbmanager.cpp
+@@ -26,15 +26,12 @@ set(HEADERS
+     wbmanager.h
+     wbscene.h
+     wbwidget.h
+-)
+ 
+-set(PLAIN_HEADERS
+     wbnewimage.h
+     wbnewitem.h
+     wbnewpath.h
+ )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS})
+-add_library(whiteboarding STATIC ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(whiteboarding STATIC ${HEADERS} ${SOURCES})
+ add_dependencies(whiteboarding build_ui_files)
+ target_link_libraries(whiteboarding ${QT_LIBRARIES} tools widgets)
+diff --git a/src/widgets/CMakeLists.txt b/src/widgets/CMakeLists.txt
+index 76467483..04c08f57 100644
+--- a/src/widgets/CMakeLists.txt
++++ b/src/widgets/CMakeLists.txt
+@@ -19,9 +19,7 @@ set(SOURCES
+     psitooltip.cpp
+     tabbar.cpp
+     urlobject.cpp
+-)
+ 
+-set(PLAIN_SOURCES
+     actionlineedit.cpp
+     pixmapratiolabel.cpp
+     psitabbar.cpp
+@@ -55,9 +53,7 @@ set(HEADERS
+     updatingcombobox.h
+     urllabel.h
+     urlobject.h
+-)
+ 
+-set(PLAIN_HEADERS
+     psirichtext.h
+     psitooltip.h
+     stretchwidget.h
+@@ -68,7 +64,7 @@ set(FORMS
+ )
+ 
+ if(IS_PSIPLUS AND (EXISTS "${CMAKE_CURRENT_LIST_DIR}/psiwindowheader.cpp"))
+-    list(APPEND PLAIN_SOURCES
++    list(APPEND SOURCES
+         psiwindowheader.cpp
+     )
+     list(APPEND HEADERS
+@@ -80,7 +76,6 @@ if(IS_PSIPLUS AND (EXISTS "${CMAKE_CURRENT_LIST_DIR}/psiwindowheader.cpp"))
+ endif()
+ 
+ qt5_wrap_ui(UI_FORMS ${FORMS})
+-qt_wrap_cpp(MOC_SOURCES ${SOURCES} ${HEADERS})
+-add_library(widgets STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${UI_FORMS} ${PLAIN_SOURCES} ${PLAIN_HEADERS})
++add_library(widgets STATIC ${SOURCES} ${HEADERS} ${UI_FORMS})
+ target_link_libraries(widgets ${QT_LIBRARIES} ${iris_LIB} libpsi_tools)
+ target_include_directories(widgets PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
