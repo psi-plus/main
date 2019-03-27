@@ -1,0 +1,148 @@
+diff --git a/iris/CMakeLists.txt b/iris/CMakeLists.txt
+index 12d5fd2..f716cf4 100644
+--- a/iris/CMakeLists.txt
++++ b/iris/CMakeLists.txt
+@@ -35,7 +35,7 @@ set(CMAKE_CXX_STANDARD 14)
+ include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+ include_directories(include/iris)
+ 
+-set(CMAKE_AUTOMOC OFF)
++set(CMAKE_AUTOMOC ON)
+ 
+ find_package(Qt5 COMPONENTS Core Gui Xml Network REQUIRED)
+ if(USE_QJDNS)
+@@ -54,25 +54,6 @@ include_directories(
+     ${QCA_INCLUDES}
+ )
+ 
+-macro(qt_wrap_cpp)
+-    set(_SOURCES ${ARGN})
+-    list(REMOVE_AT _SOURCES 0)
+-    foreach(SOURCE ${_SOURCES})
+-        if(SOURCE MATCHES "^(.*/|)([^/.]+)\\.h$")
+-            set(DEST "moc_${CMAKE_MATCH_2}.cpp")
+-            qt5_generate_moc(${SOURCE} ${DEST})
+-            list(APPEND ${ARGV0} ${DEST})
+-        elseif(SOURCE MATCHES "^(.*/|)([^/.]+)\\.cpp$")
+-            set(DEST "${CMAKE_MATCH_2}.moc")
+-            qt5_generate_moc(${SOURCE} ${DEST})
+-            list(APPEND ${ARGV0} ${DEST})
+-        else()
+-            message(WARNING "Wrong source ${SOURCE}")
+-        endif()
+-    endforeach()
+-    unset(_SOURCES)
+-endmacro()
+-
+ if(NOT USE_QJDNS AND SEPARATE_QJDNS)
+     message(WARNING "SEPARATE_QJDNS flag enabled, but USE_QJDNS flag disabled. Both flags will be disabled")
+     set(SEPARATE_QJDNS OFF)
+diff --git a/iris/src/irisnet/CMakeLists.txt b/iris/src/irisnet/CMakeLists.txt
+index a7b201f..662c854 100644
+--- a/iris/src/irisnet/CMakeLists.txt
++++ b/iris/src/irisnet/CMakeLists.txt
+@@ -14,7 +14,7 @@ set( CMAKE_MODULE_PATH
+     "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules"
+ )
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     corelib/irisnetglobal.cpp
+     corelib/irisnetplugin.cpp
+ 
+@@ -30,9 +30,7 @@ set(PLAIN_SOURCES
+ 
+     noncore/legacy/ndns.cpp
+     noncore/legacy/srvresolver.cpp
+-)
+ 
+-set(SOURCES
+     corelib/addressresolver.cpp
+     corelib/netavailability.cpp
+     corelib/netinterface.cpp
+@@ -64,7 +62,7 @@ else()
+     list(APPEND SOURCES corelib/netnames_jdns.cpp)
+ endif()
+ 
+-set(PLAIN_HEADERS
++set(HEADERS
+     corelib/irisnetexport.h
+     corelib/irisnetglobal.h
+     corelib/irisnetglobal_p.h
+@@ -72,9 +70,7 @@ set(PLAIN_HEADERS
+     noncore/stunmessage.h
+     noncore/stuntypes.h
+     noncore/stunutil.h
+-)
+ 
+-set(HEADERS
+     corelib/addressresolver.h
+     corelib/irisnetplugin.h
+     corelib/netavailability.h
+@@ -104,8 +100,7 @@ set(HEADERS
+     noncore/legacy/srvresolver.h
+ )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS} ${SOURCES})
+-add_library(irisnet STATIC ${SOURCES} ${HEADERS} ${MOC_SOURCES} ${PLAIN_SOURCES} ${PLAIN_HEADERS} )
++add_library(irisnet STATIC ${SOURCES} ${HEADERS} )
+ 
+ if(WIN32 AND (SEPARATE_QJDNS OR (NOT USE_QJDNS)))
+     set(EXTRA_LDFLAGS ws2_32)
+diff --git a/iris/src/xmpp/CMakeLists.txt b/iris/src/xmpp/CMakeLists.txt
+index 40da837..593b5dc 100644
+--- a/iris/src/xmpp/CMakeLists.txt
++++ b/iris/src/xmpp/CMakeLists.txt
+@@ -13,7 +13,7 @@ include_directories(
+     ${QCA_INCLUDES}
+     )
+ 
+-set(PLAIN_HEADERS
++set(HEADERS
+     xmpp-core/parser.h
+     xmpp-core/protocol.h
+     xmpp-core/sm.h
+@@ -68,9 +68,7 @@ set(PLAIN_HEADERS
+     blake2/blake2qt.h
+     blake2/blake2.h
+     blake2/blake2-impl.h
+-    )
+ 
+-set(HEADERS
+     xmpp-core/compressionhandler.h
+     xmpp-core/securestream.h
+     xmpp-core/xmpp.h
+@@ -97,7 +95,7 @@ set(HEADERS
+     zlib/zlibdecompressor.h
+     )
+ 
+-set(PLAIN_SOURCES
++set(SOURCES
+     xmpp-core/compressionhandler.cpp
+     xmpp-core/connector.cpp
+     xmpp-core/parser.cpp
+@@ -146,9 +144,7 @@ set(PLAIN_SOURCES
+     sasl/scramsha1message.cpp
+     sasl/scramsha1response.cpp
+     sasl/scramsha1signature.cpp
+-    )
+ 
+-set(SOURCES
+     xmpp-core/securestream.cpp
+     xmpp-core/simplesasl.cpp
+ 
+@@ -157,14 +153,10 @@ set(SOURCES
+     xmpp-im/jingle.cpp
+     )
+ 
+-qt_wrap_cpp(MOC_SOURCES ${HEADERS} ${SOURCES})
+ add_library(iris
+     STATIC
+     ${HEADERS}
+     ${SOURCES}
+-    ${MOC_SOURCES}
+-    ${PLAIN_SOURCES}
+-    ${PLAIN_HEADERS}
+ )
+ 
+ if( SEPARATE_QJDNS AND WIN32)
