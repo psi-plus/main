@@ -1,6 +1,6 @@
---- git.orig/iris/src/xmpp/xmpp-im/client.cpp
-+++ git/iris/src/xmpp/xmpp-im/client.cpp
-@@ -88,6 +88,8 @@
+--- a/iris/src/xmpp/xmpp-im/client.cpp
++++ b/iris/src/xmpp/xmpp-im/client.cpp
+@@ -94,6 +94,8 @@
  #define vsnprintf _vsnprintf
  #endif
  
@@ -9,7 +9,7 @@
  namespace XMPP
  {
  
-@@ -926,12 +928,38 @@ void Client::prRoster(const Roster &r)
+@@ -982,12 +984,38 @@ void Client::prRoster(const Roster &r)
      importRoster(r);
  }
  
@@ -49,7 +49,7 @@
      connect(r, SIGNAL(finished()), SLOT(slotRosterRequestFinished()));
      r->get();
      d->roster.flagAllForDelete(); // mod_groups patch
-@@ -1366,13 +1394,35 @@ void LiveRosterItem::setFlagForDelete(bo
+@@ -1434,13 +1462,35 @@ void LiveRosterItem::setFlagForDelete(bool b)
  //---------------------------------------------------------------------------
  // LiveRoster
  //---------------------------------------------------------------------------
@@ -86,7 +86,7 @@
  }
  
  void LiveRoster::flagAllForDelete()
-@@ -1401,4 +1451,14 @@ LiveRoster::ConstIterator LiveRoster::fi
+@@ -1469,4 +1519,14 @@ LiveRoster::ConstIterator LiveRoster::find(const Jid &j, bool compareRes) const
      return it;
  }
  
@@ -101,9 +101,9 @@
 +}
 +
  }
---- git.orig/iris/src/xmpp/xmpp-im/types.cpp
-+++ git/iris/src/xmpp/xmpp-im/types.cpp
-@@ -3287,13 +3287,35 @@ bool RosterItem::fromXml(const QDomEleme
+--- a/iris/src/xmpp/xmpp-im/types.cpp
++++ b/iris/src/xmpp/xmpp-im/types.cpp
+@@ -3303,13 +3303,35 @@ bool RosterItem::fromXml(const QDomElement &item)
  //---------------------------------------------------------------------------
  // Roster
  //---------------------------------------------------------------------------
@@ -114,8 +114,7 @@
 +};
 +
  Roster::Roster()
--    : QList<RosterItem>()
-+    : QList<RosterItem>()
+     : QList<RosterItem>()
 +    , d(new Roster::Private)
  {
  }
@@ -140,7 +139,7 @@
  }
  
  Roster::Iterator Roster::find(const Jid &j)
-@@ -3316,6 +3338,16 @@ Roster::ConstIterator Roster::find(const
+@@ -3332,6 +3354,16 @@ Roster::ConstIterator Roster::find(const Jid &j) const
      return end();
  }
  
@@ -157,18 +156,18 @@
  
  //---------------------------------------------------------------------------
  // FormField
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_client.h
-+++ git/iris/src/xmpp/xmpp-im/xmpp_client.h
-@@ -88,7 +88,7 @@ namespace XMPP
-         QString resource() const;
-         Jid jid() const;
+--- a/iris/src/xmpp/xmpp-im/xmpp_client.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_client.h
+@@ -101,7 +101,7 @@ namespace XMPP
+         void setNetworkAccessManager(QNetworkAccessManager *qnam);
+         QNetworkAccessManager *networkAccessManager() const;
  
 -        void rosterRequest();
 +        void rosterRequest(bool withGroupsDelimiter = true);
          void sendMessage(Message &);
          void sendSubscription(const Jid &, const QString &, const QString& nick = QString());
          void setPresence(const Status &);
-@@ -147,6 +147,7 @@ namespace XMPP
+@@ -165,6 +165,7 @@ namespace XMPP
          void activated();
          void disconnected();
          //void authFinished(bool, int, const QString &);
@@ -176,7 +175,7 @@
          void rosterRequestFinished(bool, int, const QString &);
          void rosterItemAdded(const RosterItem &);
          void rosterItemUpdated(const RosterItem &);
-@@ -181,6 +182,7 @@ namespace XMPP
+@@ -199,6 +200,7 @@ namespace XMPP
          void streamIncomingXml(const QString &);
          void streamOutgoingXml(const QString &);
  
@@ -184,9 +183,9 @@
          void slotRosterRequestFinished();
  
          // basic daemons
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
-+++ git/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
-@@ -34,9 +34,19 @@ namespace XMPP
+--- a/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_liveroster.h
+@@ -33,9 +33,19 @@ namespace XMPP
          LiveRoster();
          ~LiveRoster();
  
@@ -206,9 +205,9 @@
      };
  }
  
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_roster.h
-+++ git/iris/src/xmpp/xmpp-im/xmpp_roster.h
-@@ -36,12 +36,18 @@ namespace XMPP
+--- a/iris/src/xmpp/xmpp-im/xmpp_roster.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_roster.h
+@@ -35,12 +35,18 @@ namespace XMPP
          Roster();
          ~Roster();
  
@@ -229,10 +228,10 @@
      };
  }
  
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-+++ git/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-@@ -382,9 +382,11 @@ public:
-     Private() {}
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
+@@ -381,9 +381,11 @@ public:
+     Private() = default;
  
      Roster roster;
 +    QString groupsDelimiter;
@@ -243,7 +242,7 @@
  JT_Roster::JT_Roster(Task *parent)
  :Task(parent)
  {
-@@ -422,7 +424,7 @@ void JT_Roster::set(const Jid &jid, cons
+@@ -421,7 +423,7 @@ void JT_Roster::set(const Jid &jid, const QString &name, const QStringList &grou
  
  void JT_Roster::remove(const Jid &jid)
  {
@@ -252,7 +251,7 @@
      //to = client()->host();
      QDomElement item = doc()->createElement("item");
      item.setAttribute("jid", jid.full());
-@@ -430,11 +432,47 @@ void JT_Roster::remove(const Jid &jid)
+@@ -429,11 +431,47 @@ void JT_Roster::remove(const Jid &jid)
      d->itemList += item;
  }
  
@@ -302,7 +301,7 @@
          //to = client()->host();
          iq = createIQ(doc(), "set", to.full(), id());
          QDomElement query = doc()->createElement("query");
-@@ -444,6 +482,12 @@ void JT_Roster::onGo()
+@@ -443,6 +481,12 @@ void JT_Roster::onGo()
              query.appendChild(it);
          send(iq);
      }
@@ -315,7 +314,7 @@
  }
  
  const Roster & JT_Roster::roster() const
-@@ -451,6 +495,11 @@ const Roster & JT_Roster::roster() const
+@@ -450,6 +494,11 @@ const Roster & JT_Roster::roster() const
      return d->roster;
  }
  
@@ -327,7 +326,7 @@
  QString JT_Roster::toString() const
  {
      if(type != 1)
-@@ -519,6 +568,24 @@ bool JT_Roster::take(const QDomElement &
+@@ -518,6 +567,24 @@ bool JT_Roster::take(const QDomElement &x)
          setSuccess();
          return true;
      }
@@ -352,9 +351,9 @@
  
      return false;
  }
---- git.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.h
-+++ git/iris/src/xmpp/xmpp-im/xmpp_tasks.h
-@@ -101,7 +101,12 @@ namespace XMPP
+--- a/iris/src/xmpp/xmpp-im/xmpp_tasks.h
++++ b/iris/src/xmpp/xmpp-im/xmpp_tasks.h
+@@ -100,7 +100,12 @@ namespace XMPP
          void set(const Jid &, const QString &name, const QStringList &groups);
          void remove(const Jid &);
  

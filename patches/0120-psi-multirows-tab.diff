@@ -1,6 +1,16 @@
---- git.orig/iconsets/system/default/icondef.xml
-+++ git/iconsets/system/default/icondef.xml
-@@ -746,6 +746,11 @@
+--- a/iconsets.qrc
++++ b/iconsets.qrc
+@@ -142,6 +142,7 @@
+         <file>iconsets/system/default/psiplus/draw.png</file>
+         <file>iconsets/system/default/psiplus/frame.png</file>
+         <file>iconsets/system/default/psiplus/palette.png</file>
++        <file>iconsets/system/default/psiplus/pin.png</file>
+         <file>iconsets/system/default/psiplus/undo.png</file>
+         <file>iconsets/system/default/psiplus/print.png</file>
+         <file>iconsets/system/default/keys_64.png</file>
+--- a/iconsets/system/default/icondef.xml
++++ b/iconsets/system/default/icondef.xml
+@@ -756,6 +756,11 @@
  		<x xmlns='name'>psi/doubleBackArrow</x>
  		<object mime='image/png'>psiplus/doublebackarrow.png</object>
  	</icon>
@@ -12,18 +22,8 @@
  	<!-- End psi Plus icons -->
  
  	<!-- Icons for screenshot-plugin -->
---- git.orig/iconsets.qrc
-+++ git/iconsets.qrc
-@@ -140,6 +140,7 @@
-         <file>iconsets/system/default/psiplus/draw.png</file>
-         <file>iconsets/system/default/psiplus/frame.png</file>
-         <file>iconsets/system/default/psiplus/palette.png</file>
-+        <file>iconsets/system/default/psiplus/pin.png</file>
-         <file>iconsets/system/default/psiplus/undo.png</file>
-         <file>iconsets/system/default/psiplus/print.png</file>
-         <file>iconsets/system/default/keys_64.png</file>
---- git.orig/options/default.xml
-+++ git/options/default.xml
+--- a/options/default.xml
++++ b/options/default.xml
 @@ -509,6 +509,9 @@ QLineEdit#le_status_text {
                  <tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
                  <use-tab-shortcuts type="bool">true</use-tab-shortcuts>
@@ -54,17 +54,17 @@
              </alist>
              <chat comment="Shortcuts in the chat dialog">
                  <next-tab type="QVariantList" comment="Switch to the next tab">
---- git.orig/src/groupchatdlg.cpp
-+++ git/src/groupchatdlg.cpp
-@@ -95,6 +95,7 @@
- #include "vcardfactory.h"
+--- a/src/groupchatdlg.cpp
++++ b/src/groupchatdlg.cpp
+@@ -96,6 +96,7 @@
  #include "languagemanager.h"
  #include "filesharedlg.h"
+ #include "filesharingmanager.h"
 +#include "tabdlg.h"
  
  #ifdef Q_OS_WIN
  #include <windows.h>
-@@ -259,6 +260,7 @@ public:
+@@ -260,6 +261,7 @@ public:
      int rosterSize;
  public:
      bool trackBar;
@@ -72,7 +72,7 @@
  
      int logHeight;
      int chateditHeight;
-@@ -848,6 +850,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -849,6 +851,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
      setAcceptDrops(true);
  
      ui_.setupUi(this);
@@ -80,7 +80,7 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -921,6 +924,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -922,6 +925,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
          else if (name == QLatin1String("gchat_templates")) {
              action->setMenu(getTemplateMenu());
          }
@@ -90,7 +90,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2489,6 +2495,13 @@ void GCMainDlg::buildMenu()
+@@ -2490,6 +2496,13 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
@@ -104,9 +104,9 @@
  #ifdef PSI_PLUGINS
      if(!PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m1.visible").toBool()) {
          d->pm_settings->addSeparator();
---- git.orig/src/psiactionlist.cpp
-+++ git/src/psiactionlist.cpp
-@@ -454,6 +454,8 @@ void PsiActionList::Private::createChat(
+--- a/src/psiactionlist.cpp
++++ b/src/psiactionlist.cpp
+@@ -454,6 +454,8 @@ void PsiActionList::Private::createChat()
          IconAction *actCompact = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
          IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
@@ -115,7 +115,7 @@
  
          ActionNames actions[] = {
              { "chat_clear",  actClear  },
-@@ -469,6 +471,8 @@ void PsiActionList::Private::createChat(
+@@ -469,6 +471,8 @@ void PsiActionList::Private::createChat()
              { "chat_compact", actCompact   },
              { "chat_active_contacts", actActiveContacts   },
              { "chat_templates", actTemplates },
@@ -124,7 +124,7 @@
              { "", nullptr }
          };
  
-@@ -487,6 +491,8 @@ void PsiActionList::Private::createGroup
+@@ -487,6 +491,8 @@ void PsiActionList::Private::createGroupchat()
          IconAction *actConfigure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("Configure Room"), 0, this);
          IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
@@ -133,7 +133,7 @@
  
          ActionNames actions[] = {
              { "gchat_clear",     actClear     },
-@@ -495,6 +501,8 @@ void PsiActionList::Private::createGroup
+@@ -495,6 +501,8 @@ void PsiActionList::Private::createGroupchat()
              { "gchat_configure", actConfigure },
              { "gchat_icon",      actIcon      },
              { "gchat_templates", actTemplates },
@@ -142,17 +142,17 @@
              { "", nullptr }
          };
  
---- git.orig/src/psichatdlg.cpp
-+++ git/src/psichatdlg.cpp
+--- a/src/psichatdlg.cpp
++++ b/src/psichatdlg.cpp
 @@ -49,6 +49,7 @@
  #include "avcall/avcall.h"
  #include "actionlist.h"
  #include "psiactionlist.h"
 +#include "tabdlg.h"
  #ifdef PSI_PLUGINS
+ #include "filesharedlg.h"
  #include "pluginmanager.h"
- #endif
-@@ -547,6 +548,9 @@ void PsiChatDlg::initToolButtons()
+@@ -548,6 +549,9 @@ void PsiChatDlg::initToolButtons()
          else if (name == "chat_templates") {
              action->setMenu(getTemplateMenu());
          }
@@ -162,7 +162,7 @@
      }
  
      list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -909,6 +913,12 @@ void PsiChatDlg::buildMenu()
+@@ -910,6 +914,12 @@ void PsiChatDlg::buildMenu()
  
      pm_settings_->addAction(actions_->action("chat_info"));
      pm_settings_->addAction(actions_->action("chat_history"));
@@ -175,8 +175,8 @@
  #ifdef PSI_PLUGINS
      if(!PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.visible").toBool()) {
          pm_settings_->addSeparator();
---- git.orig/src/tabs/tabbablewidget.cpp
-+++ git/src/tabs/tabbablewidget.cpp
+--- a/src/tabs/tabbablewidget.cpp
++++ b/src/tabs/tabbablewidget.cpp
 @@ -293,3 +293,8 @@ void TabbableWidget::hideTab()
      else
          hide();
@@ -186,8 +186,8 @@
 +{
 +    getManagingTabDlg()->pinTab(this);
 +}
---- git.orig/src/tabs/tabbablewidget.h
-+++ git/src/tabs/tabbablewidget.h
+--- a/src/tabs/tabbablewidget.h
++++ b/src/tabs/tabbablewidget.h
 @@ -87,6 +87,7 @@ public slots:
      void bringToFront(bool raiseWindow = true);
      virtual void ensureTabbedCorrectly();
@@ -196,9 +196,9 @@
  
  protected:
      virtual void setJid(const Jid&);
---- git.orig/src/tabs/tabdlg.cpp
-+++ git/src/tabs/tabdlg.cpp
-@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint
+--- a/src/tabs/tabdlg.cpp
++++ b/src/tabs/tabdlg.cpp
+@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
              tabMenu_->addMenu(sendTo);
          }
  
@@ -210,7 +210,7 @@
          QAction *act = tabMenu_->exec(pos);
          if (!act)
              return;
-@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint
+@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
          else if(act == h) {
              hideTab(getTab(tab));
          }
@@ -220,7 +220,7 @@
          else {
              TabDlg* target = sentTos[act];
              if (target)
-@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab
+@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab)
      closeTab(tab, false);
  }
  
@@ -232,7 +232,7 @@
  void TabDlg::hideAllTab()
  {
      foreach(TabbableWidget* tab, tabs_)
-@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, i
+@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, int chat)
      }
  }
  
@@ -244,8 +244,8 @@
  TabbableWidget* TabDlg::getCurrentTab() const
  {
      return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
---- git.orig/src/tabs/tabdlg.h
-+++ git/src/tabs/tabdlg.h
+--- a/src/tabs/tabdlg.h
++++ b/src/tabs/tabdlg.h
 @@ -88,6 +88,8 @@ public:
      void setTabIcon(QWidget *,const QIcon &);
      TabbableWidget* getCurrentTab() const;
@@ -263,9 +263,9 @@
      void hideCurrentTab();
      void hideAllTab();
  
---- git.orig/src/widgets/psitabwidget.cpp
-+++ git/src/widgets/psitabwidget.cpp
-@@ -37,7 +37,11 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+--- a/src/widgets/psitabwidget.cpp
++++ b/src/widgets/psitabwidget.cpp
+@@ -37,7 +37,11 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
          : QWidget(parent) {
      tabsPosition_ = QTabWidget::East; // impossible => uninitialised state
      tabBar_ = new PsiTabBar(this);
@@ -278,7 +278,7 @@
      layout_ = new QVBoxLayout(this);
      layout_->setMargin(0);
      layout_->setSpacing(0);
-@@ -54,19 +58,21 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+@@ -54,19 +58,21 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
      downButton_ = new QToolButton(this);
      downButton_->setMinimumSize(3,3);
      downButton_->setFixedWidth(buttonwidth);
@@ -302,7 +302,7 @@
      closeButton_->setText("x");
      downButton_->setArrowType(Qt::DownArrow);
      downButton_->setPopupMode(QToolButton::InstantPopup);
-@@ -75,20 +81,22 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
+@@ -75,20 +81,22 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
      setTabPosition(QTabWidget::North);
      setLooks();
  
@@ -333,7 +333,7 @@
  }
  
  void PsiTabWidget::setCloseIcon(const QIcon& icon) {
-@@ -179,6 +187,7 @@ void PsiTabWidget::addTab(QWidget *widge
+@@ -179,6 +187,7 @@ void PsiTabWidget::addTab(QWidget *widget, QString name, const QIcon &icon)
          tabBar_->addTab(name);
      setLooks();
      showPage(currentPage());
@@ -356,7 +356,7 @@
  /**
   * Selects the page for the specified widget.
   */
-@@ -216,6 +233,27 @@ void PsiTabWidget::showPageDirectly(QWid
+@@ -216,6 +233,27 @@ void PsiTabWidget::showPageDirectly(QWidget* widget) {
      }
  }
  
@@ -384,7 +384,7 @@
  /**
   * Removes the page for the specified widget.
   */
-@@ -360,7 +398,12 @@ void PsiTabWidget::setTabButtonsShown(bo
+@@ -360,7 +398,12 @@ void PsiTabWidget::setTabButtonsShown(bool shown) {
   * Enable/disable dragging of tabs
   */
  void PsiTabWidget::setDragsEnabled(bool enabled) {
@@ -398,8 +398,8 @@
  }
  
  void PsiTabWidget::widgetMoved(int from, int to)
---- git.orig/src/widgets/psitabwidget.h
-+++ git/src/widgets/psitabwidget.h
+--- a/src/widgets/psitabwidget.h
++++ b/src/widgets/psitabwidget.h
 @@ -21,7 +21,6 @@
  #define PSITABWIDGET_H
  
