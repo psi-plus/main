@@ -72,7 +72,7 @@
  
      int logHeight;
      int chateditHeight;
-@@ -849,6 +851,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -855,6 +857,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      setAcceptDrops(true);
  
      ui_.setupUi(this);
@@ -80,7 +80,7 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -922,6 +925,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -935,6 +938,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
          else if (name == QLatin1String("gchat_templates")) {
              action->setMenu(getTemplateMenu());
          }
@@ -90,7 +90,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2490,6 +2496,10 @@ void GCMainDlg::buildMenu()
+@@ -2503,6 +2509,10 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
@@ -103,33 +103,33 @@
          d->pm_settings->addSeparator();
 --- git.orig/src/psiactionlist.cpp
 +++ git/src/psiactionlist.cpp
-@@ -454,6 +454,7 @@ void PsiActionList::Private::createChat(
-         IconAction *actCompact = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
+@@ -455,6 +455,7 @@ void PsiActionList::Private::createChat(
          IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
+         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/filemanager", tr("Share Files"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
 +        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
          ActionNames actions[] = {
              { "chat_clear",  actClear  },
-@@ -469,6 +470,7 @@ void PsiActionList::Private::createChat(
-             { "chat_compact", actCompact   },
+@@ -471,6 +472,7 @@ void PsiActionList::Private::createChat(
              { "chat_active_contacts", actActiveContacts   },
+             { "chat_share_files", actShareFiles  },
              { "chat_templates", actTemplates },
 +            { "chat_pin_tab", actPinTab },
              { "", nullptr }
          };
  
-@@ -487,6 +489,7 @@ void PsiActionList::Private::createGroup
-         IconAction *actConfigure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("Configure Room"), 0, this);
+@@ -490,6 +492,7 @@ void PsiActionList::Private::createGroup
          IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
+         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/filemanager", tr("Share Files"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
 +        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
          ActionNames actions[] = {
-             { "gchat_clear",     actClear     },
-@@ -495,6 +498,7 @@ void PsiActionList::Private::createGroup
-             { "gchat_configure", actConfigure },
-             { "gchat_icon",      actIcon      },
+             { "gchat_clear",  actClear  },
+@@ -499,6 +502,7 @@ void PsiActionList::Private::createGroup
+             { "gchat_icon", actIcon   },
+             { "gchat_share_files", actShareFiles   },
              { "gchat_templates", actTemplates },
 +            { "gchat_pin_tab",   actPinTab    },
              { "", nullptr }
@@ -137,15 +137,15 @@
  
 --- git.orig/src/psichatdlg.cpp
 +++ git/src/psichatdlg.cpp
-@@ -49,6 +49,7 @@
- #include "avcall/avcall.h"
+@@ -50,6 +50,7 @@
  #include "actionlist.h"
  #include "psiactionlist.h"
+ #include "filesharingmanager.h"
 +#include "tabdlg.h"
  #ifdef PSI_PLUGINS
  #include "filesharedlg.h"
  #include "pluginmanager.h"
-@@ -548,6 +549,9 @@ void PsiChatDlg::initToolButtons()
+@@ -556,6 +557,9 @@ void PsiChatDlg::initToolButtons()
          else if (name == "chat_templates") {
              action->setMenu(getTemplateMenu());
          }
@@ -155,7 +155,7 @@
      }
  
      list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -910,6 +914,11 @@ void PsiChatDlg::buildMenu()
+@@ -918,6 +922,11 @@ void PsiChatDlg::buildMenu()
  
      pm_settings_->addAction(actions_->action("chat_info"));
      pm_settings_->addAction(actions_->action("chat_history"));
