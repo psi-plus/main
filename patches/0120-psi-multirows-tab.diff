@@ -1,15 +1,5 @@
---- a/iconsets.qrc
-+++ b/iconsets.qrc
-@@ -142,6 +142,7 @@
-         <file>iconsets/system/default/psiplus/draw.png</file>
-         <file>iconsets/system/default/psiplus/frame.png</file>
-         <file>iconsets/system/default/psiplus/palette.png</file>
-+        <file>iconsets/system/default/psiplus/pin.png</file>
-         <file>iconsets/system/default/psiplus/undo.png</file>
-         <file>iconsets/system/default/psiplus/print.png</file>
-         <file>iconsets/system/default/keys_64.png</file>
---- a/iconsets/system/default/icondef.xml
-+++ b/iconsets/system/default/icondef.xml
+--- git.orig/iconsets/system/default/icondef.xml
++++ git/iconsets/system/default/icondef.xml
 @@ -756,6 +756,11 @@
  		<x xmlns='name'>psi/doubleBackArrow</x>
  		<object mime='image/png'>psiplus/doublebackarrow.png</object>
@@ -22,8 +12,18 @@
  	<!-- End psi Plus icons -->
  
  	<!-- Icons for screenshot-plugin -->
---- a/options/default.xml
-+++ b/options/default.xml
+--- git.orig/iconsets.qrc
++++ git/iconsets.qrc
+@@ -142,6 +142,7 @@
+         <file>iconsets/system/default/psiplus/draw.png</file>
+         <file>iconsets/system/default/psiplus/frame.png</file>
+         <file>iconsets/system/default/psiplus/palette.png</file>
++        <file>iconsets/system/default/psiplus/pin.png</file>
+         <file>iconsets/system/default/psiplus/undo.png</file>
+         <file>iconsets/system/default/psiplus/print.png</file>
+         <file>iconsets/system/default/keys_64.png</file>
+--- git.orig/options/default.xml
++++ git/options/default.xml
 @@ -509,6 +509,9 @@ QLineEdit#le_status_text {
                  <tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
                  <use-tab-shortcuts type="bool">true</use-tab-shortcuts>
@@ -54,8 +54,8 @@
              </alist>
              <chat comment="Shortcuts in the chat dialog">
                  <next-tab type="QVariantList" comment="Switch to the next tab">
---- a/src/groupchatdlg.cpp
-+++ b/src/groupchatdlg.cpp
+--- git.orig/src/groupchatdlg.cpp
++++ git/src/groupchatdlg.cpp
 @@ -96,6 +96,7 @@
  #include "languagemanager.h"
  #include "filesharedlg.h"
@@ -72,7 +72,7 @@
  
      int logHeight;
      int chateditHeight;
-@@ -849,6 +851,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -849,6 +851,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      setAcceptDrops(true);
  
      ui_.setupUi(this);
@@ -80,70 +80,63 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -922,6 +925,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager)
+@@ -922,6 +925,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
          else if (name == QLatin1String("gchat_templates")) {
              action->setMenu(getTemplateMenu());
          }
-+        else if (name == "gchat_pin_tab" || name == "gchat_unpin_tab") {
++        else if (name == "gchat_pin_tab") {
 +            connect(action, SIGNAL(triggered()), SLOT(pinTab()));
 +        }
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2490,6 +2496,13 @@ void GCMainDlg::buildMenu()
+@@ -2490,6 +2496,10 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
 +    if (PsiOptions::instance()->getOption("options.ui.tabs.multi-rows").toBool() && d->tabmode) {
 +        d->pm_settings->addSeparator();
-+        if (getManagingTabDlg()->isTabPinned(this))
-+            d->pm_settings->addAction(d->actions->action("gchat_unpin_tab"));
-+        else
-+            d->pm_settings->addAction(d->actions->action("gchat_pin_tab"));
++        d->pm_settings->addAction(d->actions->action("gchat_pin_tab"));
 +    }
  #ifdef PSI_PLUGINS
      if(!PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m1.visible").toBool()) {
          d->pm_settings->addSeparator();
---- a/src/psiactionlist.cpp
-+++ b/src/psiactionlist.cpp
-@@ -454,6 +454,8 @@ void PsiActionList::Private::createChat()
+--- git.orig/src/psiactionlist.cpp
++++ git/src/psiactionlist.cpp
+@@ -454,6 +454,7 @@ void PsiActionList::Private::createChat(
          IconAction *actCompact = new IconAction(tr("Toggle Compact/Full Size"), "psi/compact", tr("Toggle Compact/Full Size"), 0, this);
          IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
-+        IconAction *actPinTab = new IconAction(tr("Pin Tab"), "psi/pin", tr("Pin Tab"), 0 , this);
-+        IconAction *actUnpinTab = new IconAction(tr("Unpin Tab"), "psi/pin", tr("Unpin Tab"), 0 , this);
++        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
          ActionNames actions[] = {
              { "chat_clear",  actClear  },
-@@ -469,6 +471,8 @@ void PsiActionList::Private::createChat()
+@@ -469,6 +470,7 @@ void PsiActionList::Private::createChat(
              { "chat_compact", actCompact   },
              { "chat_active_contacts", actActiveContacts   },
              { "chat_templates", actTemplates },
 +            { "chat_pin_tab", actPinTab },
-+            { "chat_unpin_tab", actUnpinTab },
              { "", nullptr }
          };
  
-@@ -487,6 +491,8 @@ void PsiActionList::Private::createGroupchat()
+@@ -487,6 +489,7 @@ void PsiActionList::Private::createGroup
          IconAction *actConfigure = new IconAction(tr("Configure Room"), "psi/configure-room", tr("Configure Room"), 0, this);
          IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
-+        IconAction *actPinTab = new IconAction(tr("Pin Tab"), "psi/pin", tr("Pin Tab"), 0 , this);
-+        IconAction *actUnpinTab = new IconAction(tr("Unpin Tab"), "psi/pin", tr("Unpin Tab"), 0 , this);
++        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
          ActionNames actions[] = {
              { "gchat_clear",     actClear     },
-@@ -495,6 +501,8 @@ void PsiActionList::Private::createGroupchat()
+@@ -495,6 +498,7 @@ void PsiActionList::Private::createGroup
              { "gchat_configure", actConfigure },
              { "gchat_icon",      actIcon      },
              { "gchat_templates", actTemplates },
 +            { "gchat_pin_tab",   actPinTab    },
-+            { "gchat_unpin_tab", actUnpinTab  },
              { "", nullptr }
          };
  
---- a/src/psichatdlg.cpp
-+++ b/src/psichatdlg.cpp
+--- git.orig/src/psichatdlg.cpp
++++ git/src/psichatdlg.cpp
 @@ -49,6 +49,7 @@
  #include "avcall/avcall.h"
  #include "actionlist.h"
@@ -156,27 +149,70 @@
          else if (name == "chat_templates") {
              action->setMenu(getTemplateMenu());
          }
-+        else if (name == "chat_pin_tab" || name == "chat_unpin_tab") {
++        else if (name == "chat_pin_tab") {
 +            connect(action, SIGNAL(triggered()), SLOT(pinTab()));
 +        }
      }
  
      list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -910,6 +914,12 @@ void PsiChatDlg::buildMenu()
+@@ -910,6 +914,11 @@ void PsiChatDlg::buildMenu()
  
      pm_settings_->addAction(actions_->action("chat_info"));
      pm_settings_->addAction(actions_->action("chat_history"));
 +    auto dlg = getManagingTabDlg();
 +    if (dlg && PsiOptions::instance()->getOption("options.ui.tabs.multi-rows").toBool()) {
-+        pm_settings_->addAction(actions_->action(dlg->isTabPinned(this)?
-+                                                     "chat_unpin_tab":
-+                                                     "chat_pin_tab"));
++        pm_settings_->addAction(actions_->action("chat_pin_tab"));
++
 +    } // else it's not tabbed dialog
  #ifdef PSI_PLUGINS
      if(!PsiOptions::instance()->getOption("options.ui.contactlist.toolbars.m0.visible").toBool()) {
          pm_settings_->addSeparator();
---- a/src/tabs/tabbablewidget.cpp
-+++ b/src/tabs/tabbablewidget.cpp
+--- git.orig/src/tabs/tabbablewidget.cpp
++++ git/src/tabs/tabbablewidget.cpp
+@@ -42,7 +42,7 @@ TabbableWidget::TabbableWidget(const Jid
+     , tabManager_(tabManager)
+ {
+     if (TabbableWidget::chatsCount == 0) {
+-        TabbableWidget::templateMenu = new SendButtonTemplatesMenu(NULL);
++        TabbableWidget::templateMenu = new SendButtonTemplatesMenu(nullptr);
+         TabbableWidget::templateMenu->setParams(false);
+         TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
+     }
+@@ -124,20 +124,20 @@ TabbableWidget::~TabbableWidget()
+     }
+     --TabbableWidget::chatsCount;
+     if (TabbableWidget::chatsCount == 0) {
+-        if (TabbableWidget::templateMenu != NULL) {
++        if (TabbableWidget::templateMenu != nullptr) {
+             delete TabbableWidget::templateMenu;
+-            TabbableWidget::templateMenu = NULL;
++            TabbableWidget::templateMenu = nullptr;
+         }
+         if (!TabbableWidget::templateEditDlg.isNull()) {
+             delete (TabbableWidget::templateEditDlg);
+-            TabbableWidget::templateEditDlg = NULL;
++            TabbableWidget::templateEditDlg = nullptr;
+         }
+     }
+ }
+ 
+ int TabbableWidget::chatsCount = 0;
+-SendButtonTemplatesMenu *TabbableWidget::templateMenu = NULL;
+-QPointer<SendButtonTemplatesEditor> TabbableWidget::templateEditDlg = NULL;
++SendButtonTemplatesMenu *TabbableWidget::templateMenu = nullptr;
++QPointer<SendButtonTemplatesEditor> TabbableWidget::templateEditDlg = nullptr;
+ 
+ SendButtonTemplatesMenu* TabbableWidget::getTemplateMenu()
+ {
+@@ -149,7 +149,7 @@ void TabbableWidget::showTemplateEditor(
+     bool new_window = false;
+     if (TabbableWidget::templateEditDlg.isNull()) {
+         new_window = true;
+-        TabbableWidget::templateEditDlg = new SendButtonTemplatesEditor(NULL);
++        TabbableWidget::templateEditDlg = new SendButtonTemplatesEditor(nullptr);
+         if (TabbableWidget::templateMenu) {
+             TabbableWidget::templateEditDlg->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
+             connect(TabbableWidget::templateEditDlg.data(), SIGNAL(accepted()), TabbableWidget::templateMenu, SLOT(update()));
 @@ -293,3 +293,8 @@ void TabbableWidget::hideTab()
      else
          hide();
@@ -186,8 +222,8 @@
 +{
 +    getManagingTabDlg()->pinTab(this);
 +}
---- a/src/tabs/tabbablewidget.h
-+++ b/src/tabs/tabbablewidget.h
+--- git.orig/src/tabs/tabbablewidget.h
++++ git/src/tabs/tabbablewidget.h
 @@ -87,6 +87,7 @@ public slots:
      void bringToFront(bool raiseWindow = true);
      virtual void ensureTabbedCorrectly();
@@ -196,13 +232,13 @@
  
  protected:
      virtual void setJid(const Jid&);
---- a/src/tabs/tabdlg.cpp
-+++ b/src/tabs/tabdlg.cpp
-@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
+--- git.orig/src/tabs/tabdlg.cpp
++++ git/src/tabs/tabdlg.cpp
+@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint
              tabMenu_->addMenu(sendTo);
          }
  
-+        QAction *p = 0;
++        QAction *p = nullptr;
 +        if (PsiOptions::instance()->getOption("options.ui.tabs.multi-rows", true).toBool()) {
 +            p = tabMenu_->addAction(tabWidget_->isPagePinned(getTab(tab)) ? tr("Unpin Tab") : tr("Pin Tab"));
 +        }
@@ -210,7 +246,7 @@
          QAction *act = tabMenu_->exec(pos);
          if (!act)
              return;
-@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint pos, QContextMenuEvent * event)
+@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint
          else if(act == h) {
              hideTab(getTab(tab));
          }
@@ -220,7 +256,7 @@
          else {
              TabDlg* target = sentTos[act];
              if (target)
-@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab)
+@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab
      closeTab(tab, false);
  }
  
@@ -232,7 +268,7 @@
  void TabDlg::hideAllTab()
  {
      foreach(TabbableWidget* tab, tabs_)
-@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, int chat)
+@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, i
      }
  }
  
@@ -244,8 +280,8 @@
  TabbableWidget* TabDlg::getCurrentTab() const
  {
      return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
---- a/src/tabs/tabdlg.h
-+++ b/src/tabs/tabdlg.h
+--- git.orig/src/tabs/tabdlg.h
++++ git/src/tabs/tabdlg.h
 @@ -88,6 +88,8 @@ public:
      void setTabIcon(QWidget *,const QIcon &);
      TabbableWidget* getCurrentTab() const;
@@ -263,9 +299,9 @@
      void hideCurrentTab();
      void hideAllTab();
  
---- a/src/widgets/psitabwidget.cpp
-+++ b/src/widgets/psitabwidget.cpp
-@@ -37,7 +37,11 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
+--- git.orig/src/widgets/psitabwidget.cpp
++++ git/src/widgets/psitabwidget.cpp
+@@ -37,7 +37,11 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
          : QWidget(parent) {
      tabsPosition_ = QTabWidget::East; // impossible => uninitialised state
      tabBar_ = new PsiTabBar(this);
@@ -278,7 +314,7 @@
      layout_ = new QVBoxLayout(this);
      layout_->setMargin(0);
      layout_->setSpacing(0);
-@@ -54,19 +58,21 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
+@@ -54,19 +58,21 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
      downButton_ = new QToolButton(this);
      downButton_->setMinimumSize(3,3);
      downButton_->setFixedWidth(buttonwidth);
@@ -302,7 +338,7 @@
      closeButton_->setText("x");
      downButton_->setArrowType(Qt::DownArrow);
      downButton_->setPopupMode(QToolButton::InstantPopup);
-@@ -75,20 +81,22 @@ PsiTabWidget::PsiTabWidget(QWidget *parent)
+@@ -75,20 +81,22 @@ PsiTabWidget::PsiTabWidget(QWidget *pare
      setTabPosition(QTabWidget::North);
      setLooks();
  
@@ -333,7 +369,7 @@
  }
  
  void PsiTabWidget::setCloseIcon(const QIcon& icon) {
-@@ -179,6 +187,7 @@ void PsiTabWidget::addTab(QWidget *widget, QString name, const QIcon &icon)
+@@ -179,6 +187,7 @@ void PsiTabWidget::addTab(QWidget *widge
          tabBar_->addTab(name);
      setLooks();
      showPage(currentPage());
@@ -356,7 +392,7 @@
  /**
   * Selects the page for the specified widget.
   */
-@@ -216,6 +233,27 @@ void PsiTabWidget::showPageDirectly(QWidget* widget) {
+@@ -216,6 +233,27 @@ void PsiTabWidget::showPageDirectly(QWid
      }
  }
  
@@ -384,7 +420,7 @@
  /**
   * Removes the page for the specified widget.
   */
-@@ -360,7 +398,12 @@ void PsiTabWidget::setTabButtonsShown(bool shown) {
+@@ -360,7 +398,12 @@ void PsiTabWidget::setTabButtonsShown(bo
   * Enable/disable dragging of tabs
   */
  void PsiTabWidget::setDragsEnabled(bool enabled) {
@@ -398,8 +434,8 @@
  }
  
  void PsiTabWidget::widgetMoved(int from, int to)
---- a/src/widgets/psitabwidget.h
-+++ b/src/widgets/psitabwidget.h
+--- git.orig/src/widgets/psitabwidget.h
++++ git/src/widgets/psitabwidget.h
 @@ -21,7 +21,6 @@
  #define PSITABWIDGET_H
  
