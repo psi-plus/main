@@ -1,6 +1,6 @@
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -496,6 +496,7 @@ QLineEdit#le_status_text {
+@@ -490,6 +490,7 @@ QLineEdit#le_status_text {
                  </sounds>
                  <successful-subscription type="bool">true</successful-subscription>
              </notifications>
@@ -26,7 +26,7 @@
  
      int logHeight;
      int chateditHeight;
-@@ -852,6 +854,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -858,6 +860,13 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
  
      ui_.setupUi(this);
      d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
@@ -40,7 +40,7 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -2331,6 +2340,25 @@ void GCMainDlg::setLooks()
+@@ -2392,6 +2401,25 @@ void GCMainDlg::setLooks()
      setMucSelfAvatar();
  }
  
@@ -68,7 +68,7 @@
      ui_.toolbar->clear();
 --- git.orig/src/groupchatdlg.h
 +++ git/src/groupchatdlg.h
-@@ -169,6 +169,7 @@ private:
+@@ -168,6 +168,7 @@ private:
  
      inline XMPP::Jid jidForNick(const QString &nick) const;
  
@@ -78,7 +78,7 @@
  
 --- git.orig/src/mainwin.cpp
 +++ git/src/mainwin.cpp
-@@ -130,6 +130,7 @@ public:
+@@ -129,6 +129,7 @@ public:
      int tabsSize;
      int rosterSize;
      bool isLeftRoster;
@@ -86,7 +86,7 @@
  
      PopupAction *optionsButton, *statusButton;
      IconActionGroup *statusGroup, *viewGroups;
-@@ -553,6 +554,8 @@ MainWin::MainWin(bool _onTop, bool _asTo
+@@ -556,6 +557,8 @@ MainWin::MainWin(bool _onTop, bool _asTo
          connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
      optionChanged("options.ui.contactlist.css");
  
@@ -95,7 +95,7 @@
      reinitAutoHide();
  }
  
-@@ -591,6 +594,10 @@ void MainWin::optionChanged(const QStrin
+@@ -594,6 +597,10 @@ void MainWin::optionChanged(const QStrin
              setStyleSheet(css);
          }
      }
@@ -106,7 +106,7 @@
  }
  
  void MainWin::registerAction( IconAction* action )
-@@ -1739,6 +1746,7 @@ void MainWin::statusClicked(int x)
+@@ -1732,6 +1739,7 @@ void MainWin::statusClicked(int x)
  {
      if(x == Qt::MidButton) {
          recvNextEvent();
@@ -114,7 +114,7 @@
      }
  }
  
-@@ -1986,4 +1994,34 @@ void MainWin::resizeEvent(QResizeEvent *
+@@ -1979,4 +1987,34 @@ void MainWin::resizeEvent(QResizeEvent *
      }
  }
  
@@ -151,7 +151,7 @@
  //#endif
 --- git.orig/src/mainwin.h
 +++ git/src/mainwin.h
-@@ -26,6 +26,7 @@
+@@ -25,6 +25,7 @@
  #include <QList>
  #include <QString>
  #include <QStringList>
@@ -159,7 +159,7 @@
  
  #include "advwidget.h"
  #include "xmpp_status.h"
-@@ -86,6 +87,8 @@ protected:
+@@ -85,6 +86,8 @@ protected:
  #ifdef Q_OS_WIN
      bool winEvent(MSG *, long *);
  #endif
@@ -225,7 +225,7 @@
    <tabstop>ck_dockHideMW</tabstop>
 --- git.orig/src/psichatdlg.cpp
 +++ git/src/psichatdlg.cpp
-@@ -183,6 +183,9 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
+@@ -185,6 +185,9 @@ PsiChatDlg::PsiChatDlg(const Jid& jid, P
      connect(account(), SIGNAL(removedContact(PsiContact*)), SLOT(updateContactAdding(PsiContact*)));
      connect(account(), SIGNAL(updateContact(const Jid &)), SLOT(updateContactAdding(const Jid &)));
      mCmdManager_.registerProvider(new ChatDlgMCmdProvider(this));
@@ -235,7 +235,7 @@
      SendButtonTemplatesMenu* menu = getTemplateMenu();
      if (menu) {
          connect(menu, SIGNAL(doPasteAndSend()), this, SLOT(doPasteAndSend()));
-@@ -283,6 +286,11 @@ void PsiChatDlg::initUi()
+@@ -285,6 +288,11 @@ void PsiChatDlg::initUi()
      act_mini_cmd_->setText(tr("Input command..."));
      connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
      addAction(act_mini_cmd_);
@@ -247,7 +247,7 @@
  
      connect(ui_.log->textWidget(), SIGNAL(quote(const QString &)), ui_.mle->chatEdit(), SLOT(insertAsQuote(const QString &)));
  
-@@ -592,6 +600,22 @@ void PsiChatDlg::activated()
+@@ -601,6 +609,22 @@ void PsiChatDlg::activated()
      ChatDlg::activated();
  
      updateCountVisibility();
@@ -270,7 +270,7 @@
  }
  
  void PsiChatDlg::setContactToolTip(QString text)
-@@ -1133,4 +1157,23 @@ void PsiChatDlg::doSwitchJidMode()
+@@ -1147,4 +1171,23 @@ void PsiChatDlg::doSwitchJidMode()
      }
  }
  
@@ -326,7 +326,7 @@
  #endif
 --- git.orig/src/tabs/tabdlg.cpp
 +++ git/src/tabs/tabdlg.cpp
-@@ -167,9 +167,19 @@ TabDlg::TabDlg(TabManager* tabManager, c
+@@ -165,9 +165,19 @@ TabDlg::TabDlg(TabManager* tabManager, c
          delegate_->tabWidgetCreated(this, tabWidget_);
  
      QVBoxLayout *vert1 = new QVBoxLayout(this);
@@ -347,7 +347,7 @@
      setAcceptDrops(true);
  
      X11WM_CLASS("tabs");
-@@ -189,6 +199,7 @@ TabDlg::TabDlg(TabManager* tabManager, c
+@@ -187,6 +197,7 @@ TabDlg::TabDlg(TabManager* tabManager, c
  
      if(!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
          setGeometryOptionPath(geometryOption);
@@ -357,7 +357,7 @@
  TabDlg::~TabDlg()
 --- git.orig/src/tabs/tabdlg.h
 +++ git/src/tabs/tabdlg.h
-@@ -29,6 +29,7 @@
+@@ -28,6 +28,7 @@
  #include "advwidget.h"
  
  #include "tabbablewidget.h"
@@ -365,7 +365,7 @@
  
  class PsiCon;
  class ChatTabs;
-@@ -174,6 +175,7 @@ private:
+@@ -172,6 +173,7 @@ private:
      void extinguishFlashingTabs();
      void updateCaption();
      void updateTabBar();
@@ -375,7 +375,7 @@
  #endif
 --- git.orig/src/tools/advwidget/advwidget.cpp
 +++ git/src/tools/advwidget/advwidget.cpp
-@@ -386,7 +386,11 @@ bool GAdvancedWidget::Private::eventFilt
+@@ -389,7 +389,11 @@ bool GAdvancedWidget::Private::eventFilt
              }
              saveGeometryTimer_->start();
          }
@@ -398,7 +398,7 @@
   *
   * This library is free software; you can redistribute it and/or
   * modify it under the terms of the GNU Lesser General Public
-@@ -21,6 +21,7 @@
+@@ -20,6 +20,7 @@
  #ifndef ADVWIDGET_H
  #define ADVWIDGET_H
  
@@ -406,7 +406,7 @@
  #include <QWidget>
  
  class GAdvancedWidget : public QObject
-@@ -65,14 +66,205 @@ class AdvancedWidget : public BaseClass
+@@ -64,7 +65,196 @@ class AdvancedWidget : public BaseClass
  {
  private:
      GAdvancedWidget *gAdvWidget;
@@ -470,7 +470,7 @@
 +        {
 +            return Qt::TopLeftSection;
 +        }
-+
+ 
 +        return Qt::NoSection;
 +    }
 +    void doWindowResize(QWidget *window, const QPoint &eventPos, Qt::WindowFrameSection region)
@@ -600,13 +600,10 @@
 +    {
 +        return (BaseClass::window()->windowState() == Qt::WindowMaximized)||(BaseClass::window()->windowState() == Qt::WindowFullScreen);
 +    }
- 
  public:
--    AdvancedWidget(QWidget *parent = 0, Qt::WindowFlags f = 0)
-+    AdvancedWidget(QWidget *parent = nullptr, Qt::WindowFlags f = nullptr)
+     AdvancedWidget(QWidget *parent = nullptr, Qt::WindowFlags f = nullptr)
          : BaseClass(parent)
--        , gAdvWidget(0)
-+        , gAdvWidget(nullptr)
+@@ -72,6 +262,7 @@ public:
      {
          if (f != 0)
              BaseClass::setWindowFlags(f);
@@ -614,7 +611,7 @@
          gAdvWidget = new GAdvancedWidget( this );
      }
  
-@@ -151,6 +343,49 @@ public:
+@@ -150,6 +341,49 @@ public:
          windowTitleChanged();
      }
  
@@ -664,7 +661,7 @@
  protected:
      virtual void windowTitleChanged()
      {
-@@ -165,6 +400,63 @@ protected:
+@@ -164,6 +398,63 @@ protected:
          }
          BaseClass::changeEvent(event);
      }
