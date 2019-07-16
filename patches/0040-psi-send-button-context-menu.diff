@@ -45,7 +45,7 @@
      setAcceptDrops(true);
  
      ui_.setupUi(this);
-@@ -921,6 +928,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -923,6 +930,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
                  });
              });
          }
@@ -55,7 +55,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -962,6 +972,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -964,6 +974,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      connect(bm, SIGNAL(conferencesChanged(QList<ConferenceBookmark>)), SLOT(updateMucName()));
      connect(bm, SIGNAL(bookmarksSaved()), SLOT(updateBookmarkIcon()));
  
@@ -65,7 +65,7 @@
      int s = PsiIconset::instance()->system().iconSize();
      ui_.toolbar->setIconSize(QSize(s,s));
  
-@@ -977,6 +990,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -979,6 +992,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      connect(d->act_send,SIGNAL(triggered()), SLOT(mle_returnPressed()));
       ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
      connect(ui_.pb_send, SIGNAL(clicked()), SLOT(mle_returnPressed()));
@@ -73,7 +73,7 @@
      d->act_close = new QAction(this);
      addAction(d->act_close);
      connect(d->act_close,SIGNAL(triggered()), SLOT(close()));
-@@ -1071,6 +1085,13 @@ GCMainDlg::~GCMainDlg()
+@@ -1073,6 +1087,13 @@ GCMainDlg::~GCMainDlg()
      account()->dialogUnregister(this);
      delete d->mucManager;
      delete d;
@@ -87,7 +87,7 @@
  }
  
  void GCMainDlg::horizSplitterMoved()
-@@ -2441,6 +2462,8 @@ void GCMainDlg::buildMenu()
+@@ -2500,6 +2521,8 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addSeparator();
  
      d->pm_settings->addAction(d->actions->action("gchat_icon"));
@@ -96,7 +96,7 @@
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
  #ifdef PSI_PLUGINS
-@@ -2516,4 +2539,48 @@ QStringList GCMainDlg::mucRosterContent(
+@@ -2575,4 +2598,48 @@ QStringList GCMainDlg::mucRosterContent(
      return d->usersModel->nickList();
  }
  
@@ -350,7 +350,7 @@
      MCmdSimpleSite mCmdSite_;
 --- git.orig/src/psioptions.cpp
 +++ git/src/psioptions.cpp
-@@ -198,12 +198,13 @@ bool PsiOptions::newProfile()
+@@ -195,12 +195,13 @@ bool PsiOptions::newProfile()
          chatToolbar.keys += pluginsKeys;
          chatToolbar.keys << "spacer" << "chat_icon" << "chat_file"
                           << "chat_pgp" << "chat_info" << "chat_history" << "chat_voice"
@@ -389,7 +389,7 @@
  
 --- git.orig/src/sendbuttonmenu.cpp
 +++ git/src/sendbuttonmenu.cpp
-@@ -0,0 +1,495 @@
+@@ -0,0 +1,491 @@
 +#include <QInputDialog>
 +#include <QMessageBox>
 +
@@ -432,7 +432,7 @@
 +        if (menu_list.size() == 0)
 +            continue;
 +        // find subitems if exists
-+        QTreeWidgetItem *item = NULL;
++        QTreeWidgetItem *item = nullptr;
 +        QString menu_str = "";
 +        int j = menu_list.size() - 2;
 +        for (; j >= 0; j--) {
@@ -442,7 +442,7 @@
 +                menu_str = menu_str2;
 +                menu_str2.append("/" + menu_list.at(k));
 +            }
-+            item = subitems.value(menu_str2, NULL);
++            item = subitems.value(menu_str2, nullptr);
 +            if (item) {
 +                menu_str = menu_str2;
 +                ++j;
@@ -703,7 +703,6 @@
 +
 +SendButtonTemplatesMenu::SendButtonTemplatesMenu(QWidget* parent)
 +    : QMenu(parent)
-+    , mapper(NULL)
 +    , ps_(false)
 +{
 +    setSeparatorsCollapsible(true);
@@ -778,9 +777,6 @@
 +void SendButtonTemplatesMenu::update()
 +{
 +    clearMenu(this);
-+    if (mapper)
-+        delete mapper;
-+    mapper = new QSignalMapper(this);
 +
 +    pasteSendAct = new QAction(IconsetFactory::icon("psi/action_paste_and_send").icon(), tr("Paste and &Send"), this);
 +    connect(pasteSendAct, SIGNAL(triggered()), SIGNAL(doPasteAndSend()));
@@ -807,7 +803,7 @@
 +        if (menu_list.size() == 0)
 +            continue;
 +        // find submenus if exists
-+        QAction *m_act = NULL;
++        QAction *m_act = nullptr;
 +        QString menu_str = "";
 +        int j = menu_list.size() - 2;
 +        for (; j >= 0; j--) {
@@ -817,7 +813,7 @@
 +                menu_str = menu_str2;
 +                menu_str2.append("/" + menu_list.at(k));
 +            }
-+            m_act = submenus.value(menu_str2, NULL);
++            m_act = submenus.value(menu_str2, nullptr);
 +            if (m_act) {
 +                menu_str = menu_str2;
 +                ++j;
@@ -843,8 +839,9 @@
 +            QAction *c_act = makeAction(SendButtonTemplatesMenu::stripSlashes(str1));
 +            smenu->addAction(c_act);
 +            if (j == (sub_cnt - 1)) {
-+                connect(c_act, SIGNAL(triggered()), mapper, SLOT(map()));
-+                mapper->setMapping(c_act, SendButtonTemplatesMenu::stripSlashes(str1));
++                connect(c_act, &QAction::triggered, this, [this, str1](){
++                    emit doTemplateText(SendButtonTemplatesMenu::stripSlashes(str1));
++                });
 +                break;
 +            } else {
 +                smenu = new QMenu(this);
@@ -854,7 +851,6 @@
 +            }
 +        }
 +    }
-+    connect(mapper, SIGNAL(mapped(const QString &)), SIGNAL(doTemplateText(const QString &)));
 +}
 +
 +void SendButtonTemplatesMenu::clickOnlyPaste()
@@ -887,14 +883,13 @@
 +}
 --- git.orig/src/sendbuttonmenu.h
 +++ git/src/sendbuttonmenu.h
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,75 @@
 +#ifndef SENDBUTTONMENU_H
 +#define SENDBUTTONMENU_H
 +
 +#include <QDialog>
 +#include <QMenu>
 +#include <QPointer>
-+#include <QSignalMapper>
 +
 +#include "ui_sendbuttontemplateseditor.h"
 +
@@ -902,7 +897,7 @@
 +{
 +    Q_OBJECT
 +public:
-+    SendButtonTemplatesEditor(QWidget* parent = 0);
++    SendButtonTemplatesEditor(QWidget* parent = nullptr);
 +
 +private:
 +    Ui::SendButtonTemplatesEditor ui_;
@@ -945,7 +940,6 @@
 +    static QString stripSlashes(QString);
 +
 +private:
-+    QSignalMapper *mapper;
 +    bool ps_;
 +    QAction *pasteSendAct;
 +    QAction *onlyPaste;
@@ -1334,7 +1328,7 @@
 +</ui>
 --- git.orig/src/src.pri
 +++ git/src/src.pri
-@@ -228,6 +228,7 @@ HEADERS += \
+@@ -224,6 +224,7 @@ HEADERS += \
      $$PWD/vcardphotodlg.h \
      $$PWD/psicli.h \
      $$PWD/coloropt.h \
@@ -1342,7 +1336,7 @@
      $$PWD/geolocationdlg.h \
      $$PWD/rosteravatarframe.h \
      $$PWD/psicapsregsitry.h \
-@@ -366,6 +367,7 @@ SOURCES += \
+@@ -361,6 +362,7 @@ SOURCES += \
      $$PWD/bookmarkmanagedlg.cpp \
      $$PWD/vcardphotodlg.cpp \
      $$PWD/coloropt.cpp \
@@ -1350,7 +1344,7 @@
      $$PWD/geolocationdlg.cpp \
      $$PWD/rosteravatarframe.cpp \
      $$PWD/tabcompletion.cpp \
-@@ -585,6 +587,7 @@ FORMS += \
+@@ -587,6 +589,7 @@ FORMS += \
      $$PWD/bookmarkmanage.ui \
      $$PWD/ahcommanddlg.ui \
      $$PWD/ahcformdlg.ui \
