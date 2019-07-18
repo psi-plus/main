@@ -1,6 +1,6 @@
 --- git.orig/iconsets/system/default/icondef.xml
 +++ git/iconsets/system/default/icondef.xml
-@@ -756,6 +756,11 @@
+@@ -769,6 +769,11 @@
  		<x xmlns='name'>psi/doubleBackArrow</x>
  		<object mime='image/png'>psiplus/doublebackarrow.png</object>
  	</icon>
@@ -14,7 +14,7 @@
  	<!-- Icons for screenshot-plugin -->
 --- git.orig/iconsets.qrc
 +++ git/iconsets.qrc
-@@ -142,6 +142,7 @@
+@@ -145,6 +145,7 @@
          <file>iconsets/system/default/psiplus/draw.png</file>
          <file>iconsets/system/default/psiplus/frame.png</file>
          <file>iconsets/system/default/psiplus/palette.png</file>
@@ -24,7 +24,7 @@
          <file>iconsets/system/default/keys_64.png</file>
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -509,6 +509,9 @@ QLineEdit#le_status_text {
+@@ -505,6 +505,9 @@ QLineEdit#le_status_text {
                  <tab-singles type="QString" comment="Tab types that would have been untabbed are given their own tabset. 'C' for chat and 'M' for mucs"/>
                  <use-tab-shortcuts type="bool">true</use-tab-shortcuts>
                  <show-tab-buttons type="bool">true</show-tab-buttons>
@@ -34,29 +34,25 @@
              </tabs>
          </ui>
          <shortcuts comment="Shortcuts">
-@@ -576,8 +579,10 @@ QLineEdit#le_status_text {
+@@ -572,6 +575,7 @@ QLineEdit#le_status_text {
                  <chat_icon type="QKeySequence"></chat_icon>
                  <chat_info type="QKeySequence"></chat_info>
                  <chat_pgp type="QKeySequence"></chat_pgp>
 +                <chat_pin_tab type="QKeySequence"></chat_pin_tab>
                  <chat_ps type="QKeySequence"></chat_ps>
                  <chat_templates type="QKeySequence"></chat_templates>
-+                <chat_unpin_tab type="QKeySequence"></chat_unpin_tab>
                  <chat_voice type="QKeySequence"></chat_voice>
-                 <gchat_clear type="QKeySequence"></gchat_clear>
-                 <gchat_configure type="QKeySequence"></gchat_configure>
-@@ -586,6 +591,8 @@ QLineEdit#le_status_text {
+@@ -582,6 +586,7 @@ QLineEdit#le_status_text {
                  <gchat_icon type="QKeySequence"></gchat_icon>
                  <gchat_ps type="QKeySequence"></gchat_ps>
                  <gchat_templates type="QKeySequence"></gchat_templates>
 +                <gchat_pin_tab type="QKeySequence"></gchat_pin_tab>
-+                <gchat_unpin_tab type="QKeySequence"></gchat_unpin_tab>
              </alist>
              <chat comment="Shortcuts in the chat dialog">
                  <next-tab type="QVariantList" comment="Switch to the next tab">
 --- git.orig/src/groupchatdlg.cpp
 +++ git/src/groupchatdlg.cpp
-@@ -96,6 +96,7 @@
+@@ -97,6 +97,7 @@
  #include "languagemanager.h"
  #include "filesharedlg.h"
  #include "filesharingmanager.h"
@@ -80,7 +76,7 @@
      ui_.lb_ident->setAccount(account());
      ui_.lb_ident->setShowJid(false);
      ui_.log->setSessionData(true, false, jid(), jid().full()); //FIXME change conference name
-@@ -935,6 +938,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -937,6 +940,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
          else if (name == QLatin1String("gchat_templates")) {
              action->setMenu(getTemplateMenu());
          }
@@ -90,7 +86,7 @@
      }
  
      actList = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -2503,6 +2509,10 @@ void GCMainDlg::buildMenu()
+@@ -2545,6 +2551,10 @@ void GCMainDlg::buildMenu()
      d->pm_settings->addAction(d->act_pastesend);
      d->pm_settings->addAction(d->act_nick);
      d->pm_settings->addAction(d->act_bookmark);
@@ -105,7 +101,7 @@
 +++ git/src/psiactionlist.cpp
 @@ -455,6 +455,7 @@ void PsiActionList::Private::createChat(
          IconAction *actActiveContacts = new IconAction (tr("Active contacts"), "psi/jabber", tr("Active contacts"), 0, this);
-         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/filemanager", tr("Share Files"), 0, this);
+         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/share_file", tr("Share Files"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
 +        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
@@ -121,7 +117,7 @@
  
 @@ -490,6 +492,7 @@ void PsiActionList::Private::createGroup
          IconAction *actIcon = new IconAction(tr("Select Icon"), "psi/smile", tr("Select Icon"), 0, this);
-         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/filemanager", tr("Share Files"), 0, this);
+         IconAction *actShareFiles = new IconAction (tr("Share Files"), "psi/share_file", tr("Share Files"), 0, this);
          IconAction *actTemplates = new IconAction(tr("Templates"), "psi/action_templates", tr("Templates"), 0, this);
 +        IconAction *actPinTab = new IconAction(tr("Pin/UnPin Tab"), "psi/pin", tr("Pin/UnPin Tab"), 0 , this);
  
@@ -169,50 +165,6 @@
          pm_settings_->addSeparator();
 --- git.orig/src/tabs/tabbablewidget.cpp
 +++ git/src/tabs/tabbablewidget.cpp
-@@ -42,7 +42,7 @@ TabbableWidget::TabbableWidget(const Jid
-     , tabManager_(tabManager)
- {
-     if (TabbableWidget::chatsCount == 0) {
--        TabbableWidget::templateMenu = new SendButtonTemplatesMenu(NULL);
-+        TabbableWidget::templateMenu = new SendButtonTemplatesMenu(nullptr);
-         TabbableWidget::templateMenu->setParams(false);
-         TabbableWidget::templateMenu->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
-     }
-@@ -124,20 +124,20 @@ TabbableWidget::~TabbableWidget()
-     }
-     --TabbableWidget::chatsCount;
-     if (TabbableWidget::chatsCount == 0) {
--        if (TabbableWidget::templateMenu != NULL) {
-+        if (TabbableWidget::templateMenu != nullptr) {
-             delete TabbableWidget::templateMenu;
--            TabbableWidget::templateMenu = NULL;
-+            TabbableWidget::templateMenu = nullptr;
-         }
-         if (!TabbableWidget::templateEditDlg.isNull()) {
-             delete (TabbableWidget::templateEditDlg);
--            TabbableWidget::templateEditDlg = NULL;
-+            TabbableWidget::templateEditDlg = nullptr;
-         }
-     }
- }
- 
- int TabbableWidget::chatsCount = 0;
--SendButtonTemplatesMenu *TabbableWidget::templateMenu = NULL;
--QPointer<SendButtonTemplatesEditor> TabbableWidget::templateEditDlg = NULL;
-+SendButtonTemplatesMenu *TabbableWidget::templateMenu = nullptr;
-+QPointer<SendButtonTemplatesEditor> TabbableWidget::templateEditDlg = nullptr;
- 
- SendButtonTemplatesMenu* TabbableWidget::getTemplateMenu()
- {
-@@ -149,7 +149,7 @@ void TabbableWidget::showTemplateEditor(
-     bool new_window = false;
-     if (TabbableWidget::templateEditDlg.isNull()) {
-         new_window = true;
--        TabbableWidget::templateEditDlg = new SendButtonTemplatesEditor(NULL);
-+        TabbableWidget::templateEditDlg = new SendButtonTemplatesEditor(nullptr);
-         if (TabbableWidget::templateMenu) {
-             TabbableWidget::templateEditDlg->setStyleSheet(PsiOptions::instance()->getOption("options.ui.chat.css").toString());
-             connect(TabbableWidget::templateEditDlg.data(), SIGNAL(accepted()), TabbableWidget::templateMenu, SLOT(update()));
 @@ -293,3 +293,8 @@ void TabbableWidget::hideTab()
      else
          hide();
@@ -234,7 +186,7 @@
      virtual void setJid(const Jid&);
 --- git.orig/src/tabs/tabdlg.cpp
 +++ git/src/tabs/tabdlg.cpp
-@@ -273,6 +273,11 @@ void TabDlg::showTabMenu(int tab, QPoint
+@@ -267,6 +267,11 @@ void TabDlg::showTabMenu(int tab, QPoint
              tabMenu_->addMenu(sendTo);
          }
  
@@ -246,7 +198,7 @@
          QAction *act = tabMenu_->exec(pos);
          if (!act)
              return;
-@@ -285,6 +290,9 @@ void TabDlg::showTabMenu(int tab, QPoint
+@@ -279,6 +284,9 @@ void TabDlg::showTabMenu(int tab, QPoint
          else if(act == h) {
              hideTab(getTab(tab));
          }
@@ -256,7 +208,7 @@
          else {
              TabDlg* target = sentTos[act];
              if (target)
-@@ -430,6 +438,11 @@ void TabDlg::hideTab(TabbableWidget* tab
+@@ -424,6 +432,11 @@ void TabDlg::hideTab(TabbableWidget* tab
      closeTab(tab, false);
  }
  
@@ -268,7 +220,7 @@
  void TabDlg::hideAllTab()
  {
      foreach(TabbableWidget* tab, tabs_)
-@@ -910,6 +923,11 @@ void TabDlg::updateVSplitters(int log, i
+@@ -904,6 +917,11 @@ void TabDlg::updateVSplitters(int log, i
      }
  }
  
