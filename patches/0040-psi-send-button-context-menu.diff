@@ -1,13 +1,13 @@
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -124,6 +124,7 @@
+@@ -123,6 +123,7 @@
                  <show-status-changes type="bool">true</show-status-changes>
                  <show-previews type="bool">true</show-previews>
                  <warn-before-clear type="bool">true</warn-before-clear>
 +                <only-paste-template type="bool">false</only-paste-template>
                  <css type="QString" />
-                 <hide-when-closing type="bool">false</hide-when-closing>
                  <status-with-priority comment="Show priority with status change" type="bool">false</status-with-priority>
+                 <default-jid-mode comment="Default jid mode: barejid | auto" type="QString">auto</default-jid-mode>
 --- git.orig/src/chatdlg.ui
 +++ git/src/chatdlg.ui
 @@ -350,6 +350,9 @@
@@ -254,7 +254,7 @@
              action->addTo(ui_.toolbar);
 -            if (actionName == "chat_icon") {
 +            if (actionName == QLatin1String("chat_icon") || actionName == QLatin1String("chat_templates")) {
-                 ((QToolButton *)ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
+                 static_cast<QToolButton *>(ui_.toolbar->widgetForAction(action))->setPopupMode(QToolButton::InstantPopup);
              }
          }
 @@ -511,6 +527,9 @@ void PsiChatDlg::initToolButtons()
@@ -267,7 +267,7 @@
      }
  
      list = account()->psi()->actionList()->actionLists(PsiActionList::Actions_Common).at(0);
-@@ -862,6 +881,8 @@ void PsiChatDlg::buildMenu()
+@@ -863,6 +882,8 @@ void PsiChatDlg::buildMenu()
      pm_settings_->addSeparator();
  
      pm_settings_->addAction(actions_->action("chat_icon"));
@@ -276,7 +276,7 @@
      pm_settings_->addAction(actions_->action("chat_file"));
      if (AvCallManager::isSupported()) {
          pm_settings_->addAction(actions_->action("chat_voice"));
-@@ -923,6 +944,49 @@ void PsiChatDlg::chatEditCreated()
+@@ -924,6 +945,49 @@ void PsiChatDlg::chatEditCreated()
      });
  }
  
