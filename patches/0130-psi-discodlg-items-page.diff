@@ -1,6 +1,6 @@
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -493,6 +493,7 @@ QLineEdit#le_status_text {
+@@ -486,6 +486,7 @@ QLineEdit#le_status_text {
              <service-discovery>
                  <automatically-get-info type="bool">false</automatically-get-info>
                  <automatically-get-items type="bool">false</automatically-get-items>
@@ -197,17 +197,17 @@
      treeWidget()->setUpdatesEnabled(false);
  
      QHash<QString, DiscoListItem*> children;
--    DiscoListItem *child = (DiscoListItem *)QTreeWidgetItem::child(0);
-+    DiscoBaseItem *child = (DiscoBaseItem *)QTreeWidgetItem::child(0);
+-    DiscoListItem *child = static_cast<DiscoListItem *>(QTreeWidgetItem::child(0));
++    DiscoBaseItem *child = static_cast<DiscoBaseItem *>(QTreeWidgetItem::child(0));
 +    DiscoListItem *item;
      for ( int i = 1; child; ++i ) {
 -        children.insert( child->hash(), child );
 -
 +        if (!moreItem && child->type() != MoreItemsType) {
-+            item = (DiscoListItem *)child;
++            item = static_cast<DiscoListItem *>(child);
 +            children.insert(item->hash(), item);
 +        }
-         child = (DiscoListItem *)QTreeWidgetItem::child(i);
+         child = static_cast<DiscoListItem *>(QTreeWidgetItem::child(i));
      }
  
 @@ -453,10 +538,10 @@ void DiscoListItem::updateItemsFinished(
@@ -281,22 +281,22 @@
  // DiscoList
  //----------------------------------------------------------------------------
  
-@@ -615,10 +738,12 @@ void DiscoListView::resizeEvent(QResizeE
+@@ -619,10 +742,12 @@ void DiscoListView::resizeEvent(QResizeE
   */
  bool DiscoListView::maybeTip(const QPoint &pos)
  {
--    DiscoListItem* i = (DiscoListItem*)itemAt(viewport()->mapFromGlobal(pos));
+-    DiscoListItem* i = static_cast<DiscoListItem *>(itemAt(viewport()->mapFromGlobal(pos)));
 -    if(!i)
 +    QTreeWidgetItem *twi = itemAt(viewport()->mapFromGlobal(pos));
 +    if (!twi || twi->type() == MoreItemsType)
          return false;
  
-+    DiscoListItem* i = (DiscoListItem*)twi;
++    DiscoListItem* i = static_cast<DiscoListItem*>(twi);
 +
      // NAME <JID> (Node "NODE")
      //
      // Identities:
-@@ -775,6 +900,8 @@ public: // data
+@@ -779,6 +904,8 @@ public: // data
  
      BusyWidget *busy;
  
@@ -305,7 +305,7 @@
  public: // functions
      Private(DiscoDlg *parent, PsiAccount *pa);
      ~Private();
-@@ -800,6 +927,7 @@ public slots:
+@@ -804,6 +931,7 @@ public slots:
  
      void itemSelected (QTreeWidgetItem *);
      void itemExpanded (QTreeWidgetItem *);
@@ -313,7 +313,7 @@
      void itemDoubleclicked (QTreeWidgetItem *);
      bool eventFilter (QObject *, QEvent *);
  
-@@ -834,6 +962,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
+@@ -838,6 +966,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
      dlg->le_filter->installEventFilter(this);
      connect(dlg->lv_disco, SIGNAL(currentItemChanged (QTreeWidgetItem *, QTreeWidgetItem *)), SLOT(itemSelected (QTreeWidgetItem *)));
      connect(dlg->lv_disco, SIGNAL(itemExpanded (QTreeWidgetItem *)), SLOT(itemExpanded (QTreeWidgetItem *)));
@@ -321,7 +321,7 @@
      connect(dlg->lv_disco, SIGNAL(itemDoubleClicked (QTreeWidgetItem *, int)), SLOT(itemDoubleclicked (QTreeWidgetItem *)));
      connect(dlg->le_filter, SIGNAL(textChanged(QString)), dlg->lv_disco, SLOT(updateItemsVisibility(QString)));
  
-@@ -1074,7 +1203,7 @@ void DiscoDlg::Private::enableButtons(co
+@@ -1075,7 +1204,7 @@ void DiscoDlg::Private::enableButtons(co
  
  void DiscoDlg::Private::itemSelected (QTreeWidgetItem *item)
  {
@@ -330,7 +330,7 @@
      if ( !it ) {
          disableButtons();
          return;
-@@ -1093,12 +1222,19 @@ void DiscoDlg::Private::itemExpanded (QT
+@@ -1094,12 +1223,19 @@ void DiscoDlg::Private::itemExpanded (QT
          it->setExpanded(true);
  }
  
@@ -352,20 +352,20 @@
      const DiscoItem d = it->item();
      const Features &f = d.features();
  
-@@ -1144,9 +1280,10 @@ bool DiscoDlg::Private::eventFilter (QOb
+@@ -1145,9 +1281,10 @@ bool DiscoDlg::Private::eventFilter (QOb
          if ( event->type() == QEvent::ContextMenu ) {
              QContextMenuEvent *e = static_cast<QContextMenuEvent *>(event);
  
--            DiscoListItem *it = (DiscoListItem *)dlg->lv_disco->currentItem();
+-            DiscoListItem *it = static_cast<DiscoListItem *>(dlg->lv_disco->currentItem());
 -            if ( !it )
 +            QTreeWidgetItem *twi = dlg->lv_disco->currentItem();
 +            if (!twi || twi->type() == MoreItemsType)
                  return true;
-+            DiscoListItem *it = (DiscoListItem *)twi;
++            DiscoListItem *it = static_cast<DiscoListItem *>(twi);
  
              // prepare features list
              QList<long> idFeatures;
-@@ -1269,6 +1406,7 @@ DiscoDlg::DiscoDlg(PsiAccount *pa, const
+@@ -1270,6 +1407,7 @@ DiscoDlg::DiscoDlg(PsiAccount *pa, const
      d->jid  = jid;
      d->node = node;
      d->data.pa->dialogRegister(this);
@@ -373,7 +373,7 @@
  
      //setWindowTitle(CAP(caption()));
      setWindowIcon(PsiIconset::instance()->transportStatus("transport", STATUS_ONLINE).icon());
-@@ -1310,6 +1448,15 @@ void DiscoDlg::doDisco(QString host, QSt
+@@ -1311,6 +1449,15 @@ void DiscoDlg::doDisco(QString host, QSt
      d->doDisco(host, node);
  }
  
