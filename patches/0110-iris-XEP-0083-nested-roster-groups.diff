@@ -103,7 +103,7 @@
  }
 --- git.orig/iris/src/xmpp/xmpp-im/types.cpp
 +++ git/iris/src/xmpp/xmpp-im/types.cpp
-@@ -3318,13 +3318,35 @@ bool RosterItem::fromXml(const QDomEleme
+@@ -3407,13 +3407,35 @@ bool RosterItem::fromXml(const QDomEleme
  //---------------------------------------------------------------------------
  // Roster
  //---------------------------------------------------------------------------
@@ -113,8 +113,8 @@
 +    QString groupsDelimiter;
 +};
 +
- Roster::Roster()
-     : QList<RosterItem>()
+ Roster::Roster() :
+     QList<RosterItem>()
 +    , d(new Roster::Private)
  {
  }
@@ -139,7 +139,7 @@
  }
  
  Roster::Iterator Roster::find(const Jid &j)
-@@ -3347,6 +3369,16 @@ Roster::ConstIterator Roster::find(const
+@@ -3436,6 +3458,16 @@ Roster::ConstIterator Roster::find(const
      return end();
  }
  
@@ -230,19 +230,15 @@
  
 --- git.orig/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
 +++ git/iris/src/xmpp/xmpp-im/xmpp_tasks.cpp
-@@ -374,9 +374,11 @@ public:
+@@ -367,6 +367,7 @@ public:
      Private() = default;
  
-     Roster roster;
-+    QString groupsDelimiter;
+     Roster             roster;
++    QString            groupsDelimiter;
      QList<QDomElement> itemList;
  };
  
-+
- JT_Roster::JT_Roster(Task *parent)
- :Task(parent)
- {
-@@ -413,7 +415,7 @@ void JT_Roster::set(const Jid &jid, cons
+@@ -406,7 +407,7 @@ void JT_Roster::set(const Jid &jid, cons
  
  void JT_Roster::remove(const Jid &jid)
  {
@@ -251,7 +247,7 @@
      //to = client()->host();
      QDomElement item = doc()->createElement("item");
      item.setAttribute("jid", jid.full());
-@@ -421,11 +423,47 @@ void JT_Roster::remove(const Jid &jid)
+@@ -414,11 +415,46 @@ void JT_Roster::remove(const Jid &jid)
      d->itemList += item;
  }
  
@@ -292,16 +288,14 @@
 +
  void JT_Roster::onGo()
  {
--    if(type == 0)
-+    if (type == 0) {
+     if (type == 0)
          send(iq);
--    else if(type == 1) {
-+    }
-+    else if(type == 1 || type == 2) {
+-    else if (type == 1) {
++    else if (type == 1 || type == 2) {
          //to = client()->host();
-         iq = createIQ(doc(), "set", to.full(), id());
+         iq                = createIQ(doc(), "set", to.full(), id());
          QDomElement query = doc()->createElementNS("jabber:iq:roster", "query");
-@@ -434,6 +472,12 @@ void JT_Roster::onGo()
+@@ -427,6 +463,12 @@ void JT_Roster::onGo()
              query.appendChild(it);
          send(iq);
      }
@@ -313,8 +307,8 @@
 +    }
  }
  
- const Roster & JT_Roster::roster() const
-@@ -441,6 +485,11 @@ const Roster & JT_Roster::roster() const
+ const Roster &JT_Roster::roster() const
+@@ -434,6 +476,11 @@ const Roster &JT_Roster::roster() const
      return d->roster;
  }
  
@@ -325,8 +319,8 @@
 +
  QString JT_Roster::toString() const
  {
-     if(type != 1)
-@@ -509,6 +558,24 @@ bool JT_Roster::take(const QDomElement &
+     if (type != 1)
+@@ -501,6 +548,24 @@ bool JT_Roster::take(const QDomElement &
          setSuccess();
          return true;
      }
