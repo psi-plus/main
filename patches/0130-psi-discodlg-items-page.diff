@@ -1,8 +1,8 @@
 --- git.orig/options/default.xml
 +++ git/options/default.xml
-@@ -486,6 +486,7 @@ QLineEdit#le_status_text {
+@@ -487,6 +487,7 @@ QLineEdit#le_status_text {
              <service-discovery>
-                 <automatically-get-info type="bool">false</automatically-get-info>
+                 <automatically-get-info type="bool">true</automatically-get-info>
                  <automatically-get-items type="bool">false</automatically-get-items>
 +                <items-per-page type="int" comment="Number of items per page for page-by-page feature (XEP-0059). 0 turns this feature off.">0</items-per-page>
                  <recent-jids type="QStringList" />
@@ -10,46 +10,40 @@
              <tabs>
 --- git.orig/src/discodlg.cpp
 +++ git/src/discodlg.cpp
-@@ -55,6 +55,8 @@
+@@ -52,6 +52,8 @@
  
  //----------------------------------------------------------------------------
  
 +#define MoreItemsType QTreeWidgetItem::UserType
 +
- PsiIcon category2icon(PsiAccount *acc, const Jid &jid, const QString &category, const QString &type, int status=STATUS_ONLINE)
+ PsiIcon category2icon(PsiAccount *acc, const Jid &jid, const QString &category, const QString &type,
+                       int status = STATUS_ONLINE)
  {
-     // TODO: update this to http://www.jabber.org/registrar/disco-categories.html#gateway
-@@ -174,10 +176,70 @@ struct DiscoData {
+@@ -167,10 +169,63 @@ struct DiscoData {
  };
  
  //----------------------------------------------------------------------------
 +// DiscoBaseItem
 +//----------------------------------------------------------------------------
-+class DiscoBaseItem : public QObject, public QTreeWidgetItem
-+{
++class DiscoBaseItem : public QObject, public QTreeWidgetItem {
 +public:
 +    DiscoBaseItem(QTreeWidget *parent, int type = Type);
 +    DiscoBaseItem(QTreeWidgetItem *parent, int type = Type);
 +    ~DiscoBaseItem() {}
 +
 +    virtual const DiscoItem &item() const;
-+    virtual void itemSelected() {}
-+    virtual void itemClicked() {}
++    virtual void             itemSelected() {}
++    virtual void             itemClicked() {}
 +
 +    virtual bool operator<(const QTreeWidgetItem &other) const;
 +};
 +
-+DiscoBaseItem::DiscoBaseItem(QTreeWidget *parent, int type)
-+    : QTreeWidgetItem(parent, type)
-+{
-+}
++DiscoBaseItem::DiscoBaseItem(QTreeWidget *parent, int type) : QTreeWidgetItem(parent, type) {}
 +
-+DiscoBaseItem::DiscoBaseItem(QTreeWidgetItem *parent, int type)
-+    : QTreeWidgetItem(parent, type)
-+{
-+}
++DiscoBaseItem::DiscoBaseItem(QTreeWidgetItem *parent, int type) : QTreeWidgetItem(parent, type) {}
 +
-+const DiscoItem &DiscoBaseItem::item() const {
++const DiscoItem &DiscoBaseItem::item() const
++{
 +    static DiscoItem di;
 +    return di;
 +}
@@ -62,114 +56,122 @@
 +    return QTreeWidgetItem::operator<(other);
 +}
 +
-+
 +//----------------------------------------------------------------------------
 +// DiscoExtraItem
 +//----------------------------------------------------------------------------
 +
 +class DiscoListItem;
-+class DiscoExtraItem : public DiscoBaseItem
-+{
++class DiscoExtraItem : public DiscoBaseItem {
 +public:
 +    DiscoExtraItem(DiscoListItem *parent, const QString &text);
-+    virtual ~DiscoExtraItem(){}
++    virtual ~DiscoExtraItem() {}
 +
 +    virtual void itemClicked();
++
 +private:
 +    void init(const QString &text);
++
 +private:
 +    DiscoListItem *_parent;
 +};
-+
 +
 +//----------------------------------------------------------------------------
  // DiscoListItem
  //----------------------------------------------------------------------------
  
--class DiscoListItem : public QObject, public QTreeWidgetItem
-+class DiscoListItem : public DiscoBaseItem
- {
+-class DiscoListItem : public QObject, public QTreeWidgetItem {
++class DiscoListItem : public DiscoBaseItem {
      Q_OBJECT
  public:
-@@ -192,7 +254,7 @@ public:
+     DiscoListItem(DiscoItem it, DiscoData *d, QTreeWidget *parent);
+@@ -184,7 +239,7 @@ public:
  
  public slots: // the two are used internally by class, and also called by DiscoDlg::Private::refresh()
-     void updateInfo();
--    void updateItems(bool parentAutoItems = false);
-+    void updateItems(bool parentAutoItems = false, bool more = false);
+     void    updateInfo();
+-    void    updateItems(bool parentAutoItems = false);
++    void    updateItems(bool parentAutoItems = false, bool more = false);
      QString getErrorInfo() const;
  
  private slots:
-@@ -207,6 +269,8 @@ private:
-     bool autoItems; // used in updateItemsFinished
-     bool autoInfo;
-     QString errorInfo;
-+    DiscoExtraItem *moreItem;
+@@ -192,13 +247,15 @@ private slots:
+     void discoInfoFinished();
+ 
+ private:
+-    DiscoItem  di;
+-    DiscoData *d;
+-    bool       isRoot;
+-    bool       alreadyItems, alreadyInfo;
+-    bool       autoItems; // used in updateItemsFinished
+-    bool       autoInfo;
+-    QString    errorInfo;
++    DiscoItem            di;
++    DiscoData *          d;
++    bool                 isRoot;
++    bool                 alreadyItems, alreadyInfo;
++    bool                 autoItems; // used in updateItemsFinished
++    bool                 autoInfo;
++    QString              errorInfo;
++    DiscoExtraItem *     moreItem;
 +    SubsetsClientManager subsets;
  
-     void copyItem(const DiscoItem &);
-     void updateInfo(const DiscoItem &);
-@@ -222,11 +286,12 @@ private:
+     void    copyItem(const DiscoItem &);
+     void    updateInfo(const DiscoItem &);
+@@ -214,24 +271,25 @@ private:
  
-     bool autoItemsEnabled() const;
-     bool autoInfoEnabled() const;
-+    int  itemsPerPage() const;
+     bool      autoItemsEnabled() const;
+     bool      autoInfoEnabled() const;
++    int       itemsPerPage() const;
      DiscoDlg *dlg() const;
  };
  
- DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidget *parent)
--: QTreeWidgetItem (parent)
-+: DiscoBaseItem (parent)
+-DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidget *parent) : QTreeWidgetItem(parent)
++DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidget *parent) : DiscoBaseItem(parent)
  {
      isRoot = true;
  
-@@ -234,7 +299,7 @@ DiscoListItem::DiscoListItem(DiscoItem i
+     init(it, _d);
  }
  
- DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidgetItem *parent)
--: QTreeWidgetItem (parent)
-+: DiscoBaseItem (parent)
+-DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidgetItem *parent) : QTreeWidgetItem(parent)
++DiscoListItem::DiscoListItem(DiscoItem it, DiscoData *_d, QTreeWidgetItem *parent) : DiscoBaseItem(parent)
  {
      isRoot = false;
  
-@@ -243,6 +308,7 @@ DiscoListItem::DiscoListItem(DiscoItem i
- 
- DiscoListItem::~DiscoListItem()
- {
-+    delete moreItem;
+     init(it, _d);
  }
  
+-DiscoListItem::~DiscoListItem() {}
++DiscoListItem::~DiscoListItem() { delete moreItem; }
+ 
  void DiscoListItem::init(DiscoItem _item, DiscoData *_d)
-@@ -262,6 +328,7 @@ void DiscoListItem::init(DiscoItem _item
-         if ( !isRoot )
+ {
+@@ -250,6 +308,7 @@ void DiscoListItem::init(DiscoItem _item
+         if (!isRoot)
              autoInfo = true;
      }
 +    moreItem = nullptr;
  }
  
  void DiscoListItem::copyItem(const DiscoItem &it)
-@@ -359,6 +426,11 @@ bool DiscoListItem::autoInfoEnabled() co
-     return dlg()->ck_autoInfo->isChecked();
- }
+@@ -332,6 +391,8 @@ bool DiscoListItem::autoItemsEnabled() c
  
-+int DiscoListItem::itemsPerPage() const
-+{
-+    return dlg()->itemsPerPage();
-+}
+ bool DiscoListItem::autoInfoEnabled() const { return dlg()->ck_autoInfo->isChecked(); }
+ 
++int DiscoListItem::itemsPerPage() const { return dlg()->itemsPerPage(); }
 +
- void DiscoListItem::setExpanded (bool expand)
+ void DiscoListItem::setExpanded(bool expand)
  {
-     if ( expand ) {
-@@ -377,7 +449,7 @@ void DiscoListItem::itemSelected()
+     if (expand) {
+@@ -350,7 +411,7 @@ void DiscoListItem::itemSelected()
          updateInfo();
  }
  
 -void DiscoListItem::updateItems(bool parentAutoItems)
 +void DiscoListItem::updateItems(bool parentAutoItems, bool more)
  {
-     if ( parentAutoItems ) {
+     if (parentAutoItems) {
          // save traffic
-@@ -402,6 +474,15 @@ void DiscoListItem::updateItems(bool par
+@@ -375,6 +436,15 @@ void DiscoListItem::updateItems(bool par
  
      JT_DiscoItems *jt = new JT_DiscoItems(d->pa->client()->rootTask());
      connect(jt, SIGNAL(finished()), SLOT(discoItemsFinished()));
@@ -185,23 +187,23 @@
      jt->get(di.jid(), di.node());
      jt->go(true);
      d->tasks->append(jt);
-@@ -412,6 +493,7 @@ void DiscoListItem::discoItemsFinished()
+@@ -385,6 +455,7 @@ void DiscoListItem::discoItemsFinished()
      JT_DiscoItems *jt = static_cast<JT_DiscoItems *>(sender());
  
-     if ( jt->success() ) {
+     if (jt->success()) {
 +        jt->extractSubsetInfo(subsets);
          updateItemsFinished(jt->items());
-     }
-     else if ( !autoItems ) {
-@@ -441,10 +523,13 @@ void DiscoListItem::updateItemsFinished(
+     } else if (!autoItems) {
+         QString error = jt->statusString();
+@@ -416,10 +487,13 @@ void DiscoListItem::updateItemsFinished(
      treeWidget()->setUpdatesEnabled(false);
  
-     QHash<QString, DiscoListItem*> children;
--    DiscoListItem *child = static_cast<DiscoListItem *>(QTreeWidgetItem::child(0));
-+    DiscoBaseItem *child = static_cast<DiscoBaseItem *>(QTreeWidgetItem::child(0));
-+    DiscoListItem *item;
-     for ( int i = 1; child; ++i ) {
--        children.insert( child->hash(), child );
+     QHash<QString, DiscoListItem *> children;
+-    DiscoListItem *                 child = static_cast<DiscoListItem *>(QTreeWidgetItem::child(0));
++    DiscoBaseItem *                 child = static_cast<DiscoBaseItem *>(QTreeWidgetItem::child(0));
++    DiscoListItem *                 item;
+     for (int i = 1; child; ++i) {
+-        children.insert(child->hash(), child);
 -
 +        if (!moreItem && child->type() != MoreItemsType) {
 +            item = static_cast<DiscoListItem *>(child);
@@ -210,21 +212,21 @@
          child = static_cast<DiscoListItem *>(QTreeWidgetItem::child(i));
      }
  
-@@ -453,10 +538,10 @@ void DiscoListItem::updateItemsFinished(
+@@ -428,10 +502,10 @@ void DiscoListItem::updateItemsFinished(
          const DiscoItem a = *it;
  
          QString key = computeHash(a.jid().full(), a.node());
--        child = children[ key ];
-+        item = children[ key ];
+-        child       = children[key];
++        item        = children[key];
  
--        if ( child ) {
--            child->copyItem ( a );
-+        if ( item ) {
-+            item->copyItem ( a );
-             children.remove( key );
-         }
-         else {
-@@ -468,10 +553,20 @@ void DiscoListItem::updateItemsFinished(
+-        if (child) {
+-            child->copyItem(a);
++        if (item) {
++            item->copyItem(a);
+             children.remove(key);
+         } else {
+             new DiscoListItem(a, d, this);
+@@ -442,10 +516,19 @@ void DiscoListItem::updateItemsFinished(
      qDeleteAll(children);
      children.clear();
  
@@ -232,13 +234,12 @@
 +    if (subsets.isValid() && !subsets.isLast()) {
 +        if (!moreItem && childCount() != 0)
 +            moreItem = new DiscoExtraItem(this, tr("more items", "Getting more disco items in order page by page"));
-+    }
-+    else if (moreItem) {
++    } else if (moreItem) {
 +        delete moreItem;
 +        moreItem = nullptr;
 +    }
 +
-     if ( autoItems && isExpanded() )
+     if (autoItems && isExpanded())
          autoItemsChildren();
  
 -    if (list.isEmpty()) {
@@ -246,24 +247,20 @@
          hideChildIndicator();
      }
  
-@@ -559,6 +654,34 @@ void DiscoListItem::updateInfo(const Dis
+@@ -536,6 +619,29 @@ void DiscoListItem::updateInfo(const Dis
  }
  
  //----------------------------------------------------------------------------
 +// DiscoExtraItem implementation
 +//----------------------------------------------------------------------------
 +
-+DiscoExtraItem::DiscoExtraItem(DiscoListItem *parent, const QString &text)
-+    :DiscoBaseItem(parent, MoreItemsType)
++DiscoExtraItem::DiscoExtraItem(DiscoListItem *parent, const QString &text) : DiscoBaseItem(parent, MoreItemsType)
 +{
 +    _parent = parent;
 +    init(text);
 +}
 +
-+void DiscoExtraItem::itemClicked()
-+{
-+    _parent->updateItems(false, true);
-+}
++void DiscoExtraItem::itemClicked() { _parent->updateItems(false, true); }
 +
 +void DiscoExtraItem::init(const QString &text)
 +{
@@ -276,27 +273,26 @@
 +    setFont(0, f);
 +}
 +
-+
 +//----------------------------------------------------------------------------
  // DiscoList
  //----------------------------------------------------------------------------
  
-@@ -619,10 +742,12 @@ void DiscoListView::resizeEvent(QResizeE
+@@ -594,10 +700,12 @@ void DiscoListView::resizeEvent(QResizeE
   */
  bool DiscoListView::maybeTip(const QPoint &pos)
  {
--    DiscoListItem* i = static_cast<DiscoListItem *>(itemAt(viewport()->mapFromGlobal(pos)));
--    if(!i)
+-    DiscoListItem *i = static_cast<DiscoListItem *>(itemAt(viewport()->mapFromGlobal(pos)));
+-    if (!i)
 +    QTreeWidgetItem *twi = itemAt(viewport()->mapFromGlobal(pos));
 +    if (!twi || twi->type() == MoreItemsType)
          return false;
  
-+    DiscoListItem* i = static_cast<DiscoListItem*>(twi);
++    DiscoListItem *i = static_cast<DiscoListItem *>(twi);
 +
      // NAME <JID> (Node "NODE")
      //
      // Identities:
-@@ -779,6 +904,8 @@ public: // data
+@@ -749,6 +857,8 @@ public: // data
  
      BusyWidget *busy;
  
@@ -305,32 +301,32 @@
  public: // functions
      Private(DiscoDlg *parent, PsiAccount *pa);
      ~Private();
-@@ -804,6 +931,7 @@ public slots:
+@@ -774,6 +884,7 @@ public slots:
  
-     void itemSelected (QTreeWidgetItem *);
-     void itemExpanded (QTreeWidgetItem *);
+     void itemSelected(QTreeWidgetItem *);
+     void itemExpanded(QTreeWidgetItem *);
 +    void itemClicked(QTreeWidgetItem *);
-     void itemDoubleclicked (QTreeWidgetItem *);
-     bool eventFilter (QObject *, QEvent *);
+     void itemDoubleclicked(QTreeWidgetItem *);
+     bool eventFilter(QObject *, QEvent *);
  
-@@ -838,6 +966,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
-     dlg->le_filter->installEventFilter(this);
-     connect(dlg->lv_disco, SIGNAL(currentItemChanged (QTreeWidgetItem *, QTreeWidgetItem *)), SLOT(itemSelected (QTreeWidgetItem *)));
-     connect(dlg->lv_disco, SIGNAL(itemExpanded (QTreeWidgetItem *)), SLOT(itemExpanded (QTreeWidgetItem *)));
-+    connect(dlg->lv_disco, SIGNAL(itemClicked(QTreeWidgetItem*,int)), SLOT(itemClicked(QTreeWidgetItem*)));
-     connect(dlg->lv_disco, SIGNAL(itemDoubleClicked (QTreeWidgetItem *, int)), SLOT(itemDoubleclicked (QTreeWidgetItem *)));
+@@ -809,6 +920,7 @@ DiscoDlg::Private::Private(DiscoDlg *par
+     connect(dlg->lv_disco, SIGNAL(currentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *)),
+             SLOT(itemSelected(QTreeWidgetItem *)));
+     connect(dlg->lv_disco, SIGNAL(itemExpanded(QTreeWidgetItem *)), SLOT(itemExpanded(QTreeWidgetItem *)));
++    connect(dlg->lv_disco, SIGNAL(itemClicked(QTreeWidgetItem *, int)), SLOT(itemClicked(QTreeWidgetItem *)));
+     connect(dlg->lv_disco, SIGNAL(itemDoubleClicked(QTreeWidgetItem *, int)),
+             SLOT(itemDoubleclicked(QTreeWidgetItem *)));
      connect(dlg->le_filter, SIGNAL(textChanged(QString)), dlg->lv_disco, SLOT(updateItemsVisibility(QString)));
+@@ -1044,7 +1156,7 @@ void DiscoDlg::Private::enableButtons(co
  
-@@ -1075,7 +1204,7 @@ void DiscoDlg::Private::enableButtons(co
- 
- void DiscoDlg::Private::itemSelected (QTreeWidgetItem *item)
+ void DiscoDlg::Private::itemSelected(QTreeWidgetItem *item)
  {
 -    DiscoListItem *it = static_cast<DiscoListItem *>(item);
 +    DiscoBaseItem *it = static_cast<DiscoBaseItem *>(item);
-     if ( !it ) {
+     if (!it) {
          disableButtons();
          return;
-@@ -1094,12 +1223,19 @@ void DiscoDlg::Private::itemExpanded (QT
+@@ -1063,14 +1175,21 @@ void DiscoDlg::Private::itemExpanded(QTr
          it->setExpanded(true);
  }
  
@@ -341,23 +337,27 @@
 +        it->itemClicked();
 +}
 +
- void DiscoDlg::Private::itemDoubleclicked (QTreeWidgetItem *item)
+ void DiscoDlg::Private::itemDoubleclicked(QTreeWidgetItem *item)
  {
 -    DiscoListItem *it = static_cast<DiscoListItem *>(item);
--    if ( !it )
+-    if (!it)
 +    if (!item || item->type() == MoreItemsType)
          return;
  
-+    DiscoListItem *it = (DiscoListItem *)item;
-     const DiscoItem d = it->item();
-     const Features &f = d.features();
+-    const DiscoItem d = it->item();
+-    const Features &f = d.features();
++    DiscoListItem * it = static_cast<DiscoListItem *>(item);
++    const DiscoItem d  = it->item();
++    const Features &f  = d.features();
  
-@@ -1145,9 +1281,10 @@ bool DiscoDlg::Private::eventFilter (QOb
-         if ( event->type() == QEvent::ContextMenu ) {
+     // set the prior state of item
+     // FIXME: causes minor flickering
+@@ -1111,9 +1230,10 @@ bool DiscoDlg::Private::eventFilter(QObj
+         if (event->type() == QEvent::ContextMenu) {
              QContextMenuEvent *e = static_cast<QContextMenuEvent *>(event);
  
 -            DiscoListItem *it = static_cast<DiscoListItem *>(dlg->lv_disco->currentItem());
--            if ( !it )
+-            if (!it)
 +            QTreeWidgetItem *twi = dlg->lv_disco->currentItem();
 +            if (!twi || twi->type() == MoreItemsType)
                  return true;
@@ -365,17 +365,17 @@
  
              // prepare features list
              QList<long> idFeatures;
-@@ -1270,6 +1407,7 @@ DiscoDlg::DiscoDlg(PsiAccount *pa, const
+@@ -1237,6 +1357,7 @@ DiscoDlg::DiscoDlg(PsiAccount *pa, const
      d->jid  = jid;
      d->node = node;
      d->data.pa->dialogRegister(this);
 +    d->itemsPerPage = PsiOptions::instance()->getOption("options.ui.service-discovery.items-per-page").toInt();
  
-     //setWindowTitle(CAP(caption()));
+     // setWindowTitle(CAP(caption()));
      setWindowIcon(PsiIconset::instance()->transportStatus("transport", STATUS_ONLINE).icon());
-@@ -1311,6 +1449,15 @@ void DiscoDlg::doDisco(QString host, QSt
-     d->doDisco(host, node);
- }
+@@ -1277,6 +1398,15 @@ DiscoDlg::~DiscoDlg()
+ 
+ void DiscoDlg::doDisco(QString host, QString node) { d->doDisco(host, node); }
  
 +int DiscoDlg::itemsPerPage() const
 +{
@@ -386,16 +386,16 @@
 +    return d->itemsPerPage;
 +}
 +
- PsiAccount *DiscoDlg::account()
- {
-     return d->data.pa;
+ PsiAccount *DiscoDlg::account() { return d->data.pa; }
+ 
+ #include "discodlg.moc"
 --- git.orig/src/discodlg.h
 +++ git/src/discodlg.h
-@@ -38,6 +38,7 @@ public:
+@@ -37,6 +37,7 @@ public:
      ~DiscoDlg();
  
-     void doDisco(QString host = QString(), QString node = QString());
-+    int  itemsPerPage() const;
+     void        doDisco(QString host = QString(), QString node = QString());
++    int         itemsPerPage() const;
      PsiAccount *account();
  
  signals:

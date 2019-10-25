@@ -11,14 +11,14 @@
                  <history comment="Message history options">
 --- git.orig/src/chatsplitter.cpp
 +++ git/src/chatsplitter.cpp
-@@ -74,6 +74,15 @@ void ChatSplitter::setSizes(const QList<
+@@ -71,6 +71,15 @@ void ChatSplitter::setSizes(const QList<
          splitter_->setSizes(list);
  }
  
 +QList<int> ChatSplitter::sizes()
 +{
 +    QList<int> list;
-+    if(splitter_)
++    if (splitter_)
 +        list = splitter_->sizes();
 +
 +    return list;
@@ -27,38 +27,44 @@
  /**
   * Moves \a child either to the real QSplitter, or adds it to the
   * private layout.
-@@ -129,6 +138,8 @@ void ChatSplitter::updateLayout()
+@@ -125,6 +134,8 @@ void ChatSplitter::updateLayout()
  
-     foreach(QWidget* child, children_)
+     foreach (QWidget *child, children_)
          updateChildLayout(child);
 +
-+    connect(splitter_, SIGNAL(splitterMoved(int,int)), SIGNAL(splitterMoved(int,int)));
++    connect(splitter_, SIGNAL(splitterMoved(int, int)), SIGNAL(splitterMoved(int, int)));
  }
  
  /**
 --- git.orig/src/chatsplitter.h
 +++ git/src/chatsplitter.h
-@@ -34,6 +34,7 @@ public:
-     void setOrientation(Qt::Orientation orientation);
-     void addWidget(QWidget* widget);
-     void setSizes(const QList<int>& list);
+@@ -30,9 +30,10 @@ class ChatSplitter : public QWidget {
+ public:
+     ChatSplitter(QWidget *parent);
+ 
+-    void setOrientation(Qt::Orientation orientation);
+-    void addWidget(QWidget *widget);
+-    void setSizes(const QList<int> &list);
++    void       setOrientation(Qt::Orientation orientation);
++    void       addWidget(QWidget *widget);
++    void       setSizes(const QList<int> &list);
 +    QList<int> sizes();
  
  protected:
      /**
-@@ -48,6 +49,9 @@ public slots:
+@@ -47,6 +48,9 @@ public slots:
  private slots:
-     void childDestroyed(QObject* obj);
+     void childDestroyed(QObject *obj);
  
 +signals:
-+    void splitterMoved(int,int);
++    void splitterMoved(int, int);
 +
  private:
-     void updateChildLayout(QWidget* child);
+     void updateChildLayout(QWidget *child);
      void updateLayout();
 --- git.orig/src/groupchatdlg.cpp
 +++ git/src/groupchatdlg.cpp
-@@ -272,6 +272,9 @@ public:
+@@ -253,6 +253,9 @@ public:
      int logSize;
      int rosterSize;
  
@@ -68,15 +74,15 @@
  public:
      bool trackBar;
      bool tabmode;
-@@ -1046,6 +1049,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -1026,6 +1029,7 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
      ui_.tb_actions->setStyleSheet(" QToolButton::menu-indicator { image:none } ");
  
      connect(ui_.hsplitter, SIGNAL(splitterMoved(int, int)), this, SLOT(horizSplitterMoved()));
-+    connect(ui_.vsplitter, SIGNAL(splitterMoved(int,int)), this, SLOT(verticalSplitterMoved(int,int)));
++    connect(ui_.vsplitter, SIGNAL(splitterMoved(int, int)), this, SLOT(verticalSplitterMoved(int, int)));
  
      // resize the horizontal splitter
      d->logSize    = PsiOptions::instance()->getOption("options.ui.muc.log-width").toInt();
-@@ -1063,10 +1067,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
+@@ -1043,10 +1047,9 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, con
          ui_.hsplitter->insertWidget(0, ui_.lv_users); // Swap widgets
  
      // resize the vertical splitter
@@ -84,20 +90,20 @@
 -    list << 324;
 -    list << 10;
 -    ui_.vsplitter->setSizes(list);
-+    d->logHeight = PsiOptions::instance()->getOption("options.ui.chat.log-height").toInt();
++    d->logHeight      = PsiOptions::instance()->getOption("options.ui.chat.log-height").toInt();
 +    d->chateditHeight = PsiOptions::instance()->getOption("options.ui.chat.chatedit-height").toInt();
 +    setVSplitterPosition(d->logHeight, d->chateditHeight);
  
      X11WM_CLASS("groupchat");
  
-@@ -1136,6 +1139,26 @@ void GCMainDlg::horizSplitterMoved()
+@@ -1119,6 +1122,26 @@ void GCMainDlg::horizSplitterMoved()
      PsiOptions::instance()->setOption("options.ui.muc.roster-width", d->rosterSize);
  }
  
 +void GCMainDlg::verticalSplitterMoved(int, int)
 +{
-+    QList<int> list = ui_.vsplitter->sizes();
-+    d->logHeight = list.first();
++    QList<int> list   = ui_.vsplitter->sizes();
++    d->logHeight      = list.first();
 +    d->chateditHeight = list.last();
 +    PsiOptions::instance()->setOption("options.ui.chat.log-height", d->logHeight);
 +    PsiOptions::instance()->setOption("options.ui.chat.chatedit-height", d->chateditHeight);
@@ -105,73 +111,73 @@
 +    emit vSplitterMoved(d->logHeight, d->chateditHeight);
 +}
 +
-+void GCMainDlg::setVSplitterPosition(int log,int chat)
++void GCMainDlg::setVSplitterPosition(int log, int chat)
 +{
 +    QList<int> list;
-+    d->logHeight = log;
++    d->logHeight      = log;
 +    d->chateditHeight = chat;
 +    list << log << chat;
 +    ui_.vsplitter->setSizes(list);
 +}
 +
- void GCMainDlg::doMinimize()
- {
-     window()->showMinimized();
+ void GCMainDlg::doMinimize() { window()->showMinimized(); }
+ 
+ void GCMainDlg::ensureTabbedCorrectly()
 --- git.orig/src/groupchatdlg.h
 +++ git/src/groupchatdlg.h
-@@ -74,6 +74,7 @@ public:
-     virtual int unreadMessageCount() const;
-     const QString & getDisplayName() const;
-     virtual QString desiredCaption() const;
-+    virtual void setVSplitterPosition(int log,int chat);
+@@ -73,6 +73,7 @@ public:
+     virtual int                   unreadMessageCount() const;
+     const QString &               getDisplayName() const;
+     virtual QString               desiredCaption() const;
++    virtual void                  setVSplitterPosition(int log, int chat);
  
  protected:
      void setShortcuts();
-@@ -140,6 +141,7 @@ private slots:
+@@ -139,6 +140,7 @@ private slots:
      void sendTemp(const QString &);
      void psButtonEnabled();
      void horizSplitterMoved();
 +    void verticalSplitterMoved(int, int);
      void doMinimize();
-     void avatarUpdated(const Jid& jid);
+     void avatarUpdated(const Jid &jid);
      void doContactContextMenu(const QString &nick);
 --- git.orig/src/psichatdlg.cpp
 +++ git/src/psichatdlg.cpp
-@@ -267,10 +267,11 @@ void PsiChatDlg::initUi()
+@@ -280,10 +280,11 @@ void PsiChatDlg::initUi()
  
-     connect(account()->client()->capsManager(), SIGNAL(capsChanged(const Jid&)), SLOT(capsChanged(const Jid&)));
+     connect(account()->client()->capsManager(), SIGNAL(capsChanged(const Jid &)), SLOT(capsChanged(const Jid &)));
  
 -    QList<int> list;
 -    list << 324;
 -    list << 96;
 -    ui_.splitter->setSizes(list);
-+    logHeight = PsiOptions::instance()->getOption("options.ui.chat.log-height").toInt();
++    logHeight      = PsiOptions::instance()->getOption("options.ui.chat.log-height").toInt();
 +    chateditHeight = PsiOptions::instance()->getOption("options.ui.chat.chatedit-height").toInt();
 +    setVSplitterPosition(logHeight, chateditHeight);
 +
-+    connect(ui_.splitter, SIGNAL(splitterMoved(int,int)), this, SLOT(verticalSplitterMoved(int,int)));
++    connect(ui_.splitter, SIGNAL(splitterMoved(int, int)), this, SLOT(verticalSplitterMoved(int, int)));
  
      smallChat_ = PsiOptions::instance()->getOption("options.ui.chat.use-small-chats").toBool();
-      ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
-@@ -299,6 +300,26 @@ void PsiChatDlg::initUi()
+     ui_.pb_send->setIcon(IconsetFactory::icon("psi/action_button_send").icon());
+@@ -313,6 +314,26 @@ void PsiChatDlg::initUi()
      ui_.mle->chatEdit()->addSoundRecButton();
  }
  
 +void PsiChatDlg::verticalSplitterMoved(int, int)
 +{
 +    QList<int> list = ui_.splitter->sizes();
-+    logHeight = list.first();
-+    chateditHeight = list.last();
++    logHeight       = list.first();
++    chateditHeight  = list.last();
 +    PsiOptions::instance()->setOption("options.ui.chat.log-height", logHeight);
 +    PsiOptions::instance()->setOption("options.ui.chat.chatedit-height", chateditHeight);
 +
 +    emit vSplitterMoved(logHeight, chateditHeight);
 +}
 +
-+void PsiChatDlg::setVSplitterPosition(int log,int chat)
++void PsiChatDlg::setVSplitterPosition(int log, int chat)
 +{
 +    QList<int> list;
-+    logHeight = log;
++    logHeight      = log;
 +    chateditHeight = chat;
 +    list << log << chat;
 +    ui_.splitter->setSizes(list);
@@ -182,24 +188,24 @@
      if (PsiOptions::instance()->getOption("options.ui.message.show-character-count").toBool() && !smallChat_) {
 --- git.orig/src/psichatdlg.h
 +++ git/src/psichatdlg.h
-@@ -22,6 +22,8 @@ public:
-     PsiChatDlg(const Jid& jid, PsiAccount* account, TabManager* tabManager);
+@@ -21,6 +21,8 @@ public:
+     PsiChatDlg(const Jid &jid, PsiAccount *account, TabManager *tabManager);
      ~PsiChatDlg();
  
-+    virtual void setVSplitterPosition(int log,int chat);
++    virtual void setVSplitterPosition(int log, int chat);
 +
  protected:
      // reimplemented
      void contextMenuEvent(QContextMenuEvent *);
-@@ -43,6 +45,7 @@ private slots:
-     void updateCountVisibility();
-     void updateContactAdding(PsiContact* c = nullptr);
-     void updateContactAdding(const Jid &j);
-+    void verticalSplitterMoved(int, int);
-     void contactChanged();
+@@ -42,6 +44,7 @@ private slots:
+     void    updateCountVisibility();
+     void    updateContactAdding(PsiContact *c = nullptr);
+     void    updateContactAdding(const Jid &j);
++    void    verticalSplitterMoved(int, int);
+     void    contactChanged();
      QString makeContactName(const QString &name, const Jid &jid) const;
-     void updateToolbuttons();
-@@ -108,6 +111,9 @@ private:
+     void    updateToolbuttons();
+@@ -107,6 +110,9 @@ private:
      class ChatDlgMCmdProvider;
  
      static PsiIcon *throbber_icon;
@@ -211,61 +217,59 @@
  #endif // PSICHATDLG_H
 --- git.orig/src/tabs/tabbablewidget.h
 +++ git/src/tabs/tabbablewidget.h
-@@ -71,6 +71,7 @@ public:
-     virtual State state() const = 0;
-     virtual int unreadMessageCount() const = 0;
-     virtual QString desiredCaption() const = 0;
-+    virtual void setVSplitterPosition(int,int) {} // default implementation do nothing
+@@ -66,6 +66,7 @@ public:
+     virtual State   state() const              = 0;
+     virtual int     unreadMessageCount() const = 0;
+     virtual QString desiredCaption() const     = 0;
++    virtual void    setVSplitterPosition(int, int) {} // default implementation do nothing
  
      // Templates
-     SendButtonTemplatesMenu* getTemplateMenu();
-@@ -81,6 +82,7 @@ signals:
+     SendButtonTemplatesMenu *getTemplateMenu();
+@@ -76,6 +77,7 @@ signals:
      void invalidateTabInfo();
      void updateFlashState();
      void eventsRead(const Jid &);
-+    void vSplitterMoved(int,int);
++    void vSplitterMoved(int, int);
  
  public slots:
-     void bringToFront(bool raiseWindow = true);
+     void         bringToFront(bool raiseWindow = true);
 --- git.orig/src/tabs/tabdlg.cpp
 +++ git/src/tabs/tabdlg.cpp
-@@ -407,6 +407,7 @@ void TabDlg::addTab(TabbableWidget* tab)
+@@ -345,6 +345,7 @@ void TabDlg::addTab(TabbableWidget *tab)
  
      connect(tab, SIGNAL(invalidateTabInfo()), SLOT(updateTab()));
      connect(tab, SIGNAL(updateFlashState()), SLOT(updateFlashState()));
-+    connect(tab, SIGNAL(vSplitterMoved(int,int)), SLOT(updateVSplitters(int,int)));
++    connect(tab, SIGNAL(vSplitterMoved(int, int)), SLOT(updateVSplitters(int, int)));
  
      updateTab(tab);
      setUpdatesEnabled(true);
-@@ -482,6 +483,7 @@ void TabDlg::removeTabWithNoChecks(Tabba
+@@ -406,6 +407,7 @@ void TabDlg::removeTabWithNoChecks(Tabba
  {
      disconnect(tab, SIGNAL(invalidateTabInfo()), this, SLOT(updateTab()));
      disconnect(tab, SIGNAL(updateFlashState()), this, SLOT(updateFlashState()));
-+    disconnect(tab, SIGNAL(vSplitterMoved(int,int)), this, SLOT(updateVSplitters(int,int)));
++    disconnect(tab, SIGNAL(vSplitterMoved(int, int)), this, SLOT(updateVSplitters(int, int)));
  
      tabs_.removeAll(tab);
      tabWidget_->removePage(tab);
-@@ -901,6 +903,13 @@ bool TabDlg::isTabPinned(QWidget *page)
-     return tabWidget_->isPagePinned(page);
- }
+@@ -808,4 +810,11 @@ void TabDlg::setTabIcon(QWidget *widget,
+ 
+ bool TabDlg::isTabPinned(QWidget *page) { return tabWidget_->isPagePinned(page); }
  
 +void TabDlg::updateVSplitters(int log, int chat)
 +{
-+    foreach(TabbableWidget *w, tabs_) {
++    foreach (TabbableWidget *w, tabs_) {
 +        w->setVSplitterPosition(log, chat);
 +    }
 +}
 +
- TabbableWidget* TabDlg::getCurrentTab() const
- {
-     return dynamic_cast<TabbableWidget*>(tabWidget_->currentPage());
+ TabbableWidget *TabDlg::getCurrentTab() const { return dynamic_cast<TabbableWidget *>(tabWidget_->currentPage()); }
 --- git.orig/src/tabs/tabdlg.h
 +++ git/src/tabs/tabdlg.h
-@@ -145,6 +145,7 @@ private slots:
+@@ -143,6 +143,7 @@ private slots:
      void menu_sendTabTo(QAction *act);
-     void queuedSendTabTo(TabbableWidget* chat, TabDlg *dest);
-     void showTabMenu(int tab, QPoint pos, QContextMenuEvent * event);
+     void queuedSendTabTo(TabbableWidget *chat, TabDlg *dest);
+     void showTabMenu(int tab, QPoint pos, QContextMenuEvent *event);
 +    void updateVSplitters(int log, int chat);
  
  private:
-     TabDlgDelegate *delegate_;
+     TabDlgDelegate *         delegate_;

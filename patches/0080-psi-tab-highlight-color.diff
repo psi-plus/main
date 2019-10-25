@@ -1,90 +1,77 @@
 --- git.orig/src/chatdlg.cpp
 +++ git/src/chatdlg.cpp
-@@ -1192,15 +1192,17 @@ void ChatDlg::chatEditCreated()
+@@ -1157,6 +1157,8 @@ void ChatDlg::chatEditCreated()
  
  TabbableWidget::State ChatDlg::state() const
  {
--    switch (contactChatState_) {
--    case XMPP::StateComposing:
--        return TabbableWidget::State::Composing;
--    case XMPP::StateInactive:
--    case XMPP::StateGone:
--        return TabbableWidget::State::Inactive;
--    default:
--        return TabbableWidget::State::None;
-+    TabbableWidget::State state = TabbableWidget::State::None;
-+    if(contactChatState_ == XMPP::StateComposing) {
-+        state = TabbableWidget::State::Composing;
-     }
-+    else if(unreadMessageCount()) {
-+        state = TabbableWidget::State::Highlighted;
-+    } else if (contactChatState_ == XMPP::StateInactive || contactChatState_ == XMPP::StateGone) {
-+        state = TabbableWidget::State::Inactive;
-+    }
-+
-+    return state;
- }
- 
- int ChatDlg::unreadMessageCount() const
++    if (unreadMessageCount())
++        return TabbableWidget::State::Highlighted;
+     switch (contactChatState_) {
+     case XMPP::StateComposing:
+         return TabbableWidget::State::Composing;
 --- git.orig/src/groupchatdlg.cpp
 +++ git/src/groupchatdlg.cpp
-@@ -2540,7 +2540,7 @@ void GCMainDlg::chatEditCreated()
- 
- TabbableWidget::State GCMainDlg::state() const
- {
--    return TabbableWidget::State::None;
-+    return d->hPending ? TabbableWidget::State::Highlighted : TabbableWidget::State::None;
+@@ -2492,7 +2492,10 @@ void GCMainDlg::chatEditCreated()
+     });
  }
  
- int GCMainDlg::unreadMessageCount() const
+-TabbableWidget::State GCMainDlg::state() const { return TabbableWidget::State::None; }
++TabbableWidget::State GCMainDlg::state() const
++{
++    return d->hPending ? TabbableWidget::State::Highlighted : TabbableWidget::State::None;
++}
+ 
+ int GCMainDlg::unreadMessageCount() const { return d->pending; }
+ 
 --- git.orig/src/tabs/tabbablewidget.h
 +++ git/src/tabs/tabbablewidget.h
-@@ -66,7 +66,8 @@ public:
-     enum class State : char {
-         None = 0,
-         Composing,
--        Inactive
-+        Inactive,
-+        Highlighted
-     };
-     virtual State state() const = 0;
-     virtual int unreadMessageCount() const = 0;
+@@ -62,7 +62,7 @@ public:
+ 
+     virtual void invalidateTab();
+ 
+-    enum class State : char { None = 0, Composing, Inactive };
++    enum class State : char { None = 0, Composing, Inactive, Highlighted };
+     virtual State   state() const              = 0;
+     virtual int     unreadMessageCount() const = 0;
+     virtual QString desiredCaption() const     = 0;
 --- git.orig/src/tabs/tabdlg.cpp
 +++ git/src/tabs/tabdlg.cpp
-@@ -640,21 +640,27 @@ void TabDlg::updateTab(TabbableWidget* c
+@@ -560,22 +560,28 @@ void TabDlg::updateTab(TabbableWidget *c
      tabWidget_->setTabText(chat, captionForTab(chat));
-     //now set text colour based upon whether there are new messages/composing etc
+     // now set text colour based upon whether there are new messages/composing etc
  
 -    if (chat->state() == TabbableWidget::State::Composing) {
 +    TabbableWidget::State state = chat->state();
 +    if (state == TabbableWidget::State::Composing) {
-         tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.composing-color").value<QColor>());
+         tabWidget_->setTabTextColor(
+             chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.composing-color").value<QColor>());
          tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/typing")->icon());
-     }
--    else if (chat->unreadMessageCount()) {
--        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
+-    } else if (chat->unreadMessageCount()) {
+-        tabWidget_->setTabTextColor(
+-            chat,
+-            PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
 -        tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/chat")->icon());
--    }
--    else if (chat->state() == TabbableWidget::State::Inactive) {
--        tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
+-    } else if (chat->state() == TabbableWidget::State::Inactive) {
+-        tabWidget_->setTabTextColor(
+-            chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
 -        tabWidget_->setTabIcon(chat, chat->icon());
--    }
-     else {
+     } else {
 -        tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
 -        tabWidget_->setTabIcon(chat, chat->icon());
 +        if (state == TabbableWidget::State::Highlighted) {
-+            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
-+        }
-+        else if (state == TabbableWidget::State::Inactive) {
-+            tabWidget_->setTabTextColor(chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
++            tabWidget_->setTabTextColor(
++                chat,
++                PsiOptions::instance()->getOption("options.ui.look.colors.chat.unread-message-color").value<QColor>());
++        } else if (state == TabbableWidget::State::Inactive) {
++            tabWidget_->setTabTextColor(
++                chat, PsiOptions::instance()->getOption("options.ui.look.colors.chat.inactive-color").value<QColor>());
 +        } else {
 +            tabWidget_->setTabTextColor(chat, palette().color(QPalette::Text));
 +        }
 +
-+        if(chat->unreadMessageCount()) {
++        if (chat->unreadMessageCount()) {
 +            tabWidget_->setTabIcon(chat, IconsetFactory::iconPtr("psi/chat")->icon());
-+        }
-+        else {
++        } else {
 +            tabWidget_->setTabIcon(chat, chat->icon());
 +        }
      }
