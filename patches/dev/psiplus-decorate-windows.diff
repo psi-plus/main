@@ -11,7 +11,7 @@ index ac949fe2..3c2d9f35 100644
                  <automatically-get-info type="bool">true</automatically-get-info>
                  <automatically-get-items type="bool">false</automatically-get-items>
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index 41ecdc0c..fcd8c5d1 100644
+index 41ecdc0c..b3c06424 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
 @@ -57,6 +57,7 @@
@@ -26,27 +26,27 @@ index 41ecdc0c..fcd8c5d1 100644
  public:
      bool trackBar;
      bool tabmode;
-+    PsiWindowHeader *winHeader_;
++    PsiWindowHeader::Ptr winHeader_;
  
  public:
      ChatEdit *mle() const { return dlg->ui_.mle->chatEdit(); }
-@@ -859,6 +861,12 @@ GCMainDlg::GCMainDlg(PsiAccount *pa, const Jid &j, TabManager *tabManager) : Tab
- 
-     ui_.setupUi(this);
-     d->tabmode = PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool();
-+    setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
-+    if (!d->tabmode && !isBorder()) {
-+        d->winHeader_ = new PsiWindowHeader(this);
-+        ui_.vboxLayout1->insertWidget(0, d->winHeader_);
-+    }
-+    setMargins();
- 
-     ui_.log->setSessionData(true, false, jid(), jid().full()); // FIXME change conference name
- #ifdef WEBKIT
-@@ -2328,6 +2336,25 @@ void GCMainDlg::setLooks()
+@@ -2326,6 +2328,36 @@ void GCMainDlg::setLooks()
+             : Qt::ScrollBarAsNeeded);
+     ui_.lv_users->setLooks();
      setMucSelfAvatar();
- }
- 
++    bool isDecor = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
++    if (isBorder() != isDecor) {
++        if (!isDecor && !d->winHeader_ && !d->tabmode) {
++            d->winHeader_.reset(new PsiWindowHeader(this));
++            ui_.vboxLayout1->insertWidget(0, d->winHeader_.get());
++        } else if (d->winHeader_) {
++            d->winHeader_.reset();
++        }
++        setWindowBorder(isDecor);
++        setMargins();
++    }
++}
++
 +void GCMainDlg::setMargins()
 +{
 +    ui_.vboxLayout->setContentsMargins(0,0,0,0);
@@ -64,11 +64,9 @@ index 41ecdc0c..fcd8c5d1 100644
 +        ui_.vboxLayout1->setContentsMargins(4,4,4,0);
 +        ui_.hboxLayout->setContentsMargins(2,0,4,0);
 +    }
-+}
-+
+ }
+ 
  void GCMainDlg::setToolbuttons()
- {
-     ui_.toolbar->clear();
 diff --git a/src/groupchatdlg.h b/src/groupchatdlg.h
 index ee5f574f..9ae3d5da 100644
 --- a/src/groupchatdlg.h
@@ -82,7 +80,7 @@ index ee5f574f..9ae3d5da 100644
  };
  
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index da3362bd..b07b6b42 100644
+index da3362bd..906408dc 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
 @@ -126,6 +126,7 @@ public:
@@ -93,7 +91,16 @@ index da3362bd..b07b6b42 100644
  
      PopupAction *        optionsButton, *statusButton;
      IconActionGroup *    statusGroup, *viewGroups;
-@@ -320,9 +321,17 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+@@ -135,6 +136,8 @@ public:
+     MainWin *            mainWin;
+     RosterAvatarFrame *  rosterAvatar;
+     QPointer<PsiAccount> defaultAccount;
++    PsiWindowHeader::Ptr      windowHeader;
++    QPointer<QToolBar>        windowHeaderBar;
+ 
+     QLineEdit *  searchText;
+     QToolButton *searchPb;
+@@ -320,9 +323,12 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
  
      QWidget *rosterBar = new QWidget(this);
      bool     allInOne  = false;
@@ -102,17 +109,12 @@ index da3362bd..b07b6b42 100644
      if (PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool()
          && PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A')) {
 +        if (!isDecorated) {
-+            QToolBar        *headerBar = new QToolBar(this);
-+            PsiWindowHeader *header_   = new PsiWindowHeader(this);
-+            addToolBar(Qt::TopToolBarArea, headerBar);
-+            headerBar->addWidget(header_);
-+            headerBar->setMovable(false);
-+            headerBar->setFloatable(false);
++            setWindowHeader(true);
 +        }
          d->splitter = new QSplitter(this);
          d->splitter->setObjectName("onewindowsplitter");
          connect(d->splitter, SIGNAL(splitterMoved(int, int)), this, SLOT(splitterMoved()));
-@@ -528,6 +537,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+@@ -528,6 +534,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
      connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
      optionChanged("options.ui.contactlist.css");
  
@@ -121,18 +123,20 @@ index da3362bd..b07b6b42 100644
      reinitAutoHide();
  }
  
-@@ -565,6 +576,10 @@ void MainWin::optionChanged(const QString &option)
+@@ -565,6 +573,12 @@ void MainWin::optionChanged(const QString &option)
              setStyleSheet(css);
          }
      }
 +    else if (option == "options.ui.decorate-windows") {
-+        setWindowBorder(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool());
++        bool isBorder = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
++        setWindowBorder(isBorder);
++        setWindowHeader(!isBorder);
 +        show();
 +    }
  }
  
  void MainWin::registerAction(IconAction *action)
-@@ -1708,6 +1723,7 @@ void MainWin::statusClicked(int x)
+@@ -1708,6 +1722,7 @@ void MainWin::statusClicked(int x)
  {
      if (x == Qt::MiddleButton) {
          emit recvNextEvent();
@@ -140,7 +144,7 @@ index da3362bd..b07b6b42 100644
      }
  }
  
-@@ -1946,4 +1962,42 @@ void MainWin::resizeEvent(QResizeEvent *e)
+@@ -1946,4 +1961,62 @@ void MainWin::resizeEvent(QResizeEvent *e)
      }
  }
  
@@ -182,9 +186,29 @@ index da3362bd..b07b6b42 100644
 +    AdvancedWidget<QMainWindow>::mouseReleaseEvent(e);
 +}
 +
++void MainWin::setWindowHeader(bool visible)
++{
++    if (visible) {
++        if (!d->windowHeader)
++            d->windowHeader.reset(new PsiWindowHeader(this));
++        if (!d->windowHeaderBar) {
++            d->windowHeaderBar = new QToolBar(this);
++            addToolBar(Qt::TopToolBarArea, d->windowHeaderBar);
++            d->windowHeaderBar->addWidget(d->windowHeader.get());
++            d->windowHeaderBar->setMovable(false);
++            d->windowHeaderBar->setFloatable(false);
++        }
++    } else {
++        if (d->windowHeader)
++            d->windowHeader.reset();
++        if (d->windowHeaderBar)
++            delete d->windowHeaderBar;
++    }
++}
++
  //#endif
 diff --git a/src/mainwin.h b/src/mainwin.h
-index 802f064e..607a3fb1 100644
+index 802f064e..91f68dba 100644
 --- a/src/mainwin.h
 +++ b/src/mainwin.h
 @@ -28,6 +28,7 @@
@@ -204,6 +228,15 @@ index 802f064e..607a3fb1 100644
  
  signals:
      void statusChanged(XMPP::Status::Type);
+@@ -185,6 +188,8 @@ private:
+ 
+     void buildStatusMenu(GlobalStatusMenu *statusMenu);
+ 
++    void setWindowHeader(bool visible);
++
+ #ifdef Q_OS_WIN
+     void updateWinTaskbar(bool enabled);
+ #endif
 diff --git a/src/options/opt_application.cpp b/src/options/opt_application.cpp
 index cc8ad01b..388a548d 100644
 --- a/src/options/opt_application.cpp
@@ -264,7 +297,7 @@ index 29c4a5ab..3c015783 100644
    <tabstop>ck_dockDCstyle</tabstop>
    <tabstop>ck_dockHideMW</tabstop>
 diff --git a/src/psichatdlg.cpp b/src/psichatdlg.cpp
-index 30797d70..fe8db3e0 100644
+index 30797d70..c4cbdf03 100644
 --- a/src/psichatdlg.cpp
 +++ b/src/psichatdlg.cpp
 @@ -219,6 +219,8 @@ PsiChatDlg::PsiChatDlg(const Jid &jid, PsiAccount *pa, TabManager *tabManager) :
@@ -281,22 +314,26 @@ index 30797d70..fe8db3e0 100644
      connect(act_mini_cmd_, SIGNAL(triggered()), SLOT(doMiniCmd()));
      addAction(act_mini_cmd_);
 +    if (!tabmode) {
-+        winHeader_ = new PsiWindowHeader(this);
-+        ui_.vboxLayout1->insertWidget(0, winHeader_);
++        winHeader_.reset(new PsiWindowHeader(this));
++        ui_.vboxLayout1->insertWidget(0, winHeader_.get());
 +    }
 +    setMargins();
  
      connect(ui_.log, &ChatView::quote, ui_.mle->chatEdit(), &ChatEdit::insertAsQuote);
  
-@@ -614,6 +621,22 @@ void PsiChatDlg::activated()
+@@ -614,6 +621,26 @@ void PsiChatDlg::activated()
      ChatDlg::activated();
  
      updateCountVisibility();
 +
 +    bool border = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
 +    if (!PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool()){
-+        if (!winHeader_.isNull())
-+            winHeader_->setVisible(!border);
++        if (winHeader_ && border) {
++            winHeader_.reset();
++        } else {
++            winHeader_.reset(new PsiWindowHeader(this));
++            ui_.vboxLayout1->insertWidget(0, winHeader_.get());
++        }
 +        setWindowBorder(border);
 +        setMargins();
 +#if defined(Q_OS_MAC) || defined(Q_WS_HAIKU)
@@ -305,13 +342,13 @@ index 30797d70..fe8db3e0 100644
 +        bringToFront(true);
 +#endif
 +    } else {
-+        if (!winHeader_.isNull())
-+            winHeader_->setVisible(false);
++        if (winHeader_)
++            winHeader_.reset();
 +    }
  }
  
  void PsiChatDlg::setContactToolTip(QString text)
-@@ -1233,4 +1256,23 @@ void PsiChatDlg::doSwitchJidMode()
+@@ -1233,4 +1260,23 @@ void PsiChatDlg::doSwitchJidMode()
      }
  }
  
@@ -336,7 +373,7 @@ index 30797d70..fe8db3e0 100644
 +
  #include "psichatdlg.moc"
 diff --git a/src/psichatdlg.h b/src/psichatdlg.h
-index 7ff6d822..6c5738ab 100644
+index 7ff6d822..2a3b282b 100644
 --- a/src/psichatdlg.h
 +++ b/src/psichatdlg.h
 @@ -33,6 +33,7 @@
@@ -360,7 +397,7 @@ index 7ff6d822..6c5738ab 100644
  
      static PsiIcon *throbber_icon;
 -
-+    QPointer <PsiWindowHeader> winHeader_;
++    PsiWindowHeader::Ptr winHeader_;
      int logHeight;
      int chateditHeight;
 +    bool tabmode;
@@ -368,44 +405,69 @@ index 7ff6d822..6c5738ab 100644
  
  #endif // PSICHATDLG_H
 diff --git a/src/tabs/tabdlg.cpp b/src/tabs/tabdlg.cpp
-index 63925cd9..710969f8 100644
+index 63925cd9..3d1ee3d3 100644
 --- a/src/tabs/tabdlg.cpp
 +++ b/src/tabs/tabdlg.cpp
-@@ -116,9 +116,20 @@ TabDlg::TabDlg(TabManager *tabManager, const QString &geometryOption, TabDlgDele
+@@ -115,9 +115,19 @@ TabDlg::TabDlg(TabManager *tabManager, const QString &geometryOption, TabDlgDele
+     if (delegate_)
          delegate_->tabWidgetCreated(this, tabWidget_);
  
-     QVBoxLayout *vert1 = new QVBoxLayout(this);
+-    QVBoxLayout *vert1 = new QVBoxLayout(this);
 -    vert1->setMargin(1);
+-    vert1->addWidget(tabWidget_);
++    vBox_ = new QVBoxLayout(this);
 +    //Add windowheader widget if window not decorated
 +    bool isBorder_ = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
 +    bool allInOne  = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A');
 +    if (!isBorder_ && !allInOne) {
-+        winHeader_ = new PsiWindowHeader(this);
-+        vert1->addWidget(winHeader_);
-+        vert1->setSpacing(0);
-+        vert1->setMargin(0);
++        winHeader_.reset(new PsiWindowHeader(this));
++        vBox_->addWidget(winHeader_.get());
++        vBox_->setSpacing(0);
++        vBox_->setMargin(0);
 +    } else {
-+        vert1->setMargin(1);
++        vBox_->setMargin(1);
 +    }
-     vert1->addWidget(tabWidget_);
++    vBox_->addWidget(tabWidget_);
  
-+
      setAcceptDrops(true);
  
-     X11WM_CLASS("tabs");
-@@ -136,8 +147,9 @@ TabDlg::TabDlg(TabManager *tabManager, const QString &geometryOption, TabDlgDele
+@@ -136,8 +146,10 @@ TabDlg::TabDlg(TabManager *tabManager, const QString &geometryOption, TabDlgDele
  
      setShortcuts();
  
 -    if (!PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A'))
-+    if (!allInOne)
++    if (!allInOne) {
          setGeometryOptionPath(geometryOption);
-+    setWindowBorder(isBorder_);
++        setWindowBorder(isBorder_);
++    }
  }
  
  TabDlg::~TabDlg()
+@@ -295,7 +307,21 @@ void TabDlg::queuedSendTabTo(TabbableWidget *tab, TabDlg *dest)
+                               Q_ARG(TabDlg *, dest));
+ }
+ 
+-void TabDlg::optionsUpdate() { setShortcuts(); }
++void TabDlg::optionsUpdate()
++{
++    setShortcuts();
++    bool isBorder_ = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
++    bool allInOne  = PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A');
++    if (isBorder() != isBorder_ && !allInOne) {
++        if (winHeader_ && isBorder_) {
++            winHeader_.reset();
++        } else if (!winHeader_ && !isBorder_) {
++            winHeader_.reset(new PsiWindowHeader(this));
++            vBox_->insertWidget(0, winHeader_.get());
++        }
++        setWindowBorder(isBorder_);
++    }
++}
+ 
+ void TabDlg::setLooks()
+ {
 diff --git a/src/tabs/tabdlg.h b/src/tabs/tabdlg.h
-index 8d6cf64f..b38d2fa2 100644
+index 8d6cf64f..280b4483 100644
 --- a/src/tabs/tabdlg.h
 +++ b/src/tabs/tabdlg.h
 @@ -22,6 +22,7 @@
@@ -416,11 +478,12 @@ index 8d6cf64f..b38d2fa2 100644
  
  #include <QMap>
  #include <QPointer>
-@@ -166,6 +167,7 @@ private:
+@@ -166,6 +167,8 @@ private:
      void extinguishFlashingTabs();
      void updateCaption();
      void updateTabBar();
-+    PsiWindowHeader *winHeader_;
++    QPointer<QVBoxLayout> vBox_;
++    PsiWindowHeader::Ptr winHeader_;
  };
  
  #endif // TABDLG_H
@@ -442,7 +505,7 @@ index 35aa1305..6d3ca5f6 100644
      }
  
 diff --git a/src/tools/advwidget/advwidget.h b/src/tools/advwidget/advwidget.h
-index 26babeb6..845fd79a 100644
+index 26babeb6..8a5e0e27 100644
 --- a/src/tools/advwidget/advwidget.h
 +++ b/src/tools/advwidget/advwidget.h
 @@ -1,6 +1,6 @@
@@ -461,7 +524,7 @@ index 26babeb6..845fd79a 100644
  #include <QWidget>
  
  class GAdvancedWidget : public QObject {
-@@ -61,13 +62,203 @@ private:
+@@ -61,13 +62,202 @@ private:
  template <class BaseClass> class AdvancedWidget : public BaseClass {
  private:
      GAdvancedWidget *gAdvWidget;
@@ -643,13 +706,12 @@ index 26babeb6..845fd79a 100644
 +    {
 +        BaseClass::setMouseTracking(enabled);
 +        QWidget *bw = BaseClass::window();
-+        QList<QWidget *> children = bw->findChildren<QWidget*>();
-+        foreach (QWidget *w, children) {
++        auto     children = bw->findChildren<QWidget *>();
++        for (QWidget *w : children) {
 +            w->setMouseTracking(enabled);
 +        }
-+        if (!enabled) {
++        if (!enabled)
 +            BaseClass::window()->setCursor(QCursor(Qt::ArrowCursor));
-+        }
 +    }
 +    bool isMaximized() const
 +    {
@@ -665,7 +727,7 @@ index 26babeb6..845fd79a 100644
      }
  
      virtual ~AdvancedWidget() { }
-@@ -146,6 +337,49 @@ public:
+@@ -146,6 +336,49 @@ public:
  protected:
      virtual void windowTitleChanged() { doFlash(flashing()); }
  
@@ -715,7 +777,7 @@ index 26babeb6..845fd79a 100644
  protected:
      void changeEvent(QEvent *event)
      {
-@@ -154,6 +388,63 @@ protected:
+@@ -154,6 +387,63 @@ protected:
          }
          BaseClass::changeEvent(event);
      }
@@ -779,6 +841,33 @@ index 26babeb6..845fd79a 100644
  };
  
  #endif // ADVWIDGET_H
+diff --git a/src/widgets/psiwindowheader.cpp b/src/widgets/psiwindowheader.cpp
+index 92d40c9e..78ff8456 100644
+--- a/src/widgets/psiwindowheader.cpp
++++ b/src/widgets/psiwindowheader.cpp
+@@ -53,9 +53,8 @@ PsiWindowHeader::PsiWindowHeader(QWidget *p)
+ PsiWindowHeader::~PsiWindowHeader()
+ {
+     //Disable mouse tracking on widget deletion
+-    if(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool()) {
++    if (PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool())
+         enableMouseTracking(false);
+-    }
+ }
+ 
+ void PsiWindowHeader::hidePressed()
+diff --git a/src/widgets/psiwindowheader.h b/src/widgets/psiwindowheader.h
+index cd43f2eb..617b51b2 100644
+--- a/src/widgets/psiwindowheader.h
++++ b/src/widgets/psiwindowheader.h
+@@ -33,6 +33,7 @@ class PsiWindowHeader : public QWidget
+     Q_OBJECT
+ public:
+     PsiWindowHeader(QWidget* p);
++    typedef std::shared_ptr<PsiWindowHeader> Ptr;
+     ~PsiWindowHeader();
+ 
+ private:
 diff --git a/src/widgets/widgets.pri b/src/widgets/widgets.pri
 index 7c2b24de..7310d19b 100644
 --- a/src/widgets/widgets.pri
