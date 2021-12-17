@@ -1,8 +1,8 @@
 diff --git a/options/default.xml b/options/default.xml
-index ac949fe2..3c2d9f35 100644
+index 581a45df..84929038 100644
 --- a/options/default.xml
 +++ b/options/default.xml
-@@ -488,6 +488,7 @@ QLineEdit#le_status_text {
+@@ -489,6 +489,7 @@ QLineEdit#le_status_text {
                  </sounds>
                  <successful-subscription type="bool">true</successful-subscription>
              </notifications>
@@ -11,10 +11,10 @@ index ac949fe2..3c2d9f35 100644
                  <automatically-get-info type="bool">true</automatically-get-info>
                  <automatically-get-items type="bool">false</automatically-get-items>
 diff --git a/src/groupchatdlg.cpp b/src/groupchatdlg.cpp
-index 41ecdc0c..b3c06424 100644
+index b47546fe..5df1d0ec 100644
 --- a/src/groupchatdlg.cpp
 +++ b/src/groupchatdlg.cpp
-@@ -57,6 +57,7 @@
+@@ -58,6 +58,7 @@
  #include "psioptions.h"
  #include "psirichtext.h"
  #include "psitooltip.h"
@@ -22,7 +22,7 @@ index 41ecdc0c..b3c06424 100644
  #include "shortcutmanager.h"
  #include "statusdlg.h"
  #include "stretchwidget.h"
-@@ -260,6 +261,7 @@ public:
+@@ -261,6 +262,7 @@ public:
  public:
      bool trackBar;
      bool tabmode;
@@ -30,7 +30,7 @@ index 41ecdc0c..b3c06424 100644
  
  public:
      ChatEdit *mle() const { return dlg->ui_.mle->chatEdit(); }
-@@ -2326,6 +2328,36 @@ void GCMainDlg::setLooks()
+@@ -2340,6 +2342,36 @@ void GCMainDlg::setLooks()
              : Qt::ScrollBarAsNeeded);
      ui_.lv_users->setLooks();
      setMucSelfAvatar();
@@ -80,18 +80,19 @@ index ee5f574f..9ae3d5da 100644
  };
  
 diff --git a/src/mainwin.cpp b/src/mainwin.cpp
-index da3362bd..906408dc 100644
+index da3362bd..3b733c6c 100644
 --- a/src/mainwin.cpp
 +++ b/src/mainwin.cpp
-@@ -126,6 +126,7 @@ public:
+@@ -126,6 +126,8 @@ public:
      int          tabsSize;
      int          rosterSize;
      bool         isLeftRoster;
 +    bool         isHide;
++    bool         allInOne;
  
      PopupAction *        optionsButton, *statusButton;
      IconActionGroup *    statusGroup, *viewGroups;
-@@ -135,6 +136,8 @@ public:
+@@ -135,6 +137,8 @@ public:
      MainWin *            mainWin;
      RosterAvatarFrame *  rosterAvatar;
      QPointer<PsiAccount> defaultAccount;
@@ -100,11 +101,13 @@ index da3362bd..906408dc 100644
  
      QLineEdit *  searchText;
      QToolButton *searchPb;
-@@ -320,9 +323,12 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+@@ -319,15 +323,18 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+     d->defaultAccount = nullptr;
  
      QWidget *rosterBar = new QWidget(this);
-     bool     allInOne  = false;
+-    bool     allInOne  = false;
 -
++    d->allInOne          = false;
 +    bool     isDecorated = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
      if (PsiOptions::instance()->getOption("options.ui.tabs.use-tabs").toBool()
          && PsiOptions::instance()->getOption("options.ui.tabs.grouping").toString().contains('A')) {
@@ -114,7 +117,22 @@ index da3362bd..906408dc 100644
          d->splitter = new QSplitter(this);
          d->splitter->setObjectName("onewindowsplitter");
          connect(d->splitter, SIGNAL(splitterMoved(int, int)), this, SLOT(splitterMoved()));
-@@ -528,6 +534,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+         setCentralWidget(d->splitter);
+-        allInOne = true;
++        d->allInOne = true;
+
+         d->mainTabs = d->psi->tabManager()->newTabs(nullptr);
+         d->psi->tabManager()->setPreferredTabsForKind('C', d->mainTabs);
+@@ -368,7 +375,7 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
+     d->vb_roster->setMargin(layoutMargin);
+     d->vb_roster->setSpacing(layoutMargin);
+
+-    if (allInOne) {
++    if (d->allInOne) {
+         QString     toolOpt = "options.ui.contactlist.toolbars";
+         const auto &bases   = PsiOptions::instance()->getChildOptionNames(toolOpt, true, true);
+         for (const QString &base : bases) {
+@@ -528,6 +535,8 @@ MainWin::MainWin(bool _onTop, bool _asTool, PsiCon *psi) :
      connect(sp_ss, SIGNAL(triggered()), SLOT(avcallConfig()));*/
      optionChanged("options.ui.contactlist.css");
  
@@ -123,20 +141,27 @@ index da3362bd..906408dc 100644
      reinitAutoHide();
  }
  
-@@ -565,6 +573,12 @@ void MainWin::optionChanged(const QString &option)
+@@ -560,10 +569,18 @@ void MainWin::optionChanged(const QString &option)
+     if (option == toolbarsStateOptionPath) {
+         loadToolbarsState();
+     } else if (option == "options.ui.contactlist.css") {
+-        const QString css = PsiOptions::instance()->getOption("options.ui.contactlist.css").toString();
++        const QString css = PsiOptions::instance()->getOption(option).toString();
+         if (!css.isEmpty()) {
              setStyleSheet(css);
          }
-     }
-+    else if (option == "options.ui.decorate-windows") {
-+        bool isBorder = PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool();
++    } else if (option == "options.ui.tabs.grouping") {
++        d->allInOne = PsiOptions::instance()->getOption(option).toString().contains('A');
++    } else if (option == "options.ui.decorate-windows") {
++        bool isBorder = PsiOptions::instance()->getOption(option).toBool();
 +        setWindowBorder(isBorder);
-+        setWindowHeader(!isBorder);
++        if (d->allInOne)
++            setWindowHeader(!isBorder);
 +        show();
-+    }
+     }
  }
  
- void MainWin::registerAction(IconAction *action)
-@@ -1708,6 +1722,7 @@ void MainWin::statusClicked(int x)
+@@ -1708,6 +1725,7 @@ void MainWin::statusClicked(int x)
  {
      if (x == Qt::MiddleButton) {
          emit recvNextEvent();
@@ -144,7 +169,7 @@ index da3362bd..906408dc 100644
      }
  }
  
-@@ -1946,4 +1961,62 @@ void MainWin::resizeEvent(QResizeEvent *e)
+@@ -1946,4 +1964,62 @@ void MainWin::resizeEvent(QResizeEvent *e)
      }
  }
  
@@ -841,33 +866,6 @@ index 26babeb6..8a5e0e27 100644
  };
  
  #endif // ADVWIDGET_H
-diff --git a/src/widgets/psiwindowheader.cpp b/src/widgets/psiwindowheader.cpp
-index 92d40c9e..78ff8456 100644
---- a/src/widgets/psiwindowheader.cpp
-+++ b/src/widgets/psiwindowheader.cpp
-@@ -53,9 +53,8 @@ PsiWindowHeader::PsiWindowHeader(QWidget *p)
- PsiWindowHeader::~PsiWindowHeader()
- {
-     //Disable mouse tracking on widget deletion
--    if(PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool()) {
-+    if (PsiOptions::instance()->getOption("options.ui.decorate-windows").toBool())
-         enableMouseTracking(false);
--    }
- }
- 
- void PsiWindowHeader::hidePressed()
-diff --git a/src/widgets/psiwindowheader.h b/src/widgets/psiwindowheader.h
-index cd43f2eb..617b51b2 100644
---- a/src/widgets/psiwindowheader.h
-+++ b/src/widgets/psiwindowheader.h
-@@ -33,6 +33,7 @@ class PsiWindowHeader : public QWidget
-     Q_OBJECT
- public:
-     PsiWindowHeader(QWidget* p);
-+    typedef std::shared_ptr<PsiWindowHeader> Ptr;
-     ~PsiWindowHeader();
- 
- private:
 diff --git a/src/widgets/widgets.pri b/src/widgets/widgets.pri
 index 7c2b24de..7310d19b 100644
 --- a/src/widgets/widgets.pri
@@ -1180,10 +1178,10 @@ index 00000000..92d40c9e
 +}
 diff --git a/src/widgets/psiwindowheader.h b/src/widgets/psiwindowheader.h
 new file mode 100644
-index 00000000..cd43f2eb
+index 00000000..617b51b2
 --- /dev/null
 +++ b/src/widgets/psiwindowheader.h
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,67 @@
 +/*
 + * psiwindowheader.cpp
 + * Copyright (C) 2010-2017  Evgeny Khryukin, Vitaly Tonkacheyev
@@ -1219,6 +1217,7 @@ index 00000000..cd43f2eb
 +    Q_OBJECT
 +public:
 +    PsiWindowHeader(QWidget* p);
++    typedef std::shared_ptr<PsiWindowHeader> Ptr;
 +    ~PsiWindowHeader();
 +
 +private:
